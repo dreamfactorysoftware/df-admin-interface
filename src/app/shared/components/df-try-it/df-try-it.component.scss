@@ -1,0 +1,245 @@
+// df-try-it — the request console. Tokens only; no color/space/type literals so
+// it survives light, dark, and phosphor. Composes df-badge for status.
+
+.try-it {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-4);
+  padding: var(--df-space-4);
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  font-size: var(--df-font-size-sm);
+  color: var(--df-text);
+
+  // ---- request line -----------------------------------------------------
+  &__request-line {
+    display: flex;
+    gap: var(--df-space-2);
+    align-items: flex-start;
+  }
+
+  &__method {
+    flex: 0 0 auto;
+    width: 11rem;
+  }
+
+  &__path {
+    flex: 1 1 auto;
+  }
+
+  &__send {
+    flex: 0 0 auto;
+    min-height: var(--df-field-height);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--df-space-2);
+  }
+
+  &__url {
+    margin: 0;
+    padding: var(--df-space-2) var(--df-space-3);
+    background: var(--df-code-bg);
+    border-radius: var(--df-radius-sm);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-code-text);
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  // ---- identity switcher ------------------------------------------------
+  &__identity {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__identity-select {
+    flex: 0 1 28rem;
+    min-width: 20rem;
+  }
+
+  &__identity-name {
+    font-weight: var(--df-font-weight-medium);
+  }
+
+  &__identity-meta {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    margin-left: var(--df-space-2);
+  }
+
+  &__identity-hint {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    line-height: var(--df-lh-base);
+  }
+
+  // ---- key/value editors ------------------------------------------------
+  &__kv {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    padding-top: var(--df-space-3);
+  }
+
+  &__kv-row {
+    display: flex;
+    gap: var(--df-space-2);
+    align-items: center;
+  }
+
+  &__kv-input {
+    flex: 1 1 0;
+    min-width: 0;
+    height: var(--df-field-height);
+    padding: 0 var(--df-space-3);
+    background: var(--df-surface-2);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    color: var(--df-text);
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--df-focus-ring);
+      border-color: var(--df-accent);
+    }
+  }
+
+  &__kv-remove {
+    flex: 0 0 auto;
+    color: var(--df-text-muted);
+  }
+
+  &__kv-add {
+    align-self: flex-start;
+    color: var(--df-accent);
+    font-size: var(--df-font-size-sm);
+  }
+
+  &__kv-note {
+    margin: 0;
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    line-height: var(--df-lh-base);
+  }
+
+  &__body {
+    width: 100%;
+    margin-top: var(--df-space-3);
+    padding: var(--df-space-3);
+    background: var(--df-code-bg);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    color: var(--df-code-text);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+    line-height: var(--df-lh-base);
+    resize: vertical;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--df-focus-ring);
+      border-color: var(--df-accent);
+    }
+  }
+
+  // ---- snippet ----------------------------------------------------------
+  &__snippet {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+  }
+
+  &__snippet-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--df-space-2);
+  }
+
+  &__copy {
+    color: var(--df-text-2);
+    font-size: var(--df-font-size-sm);
+  }
+
+  &__code {
+    margin: 0;
+    padding: var(--df-space-3);
+    background: var(--df-code-bg);
+    border: 1px solid var(--df-border-2);
+    border-radius: var(--df-radius-sm);
+    color: var(--df-code-text);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    line-height: var(--df-lh-base);
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  // ---- response ---------------------------------------------------------
+  &__response {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-3);
+    padding-top: var(--df-space-3);
+    border-top: 1px solid var(--df-border-2);
+  }
+
+  &__response-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__meta-item {
+    color: var(--df-text-2);
+    font-size: var(--df-font-size-xs);
+  }
+
+  &__response-spacer {
+    flex: 1 1 auto;
+  }
+
+  &__response-body {
+    max-height: 40rem;
+    overflow: auto;
+  }
+
+  // ---- denied fields (provable scope) -----------------------------------
+  &__denied {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-2);
+    flex-wrap: wrap;
+    padding: var(--df-space-2) var(--df-space-3);
+    background: var(--df-warning-soft);
+    border: 1px solid var(--df-warning-border);
+    border-radius: var(--df-radius-sm);
+    font-size: var(--df-font-size-xs);
+  }
+
+  &__denied-label {
+    color: var(--df-warning);
+    font-weight: var(--df-font-weight-medium);
+  }
+
+  // Denied fields are dimmed with the muted text token per the spec.
+  &__denied-field {
+    color: var(--df-text-muted);
+    font-family: var(--df-font-mono);
+    text-decoration: line-through;
+  }
+
+  &__error {
+    margin: 0;
+    color: var(--df-danger);
+    font-size: var(--df-font-size-sm);
+  }
+}
