@@ -44,6 +44,24 @@
   "sortedAsc": "Sorted ascending",
   "sortedDesc": "Sorted descending",
   "search": "Search",
+  "commandPalette": {
+    "placeholder": "Search or jump to anything",
+    "noResults": "Nothing matches that.",
+    "groups": {
+      "actions": "Actions",
+      "services": "Services",
+      "roles": "Roles",
+      "keys": "Keys",
+      "mcp": "MCP servers",
+      "docs": "Go to",
+      "recent": "Recent",
+      "suggested": "Likely next"
+    },
+    "foot": {
+      "navigate": "Navigate",
+      "select": "Open"
+    }
+  },
   "newEntry": "Create a new entry",
   "clearLimitCounter": "Clear limit counter",
   "clearLimitCounters": "Clear limit counters",
