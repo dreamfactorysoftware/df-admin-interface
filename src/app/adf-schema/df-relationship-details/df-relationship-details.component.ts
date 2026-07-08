@@ -38,6 +38,17 @@ interface BasicOption {
 @Component({
   selector: 'df-relationship-details',
   templateUrl: './df-relationship-details.component.html',
+  // Departure form-action treatment, matching the table/field detail screens.
+  styles: [
+    `
+      .action-bar {
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 8px;
+        border-top: 1px solid var(--df-border-2);
+      }
+    `,
+  ],
   standalone: true,
   imports: [
     ReactiveFormsModule,

@@ -137,7 +137,7 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
         flex-direction: column;
         height: 100%;
         border-left: 1px solid var(--df-border);
-        background: #fafafa;
+        background: var(--df-bg);
         width: 320px;
         overflow: hidden;
       }
@@ -148,14 +148,14 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
         justify-content: space-between;
         padding: 8px 12px;
         border-bottom: 1px solid var(--df-border);
-        background: #f5f5f5;
+        background: var(--df-surface-2);
 
         .schema-title {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--df-text-2);
+          letter-spacing: 0.06em;
+          color: var(--df-text-muted);
         }
 
         .close-btn {
@@ -176,8 +176,8 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
         align-items: center;
         gap: 8px;
         padding: 12px;
-        font-size: 13px;
-        color: #d32f2f;
+        font-size: 1.3rem;
+        color: var(--df-danger);
       }
 
       .schema-body {
@@ -190,8 +190,8 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: var(--df-text-faint);
+        letter-spacing: 0.06em;
+        color: var(--df-text-muted);
         padding: 12px 12px 6px;
         border-bottom: 1px solid var(--df-border-2);
       }
@@ -208,7 +208,7 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
             gap: 6px;
             font-weight: 500;
             color: var(--df-text);
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-badges {
@@ -222,18 +222,18 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
             }
 
             .badge-pk {
-              --mdc-chip-elevated-container-color: #7b1fa2;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent);
+              --mdc-chip-label-text-color: var(--df-accent-contrast);
             }
 
             .badge-fk {
-              --mdc-chip-elevated-container-color: #1565c0;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent-soft);
+              --mdc-chip-label-text-color: var(--df-accent-strong);
             }
 
             .badge-uq {
-              --mdc-chip-elevated-container-color: #ef6c00;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-surface-2);
+              --mdc-chip-label-text-color: var(--df-text-2);
             }
           }
 
@@ -241,7 +241,7 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
             font-size: 11px;
             color: var(--df-text-muted);
             margin-top: 2px;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-meta {
@@ -274,11 +274,12 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
       }
 
       .ref-link {
-        color: #1565c0;
+        color: var(--df-accent);
         cursor: pointer;
         font-size: 11px;
         text-decoration: none;
         &:hover {
+          color: var(--df-accent-strong);
           text-decoration: underline;
         }
       }
@@ -295,7 +296,7 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
             font-size: 16px;
             width: 16px;
             height: 16px;
-            color: #7b1fa2;
+            color: var(--df-accent);
             margin-top: 2px;
           }
 
@@ -308,30 +309,15 @@ import { normalizeError } from 'src/app/shared/utilities/app-error';
               font-size: 10px;
               text-transform: uppercase;
               color: var(--df-text-faint);
-              letter-spacing: 0.5px;
+              letter-spacing: 0.06em;
             }
 
             .rel-field {
               font-size: 11px;
               color: var(--df-text-muted);
-              font-family: 'Roboto Mono', monospace;
+              font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             }
           }
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .schema-info-panel {
-          background: #1e1e1e;
-        }
-        .schema-header {
-          background: #2c2c2c;
-        }
-        .ref-link {
-          color: #64b5f6;
-        }
-        .rel-list .rel-row .rel-icon {
-          color: #ce93d8;
         }
       }
     `,

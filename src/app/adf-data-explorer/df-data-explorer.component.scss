@@ -1,3 +1,8 @@
+// ============================================================
+// Data explorer shell, departure treatment. Tokens only: light,
+// dark, and phosphor all repaint via --df-* (src/styles.scss).
+// ============================================================
+
 :host {
   display: block;
   overflow: hidden;
@@ -29,13 +34,8 @@
 
 .explorer-sidenav {
   width: 280px;
-  border-right: 1px solid #e0e0e0;
-  background: #fafafa;
-
-  :host-context(.dark-theme) & {
-    border-right-color: #424242;
-    background: #303030;
-  }
+  border-right: 1px solid var(--df-border);
+  background: var(--df-bg);
 }
 
 .sidenav-content {
@@ -44,11 +44,7 @@
 }
 
 .explorer-content {
-  background: #fff;
-
-  :host-context(.dark-theme) & {
-    background: #424242;
-  }
+  background: var(--df-surface);
 }
 
 // Force mat-sidenav-content to have bounded height and act as positioned parent
@@ -65,39 +61,28 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #757575;
+  color: var(--df-text-muted);
   text-align: center;
   padding: 24px;
-
-  :host-context(.dark-theme) & {
-    color: #bdbdbd;
-  }
 
   .empty-icon {
     font-size: 64px;
     width: 64px;
     height: 64px;
-    color: #bdbdbd;
+    color: var(--df-text-faint);
     margin-bottom: 16px;
-
-    :host-context(.dark-theme) & {
-      color: #616161;
-    }
   }
 
   h2 {
     margin: 0 0 8px 0;
-    font-size: 20px;
-    font-weight: 500;
-    color: #424242;
-
-    :host-context(.dark-theme) & {
-      color: #e0e0e0;
-    }
+    font-size: 1.8rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--df-text);
   }
 
   p {
     margin: 0;
-    font-size: 14px;
+    font-size: 1.4rem;
   }
 }

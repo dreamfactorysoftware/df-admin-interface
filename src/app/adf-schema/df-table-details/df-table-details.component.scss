@@ -1,3 +1,32 @@
+// Table details, departure treatment. Tokens only; all three
+// themes repaint via --df-* (src/styles.scss).
+
 .json-area {
   min-height: 400px;
+}
+
+// Section micro-headers over the embedded fields/relationships tables:
+// 11px uppercase letterspaced, per the departure table/section standard.
+h2 {
+  margin: 8px 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--df-text-muted);
+}
+
+// JSON tab: frame the editor like every other departure code surface.
+df-ace-editor {
+  display: block;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  overflow: hidden;
+}
+
+.action-bar {
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+  border-top: 1px solid var(--df-border-2);
 }
