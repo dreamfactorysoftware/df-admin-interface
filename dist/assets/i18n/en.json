@@ -779,7 +779,9 @@
     "ms": "ms",
     "pretty": "Pretty",
     "raw": "Raw",
-    "deniedLabel": "Hidden from this identity"
+    "deniedLabel": "Hidden from this identity",
+    "deniedTitle": "Denied",
+    "deniedBoundary": "The \"{{role}}\" role has no {{method}} grant on this resource. DreamFactory enforced the boundary, not the UI."
   },
   "artifactCard": {
     "eyebrow": "Live API",
@@ -803,6 +805,31 @@
       "python": "Python",
       "mcp": "MCP client"
     }
+  },
+  "scopeMatrix": {
+    "ariaLabel": "Roles by HTTP verb access for this service",
+    "roleHeader": "Role",
+    "emptyTitle": "No roles yet",
+    "emptyHint": "Create a role to grant agents and keys scoped access to this service.",
+    "state": {
+      "full": "Full access",
+      "filtered": "Row or field filtered",
+      "none": "No access"
+    }
+  },
+  "scopeMap": {
+    "unresolvedTitle": "No identity selected",
+    "unresolvedHint": "Point this at a role, key, or agent to resolve what it can reach.",
+    "emptyTitle": "Reaches nothing",
+    "emptyHint": "This identity has no service grants. It cannot read or write any data yet.",
+    "allow": "Allow",
+    "deny": "Deny",
+    "inherited": "Inherited",
+    "explicit": "Explicit",
+    "filtered": "Filtered",
+    "filteredHint": "Narrowed to specific rows or a single table, not the whole service.",
+    "noVerbs": "No operations",
+    "grantCount": "{{count}} grant(s)"
   },
   "onboardingChecklist": {
     "eyebrow": "Get started",

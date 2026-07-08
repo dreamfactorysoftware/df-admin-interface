@@ -60,9 +60,10 @@ import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfErrorDetailComponent } from '../df-error-detail/df-error-detail.component';
 import { DfBadgeComponent } from '../df-badge/df-badge.component';
 
-// Re-export: subclasses consume DfErrorDetailComponent through the
-// DfManageTableModules array, so it must be exported from this module (NG3004).
+// Re-export: subclasses consume these through the DfManageTableModules
+// array, so they must be exported from this module (NG3004).
 export { DfErrorDetailComponent };
+export { DfBadgeComponent };
 
 export type TableState = 'loading' | 'loaded' | 'empty' | 'error';
 
