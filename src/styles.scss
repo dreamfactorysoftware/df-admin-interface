@@ -195,7 +195,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-shell-accent: #2edd5b;
 
   /* categorical tints in phosphor: in-palette intensity steps only -
-     green washes at varying levels + one amber step for system. The
+     green washes at varying intensity only. Amber is WARNINGS ONLY in
+     phosphor (Captain rule), so system rides green like the rest. The
      terminal does not do rainbows. */
   --df-tint-build-bg: rgba(51, 255, 102, 0.12);
   --df-tint-build-fg: #33ff66;
@@ -203,8 +204,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-tint-data-fg: #2edd5b;
   --df-tint-security-bg: rgba(51, 255, 102, 0.1);
   --df-tint-security-fg: #33ff66;
-  --df-tint-system-bg: rgba(217, 159, 74, 0.1);
-  --df-tint-system-fg: #d99f4a;
+  --df-tint-system-bg: rgba(51, 255, 102, 0.06);
+  --df-tint-system-fg: #28cc52;
   --df-tint-admin-bg: rgba(51, 255, 102, 0.05);
   --df-tint-admin-fg: #23a847;
   --df-tint-ai-bg: rgba(51, 255, 102, 0.09);
