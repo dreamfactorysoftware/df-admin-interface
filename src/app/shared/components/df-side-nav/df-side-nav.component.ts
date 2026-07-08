@@ -181,6 +181,21 @@ export class DfSideNavComponent implements OnInit {
   private buildNavGroups(
     nav: Array<Nav>
   ): Array<{ label: string; items: Array<Nav> }> {
+    // Captain 2026-07-07: these read as sections, not top-level rows. Nest
+    // each former top-level item inside its owning expansion.
+    const nested: Array<{ child: ROUTES; parent: ROUTES }> = [
+      { child: ROUTES.API_BUILDER, parent: ROUTES.API_CONNECTIONS },
+      { child: ROUTES.AGENTS, parent: ROUTES.AI },
+      { child: ROUTES.ALERTS, parent: ROUTES.SYSTEM_SETTINGS },
+    ];
+    for (const rule of nested) {
+      const childIdx = nav.findIndex(item => item.route === rule.child);
+      const parent = nav.find(item => item.route === rule.parent);
+      if (childIdx !== -1 && parent) {
+        parent.subRoutes = [...(parent.subRoutes ?? []), nav[childIdx]];
+        nav.splice(childIdx, 1);
+      }
+    }
     const byRoute = new Map(nav.map(item => [item.route, item]));
     const claimed = new Set<Nav>();
     const pick = (routeIds: Array<ROUTES>) =>
@@ -195,12 +210,12 @@ export class DfSideNavComponent implements OnInit {
       { label: '', items: pick([ROUTES.HOME]) },
       {
         label: 'Build',
-        items: pick([ROUTES.API_CONNECTIONS, ROUTES.API_BUILDER]),
+        items: pick([ROUTES.API_CONNECTIONS]),
       },
       { label: 'Secure & Manage', items: pick([ROUTES.API_SECURITY]) },
       {
         label: 'AI Gateway',
-        items: pick([ROUTES.AI, ROUTES.AGENTS, ROUTES.ALERTS]),
+        items: pick([ROUTES.AI]),
       },
       {
         label: 'System',
