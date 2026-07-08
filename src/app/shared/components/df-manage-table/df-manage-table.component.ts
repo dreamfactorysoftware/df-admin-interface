@@ -251,9 +251,7 @@ export abstract class DfManageTableComponent<T>
     );
   }
 
-  isCellActive(
-    cellValue: string | number | boolean | null | undefined
-  ): boolean {
+  isCellActive(cellValue: unknown): boolean {
     if (typeof cellValue === 'boolean') {
       return cellValue;
     }

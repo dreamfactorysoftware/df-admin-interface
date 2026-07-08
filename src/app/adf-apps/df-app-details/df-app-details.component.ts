@@ -219,7 +219,11 @@ export class DfAppDetailsComponent implements OnInit {
         limit: 0,
         related: 'limit_cache_by_limit_id',
       })
-      .pipe(catchError(() => of({ resource: [] } as GenericListResponse<LimitType>)))
+      .pipe(
+        catchError(() =>
+          of({ resource: [], meta: { count: 0 } } as GenericListResponse<LimitType>)
+        )
+      )
       .subscribe(res => {
         this.allLimits = res.resource ?? [];
         this.recomputeRoleLimits();
