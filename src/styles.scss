@@ -118,8 +118,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   --df-font-weight-heading: 600; /* never 700 black */
   --df-tracking-tight: -0.011em; /* font-size-xl and up */
   --df-tracking-eyebrow: 0.04em; /* uppercase micro-labels */
-  --df-font-mono: 'SFMono-Regular', ui-monospace, 'JetBrains Mono', Menlo,
-    monospace;
+  --df-font-mono:
+    'SFMono-Regular', ui-monospace, 'JetBrains Mono', Menlo, monospace;
 
   /* --- 1.2 Spacing + rhythm. Strict 4px base; calm outside, dense
      inside. Components pull margins from these, never arbitrary px. --- */
@@ -138,8 +138,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   /* --- 1.3 Elevation. Flat, border-defined. Shadow is reserved for
      true floating layers (CDK overlays) only. dark deepens; phosphor
      swaps the drop shadow for a border-glow (see theme blocks). --- */
-  --df-shadow-overlay: 0 8px 24px rgba(0, 0, 0, 0.18),
-    0 2px 6px rgba(0, 0, 0, 0.08);
+  --df-shadow-overlay:
+    0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
 
   /* --- 1.4 Warning companions. --df-warning already exists; complete
      the soft/border trio to match success/danger. --- */
@@ -224,8 +224,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
   /* Meridian per-theme (spec 1.3-1.5): only overlay/warning/skeleton
      shift for dark; type/space/motion/focus inherit from :root. */
-  --df-shadow-overlay: 0 10px 30px rgba(0, 0, 0, 0.5),
-    0 3px 8px rgba(0, 0, 0, 0.35);
+  --df-shadow-overlay:
+    0 10px 30px rgba(0, 0, 0, 0.5), 0 3px 8px rgba(0, 0, 0, 0.35);
   --df-warning-soft: rgba(251, 191, 36, 0.12);
   --df-warning-border: rgba(251, 191, 36, 0.35);
   --df-skeleton-bg: rgba(255, 255, 255, 0.06);
@@ -297,8 +297,8 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   /* Meridian per-theme (spec 1.3-1.4): no drop shadow on a terminal -
      the overlay is a border-glow. Amber is warnings-only in phosphor
      (Captain rule), so the warning trio rides the phosphor amber. */
-  --df-shadow-overlay: 0 0 0 1px var(--df-accent-soft),
-    0 0 12px rgba(51, 255, 102, 0.18);
+  --df-shadow-overlay:
+    0 0 0 1px var(--df-accent-soft), 0 0 12px rgba(51, 255, 102, 0.18);
   --df-warning-soft: rgba(217, 159, 74, 0.15);
   --df-warning-border: rgba(217, 159, 74, 0.5);
   --df-skeleton-bg: rgba(51, 255, 102, 0.06);
@@ -422,10 +422,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    var(--df-surface-2) 50%,
-    transparent 50%
-  );
+  background: linear-gradient(var(--df-surface-2) 50%, transparent 50%);
   background-size: 100% 4px;
   opacity: 0.5;
 }

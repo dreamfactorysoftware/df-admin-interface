@@ -47,9 +47,7 @@
           [routerLink]="step.route"
           (click)="onCtaClick(step)">
           {{ step.ctaLabel || t('steps.' + step.key + '.cta') }}
-          <fa-icon
-            [icon]="faArrowRight"
-            class="onboarding__cta-icon"></fa-icon>
+          <fa-icon [icon]="faArrowRight" class="onboarding__cta-icon"></fa-icon>
         </a>
       </div>
     </li>

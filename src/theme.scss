@@ -18,15 +18,21 @@ $df-typography-config: mat.define-typography-config(
   $headline-1: mat.define-typography-level(56px, 62px, 600),
   $headline-2: mat.define-typography-level(44px, 50px, 600),
   $headline-3: mat.define-typography-level(36px, 43px, 600),
-  $headline-4: mat.define-typography-level(28px, 34px, 600), // page H1 (2xl)
-  $headline-5: mat.define-typography-level(20px, 24px, 600), // sub-page H1 (xl)
-  $headline-6: mat.define-typography-level(16px, 21px, 600), // card/section (lg)
+  $headline-4: mat.define-typography-level(28px, 34px, 600),
+  // page H1 (2xl)
+  $headline-5: mat.define-typography-level(20px, 24px, 600),
+  // sub-page H1 (xl)
+  $headline-6: mat.define-typography-level(16px, 21px, 600),
+  // card/section (lg)
   $subtitle-1: mat.define-typography-level(16px, 22px, 600),
   $subtitle-2: mat.define-typography-level(13px, 19px, 500),
-  $body-1: mat.define-typography-level(13px, 19px, 400), // form-field input (sm)
-  $body-2: mat.define-typography-level(13px, 19px, 400), // BODY + table cell (sm)
-  $caption: mat.define-typography-level(12px, 16px, 400), // meta (xs)
-  $button: mat.define-typography-level(13px, 19px, 500)
+  $body-1: mat.define-typography-level(13px, 19px, 400),
+  // form-field input (sm)
+  $body-2: mat.define-typography-level(13px, 19px, 400),
+  // BODY + table cell (sm)
+  $caption: mat.define-typography-level(12px, 16px, 400),
+  // meta (xs)
+  $button: mat.define-typography-level(13px, 19px, 500),
 );
 
 $df-purple-palette: (

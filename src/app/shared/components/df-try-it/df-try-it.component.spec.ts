@@ -45,7 +45,9 @@ describe('DfTryItComponent', () => {
     component.path = '/_table/employees';
     component.snippetLang = 'curl';
     const snippet = component.snippet;
-    expect(snippet).toContain("curl -X GET 'http://localhost/api/v2/mysql/_table/employees'");
+    expect(snippet).toContain(
+      "curl -X GET 'http://localhost/api/v2/mysql/_table/employees'"
+    );
     expect(snippet).toContain("-H 'X-DreamFactory-API-Key: ABC123'");
   });
 

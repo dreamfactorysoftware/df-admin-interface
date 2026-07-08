@@ -20,8 +20,10 @@
           <mat-option
             *ngFor="let opt of keyOptions; trackBy: trackByLabel"
             [value]="opt.apiKey">
-            {{ opt.label }}<span *ngIf="opt.role" class="artifact-card__opt-role">
-              &middot; {{ opt.role }}</span>
+            {{ opt.label
+            }}<span *ngIf="opt.role" class="artifact-card__opt-role">
+              &middot; {{ opt.role }}</span
+            >
           </mat-option>
         </mat-select>
       </mat-form-field>
@@ -107,10 +109,9 @@
           context: {
             id: 'curl',
             code: curlSnippet,
-            note:
-              activeKeyVerified
-                ? t('runNote', { table: sampleTable })
-                : t('previewNote', { table: sampleTable })
+            note: activeKeyVerified
+              ? t('runNote', { table: sampleTable })
+              : t('previewNote', { table: sampleTable }),
           }
         "></ng-container>
     </mat-tab>
@@ -122,10 +123,9 @@
           context: {
             id: 'javascript',
             code: javascriptSnippet,
-            note:
-              activeKeyVerified
-                ? t('runNote', { table: sampleTable })
-                : t('previewNote', { table: sampleTable })
+            note: activeKeyVerified
+              ? t('runNote', { table: sampleTable })
+              : t('previewNote', { table: sampleTable }),
           }
         "></ng-container>
     </mat-tab>
@@ -137,10 +137,9 @@
           context: {
             id: 'python',
             code: pythonSnippet,
-            note:
-              activeKeyVerified
-                ? t('runNote', { table: sampleTable })
-                : t('previewNote', { table: sampleTable })
+            note: activeKeyVerified
+              ? t('runNote', { table: sampleTable })
+              : t('previewNote', { table: sampleTable }),
           }
         "></ng-container>
     </mat-tab>

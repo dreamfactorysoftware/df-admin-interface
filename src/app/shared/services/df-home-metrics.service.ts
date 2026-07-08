@@ -151,10 +151,7 @@ export class DfHomeMetricsService {
       return { value: null, reason: 'no-permission' };
     }
     const hasLifecycleField = services.some(
-      s =>
-        'deprecated' in s ||
-        'lifecycle' in s ||
-        'lifecycle_stage' in s
+      s => 'deprecated' in s || 'lifecycle' in s || 'lifecycle_stage' in s
     );
     if (!hasLifecycleField) {
       return { value: null, reason: 'no-source' };
@@ -189,11 +186,14 @@ export class DfHomeMetricsService {
   private async fetchUserServices(): Promise<ServiceRow[] | null> {
     try {
       const res = await firstValueFrom(
-        this.http.get<{ resource: ServiceRow[] }>(`${BASE_URL}/system/service`, {
-          // No fields filter: return the default columns so deriveDeprecated
-          // can detect a lifecycle field if the instance's schema has one.
-          context: silent(),
-        })
+        this.http.get<{ resource: ServiceRow[] }>(
+          `${BASE_URL}/system/service`,
+          {
+            // No fields filter: return the default columns so deriveDeprecated
+            // can detect a lifecycle field if the instance's schema has one.
+            context: silent(),
+          }
+        )
       );
       return (res?.resource ?? []).filter(
         s => s?.name && !SYSTEM_SERVICE_NAMES.has(s.name.toLowerCase())

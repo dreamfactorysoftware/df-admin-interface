@@ -67,7 +67,9 @@ const CUSTOM = '__custom__';
       <div class="alerts-head">
         <div>
           <div class="title-row">
-            <span class="head-icon"><mat-icon>notifications_active</mat-icon></span>
+            <span class="head-icon"
+              ><mat-icon>notifications_active</mat-icon></span
+            >
             <h1>Alerts</h1>
           </div>
           <p class="sub">

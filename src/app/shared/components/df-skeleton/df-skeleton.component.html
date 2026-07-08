@@ -7,30 +7,40 @@
   <ng-container
     *ngFor="let item of items; trackBy: trackByIndex"
     [ngSwitch]="variant">
-
     <!-- Single text line -->
-    <div *ngSwitchCase="'line'" class="df-skeleton__unit df-skeleton__unit--line">
+    <div
+      *ngSwitchCase="'line'"
+      class="df-skeleton__unit df-skeleton__unit--line">
       <span class="df-skeleton__bar df-skeleton__bar--line"></span>
     </div>
 
     <!-- Solid rectangular block (chart / image / panel) -->
-    <div *ngSwitchCase="'block'" class="df-skeleton__unit df-skeleton__unit--block">
+    <div
+      *ngSwitchCase="'block'"
+      class="df-skeleton__unit df-skeleton__unit--block">
       <span class="df-skeleton__bar df-skeleton__bar--block"></span>
     </div>
 
     <!-- Table row: leading cell + trailing cells at df-row-height -->
-    <div *ngSwitchCase="'table-row'" class="df-skeleton__unit df-skeleton__unit--row">
-      <span class="df-skeleton__bar df-skeleton__bar--cell df-skeleton__bar--wide"></span>
+    <div
+      *ngSwitchCase="'table-row'"
+      class="df-skeleton__unit df-skeleton__unit--row">
+      <span
+        class="df-skeleton__bar df-skeleton__bar--cell df-skeleton__bar--wide"></span>
       <span class="df-skeleton__bar df-skeleton__bar--cell"></span>
       <span class="df-skeleton__bar df-skeleton__bar--cell"></span>
-      <span class="df-skeleton__bar df-skeleton__bar--cell df-skeleton__bar--narrow"></span>
+      <span
+        class="df-skeleton__bar df-skeleton__bar--cell df-skeleton__bar--narrow"></span>
     </div>
 
     <!-- Card: title + two body lines + action bar -->
-    <div *ngSwitchCase="'card'" class="df-skeleton__unit df-skeleton__unit--card">
+    <div
+      *ngSwitchCase="'card'"
+      class="df-skeleton__unit df-skeleton__unit--card">
       <span class="df-skeleton__bar df-skeleton__bar--title"></span>
       <span class="df-skeleton__bar df-skeleton__bar--line"></span>
-      <span class="df-skeleton__bar df-skeleton__bar--line df-skeleton__bar--short"></span>
+      <span
+        class="df-skeleton__bar df-skeleton__bar--line df-skeleton__bar--short"></span>
       <span class="df-skeleton__bar df-skeleton__bar--action"></span>
     </div>
 

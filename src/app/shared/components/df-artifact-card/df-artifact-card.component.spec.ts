@@ -51,7 +51,7 @@ describe('DfArtifactCardComponent', () => {
 
   it('embeds the real API key header in the curl snippet', () => {
     expect(component.curlSnippet).toContain(`${API_KEY_HEADER}: abc123`);
-    expect(component.curlSnippet).toContain("-X GET");
+    expect(component.curlSnippet).toContain('-X GET');
     expect(component.curlSnippet).toContain('limit=5');
   });
 

@@ -36,8 +36,7 @@
     );
     // Sweep is derived from a motion token (calc, not a literal) so it stays
     // slow and calm relative to the 200ms UI standard.
-    animation: df-skeleton-shimmer
-      calc(var(--df-duration-standard, 200ms) * 8)
+    animation: df-skeleton-shimmer calc(var(--df-duration-standard, 200ms) * 8)
       var(--df-ease-standard, ease) infinite;
     will-change: transform;
   }

@@ -81,7 +81,12 @@ export class DfArtifactResolverService {
               `${origin}${BASE_URL}/${serviceName}/_table/${encodeURIComponent(
                 t
               )}?limit=1`,
-              { headers: { 'X-DreamFactory-API-Key': c.apiKey } }
+              {
+                headers: { 'X-DreamFactory-API-Key': c.apiKey },
+                // Omit the admin session cookie so the probe tests the API key
+                // ALONE - the same honest request the copyable curl makes.
+                credentials: 'omit',
+              }
             );
             if (r.ok) {
               hit = t;

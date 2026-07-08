@@ -221,7 +221,9 @@
               </button>
             </ng-container>
             <ng-template #noFilterActive>
-              <div class="empty-state" *ngIf="emptyStateMessage; else genericEmpty">
+              <div
+                class="empty-state"
+                *ngIf="emptyStateMessage; else genericEmpty">
                 <p class="empty-state-message">
                   {{ emptyStateMessage | transloco }}
                 </p>
@@ -232,7 +234,7 @@
                   type="button"
                   data-testid="empty-state-create"
                   (click)="createRow()">
-                  {{ (emptyStateActionLabel || 'create') | transloco }}
+                  {{ emptyStateActionLabel || 'create' | transloco }}
                 </button>
               </div>
               <ng-template #genericEmpty>

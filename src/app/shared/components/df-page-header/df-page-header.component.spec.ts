@@ -26,7 +26,9 @@ describe('DfPageHeaderComponent', () => {
   it('renders eyebrow, H1 title and description from inputs', () => {
     const eyebrow = fixture.debugElement.query(By.css('.page-header__eyebrow'));
     const title = fixture.debugElement.query(By.css('h1.page-header__title'));
-    const desc = fixture.debugElement.query(By.css('.page-header__description'));
+    const desc = fixture.debugElement.query(
+      By.css('.page-header__description')
+    );
 
     expect(eyebrow.nativeElement.textContent.trim()).toBe('Gateway');
     expect(title.nativeElement.textContent.trim()).toBe('Roles');

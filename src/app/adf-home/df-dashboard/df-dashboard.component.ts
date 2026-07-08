@@ -8,7 +8,10 @@ import { FormsModule } from '@angular/forms';
 import { TranslocoModule } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import { faShieldHalved, faArrowRight } from '@fortawesome/free-solid-svg-icons';
+import {
+  faShieldHalved,
+  faArrowRight,
+} from '@fortawesome/free-solid-svg-icons';
 import { firstValueFrom } from 'rxjs';
 
 import { BASE_URL } from 'src/app/shared/constants/urls';

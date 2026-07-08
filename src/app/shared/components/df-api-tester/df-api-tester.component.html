@@ -30,7 +30,9 @@
               [value]="i">
               <div class="endpoint-option">
                 <div class="endpoint-header">
-                  <span class="method-badge" [ngClass]="methodClass(endpoint.method)">
+                  <span
+                    class="method-badge"
+                    [ngClass]="methodClass(endpoint.method)">
                     {{ endpoint.method }}
                   </span>
                   <span class="endpoint-path">{{ endpoint.endpoint }}</span>

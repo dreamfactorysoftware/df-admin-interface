@@ -1,6 +1,8 @@
 <df-page-header
   [title]="apiDocJson?.info?.title || serviceName || ''"
-  [description]="apiDocJson?.info?.description || ('apiDocs.subtitle' | transloco)">
+  [description]="
+    apiDocJson?.info?.description || ('apiDocs.subtitle' | transloco)
+  ">
   <div pageHeaderActions class="docs-header-actions">
     <df-badge
       [variant]="healthVariant"
@@ -24,9 +26,7 @@
 </df-page-header>
 
 <!-- Unhealthy detail: fact + fix, no toast spam. -->
-<div
-  *ngIf="healthStatus === 'unhealthy'"
-  class="health-detail">
+<div *ngIf="healthStatus === 'unhealthy'" class="health-detail">
   <button
     mat-button
     class="view-details-button"
@@ -114,8 +114,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr
-            *ngFor="let p of op.parameters; trackBy: trackByParam">
+          <tr *ngFor="let p of op.parameters; trackBy: trackByParam">
             <td class="docs-table__name">{{ p.name }}</td>
             <td>{{ p.location }}</td>
             <td class="docs-table__type">{{ p.type }}</td>
@@ -228,10 +227,7 @@
 
 <!-- Advanced / raw spec: swagger demoted behind a toggle, not deleted. -->
 <div *ngIf="!loading" class="raw-spec">
-  <button
-    mat-button
-    class="raw-spec__toggle"
-    (click)="toggleAdvanced()">
+  <button mat-button class="raw-spec__toggle" (click)="toggleAdvanced()">
     <mat-icon>{{ showAdvanced ? 'expand_less' : 'expand_more' }}</mat-icon>
     {{
       (showAdvanced ? 'apiDocs.rawSpec.hide' : 'apiDocs.rawSpec.show')

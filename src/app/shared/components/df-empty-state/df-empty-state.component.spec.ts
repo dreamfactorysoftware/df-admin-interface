@@ -23,7 +23,9 @@ describe('DfEmptyStateComponent', () => {
 
   it('renders the title and helper copy passed in', () => {
     const title = fixture.debugElement.query(By.css('.empty-state__title'));
-    const desc = fixture.debugElement.query(By.css('.empty-state__description'));
+    const desc = fixture.debugElement.query(
+      By.css('.empty-state__description')
+    );
 
     expect(title.nativeElement.textContent.trim()).toBe('No services yet');
     expect(desc.nativeElement.textContent.trim()).toBe(

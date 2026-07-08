@@ -73,7 +73,10 @@ export class DfThemeToggleComponent {
    * click/keypress; honors prefers-reduced-motion.
    */
   private playBootSequence(): void {
-    if (typeof document === 'undefined' || document.querySelector('.phosphor-boot')) {
+    if (
+      typeof document === 'undefined' ||
+      document.querySelector('.phosphor-boot')
+    ) {
       return;
     }
     const reduce =

@@ -1,10 +1,4 @@
-import {
-  Component,
-  EventEmitter,
-  Input,
-  OnInit,
-  Output,
-} from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   HttpClient,
@@ -240,7 +234,8 @@ export class DfTryItComponent implements OnInit {
         });
 
         apps$.subscribe({
-          next: appsRes => this.buildIdentities(appsRes.resource ?? [], roleMeta),
+          next: appsRes =>
+            this.buildIdentities(appsRes.resource ?? [], roleMeta),
           error: () => undefined,
         });
       },
@@ -349,9 +344,7 @@ export class DfTryItComponent implements OnInit {
 
   get methodHasBody(): boolean {
     return (
-      this.method === 'POST' ||
-      this.method === 'PUT' ||
-      this.method === 'PATCH'
+      this.method === 'POST' || this.method === 'PUT' || this.method === 'PATCH'
     );
   }
 
@@ -389,9 +382,7 @@ export class DfTryItComponent implements OnInit {
     const started = performance.now();
 
     const outBody =
-      this.methodHasBody && this.bodyText.trim()
-        ? this.bodyText
-        : undefined;
+      this.methodHasBody && this.bodyText.trim() ? this.bodyText : undefined;
 
     this.http
       .request(this.method, url, {
@@ -402,8 +393,7 @@ export class DfTryItComponent implements OnInit {
       })
       .subscribe({
         next: res => this.handleResponse(res, started, true),
-        error: (err: HttpErrorResponse) =>
-          this.handleError(err, started),
+        error: (err: HttpErrorResponse) => this.handleError(err, started),
       });
   }
 
@@ -515,9 +505,7 @@ export class DfTryItComponent implements OnInit {
       const set = new Set<string>();
       records
         .filter((r: unknown) => r && typeof r === 'object')
-        .forEach((r: object) =>
-          Object.keys(r).forEach(k => set.add(k))
-        );
+        .forEach((r: object) => Object.keys(r).forEach(k => set.add(k)));
       return [...set];
     } catch {
       return [];
@@ -546,9 +534,7 @@ export class DfTryItComponent implements OnInit {
   private curlSnippet(): string {
     const lines = [`curl -X ${this.method} '${this.requestUrl}'`];
     const headers = this.requestHeaders;
-    Object.keys(headers).forEach(k =>
-      lines.push(`  -H '${k}: ${headers[k]}'`)
-    );
+    Object.keys(headers).forEach(k => lines.push(`  -H '${k}: ${headers[k]}'`));
     const body = this.bodyForSnippet();
     if (body) {
       lines.push(`  -d '${body.replace(/'/g, "'\\''")}'`);

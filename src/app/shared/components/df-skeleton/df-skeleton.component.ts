@@ -23,13 +23,7 @@ export type SkeletonVariant = 'line' | 'block' | 'table-row' | 'card';
   templateUrl: './df-skeleton.component.html',
   styleUrls: ['./df-skeleton.component.scss'],
   standalone: true,
-  imports: [
-    NgFor,
-    NgSwitch,
-    NgSwitchCase,
-    NgSwitchDefault,
-    TranslocoPipe,
-  ],
+  imports: [NgFor, NgSwitch, NgSwitchCase, NgSwitchDefault, TranslocoPipe],
 })
 export class DfSkeletonComponent {
   /** Which layout the placeholder echoes. */
