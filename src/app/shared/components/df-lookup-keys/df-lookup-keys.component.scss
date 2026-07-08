@@ -11,3 +11,13 @@
 .mat-mdc-cell {
   padding: 8px;
 }
+
+// These rows host outlined form fields, which stand taller than the
+// global 44px table density. Let editing rows size to their inputs
+// (min-height keeps empty rows on the density grid) instead of
+// clipping; hairline separators and hover still come from globals.
+.mat-mdc-row {
+  height: auto !important;
+  min-height: 44px;
+  padding: 4px 0;
+}

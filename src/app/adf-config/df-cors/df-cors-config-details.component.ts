@@ -41,6 +41,7 @@ import { AsyncPipe } from '@angular/common';
 @Component({
   selector: 'df-cors-config-details',
   templateUrl: './df-cors-config-details.component.html',
+  styleUrls: ['./df-cors-config-details.component.scss'],
   standalone: true,
   imports: [
     ReactiveFormsModule,

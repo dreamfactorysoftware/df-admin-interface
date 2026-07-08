@@ -1,0 +1,21 @@
+// Departure treatment, tokens only.
+.cache-container {
+  > p {
+    max-width: 720px;
+    margin: 0 0 16px;
+    color: var(--df-text-2);
+    font-size: 1.4rem;
+    line-height: 1.5;
+  }
+}
+
+// Flush-cache dialog (df-cache-modal shares this stylesheet).
+[mat-dialog-content] {
+  h2 {
+    margin: 0 0 16px;
+    font-size: 1.7rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--df-text);
+  }
+}
