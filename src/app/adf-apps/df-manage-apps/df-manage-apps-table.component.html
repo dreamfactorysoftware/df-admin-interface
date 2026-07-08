@@ -96,11 +96,28 @@
                 row.spendUsd | currency: 'USD' : 'symbol' : '1.2-2'
               }}</span>
             </ng-container>
+            <ng-container *ngIf="column.columnDef === 'role'">
+              <a
+                *ngIf="row.roleId !== null && row.role; else plainRole"
+                class="df-role-link"
+                [routerLink]="[
+                  '/api-connections/role-based-access',
+                  row.roleId
+                ]"
+                [attr.aria-label]="
+                  'apps.virtualKey.roleLink' | transloco: { role: row.role }
+                "
+                (click)="$event.stopPropagation()">
+                {{ row.role }}
+              </a>
+              <ng-template #plainRole>{{ row.role }}</ng-template>
+            </ng-container>
             <ng-container
               *ngIf="
                 column.columnDef !== 'active' &&
                 column.columnDef !== 'tokens' &&
-                column.columnDef !== 'spend'
+                column.columnDef !== 'spend' &&
+                column.columnDef !== 'role'
               ">
               {{ column?.cell(row) }}
             </ng-container>
