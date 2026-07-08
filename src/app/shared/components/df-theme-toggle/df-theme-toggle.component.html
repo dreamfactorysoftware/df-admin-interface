@@ -2,3 +2,11 @@
   color="primary"
   [checked]="isDarkMode$ | async"
   (change)="toggle()"></mat-slide-toggle>
+<button
+  class="phosphor-toggle"
+  type="button"
+  (click)="togglePhosphor()"
+  title="Phosphor mode"
+  aria-label="Toggle phosphor mode">
+  &gt;_
+</button>

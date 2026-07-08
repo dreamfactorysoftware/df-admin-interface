@@ -88,13 +88,14 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         gap: 0.75rem;
         max-width: 100%;
 
+        // Departure: bubbles ride the shared corner scale, flat with
+        // hairline borders; the user bubble is the solid accent.
         &--user {
           justify-content: flex-end;
 
           .msg__bubble {
-            background: #2563eb;
-            color: #fff;
-            border-bottom-right-radius: 4px;
+            background: var(--df-accent);
+            color: var(--df-accent-contrast);
           }
         }
 
@@ -104,8 +105,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
 
           .msg__bubble {
             background: var(--chat-surface-2);
-            border: 1px solid var(--chat-border);
-            border-bottom-left-radius: 4px;
+            border: 1px solid var(--chat-border-2);
           }
         }
 
@@ -116,7 +116,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
             background: var(--chat-hover);
             color: var(--chat-text-muted);
             font-style: italic;
-            font-size: 14px;
+            font-size: 1.3rem;
           }
         }
 
@@ -125,17 +125,17 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           width: 2rem;
           height: 2rem;
           border-radius: 999px;
-          background: rgba(96, 165, 250, 0.15);
-          color: #60a5fa;
+          background: var(--df-accent-soft);
+          color: var(--df-accent);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 15px;
+          font-size: 1.4rem;
         }
 
         &__bubble {
           padding: 0.75rem 1rem;
-          border-radius: 14px;
+          border-radius: var(--df-radius);
           max-width: min(720px, 80%);
 
           p {
@@ -153,7 +153,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         &__empty {
           color: var(--chat-text-faint);
           font-style: italic;
-          font-size: 14px;
+          font-size: 1.3rem;
         }
 
         &__code {
@@ -162,7 +162,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           background: var(--chat-code-bg);
           // Hairline on a panel that stays dark in both themes: keep white.
           border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 6px;
+          border-radius: var(--df-radius-sm);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 13px;
           line-height: 1.5;
@@ -210,20 +210,21 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           padding: 0.5rem 0.625rem;
           background: var(--chat-code-bg);
           border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 6px;
+          border-radius: var(--df-radius-sm);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 12px;
           line-height: 1.45;
           white-space: pre-wrap;
           word-break: break-word;
-          color: rgba(255, 255, 255, 0.8);
+          color: var(--df-code-text);
           overflow: auto;
         }
 
         &__tool-call-service {
-          padding: 0.1rem 0.4rem;
-          border-radius: 999px;
+          padding: 0.1rem 0.5rem;
+          border-radius: var(--df-radius-sm);
           background: var(--chat-surface-2);
+          border: 1px solid var(--chat-border-2);
           font-size: 11px;
         }
 
@@ -236,6 +237,12 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           font-size: 11px;
           color: var(--chat-text-faint);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+
+          // dark-style.scss forces span color to white under .dark-theme;
+          // keep usage metadata faint in both themes.
+          span {
+            color: var(--chat-text-faint) !important;
+          }
         }
       }
     `,

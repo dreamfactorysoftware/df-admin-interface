@@ -3,6 +3,7 @@
   // DfThemeService stamps .dark-theme on <body>). Child components (message,
   // tool-result, session-list) inherit these vars through the DOM, so this
   // stays the single place the chat palette is defined.
+  --chat-surface: var(--df-surface);
   --chat-surface-2: var(--df-surface-2);
   --chat-hover: var(--df-hover);
   --chat-border: var(--df-border);
@@ -13,23 +14,21 @@
   --chat-text-faint: var(--df-text-faint);
   --chat-heading: var(--df-text);
   --chat-code-bg: var(--df-code-bg);
-  // The chat panel wash is deliberately subtler than --df-surface-2 (0.02 vs
-  // 0.04/0.06), so it keeps its own values; the dark override sits at the
-  // bottom of this file, keyed off the body theme class.
-  --chat-surface: rgba(0, 0, 0, 0.02);
 
   display: flex;
   flex-direction: column;
   color: var(--chat-text);
+  // Departure: the routed content already sits on the bordered .main content
+  // card (df-side-nav, padding 20px 24px). Bleed to its edges so the card
+  // itself IS the chat surface — one bordered surface, hairlines inside.
+  margin: -20px -24px;
+  border: none;
+  background: transparent;
   // Fit within the viewport under the DF top bar + page heading so the message
-  // input stays visible without scrolling the page. Measured chrome above the
-  // chat is ~221px; this offset clears it with a small bottom margin.
-  height: calc(100vh - 24rem);
+  // input stays visible without scrolling the page. The old offset was 24rem
+  // with inner margins; the card bleed reclaims ~40px of chrome.
+  height: calc(100vh - 20rem);
   min-height: 420px;
-  margin: 0.75rem 1rem;
-  border: 1px solid var(--chat-border);
-  border-radius: 12px;
-  background: var(--chat-surface);
   overflow: hidden;
 
   &__header {
@@ -37,7 +36,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 1rem 1.25rem;
+    padding: 10px 16px;
+    min-height: 52px;
     border-bottom: 1px solid var(--chat-border-2);
     flex-wrap: wrap;
   }
@@ -49,8 +49,9 @@
 
     h2 {
       margin: 0;
-      font-size: 20px;
+      font-size: 1.6rem;
       font-weight: 600;
+      letter-spacing: -0.01em;
     }
   }
 
@@ -58,11 +59,16 @@
     min-width: 220px;
   }
 
+  // !important on the text-emphasis colors below: dark-style.scss forces
+  // `span { color: white !important }` under .dark-theme; these keep the
+  // departure type hierarchy legible in both themes (tokens, so still AA).
   &__service-name {
-    padding: 0.25rem 0.625rem;
-    border-radius: 999px;
+    padding: 2px 8px;
+    border-radius: var(--df-radius-sm);
     background: var(--chat-surface-2);
-    font-size: 14px;
+    border: 1px solid var(--chat-border-2);
+    font-size: 1.25rem;
+    color: var(--chat-text-2) !important;
   }
 
   &__header-right {
@@ -70,22 +76,26 @@
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-    color: var(--chat-text-2);
-    font-size: 14px;
+    color: var(--chat-text-muted);
+    font-size: 1.25rem;
   }
 
   &__scope-label {
+    font-size: 11px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--chat-text-muted) !important;
   }
 
   &__scope-chip {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-    font-size: 13px;
-    padding: 0.2rem 0.625rem;
-    border-radius: 999px;
-    background: rgba(46, 160, 67, 0.15);
-    border: 1px solid rgba(46, 160, 67, 0.4);
-    color: #4ade80;
+    font-size: 1.2rem;
+    padding: 2px 8px;
+    border-radius: var(--df-radius-sm);
+    background: var(--df-success-soft);
+    border: 1px solid var(--df-success-border);
+    color: var(--df-success) !important;
   }
 
   &__empty,
@@ -101,11 +111,14 @@
 
     h3 {
       margin: 0 0 0.5rem;
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
       color: var(--chat-heading);
     }
 
     a {
-      color: #60a5fa;
+      color: var(--df-accent);
     }
   }
 
@@ -143,8 +156,8 @@
   }
 
   &__act-as-hint {
-    font-size: 12px;
-    color: var(--chat-text-muted);
+    font-size: 1.2rem;
+    color: var(--chat-text-muted) !important;
   }
 
   &__session-list {
@@ -161,10 +174,10 @@
   &__error {
     margin: 0.75rem 1rem;
     padding: 0.75rem 1rem;
-    border-radius: 6px;
-    background: rgba(220, 53, 69, 0.12);
-    border: 1px solid rgba(220, 53, 69, 0.4);
-    color: #ff8585;
+    border-radius: var(--df-radius-sm);
+    background: var(--df-danger-soft);
+    border: 1px solid var(--df-danger-border);
+    color: var(--df-danger);
   }
 
   &__messages {
@@ -186,14 +199,17 @@
     align-items: center;
     gap: 0.625rem;
     padding: 0.5rem 0.875rem;
-    background: var(--chat-hover);
-    border-radius: 999px;
+    background: var(--chat-surface-2);
+    border: 1px solid var(--chat-border-2);
+    border-radius: var(--df-radius-sm);
     color: var(--chat-text-2);
-    font-size: 14px;
+    font-size: 1.3rem;
     align-self: flex-start;
   }
 }
 
-:host-context(.dark-theme) .ai-chat {
-  --chat-surface: rgba(255, 255, 255, 0.02);
+// The .main card drops to 16px padding on small screens; match the bleed.
+:host-context(.small) .ai-chat {
+  margin: -16px;
+  height: calc(100vh - 19rem);
 }

@@ -28,6 +28,7 @@ import {
   transformRoutes,
 } from '../../utilities/route';
 import { Nav } from '../../types/nav';
+import { ROUTES } from '../../types/routes';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
@@ -81,6 +82,7 @@ export class DfSideNavComponent implements OnInit {
   faBars = faBars;
   hasError$ = this.errorService.hasError$;
   nav: Array<Nav> = [];
+  navGroups: Array<{ label: string; items: Array<Nav> }> = [];
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
   faMagnifyingGlass = faMagnifyingGlass;
   faUser = faUser;
@@ -151,6 +153,7 @@ export class DfSideNavComponent implements OnInit {
         } else {
           this.nav = transformRoutes(routes);
         }
+        this.navGroups = this.buildNavGroups(this.nav);
       });
     this.search.valueChanges
       .pipe(
@@ -168,6 +171,72 @@ export class DfSideNavComponent implements OnInit {
       .subscribe(license => (this.licenseType = license));
   }
   isDarkMode = this.themeService.darkMode$;
+
+  /**
+   * Pillar IA for the shell prototype: group the flat top-level nav into
+   * product pillars. Presentation-only; the route table is untouched and
+   * any item not claimed by a pillar still renders in a trailing group so
+   * restricted-access nav sets never lose entries.
+   */
+  private buildNavGroups(
+    nav: Array<Nav>
+  ): Array<{ label: string; items: Array<Nav> }> {
+    // Captain 2026-07-07: these read as sections, not top-level rows. Nest
+    // each former top-level item inside its owning expansion.
+    const nested: Array<{ child: ROUTES; parent: ROUTES }> = [
+      { child: ROUTES.API_BUILDER, parent: ROUTES.API_CONNECTIONS },
+      { child: ROUTES.AGENTS, parent: ROUTES.AI },
+      { child: ROUTES.ALERTS, parent: ROUTES.SYSTEM_SETTINGS },
+    ];
+    for (const rule of nested) {
+      const childIdx = nav.findIndex(item => item.route === rule.child);
+      const parent = nav.find(item => item.route === rule.parent);
+      if (childIdx !== -1 && parent) {
+        parent.subRoutes = [...(parent.subRoutes ?? []), nav[childIdx]];
+        nav.splice(childIdx, 1);
+      }
+    }
+    const byRoute = new Map(nav.map(item => [item.route, item]));
+    const claimed = new Set<Nav>();
+    const pick = (routeIds: Array<ROUTES>) =>
+      routeIds
+        .map(id => byRoute.get(id))
+        .filter((item): item is Nav => {
+          if (!item) return false;
+          claimed.add(item);
+          return true;
+        });
+    const groups = [
+      { label: '', items: pick([ROUTES.HOME]) },
+      {
+        label: 'Build',
+        items: pick([ROUTES.API_CONNECTIONS]),
+      },
+      { label: 'Secure & Manage', items: pick([ROUTES.API_SECURITY]) },
+      {
+        label: 'AI Gateway',
+        items: pick([ROUTES.AI]),
+      },
+      {
+        label: 'System',
+        items: pick([ROUTES.SYSTEM_SETTINGS, ROUTES.ADMIN_SETTINGS]),
+      },
+      { label: '', items: nav.filter(item => !claimed.has(item)) },
+    ];
+    return groups.filter(group => group.items.length);
+  }
+
+  trackByGroupLabel = (
+    index: number,
+    group: { label: string; items: Array<Nav> }
+  ) => `${index}-${group.label}`;
+
+  /** Last breadcrumb = the current page; rendered as the content H1. */
+  get currentCrumb() {
+    const crumbs = this.breadCrumbs;
+    return crumbs.length ? crumbs[crumbs.length - 1] : undefined;
+  }
+
   logout() {
     this.authService.logout();
   }

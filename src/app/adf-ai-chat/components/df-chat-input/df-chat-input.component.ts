@@ -62,7 +62,7 @@ import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
           max-height: 8rem;
           padding: 0.625rem 0.875rem;
           border: 1px solid var(--df-border);
-          border-radius: 8px;
+          border-radius: var(--df-radius-sm);
           // Input well: a light-mode token surface; in dark mode keep the
           // original darker-than-card translucent black.
           background: var(--df-surface-2);
@@ -77,7 +77,7 @@ import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 
           &:focus {
             outline: none;
-            border-color: #60a5fa;
+            border-color: var(--df-accent);
           }
 
           &:disabled {
@@ -90,9 +90,9 @@ import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
           height: 2.5rem;
           flex-shrink: 0;
           border: none;
-          border-radius: 999px;
-          background: #2563eb;
-          color: #fff;
+          border-radius: var(--df-radius-sm);
+          background: var(--df-accent);
+          color: var(--df-accent-contrast);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -100,7 +100,7 @@ import { faPaperPlane } from '@fortawesome/free-solid-svg-icons';
           transition: background 120ms ease;
 
           &:hover:not(:disabled) {
-            background: #1d4ed8;
+            background: var(--df-accent-strong);
           }
 
           &:disabled {

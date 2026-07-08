@@ -89,12 +89,6 @@ mat-card.notice-card {
     color: var(--df-text);
   }
 
-  // The AI CTA banner stays light in both themes; keep its slate copy
-  // readable (the h2/p rule above would otherwise turn it white).
-  .ai-home-cta__copy p {
-    color: #475569;
-  }
-
   // --df-surface dark (#1c1b21) matches the old palette 1003 (#1c1b20)
   .notice-card {
     background-color: var(--df-surface) !important;
@@ -103,11 +97,11 @@ mat-card.notice-card {
 
 .release-container {
   display: flex;
-  gap: 15px;
+  gap: 12px;
 }
 
 .release-card {
-  background-color: mat.get-color-from-palette($df-purple-palette, 100);
+  background-color: var(--df-surface);
 }
 
 .release-btn {
@@ -135,11 +129,12 @@ mat-card.notice-card {
   }
 }
 
+// Brand-purple accent wash; adapts to both themes through the tokens.
 .ai-home-cta {
   align-items: center;
-  background: #f0fdfa;
-  border: 1px solid rgba(13, 148, 136, 0.25);
-  border-radius: 8px;
+  background: var(--df-accent-soft);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
   display: grid;
   gap: 14px;
   grid-template-columns: 42px minmax(0, 1fr) auto;
@@ -149,9 +144,9 @@ mat-card.notice-card {
 
 .ai-home-cta__icon {
   align-items: center;
-  background: #ccfbf1;
-  border-radius: 8px;
-  color: #0f766e;
+  background: var(--df-accent);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-accent-contrast);
   display: flex;
   height: 42px;
   justify-content: center;
@@ -162,14 +157,15 @@ mat-card.notice-card {
   min-width: 0;
 
   h3 {
+    color: var(--df-text);
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 650;
     line-height: 1.25;
     margin: 0 0 4px;
   }
 
   p {
-    color: #475569;
+    color: var(--df-text-2);
     font-size: 13px;
     line-height: 1.45;
     margin: 0;
@@ -177,7 +173,7 @@ mat-card.notice-card {
 }
 
 .ai-home-cta a {
-  border-radius: 6px;
+  border-radius: var(--df-radius-sm);
   white-space: nowrap;
 }
 

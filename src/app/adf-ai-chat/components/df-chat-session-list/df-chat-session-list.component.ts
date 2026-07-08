@@ -82,13 +82,14 @@ import { ChatSession } from '../../types/chat';
           display: inline-flex !important;
           align-items: center;
           gap: 0.5rem;
+          border-radius: var(--df-radius-sm) !important;
         }
 
         &__empty {
           padding: 1rem 1rem 0;
           color: var(--chat-text-muted);
           font-style: italic;
-          font-size: 14px;
+          font-size: 1.3rem;
         }
 
         &__items {
@@ -99,14 +100,17 @@ import { ChatSession } from '../../types/chat';
           margin: 0;
         }
 
+        // Sidebar density language: 44px rows, hairline separators,
+        // active state on the accent wash + inset accent bar.
         &__item {
           display: flex;
           align-items: stretch;
+          min-height: 44px;
           border-bottom: 1px solid var(--chat-border-2);
 
           &--active {
-            background: rgba(96, 165, 250, 0.08);
-            box-shadow: inset 3px 0 0 #60a5fa;
+            background: var(--df-accent-soft);
+            box-shadow: inset 2px 0 0 var(--df-accent);
           }
 
           &:hover:not(.session-list__item--active) {
@@ -120,38 +124,41 @@ import { ChatSession } from '../../types/chat';
           border: none;
           color: inherit;
           text-align: left;
-          padding: 0.625rem 1rem;
+          padding: 6px 12px;
           cursor: pointer;
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          justify-content: center;
+          gap: 2px;
           font-family: inherit;
           font-size: inherit;
         }
 
         &__title {
           font-weight: 500;
-          font-size: 0.9375rem;
+          font-size: 1.3rem;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
+        // !important: dark-style.scss forces span/button color to white
+        // under .dark-theme; these keep the muted hierarchy in both themes.
         &__meta {
-          font-size: 12px;
-          color: var(--chat-text-muted);
+          font-size: 1.1rem;
+          color: var(--chat-text-muted) !important;
         }
 
         &__delete {
           background: none;
           border: none;
-          color: var(--chat-text-faint);
+          color: var(--chat-text-faint) !important;
           cursor: pointer;
           padding: 0.5rem 0.875rem;
-          font-size: 14px;
+          font-size: 1.3rem;
 
           &:hover {
-            color: #ff6b6b;
+            color: var(--df-danger) !important;
           }
         }
       }
