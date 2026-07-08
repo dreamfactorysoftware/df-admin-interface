@@ -1,0 +1,57 @@
+<section class="onboarding" *transloco="let t; read: 'onboardingChecklist'">
+  <header *ngIf="showHeader" class="onboarding__head">
+    <span class="df-eyebrow">{{ t('eyebrow') }}</span>
+    <h2 class="onboarding__title">
+      {{ allComplete ? t('allDoneTitle') : t('title') }}
+    </h2>
+    <p class="onboarding__subtitle">
+      {{ allComplete ? t('allDoneSubtitle') : t('subtitle') }}
+    </p>
+  </header>
+
+  <ol class="onboarding__steps">
+    <li
+      *ngFor="let step of resolvedSteps; let i = index; trackBy: trackByKey"
+      class="onboarding__step"
+      [ngClass]="'onboarding__step--' + stateOf(i, step)">
+      <span class="onboarding__marker" aria-hidden="true">
+        <fa-icon
+          *ngIf="stateOf(i, step) === 'done'; else stepIndex"
+          [icon]="faCheck"
+          class="onboarding__check"></fa-icon>
+        <ng-template #stepIndex>
+          <span class="onboarding__index">{{ i + 1 }}</span>
+        </ng-template>
+      </span>
+
+      <div class="onboarding__body">
+        <span class="onboarding__step-title">
+          {{ step.title || t('steps.' + step.key + '.title') }}
+        </span>
+        <span class="onboarding__step-desc">
+          {{ step.description || t('steps.' + step.key + '.description') }}
+        </span>
+      </div>
+
+      <div class="onboarding__aside">
+        <df-badge
+          *ngIf="stateOf(i, step) === 'done'"
+          variant="success"
+          [label]="t('done')"></df-badge>
+
+        <a
+          *ngIf="stateOf(i, step) === 'active'"
+          mat-flat-button
+          color="primary"
+          class="onboarding__cta"
+          [routerLink]="step.route"
+          (click)="onCtaClick(step)">
+          {{ step.ctaLabel || t('steps.' + step.key + '.cta') }}
+          <fa-icon
+            [icon]="faArrowRight"
+            class="onboarding__cta-icon"></fa-icon>
+        </a>
+      </div>
+    </li>
+  </ol>
+</section>
