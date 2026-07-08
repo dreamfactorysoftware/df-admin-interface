@@ -1001,5 +1001,46 @@
         "message": "Agent actions appear here once df-alerts is configured with a channel."
       }
     }
+  },
+  "pipelineStrip": {
+    "view": "View",
+    "addPolicy": "Add policy",
+    "error": {
+      "title": "Pipeline unavailable",
+      "hint": "The request chain could not be derived. Reload to try again."
+    },
+    "status": {
+      "active": "Active",
+      "filtered": "Filtered",
+      "open": "Open",
+      "handler": "Generated"
+    },
+    "nodes": {
+      "key": {
+        "title": "API key",
+        "detail": "{{count}} keys can authenticate a request.",
+        "empty": "No key exists. Nothing can call this service yet."
+      },
+      "role": {
+        "title": "Role gate",
+        "detail": "{{count}} roles grant access to this service.",
+        "empty": "No role grants access. Requests are denied at the gate."
+      },
+      "rate": {
+        "title": "Rate limit",
+        "detail": "{{rate}} requests per {{period}}.",
+        "empty": "Unmetered. Requests are not capped."
+      },
+      "filter": {
+        "title": "Field filter",
+        "detail": "{{count}} grants narrow the rows or fields returned.",
+        "empty": "No field filters. Roles reach whole tables."
+      },
+      "handler": {
+        "title": "Generated handler",
+        "detail": "{{type}} REST API, generated from the schema.",
+        "empty": "REST API, generated from the schema."
+      }
+    }
   }
 }

@@ -114,6 +114,7 @@ import {
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 import { DfScopeMatrixComponent } from 'src/app/shared/components/df-scope-matrix/df-scope-matrix.component';
+import { DfPipelineStripComponent } from 'src/app/shared/components/df-pipeline-strip/df-pipeline-strip.component';
 import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
 import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
 
@@ -195,6 +196,7 @@ interface ServiceResponse {
     DfPageHeaderComponent,
     DfArtifactCardComponent,
     DfScopeMatrixComponent,
+    DfPipelineStripComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {

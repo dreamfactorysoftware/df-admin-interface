@@ -500,6 +500,28 @@
         (createKey)="onCreateApiKey()">
       </df-artifact-card>
 
+      <!-- Meridian Phase 5: Pipeline. The effective request chain for this
+           service as hairline cards (key -> role gate -> rate limit -> field
+           filter -> generated handler), each node deep-linked to the config
+           that governs it. Sits above Access so the chain reads before the
+           roles x verbs detail.
+      -->
+      <section class="service-pipeline" *ngIf="serviceData.id">
+        <df-page-header
+          [eyebrow]="'services.pipeline.eyebrow' | transloco"
+          [title]="'services.pipeline.title' | transloco"
+          [description]="'services.pipeline.description' | transloco">
+        </df-page-header>
+        <p class="service-pipeline__hint">
+          {{ 'services.pipeline.hint' | transloco }}
+        </p>
+        <df-pipeline-strip
+          [serviceId]="serviceData.id"
+          [serviceName]="serviceData.name"
+          [serviceType]="serviceData.type">
+        </df-pipeline-strip>
+      </section>
+
       <!-- Meridian Phase 3: Access. Governance made legible where you build
            the API. The roles x verbs matrix is derived client-side from the
            role graph; clicking a granted cell opens the role's resolved scope.
