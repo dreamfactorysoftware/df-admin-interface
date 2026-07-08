@@ -946,7 +946,8 @@
     },
     "tiles": {
       "totalApis": "Total APIs",
-      "percentProtected": "Protected",
+      "scopedAccess": "Scoped access",
+      "scopedAccessTip": "Of the APIs a role can reach, the share limited to specific tables or read-only access. Higher is tighter.",
       "deprecated": "Deprecated",
       "requestsToday": "Requests",
       "spendToday": "Spend"
@@ -957,9 +958,9 @@
       "30d": "Last 30 days",
       "all": "All time"
     },
-    "unprotected": {
-      "label": "{{count}} services have no role protection",
-      "cta": "Fix access"
+    "exposure": {
+      "label": "{{count}} services allow broad read and write access",
+      "cta": "Review access"
     }
   },
   "agents": {

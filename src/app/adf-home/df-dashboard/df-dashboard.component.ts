@@ -24,6 +24,7 @@ import {
   DfHomeMetricsService,
   HomeMetrics,
 } from 'src/app/shared/services/df-home-metrics.service';
+import { ServiceScopePosture } from 'src/app/shared/services/df-scope.service';
 import { DfArtifactResolverService } from 'src/app/shared/services/df-artifact-resolver.service';
 import { ArtifactKeyOption } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 
@@ -77,6 +78,8 @@ interface KpiTile {
   value: string | number;
   route: string | unknown[];
   invertDelta?: boolean;
+  /** Optional i18n key for a native tooltip explaining what the KPI means. */
+  tooltip?: string;
 }
 
 type HomeState = 'loading' | 'error' | 'onboarding' | 'cockpit';
@@ -92,7 +95,9 @@ type HomeState = 'loading' | 'error' | 'onboarding' | 'cockpit';
  *    REAL endpoint via DfHomeMetricsService; null metrics are omitted, never
  *    faked) governed by one time-range select, the df-artifact-card Live API
  *    Card wired through the shared resolver so its curl returns 200, and an
- *    unprotected-endpoints alert strip when any service has no role gate.
+ *    exposure alert strip when any user service is OPEN - broadly reachable
+ *    (whole-service read+write) through an active role. Deny-by-default: a
+ *    service no role grants is LOCKED, not a risk, and is never flagged.
  *
  * Loading renders df-skeleton tiles + checklist rows; a hard fetch failure
  * renders df-empty-state with retry. Tokens only, i18n via transloco.
@@ -148,8 +153,27 @@ export class DfDashboardComponent implements OnInit {
   artifactSampleTable = 'your_table';
   artifactKeys: ArtifactKeyOption[] = [];
 
-  // Unprotected-endpoints alert strip.
-  unprotectedCount = 0;
+  // Exposure alert strip: user services classified OPEN (whole-service write
+  // via some active role). Empty = nothing broadly exposed; the strip hides.
+  openServices: ServiceScopePosture[] = [];
+  get openCount(): number {
+    return this.openServices.length;
+  }
+  /** Deep-link for the alert CTA: the first OPEN service's Access view when its
+   *  group resolved, else the roles list so "Review access" always lands. */
+  get openReviewRoute(): string | unknown[] {
+    return this.openServices[0]?.detailRoute ?? this.rolesRoute;
+  }
+  /** Roles that make the OPEN services broadly reachable - the strip's "why". */
+  get openReasons(): string {
+    const roles = new Set<string>();
+    for (const s of this.openServices) {
+      for (const r of s.openRoles) {
+        roles.add(r);
+      }
+    }
+    return Array.from(roles).join(', ');
+  }
 
   provisioning = false;
 
@@ -206,6 +230,7 @@ export class DfDashboardComponent implements OnInit {
       const metrics = await this.homeMetrics.getMetrics(this.range);
       this.tiles = this.buildTiles(metrics);
       this.firstCallMade = (metrics.requestsToday.value ?? 0) > 0;
+      this.openServices = metrics.openServices;
     } finally {
       this.tilesLoading = false;
     }
@@ -253,15 +278,10 @@ export class DfDashboardComponent implements OnInit {
   // --- State B assembly ----------------------------------------------------
 
   private async loadCockpit(): Promise<void> {
-    const [metrics, protectedIds] = await Promise.all([
-      this.homeMetrics.getMetrics(this.range),
-      this.fetchProtectedServiceIds(),
-    ]);
+    const metrics = await this.homeMetrics.getMetrics(this.range);
     this.tiles = this.buildTiles(metrics);
     this.firstCallMade = (metrics.requestsToday.value ?? 0) > 0;
-    this.unprotectedCount = protectedIds
-      ? this.userServices.filter(s => !protectedIds.has(s.id)).length
-      : 0;
+    this.openServices = metrics.openServices;
     await this.loadArtifactCard();
   }
 
@@ -277,12 +297,13 @@ export class DfDashboardComponent implements OnInit {
         route: [`/${ROUTES.API_CONNECTIONS}`],
       });
     }
-    if (metrics.percentProtected.value !== null) {
+    if (metrics.scopedAccess.value !== null) {
       tiles.push({
-        key: 'percentProtected',
-        label: 'homeCockpit.tiles.percentProtected',
-        value: `${metrics.percentProtected.value}%`,
+        key: 'scopedAccess',
+        label: 'homeCockpit.tiles.scopedAccess',
+        value: `${metrics.scopedAccess.value}%`,
         route: this.rolesRoute,
+        tooltip: 'homeCockpit.tiles.scopedAccessTip',
       });
     }
     if (metrics.deprecatedCount.value !== null) {
@@ -370,34 +391,6 @@ export class DfDashboardComponent implements OnInit {
       return res?.meta?.count ?? res?.resource?.length ?? 0;
     } catch {
       return 0;
-    }
-  }
-
-  // serviceIds referenced by any active role's service access. null when the
-  // roles endpoint is unreadable, so the strip is suppressed rather than
-  // claiming everything is unprotected.
-  private async fetchProtectedServiceIds(): Promise<Set<number> | null> {
-    try {
-      const res = await firstValueFrom(
-        this.http.get<any>(
-          `${BASE_URL}/system/role?related=role_service_access_by_role_id&limit=200`,
-          { context: silent() }
-        )
-      );
-      const ids = new Set<number>();
-      for (const role of res?.resource ?? []) {
-        if (role?.isActive === false) {
-          continue;
-        }
-        for (const a of role?.roleServiceAccessByRoleId ?? []) {
-          if (typeof a?.serviceId === 'number') {
-            ids.add(a.serviceId);
-          }
-        }
-      }
-      return ids;
-    } catch {
-      return null;
     }
   }
 }

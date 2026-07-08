@@ -64,7 +64,8 @@
         [label]="tile.label | transloco"
         [value]="tile.value"
         [invertDelta]="tile.invertDelta || false"
-        [route]="tile.route">
+        [route]="tile.route"
+        [attr.title]="tile.tooltip ? (tile.tooltip | transloco) : null">
       </df-stat-tile>
     </div>
     <ng-template #tileSkeleton>
@@ -73,21 +74,21 @@
       </div>
     </ng-template>
 
-    <!-- Unprotected-endpoints alert strip (only when something is ungoverned) -->
+    <!-- Exposure alert strip (only when a user service is broadly OPEN) -->
     <a
-      *ngIf="unprotectedCount > 0"
+      *ngIf="openCount > 0"
       class="unprotected-strip"
-      [routerLink]="rolesRoute">
+      [routerLink]="openReviewRoute"
+      [attr.title]="openReasons || null">
       <fa-icon [icon]="faShieldHalved"></fa-icon>
       <df-badge
         variant="warning"
         [label]="
-          'homeCockpit.unprotected.label'
-            | transloco: { count: unprotectedCount }
+          'homeCockpit.exposure.label' | transloco: { count: openCount }
         ">
       </df-badge>
       <span class="unprotected-cta">
-        {{ 'homeCockpit.unprotected.cta' | transloco }}
+        {{ 'homeCockpit.exposure.cta' | transloco }}
         <fa-icon [icon]="faArrowRight"></fa-icon>
       </span>
     </a>

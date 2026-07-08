@@ -4,6 +4,11 @@ import { firstValueFrom } from 'rxjs';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
 import type { TimeRange } from 'src/app/adf-ai-usage/services/usage.service';
+import {
+  DfScopeService,
+  GovernancePosture,
+  ServiceScopePosture,
+} from 'src/app/shared/services/df-scope.service';
 
 /**
  * A single Home KPI. `value` is `null` when this instance has NO real source
@@ -23,6 +28,7 @@ export type HomeMetricReason =
   | 'no-services' // no user services on this instance yet (State A)
   | 'no-permission' // endpoint returned 403/500 for this admin
   | 'no-source' // this instance has no endpoint/field backing the metric
+  | 'no-reachable' // services exist but no active role reaches any (all locked)
   | 'endpoint-unavailable'; // the source endpoint errored / is not mounted
 
 /**
@@ -30,19 +36,27 @@ export type HomeMetricReason =
  * client-side from a REAL DreamFactory endpoint; a metric with no source on
  * the instance carries `value: null` so its tile is omitted.
  *
- * - totalApis        count of user services (system services excluded)
- * - percentProtected % of user services gated by at least one active role
- * - deprecatedCount  services flagged deprecated IF the schema carries a
- *                    lifecycle field; null otherwise (DF core has none)
- * - requestsToday    AI-gateway request volume for the window (trailing 24h)
- * - spendToday       AI-gateway spend (USD) for the window (trailing 24h)
+ * - totalApis      count of user services (system services excluded)
+ * - scopedAccess   of the REACHABLE user services (scoped + open), the % that
+ *                  are SCOPED (constrained). The honest deny-by-default
+ *                  governance KPI: high = reach is tightly scoped, low = broad
+ *                  read/write exposure. null when nothing is reachable (all
+ *                  locked) so it never fabricates a percentage.
+ * - deprecatedCount services flagged deprecated IF the schema carries a
+ *                  lifecycle field; null otherwise (DF core has none)
+ * - requestsToday  AI-gateway request volume for the window (trailing 24h)
+ * - spendToday     AI-gateway spend (USD) for the window (trailing 24h)
+ * - openServices   the user services classified OPEN (whole-service write via
+ *                  some active role) - drives the exposure alert strip. Empty
+ *                  array = nothing exposed; never a fabricated entry.
  */
 export interface HomeMetrics {
   totalApis: HomeMetric;
-  percentProtected: HomeMetric;
+  scopedAccess: HomeMetric;
   deprecatedCount: HomeMetric;
   requestsToday: HomeMetric;
   spendToday: HomeMetric;
+  openServices: ServiceScopePosture[];
 }
 
 // System service names excluded from the user-facing API count. Mirrors the
@@ -86,6 +100,7 @@ interface ServiceRow {
 @Injectable({ providedIn: 'root' })
 export class DfHomeMetricsService {
   private http = inject(HttpClient);
+  private scope = inject(DfScopeService);
 
   /**
    * Resolve the Home KPI grid. Never throws and never fabricates: a metric
@@ -96,18 +111,29 @@ export class DfHomeMetricsService {
    *                   ('today' at the AI-usage endpoint's granularity).
    */
   async getMetrics(usageRange: TimeRange = '24h'): Promise<HomeMetrics> {
-    const [services, roleAccess, usage] = await Promise.all([
+    const [services, governance, usage] = await Promise.all([
       this.fetchUserServices(),
-      this.fetchProtectedServiceIds(),
+      this.fetchGovernance(),
       this.fetchUsage(usageRange),
     ]);
 
+    // Restrict the estate-wide posture to this instance's user services (system
+    // services are excluded from every Home number for one consistent model).
+    const userIds = services
+      ? new Set(services.map(s => s.id))
+      : new Set<number>();
+    const userPostures =
+      governance && services
+        ? governance.services.filter(p => userIds.has(p.serviceId))
+        : [];
+
     return {
       totalApis: this.deriveTotalApis(services),
-      percentProtected: this.derivePercentProtected(services, roleAccess),
+      scopedAccess: this.deriveScopedAccess(services, governance, userPostures),
       deprecatedCount: this.deriveDeprecated(services),
       requestsToday: this.deriveRequests(usage),
       spendToday: this.deriveSpend(usage),
+      openServices: userPostures.filter(p => p.posture === 'open'),
     };
   }
 
@@ -120,25 +146,33 @@ export class DfHomeMetricsService {
     return { value: services.length };
   }
 
-  // --- percentProtected ----------------------------------------------------
-  // A user service is "protected" when its access is mediated by at least one
-  // active role (it appears in some role's service access). Services no active
-  // role references are ungoverned -> they drive the "unprotected endpoints"
-  // alert. null when either input is unavailable or there are no services to
-  // divide by (no honest denominator).
+  // --- scopedAccess --------------------------------------------------------
+  // DreamFactory is deny-by-default: a service is only reachable if an ACTIVE
+  // role grants a key access to it. Of the REACHABLE user services (scoped +
+  // open), this is the share that are SCOPED - constrained to a named component
+  // or read-only. High = reach is tightly governed; low = broad read/write is
+  // common. A service NO role references is LOCKED, not counted here (it is the
+  // secure default, not a risk). null when nothing is reachable (all locked, or
+  // no user services) so we never fabricate a percentage.
 
-  private derivePercentProtected(
+  private deriveScopedAccess(
     services: ServiceRow[] | null,
-    protectedIds: Set<number> | null
+    governance: GovernancePosture | null,
+    userPostures: ServiceScopePosture[]
   ): HomeMetric {
-    if (services === null || protectedIds === null) {
+    if (services === null || governance === null) {
       return { value: null, reason: 'no-permission' };
     }
     if (services.length === 0) {
       return { value: null, reason: 'no-services' };
     }
-    const covered = services.filter(s => protectedIds.has(s.id)).length;
-    return { value: Math.round((covered / services.length) * 100) };
+    const scoped = userPostures.filter(p => p.posture === 'scoped').length;
+    const open = userPostures.filter(p => p.posture === 'open').length;
+    const reachable = scoped + open;
+    if (reachable === 0) {
+      return { value: null, reason: 'no-reachable' };
+    }
+    return { value: Math.round((scoped / reachable) * 100) };
   }
 
   // --- deprecatedCount -----------------------------------------------------
@@ -203,29 +237,14 @@ export class DfHomeMetricsService {
     }
   }
 
-  // Set of serviceIds referenced by any active role's service access. Empty
-  // set = roles exist but gate nothing; null = the roles endpoint is not
-  // readable by this admin (can't determine protection honestly).
-  private async fetchProtectedServiceIds(): Promise<Set<number> | null> {
+  // Estate-wide deny-by-default posture (locked/scoped/open) derived from the
+  // ACTIVE role graph by DfScopeService - the single parser of component +
+  // verbMask, reused here rather than re-fetching/re-parsing grants. null when
+  // the role graph is unreadable, so the governance KPI + alert are suppressed
+  // rather than guessing.
+  private async fetchGovernance(): Promise<GovernancePosture | null> {
     try {
-      const res = await firstValueFrom(
-        this.http.get<any>(
-          `${BASE_URL}/system/role?related=role_service_access_by_role_id&limit=200`,
-          { context: silent() }
-        )
-      );
-      const ids = new Set<number>();
-      for (const role of res?.resource ?? []) {
-        if (role?.isActive === false) {
-          continue;
-        }
-        for (const a of role?.roleServiceAccessByRoleId ?? []) {
-          if (typeof a?.serviceId === 'number') {
-            ids.add(a.serviceId);
-          }
-        }
-      }
-      return ids;
+      return await firstValueFrom(this.scope.governancePosture());
     } catch {
       return null;
     }

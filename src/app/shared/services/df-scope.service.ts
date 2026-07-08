@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
 import {
@@ -6,6 +7,10 @@ import {
   ROLE_SERVICE_TOKEN,
   SERVICES_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
+import { URLS } from 'src/app/shared/constants/urls';
+import { SERVICE_GROUPS } from 'src/app/shared/constants/serviceGroups';
+import { ROUTES } from 'src/app/shared/types/routes';
+import { silent } from 'src/app/shared/utilities/http-contexts';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { Service } from 'src/app/shared/types/service';
@@ -36,6 +41,20 @@ const VERB_BITS: Record<ScopeVerb, number> = {
   PATCH: 8,
   DELETE: 16,
 };
+
+/** POST|PUT|PATCH|DELETE - any bit here means a grant can mutate data. */
+const WRITE_MASK =
+  VERB_BITS.POST | VERB_BITS.PUT | VERB_BITS.PATCH | VERB_BITS.DELETE;
+
+/** api-types group route segments a service detail can live under, in the order
+ * df-search resolves them. Used to deep-link an OPEN service to its Access view. */
+const API_TYPE_SEGMENTS = [
+  ROUTES.DATABASE,
+  ROUTES.SCRIPTING,
+  ROUTES.NETWORK,
+  ROUTES.FILE,
+  ROUTES.UTILITY,
+] as const;
 
 /** How wide a grant reaches: whole service, a narrowed slice, or nothing. */
 export type CellState = 'full' | 'filtered' | 'none';
@@ -91,16 +110,53 @@ export interface ReachEntry {
   source: ScopeSource;
 }
 
+/**
+ * A user service's access posture under DreamFactory's deny-by-default model,
+ * derived from the ACTIVE role graph:
+ *  - `locked`  no active role grants access -> unreachable by any key. NOT a
+ *              risk; this is the secure default, never flagged.
+ *  - `scoped`  reachable but constrained -> a named-component grant (one table)
+ *              or read-only (only GET across its grants). Governed/good.
+ *  - `open`    an active role grants WHOLE-SERVICE access (component *, _table/*
+ *              or empty) WITH a write verb (POST/PUT/PATCH/DELETE) -> the real
+ *              exposure the Home alert surfaces.
+ */
+export type ServicePosture = 'locked' | 'scoped' | 'open';
+
+export interface ServiceScopePosture {
+  serviceId: number;
+  serviceName: string;
+  serviceLabel: string;
+  posture: ServicePosture;
+  /** Active role names whose grants make this service `open` (the "why"). */
+  openRoles: string[];
+  /** Router link to the service detail Access view, or null if the group of
+   * its service type could not be resolved (deep-link then falls back). */
+  detailRoute: string[] | null;
+}
+
+/** Estate-wide posture rollup over every service the role graph can classify. */
+export interface GovernancePosture {
+  services: ServiceScopePosture[];
+  lockedCount: number;
+  scopedCount: number;
+  openCount: number;
+  /** scoped + open - services at least one active role can actually reach. */
+  reachableCount: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DfScopeService {
   private roles$?: Observable<ScopeRole[]>;
   private services$?: Observable<Service[]>;
   private apps$?: Observable<AppType[]>;
+  private typeGroups$?: Observable<Map<string, string>>;
 
   constructor(
     @Inject(ROLE_SERVICE_TOKEN) private roleService: DfBaseCrudService,
     @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService,
-    @Inject(APP_SERVICE_TOKEN) private appService: DfBaseCrudService
+    @Inject(APP_SERVICE_TOKEN) private appService: DfBaseCrudService,
+    private http: HttpClient
   ) {}
 
   /** Drop every cache so the next derivation refetches (post-edit refresh). */
@@ -108,6 +164,7 @@ export class DfScopeService {
     this.roles$ = undefined;
     this.services$ = undefined;
     this.apps$ = undefined;
+    this.typeGroups$ = undefined;
   }
 
   private getRoles(): Observable<ScopeRole[]> {
@@ -298,6 +355,146 @@ export class DfScopeService {
       allow: verbs.length > 0,
       source,
     };
+  }
+
+  /**
+   * Classify every service by its deny-by-default access posture across all
+   * ACTIVE roles. This is the honest governance signal: LOCKED is the secure
+   * default (unreachable, never a risk), SCOPED is reachable-but-constrained,
+   * and OPEN - whole-service access with a write verb - is the real exposure.
+   * Rate limits are deliberately NOT a factor: they are optional in DF and say
+   * nothing about who can reach what.
+   */
+  governancePosture(): Observable<GovernancePosture> {
+    return forkJoin({
+      roles: this.getRoles(),
+      services: this.getServices(),
+      typeGroups: this.getTypeGroups(),
+    }).pipe(
+      map(({ roles, services, typeGroups }) =>
+        this.buildGovernance(roles, services, typeGroups)
+      )
+    );
+  }
+
+  private buildGovernance(
+    roles: ScopeRole[],
+    services: Service[],
+    typeGroups: Map<string, string>
+  ): GovernancePosture {
+    const activeRoles = roles.filter(r => r.isActive !== false);
+    const postures = services.map(svc =>
+      this.postureForService(svc, activeRoles, typeGroups)
+    );
+    const lockedCount = postures.filter(p => p.posture === 'locked').length;
+    const scopedCount = postures.filter(p => p.posture === 'scoped').length;
+    const openCount = postures.filter(p => p.posture === 'open').length;
+    return {
+      services: postures,
+      lockedCount,
+      scopedCount,
+      openCount,
+      reachableCount: scopedCount + openCount,
+    };
+  }
+
+  private postureForService(
+    service: Service,
+    activeRoles: ScopeRole[],
+    typeGroups: Map<string, string>
+  ): ServiceScopePosture {
+    let reachable = false;
+    const openRoles: string[] = [];
+
+    for (const role of activeRoles) {
+      let roleOpensService = false;
+      let roleReaches = false;
+      for (const row of role.roleServiceAccessByRoleId ?? []) {
+        const targetsService =
+          this.isWildcardService(row.serviceId) || row.serviceId === service.id;
+        if (!targetsService || row.verbMask <= 0) {
+          continue; // unrelated grant, or an explicit zero-verb deny row
+        }
+        roleReaches = true;
+        const wholeService = this.rowScope(row) === 'full';
+        const hasWrite = (row.verbMask & WRITE_MASK) !== 0;
+        if (wholeService && hasWrite) {
+          roleOpensService = true;
+        }
+      }
+      if (roleReaches) {
+        reachable = true;
+      }
+      if (roleOpensService) {
+        openRoles.push(role.name);
+      }
+    }
+
+    const posture: ServicePosture = !reachable
+      ? 'locked'
+      : openRoles.length > 0
+        ? 'open'
+        : 'scoped';
+
+    return {
+      serviceId: service.id,
+      serviceName: service.name,
+      serviceLabel: service.label || service.name,
+      posture,
+      openRoles,
+      detailRoute: this.detailRouteForService(service, typeGroups),
+    };
+  }
+
+  /** Deep-link array for a service's detail Access view, resolving its api-types
+   * group segment from the service type's group. null when unresolvable. */
+  private detailRouteForService(
+    service: Service,
+    typeGroups: Map<string, string>
+  ): string[] | null {
+    const group = typeGroups.get(service.type);
+    if (!group) {
+      return null;
+    }
+    const segment = API_TYPE_SEGMENTS.find(seg =>
+      SERVICE_GROUPS[seg]?.includes(group)
+    );
+    if (!segment) {
+      return null;
+    }
+    return [
+      '/',
+      ROUTES.API_CONNECTIONS,
+      ROUTES.API_TYPES,
+      segment,
+      String(service.id),
+    ];
+  }
+
+  /** service type name -> its group label (e.g. `mysql` -> `Database`), cached.
+   * Silent: an unreadable endpoint yields an empty map so deep-links fall back
+   * rather than breaking the posture rollup. */
+  private getTypeGroups(): Observable<Map<string, string>> {
+    if (!this.typeGroups$) {
+      this.typeGroups$ = this.http
+        .get<{
+          resource?: Array<{ name: string; group: string }>;
+        }>(`${URLS.SERVICE_TYPE}?fields=name,group`, { context: silent() })
+        .pipe(
+          map(res => {
+            const m = new Map<string, string>();
+            for (const t of res?.resource ?? []) {
+              if (t?.name && t?.group) {
+                m.set(t.name, t.group);
+              }
+            }
+            return m;
+          }),
+          catchError(() => of(new Map<string, string>())),
+          shareReplay(1)
+        );
+    }
+    return this.typeGroups$;
   }
 
   private isWildcardService(serviceId: number | null | undefined): boolean {
