@@ -1,0 +1,147 @@
+// df-onboarding-checklist — Home activation engine. Tokens only; no color or
+// type literals so it resolves in light, dark, and phosphor. Three row states
+// (done / active / upcoming) share one grid and differ only in emphasis:
+// done is a success check + badge, active carries the single primary CTA, and
+// upcoming is dimmed to --df-text-faint with no affordance.
+:host {
+  display: block;
+}
+
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-5);
+  padding: var(--df-space-5);
+  background-color: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+
+  &__head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-1);
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--df-font-size-xl);
+    font-weight: var(--df-font-weight-heading);
+    line-height: var(--df-lh-tight);
+    color: var(--df-text);
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: var(--df-font-size-sm);
+    line-height: var(--df-lh-base);
+    color: var(--df-text-muted);
+  }
+
+  &__steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  // ---- one row ----
+  &__step {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--df-space-3);
+    padding: var(--df-space-3);
+    border: 1px solid transparent;
+    border-radius: var(--df-radius-sm);
+  }
+
+  &__marker {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: var(--df-space-6);
+    height: var(--df-space-6);
+    border-radius: 50%;
+    font-size: var(--df-font-size-sm);
+    font-weight: var(--df-font-weight-medium);
+    line-height: 1;
+  }
+
+  &__check {
+    font-size: var(--df-font-size-sm);
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-1);
+    min-width: 0;
+  }
+
+  &__step-title {
+    font-size: var(--df-font-size-md);
+    font-weight: var(--df-font-weight-medium);
+    line-height: var(--df-lh-tight);
+    color: var(--df-text);
+  }
+
+  &__step-desc {
+    font-size: var(--df-font-size-sm);
+    line-height: var(--df-lh-base);
+    color: var(--df-text-muted);
+  }
+
+  &__aside {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-2);
+  }
+
+  &__cta-icon {
+    font-size: var(--df-font-size-xs);
+  }
+
+  // ---- state: done ----
+  &__step--done {
+    .onboarding__marker {
+      background-color: var(--df-success-soft);
+      color: var(--df-success);
+    }
+  }
+
+  // ---- state: active (the single current step) ----
+  &__step--active {
+    background-color: var(--df-surface-2);
+    border-color: var(--df-border);
+
+    .onboarding__marker {
+      background-color: var(--df-accent);
+      color: var(--df-accent-contrast);
+    }
+  }
+
+  // ---- state: upcoming (dimmed, no CTA) ----
+  &__step--upcoming {
+    .onboarding__marker {
+      background-color: var(--df-hover);
+      color: var(--df-text-faint);
+    }
+
+    .onboarding__step-title {
+      color: var(--df-text-muted);
+    }
+
+    .onboarding__step-desc {
+      color: var(--df-text-faint);
+    }
+  }
+}
