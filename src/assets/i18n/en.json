@@ -905,5 +905,101 @@
       "label": "{{count}} services have no role protection",
       "cta": "Fix access"
     }
+  },
+  "agents": {
+    "subtitle": "AI agents with a scoped identity and short-lived keys. Watch what they call, at what cost, and what each can reach.",
+    "newAgent": "New agent",
+    "refresh": "Refresh",
+    "live": "Live",
+    "liveTip": "Activity refreshes automatically",
+    "agentsTitle": "Agents",
+    "viewScope": "Show what this agent can reach",
+    "reach": "Resolved reach",
+    "reachHint": "The services and tables this agent's role grants.",
+    "empty": {
+      "title": "No agents yet",
+      "message": "Register an AI agent to give it a scoped identity and a short-lived key."
+    },
+    "state": {
+      "active": "Active",
+      "expired": "Key expired",
+      "revoked": "Revoked"
+    },
+    "log": {
+      "title": "Gateway request log",
+      "subtitle": "Highest-cost metered calls in this window. Select a row for the full record.",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "ok": "Completed",
+      "error": "Failed",
+      "completed": "OK",
+      "failed": "Error",
+      "scoped": "Scoped",
+      "unscoped": "Unscoped",
+      "range": "Window",
+      "range24h": "Last 24h",
+      "range7d": "Last 7 days",
+      "range30d": "Last 30 days",
+      "rangeAll": "All time",
+      "empty": {
+        "title": "No agent activity yet",
+        "message": "Calls appear here once an agent or key makes a gateway request."
+      },
+      "noMatch": {
+        "title": "No matching calls",
+        "message": "No calls match this status filter in the selected window."
+      }
+    },
+    "col": {
+      "time": "Time",
+      "provider": "Provider",
+      "model": "Model",
+      "status": "Status",
+      "tokens": "Tokens in/out",
+      "cost": "Cost",
+      "latency": "Latency",
+      "scope": "Scope"
+    },
+    "drawer": {
+      "title": "Call detail",
+      "close": "Close",
+      "guardrails": "Guardrails",
+      "completed": "Completed",
+      "failed": "Failed",
+      "scopeEnforced": "Scope enforced",
+      "unscoped": "Unscoped",
+      "guardrailHint": "DreamFactory enforces the call outcome and the role scope the call ran under. Other checks are only shown when a real signal exists.",
+      "attribution": "Attribution",
+      "service": "Service",
+      "resource": "Resource",
+      "provider": "Provider",
+      "role": "Role",
+      "user": "User",
+      "app": "Key / app",
+      "when": "When",
+      "none": "None",
+      "metrics": "Metrics",
+      "tokensIn": "Tokens in",
+      "tokensOut": "Tokens out",
+      "cost": "Cost",
+      "latency": "Latency",
+      "body": "Prompt & response",
+      "bodyNote": "Prompt and response bodies are not retained by the gateway."
+    },
+    "pending": {
+      "title": "Pending access requests",
+      "empty": {
+        "title": "No pending requests",
+        "message": "When an agent asks for access it needs, the request lands here to approve or deny."
+      }
+    },
+    "activity": {
+      "title": "Agent activity",
+      "alerts": "Recent agent alerts",
+      "emptyAlerts": {
+        "title": "No agent alerts yet",
+        "message": "Agent actions appear here once df-alerts is configured with a channel."
+      }
+    }
   }
 }
