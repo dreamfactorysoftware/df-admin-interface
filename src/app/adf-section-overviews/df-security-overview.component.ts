@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { TranslocoService } from '@ngneat/transloco';
 import { catchError, map, of } from 'rxjs';
 import {
   DfSectionLandingComponent,
@@ -13,15 +14,20 @@ import { GenericListResponse } from '../shared/types/generic-http';
 import { ROUTES } from '../shared/types/routes';
 import { ServiceType } from '../shared/types/service';
 
+// Secure & Manage pillar home (/api-security). Tiles mirror the section's
+// nav children: Authentication + Rate Limiting live here, Role-Based Access
+// and API Keys are surfaced from api-connections via redirect. Tints keep
+// the page from reading monochrome (item 21): core access controls take the
+// security hue, rate limiting takes system (operational throttle).
 @Component({
   selector: 'df-security-overview',
   standalone: true,
   imports: [CommonModule, DfSectionLandingComponent],
   template: `
     <df-section-landing
-      eyebrow="Security"
-      title="Control who can call what"
-      description="Review the access surfaces that protect generated APIs: authentication providers, rate limits, roles, and application keys."
+      [eyebrow]="t('eyebrow')"
+      [title]="t('title')"
+      [description]="t('description')"
       [actions]="actions"
       [groups]="groups"
       [notes]="notes">
@@ -30,19 +36,24 @@ import { ServiceType } from '../shared/types/service';
 })
 export class DfSecurityOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
+  private transloco = inject(TranslocoService);
   private serviceTypes: ServiceType[] | null = null;
 
   groups: SectionLandingGroup[] = [];
 
+  t(key: string): string {
+    return this.transloco.translate(`sectionOverviews.security.${key}`);
+  }
+
   readonly actions: SectionLandingAction[] = [
     {
-      label: 'Create role',
+      label: this.t('actionRole'),
       route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}/${ROUTES.CREATE}`,
       icon: 'admin_panel_settings',
       primary: true,
     },
     {
-      label: 'Create API key',
+      label: this.t('actionKey'),
       route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}/${ROUTES.CREATE}`,
       icon: 'vpn_key',
     },
@@ -51,18 +62,18 @@ export class DfSecurityOverviewComponent implements OnInit {
   readonly notes: SectionLandingNote[] = [
     {
       icon: 'verified_user',
-      title: 'Least privilege',
-      text: 'Start with narrow roles, then expand only when an app or user needs more access.',
+      title: this.t('notePrivilegeTitle'),
+      text: this.t('notePrivilegeText'),
     },
     {
       icon: 'speed',
-      title: 'Rate limits protect services',
-      text: 'Limits help prevent runaway clients from overwhelming expensive or sensitive APIs.',
+      title: this.t('noteLimitsTitle'),
+      text: this.t('noteLimitsText'),
     },
     {
       icon: 'login',
-      title: 'Auth depends on installed providers',
-      text: 'Authentication options reflect the provider connectors installed in this instance.',
+      title: this.t('noteProvidersTitle'),
+      text: this.t('noteProvidersText'),
     },
   ];
 
@@ -88,37 +99,41 @@ export class DfSecurityOverviewComponent implements OnInit {
 
     this.groups = [
       {
-        title: 'Security controls',
+        title: this.t('group'),
         cards: [
           {
             icon: 'login',
-            title: 'Authentication',
-            text: 'Configure LDAP, SSO, OAuth, and other installed authentication service types.',
+            title: this.t('authTitle'),
+            text: this.t('authText'),
             route: `/${ROUTES.API_SECURITY}/${ROUTES.AUTHENTICATION}`,
-            action: 'Manage authentication',
-            meta: this.connectorMeta(authCount),
+            action: this.t('authAction'),
+            meta: this.providerMeta(authCount),
             disabled: authCount === 0,
+            tint: 'security',
           },
           {
             icon: 'speed',
-            title: 'Rate Limiting',
-            text: 'Throttle calls by user, role, service, IP, or application key.',
+            title: this.t('rateTitle'),
+            text: this.t('rateText'),
             route: `/${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
-            action: 'Manage limits',
+            action: this.t('rateAction'),
+            tint: 'system',
           },
           {
             icon: 'admin_panel_settings',
-            title: 'Role-Based Access',
-            text: 'Audit what users, apps, and AI services are allowed to reach.',
+            title: this.t('rolesTitle'),
+            text: this.t('rolesText'),
             route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.ROLE_BASED_ACCESS}`,
-            action: 'Manage roles',
+            action: this.t('rolesAction'),
+            tint: 'security',
           },
           {
             icon: 'vpn_key',
-            title: 'API Keys',
-            text: 'Review application keys and the roles they grant to callers.',
+            title: this.t('keysTitle'),
+            text: this.t('keysText'),
             route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_KEYS}`,
-            action: 'Manage keys',
+            action: this.t('keysAction'),
+            tint: 'security',
           },
         ],
       },
@@ -134,12 +149,16 @@ export class DfSecurityOverviewComponent implements OnInit {
     ).length;
   }
 
-  private connectorMeta(count: number | null): string {
+  private providerMeta(count: number | null): string {
     if (count === null) {
-      return 'Checking available providers';
+      return this.transloco.translate(
+        'sectionOverviews.shared.providersChecking'
+      );
     }
     return count === 1
-      ? '1 provider type available'
-      : `${count} provider types available`;
+      ? this.transloco.translate('sectionOverviews.shared.providersOne')
+      : this.transloco.translate('sectionOverviews.shared.providersOther', {
+          count,
+        });
   }
 }

@@ -178,6 +178,48 @@
   gap: 4px;
 }
 
+// ------------------------------------------------------------
+// Category tints (punch 21). A tinted card turns its icon into a
+// colored chip and matches the action link + hover border to the
+// same category hue. Color comes only from the --df-tint-<cat>
+// token pairs, so light, dark, and phosphor all resolve for free.
+// Scoped off disabled so an unavailable connector stays muted.
+// ------------------------------------------------------------
+.section-card[data-tint]:not(.section-card--disabled) {
+  .section-card__icon {
+    align-items: center;
+    border-radius: var(--df-radius-sm);
+    display: inline-flex;
+    height: 44px;
+    justify-content: center;
+    margin-bottom: 14px;
+    width: 44px;
+
+    mat-icon {
+      font-size: 24px;
+      height: 24px;
+      width: 24px;
+    }
+  }
+}
+
+@each $cat in build, data, security, system, admin, ai, docs {
+  .section-card[data-tint='#{$cat}']:not(.section-card--disabled) {
+    .section-card__icon {
+      background: var(--df-tint-#{$cat}-bg);
+      color: var(--df-tint-#{$cat}-fg);
+    }
+
+    .section-card__action {
+      color: var(--df-tint-#{$cat}-fg);
+    }
+
+    &:hover {
+      border-color: var(--df-tint-#{$cat}-fg);
+    }
+  }
+}
+
 // Meta and unavailable lines: previously literal greys, the source of the
 // dark-theme contrast bug on the security and system landing cards.
 .section-card__meta,
