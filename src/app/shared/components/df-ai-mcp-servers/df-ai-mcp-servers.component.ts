@@ -49,7 +49,7 @@ interface McpServerRow {
       <div *ngIf="loading" class="mcp-servers__loading">Loading MCP servers…</div>
 
       <ul *ngIf="!loading && servers.length > 0" class="mcp-servers__list">
-        <li *ngFor="let s of servers">
+        <li *ngFor="let s of servers; trackBy: trackByName">
           <button
             type="button"
             class="mcp-servers__chip"
@@ -249,5 +249,9 @@ export class DfAiMcpServersComponent implements OnInit {
       }
     }
     return [];
+  }
+
+  trackByName(_: number, s: McpServerRow): string {
+    return s.name;
   }
 }

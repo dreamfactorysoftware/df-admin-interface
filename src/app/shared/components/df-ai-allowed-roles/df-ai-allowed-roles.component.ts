@@ -60,7 +60,7 @@ interface RoleRow {
       <div *ngIf="loading" class="allowed-roles__loading">Loading roles…</div>
 
       <ul *ngIf="!loading && roles.length > 0" class="allowed-roles__list">
-        <li *ngFor="let r of roles">
+        <li *ngFor="let r of roles; trackBy: trackById">
           <button
             type="button"
             class="allowed-roles__chip"
@@ -288,5 +288,9 @@ export class DfAiAllowedRolesComponent implements OnInit {
       }
     }
     return [];
+  }
+
+  trackById(_: number, r: RoleRow): number {
+    return r.id;
   }
 }

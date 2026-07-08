@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+} from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
@@ -32,7 +38,7 @@ import { GroupRow } from '../../types/usage';
 
         <ul class="bars__list">
           <li
-            *ngFor="let row of visibleRows"
+            *ngFor="let row of visibleRows; trackBy: trackRow"
             class="bars__row"
             [class.bars__row--clickable]="clickable"
             (click)="onClick(row)">
@@ -206,7 +212,7 @@ import { GroupRow } from '../../types/usage';
     `,
   ],
 })
-export class DfUsageBarsComponent {
+export class DfUsageBarsComponent implements OnChanges {
   @Input({ required: true }) title!: string;
   /** Optional one-line description rendered as a tooltip on an info icon
    *  next to the title — for explaining what this panel actually shows. */
@@ -217,12 +223,19 @@ export class DfUsageBarsComponent {
   @Output() rowClick = new EventEmitter<GroupRow>();
   faCircleInfo = faCircleInfo;
 
-  get visibleRows(): GroupRow[] {
-    return (this.rows ?? []).slice(0, this.limit);
+  // Computed once per input change, NOT per change-detection cycle. As
+  // getters these allocated a fresh slice (and, for max, a mapped array)
+  // on every CD evaluation — and max was evaluated twice per row.
+  visibleRows: GroupRow[] = [];
+  max = 1;
+
+  ngOnChanges(): void {
+    this.visibleRows = (this.rows ?? []).slice(0, this.limit);
+    this.max = Math.max(1, ...this.visibleRows.map(r => r.totalTokens));
   }
 
-  get max(): number {
-    return Math.max(1, ...this.visibleRows.map(r => r.totalTokens));
+  trackRow(_: number, row: GroupRow): string {
+    return row.key;
   }
 
   onClick(row: GroupRow): void {

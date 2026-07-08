@@ -1,4 +1,9 @@
-import { Component, Input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Input,
+  OnInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
@@ -12,6 +17,10 @@ import { ChatMessage } from '../../types/chat';
 @Component({
   selector: 'df-chat-tool-result',
   standalone: true,
+  // OnPush is safe: `message` is only ever replaced (fresh API objects),
+  // never mutated in place, and `expanded` only changes from this
+  // component's own click handler (which marks it dirty under OnPush).
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FontAwesomeModule],
   template: `
     <div
@@ -130,7 +139,7 @@ import { ChatMessage } from '../../types/chat';
     `,
   ],
 })
-export class DfChatToolResultComponent {
+export class DfChatToolResultComponent implements OnInit {
   @Input({ required: true }) message!: ChatMessage;
   @Input() startExpanded = false;
   expanded = false;
@@ -140,12 +149,24 @@ export class DfChatToolResultComponent {
   faWrench = faWrench;
   faTriangleExclamation = faTriangleExclamation;
 
+  /** Memo for pretty: tool-result payloads can be KB-sized (query result
+   *  sets); JSON parse + pretty-print per CD cycle while expanded is a CD
+   *  storm during the chat poll. Keyed on message.content. */
+  private prettyCache: { content: string; text: string } | null = null;
+
   ngOnInit(): void {
     this.expanded = this.startExpanded || !!this.message.is_error;
   }
 
   get pretty(): string {
-    const raw = this.message.content ?? '';
+    const content = this.message.content ?? '';
+    if (this.prettyCache?.content !== content) {
+      this.prettyCache = { content, text: this.computePretty(content) };
+    }
+    return this.prettyCache.text;
+  }
+
+  private computePretty(raw: string): string {
     const trimmed = raw.trim();
     if (!trimmed) {
       return '(empty)';

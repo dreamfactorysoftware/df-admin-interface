@@ -5,6 +5,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { faArrowDown, faArrowUp } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { UsageSummary } from '../../types/usage';
+import { formatUSD } from '../../utils/cost';
 import { DfSparklineComponent } from '../df-sparkline/df-sparkline.component';
 
 @Component({
@@ -364,13 +365,8 @@ export class DfUsageSummaryComponent {
   faArrowDown = faArrowDown;
 
   formatUsd(v: number): string {
-    if (!Number.isFinite(v)) return '$0.00';
-    if (v > 0 && v < 0.01) return '<$0.01';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: v < 1 ? 4 : 2,
-    }).format(v);
+    // Shared, hoisted Intl formatters — template-reachable, runs per CD.
+    return formatUSD(v);
   }
 
   /** Render a fractional delta (1.0 = +100%) with a sign and one decimal. */

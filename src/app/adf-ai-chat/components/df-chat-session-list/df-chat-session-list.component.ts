@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
@@ -8,6 +14,9 @@ import { ChatSession } from '../../types/chat';
 @Component({
   selector: 'df-chat-session-list',
   standalone: true,
+  // OnPush is safe: the parent always reassigns `sessions` (never mutates
+  // the array or its rows in place) and the other inputs are primitives.
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, MatButtonModule, FontAwesomeModule],
   template: `
     <aside class="session-list">
@@ -165,10 +174,32 @@ export class DfChatSessionListComponent {
     return s.id;
   }
 
+  /** Memo for formatTime: toLocaleTimeString/-DateString build an Intl
+   *  DateTimeFormat per call, and this runs per session row per CD cycle
+   *  (the chat poll ticks every second). Cache is invalidated when the
+   *  calendar day rolls over so the same-day/short-date split stays fresh. */
+  private timeCache = new Map<string, string>();
+  private timeCacheDay = '';
+
   formatTime(iso?: string): string {
     if (!iso) {
       return '';
     }
+    const day = new Date().toDateString();
+    if (day !== this.timeCacheDay) {
+      this.timeCacheDay = day;
+      this.timeCache.clear();
+    }
+    const hit = this.timeCache.get(iso);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const text = this.computeTime(iso);
+    this.timeCache.set(iso, text);
+    return text;
+  }
+
+  private computeTime(iso: string): string {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) {
       return '';
