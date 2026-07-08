@@ -153,6 +153,38 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   pre {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
   }
+
+  // Rollout-verify fixes: primary actions still wore the compiled indigo
+  // Material palette (tokens set per .mat-primary class, consumed by
+  // MatButton's injected styles). Re-point them at the phosphor accent;
+  // same for the slide toggle, whose selected state stayed purple.
+  .mat-mdc-unelevated-button.mat-primary,
+  .mat-mdc-raised-button.mat-primary {
+    --mdc-filled-button-container-color: var(--df-accent);
+    --mdc-filled-button-label-text-color: var(--df-accent-contrast);
+    --mdc-protected-button-container-color: var(--df-accent);
+    --mdc-protected-button-label-text-color: var(--df-accent-contrast);
+  }
+  .mat-mdc-button.mat-primary {
+    --mdc-text-button-label-text-color: var(--df-accent);
+  }
+  .mat-mdc-outlined-button.mat-primary {
+    --mdc-outlined-button-label-text-color: var(--df-accent);
+  }
+  .mat-mdc-slide-toggle {
+    --mdc-switch-selected-track-color: var(--df-accent-soft);
+    --mdc-switch-selected-hover-track-color: var(--df-accent-soft);
+    --mdc-switch-selected-focus-track-color: var(--df-accent-soft);
+    --mdc-switch-selected-pressed-track-color: var(--df-accent-soft);
+    --mdc-switch-selected-handle-color: var(--df-accent);
+    --mdc-switch-selected-hover-handle-color: var(--df-accent-strong);
+    --mdc-switch-selected-focus-handle-color: var(--df-accent-strong);
+    --mdc-switch-selected-pressed-handle-color: var(--df-accent-strong);
+    --mdc-switch-selected-icon-color: var(--df-accent-contrast);
+    --mdc-switch-selected-focus-state-layer-color: var(--df-accent);
+    --mdc-switch-selected-hover-state-layer-color: var(--df-accent);
+    --mdc-switch-selected-pressed-state-layer-color: var(--df-accent);
+  }
 }
 
 html,
@@ -386,9 +418,10 @@ a {
 .mat-mdc-select-arrow {
   color: unset !important;
 }
-// Tab
+// Tab: the active underline rides the accent token so all three themes
+// repaint it (was a compiled purple literal that survived into phosphor).
 .mat-mdc-tab .mdc-tab-indicator__content--underline {
-  border-color: mat.get-color-from-palette($df-purple-palette, 500) !important;
+  border-color: var(--df-accent) !important;
 }
 
 // Swagger

@@ -5,6 +5,21 @@
 $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 
 .dark-theme {
+  // Rollout-verify fixes: Material inks whole components through theme
+  // tokens compiled from the (only) light theme — toolbar, sidenav
+  // content and paginator carry rgba(0,0,0,.87)/white literals set on
+  // html. The component-injected styles that consume them load after
+  // this sheet, so plain `color:` overrides lose; re-point the tokens
+  // themselves. Phosphor stacks on .dark-theme and repaints these via
+  // the --df-* vars underneath.
+  --mat-toolbar-container-text-color: var(--df-text);
+  --mat-sidenav-container-text-color: var(--df-text);
+  --mat-sidenav-content-text-color: var(--df-text);
+  --mat-paginator-container-background-color: transparent;
+  --mat-paginator-container-text-color: var(--df-text-2);
+  --mat-paginator-enabled-icon-color: var(--df-text-muted);
+  --mat-paginator-disabled-icon-color: var(--df-text-faint);
+
   // Font
   .breadcrumb-link > span {
     color: var(--df-text-2) !important;
@@ -98,11 +113,50 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   .mat-mdc-select-disabled .mat-mdc-select-value {
     color: var(--df-text-muted) !important;
   }
-  // Text-style buttons (raised/flat keep their compiled contrast labels).
-  .mat-mdc-button,
-  .mat-mdc-outlined-button,
+  // Buttons: the compiled light theme pins label/container colors as
+  // MDC tokens per palette class (.mat-unthemed = black-on-white,
+  // .mat-primary = brand navy) and MatButton's own injected styles
+  // consume them, outranking a plain `color:` here. Re-point the
+  // tokens on the same selectors, one notch more specific.
+  .mat-mdc-button.mat-unthemed {
+    --mdc-text-button-label-text-color: var(--df-text);
+  }
+  .mat-mdc-button.mat-primary {
+    --mdc-text-button-label-text-color: var(--df-accent-strong);
+  }
+  .mat-mdc-outlined-button.mat-unthemed {
+    --mdc-outlined-button-label-text-color: var(--df-text-2);
+    --mdc-outlined-button-outline-color: var(--df-border);
+  }
+  .mat-mdc-outlined-button.mat-primary {
+    --mdc-outlined-button-label-text-color: var(--df-accent-strong);
+    --mdc-outlined-button-outline-color: var(--df-border);
+  }
+  // Unthemed flat/raised buttons compile to hard white pills off the
+  // light theme; in dark they become the quiet secondary treatment.
+  .mat-mdc-unelevated-button.mat-unthemed {
+    --mdc-filled-button-container-color: var(--df-surface-2);
+    --mdc-filled-button-label-text-color: var(--df-text);
+  }
+  .mat-mdc-raised-button.mat-unthemed {
+    --mdc-protected-button-container-color: var(--df-surface-2);
+    --mdc-protected-button-label-text-color: var(--df-text);
+  }
   .mat-mdc-icon-button {
     color: var(--df-text);
+  }
+  // Tab headers: Material sets these tokens on the group element
+  // itself, so the override must target the same element to win.
+  .mat-mdc-tab-group,
+  .mat-mdc-tab-nav-bar {
+    --mat-tab-header-inactive-label-text-color: var(--df-text-muted);
+    --mat-tab-header-inactive-focus-label-text-color: var(--df-text-2);
+    --mat-tab-header-inactive-hover-label-text-color: var(--df-text-2);
+    --mat-tab-header-active-label-text-color: var(--df-accent-strong);
+    --mat-tab-header-active-focus-label-text-color: var(--df-accent-strong);
+    --mat-tab-header-active-hover-label-text-color: var(--df-accent-strong);
+    --mat-tab-header-pagination-icon-color: var(--df-text);
+    --mdc-tab-indicator-active-indicator-color: var(--df-accent-strong);
   }
   .mat-mdc-form-field-required-marker {
     color: var(--df-text-2) !important;
