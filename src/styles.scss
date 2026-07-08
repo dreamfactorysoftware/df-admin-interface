@@ -1017,8 +1017,11 @@ body .swagger-ui .opblock .opblock-section-header > label {
   border-bottom-color: var(--df-border);
 }
 
-/* opblocks: flat bordered cards on the shared corner scale, no
-   method-tinted washes, no shadows */
+/* opblocks: flat bordered cards on the shared corner scale, no shadows.
+   Punch item 22: the whole summary bar carries a method color WASH plus a
+   left SPINE, drawn from the category tint tokens (GET=data/blue,
+   POST=security/green, PUT=system/amber, PATCH=docs/teal, DELETE=danger).
+   Tokens only, so the wash repaints in light, dark and phosphor. */
 body .swagger-ui .opblock,
 body .swagger-ui .opblock.opblock-get,
 body .swagger-ui .opblock.opblock-post,
@@ -1042,8 +1045,29 @@ body .swagger-ui .opblock.opblock-delete .opblock-summary,
 body .swagger-ui .opblock.opblock-head .opblock-summary,
 body .swagger-ui .opblock.opblock-options .opblock-summary {
   border-color: var(--df-border-2);
+  border-left: 3px solid transparent;
   min-height: 44px;
   padding: 4px 10px;
+}
+body .swagger-ui .opblock.opblock-get .opblock-summary {
+  background-color: var(--df-tint-data-bg);
+  border-left-color: var(--df-tint-data-fg);
+}
+body .swagger-ui .opblock.opblock-post .opblock-summary {
+  background-color: var(--df-tint-security-bg);
+  border-left-color: var(--df-tint-security-fg);
+}
+body .swagger-ui .opblock.opblock-put .opblock-summary {
+  background-color: var(--df-tint-system-bg);
+  border-left-color: var(--df-tint-system-fg);
+}
+body .swagger-ui .opblock.opblock-patch .opblock-summary {
+  background-color: var(--df-tint-docs-bg);
+  border-left-color: var(--df-tint-docs-fg);
+}
+body .swagger-ui .opblock.opblock-delete .opblock-summary {
+  background-color: var(--df-danger-soft);
+  border-left-color: var(--df-danger);
 }
 body .swagger-ui .opblock .opblock-section-header {
   box-shadow: none;

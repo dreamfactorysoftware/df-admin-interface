@@ -1,108 +1,257 @@
-<div class="api-doc-button-container">
-  <button class="cancel-btn" mat-raised-button (click)="goBackToList()">
-    {{ 'goBack' | transloco }}
-  </button>
+<df-page-header
+  [title]="apiDocJson?.info?.title || serviceName || ''"
+  [description]="apiDocJson?.info?.description || ('apiDocs.subtitle' | transloco)">
+  <div pageHeaderActions class="docs-header-actions">
+    <df-badge
+      [variant]="healthVariant"
+      [label]="
+        (healthStatus === 'loading'
+          ? 'apiHealthBanner.loading'
+          : healthStatus === 'healthy'
+            ? 'apiHealthBanner.healthy'
+            : healthStatus === 'unhealthy'
+              ? 'apiHealthBanner.unhealthyBase'
+              : 'apiHealthBanner.warningDefault'
+        ) | transloco
+      "></df-badge>
+    <button mat-stroked-button (click)="goBackToList()">
+      {{ 'goBack' | transloco }}
+    </button>
+    <button mat-flat-button color="primary" (click)="downloadApiDoc()">
+      {{ 'apiDocs.downloadApiDoc' | transloco }}
+    </button>
+  </div>
+</df-page-header>
 
-  <button class="save-btn" mat-raised-button (click)="downloadApiDoc()">
-    {{ 'apiDocs.downloadApiDoc' | transloco }}
+<!-- Unhealthy detail: fact + fix, no toast spam. -->
+<div
+  *ngIf="healthStatus === 'unhealthy'"
+  class="health-detail">
+  <button
+    mat-button
+    class="view-details-button"
+    (click)="toggleUnhealthyErrorDetails()">
+    {{
+      (showUnhealthyErrorDetails
+        ? 'apiHealthBanner.hideDetails'
+        : 'apiHealthBanner.viewDetails'
+      ) | transloco
+    }}
   </button>
+  <pre *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">{{
+    healthError
+  }}</pre>
 </div>
 
-<!-- Moved API Keys Dropdown -->
-<div class="api-keys-container" *ngIf="apiKeys.length">
-  <mat-form-field appearance="outline" class="api-keys-select">
-    <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
-    <mat-select>
-      <mat-option [value]="null">
-        <div class="api-key-option">
-          <div class="key-info">
-            <span class="key-name"
-              >None (Session token based authentication)</span
-            >
-            <span class="key-preview"
-              >Uses session token to build the request</span
-            >
-          </div>
-        </div>
-      </mat-option>
-      <mat-option
-        *ngFor="let key of apiKeys; trackBy: trackByApiKey"
-        [value]="key.apiKey">
-        <div class="api-key-option">
-          <div class="key-info">
-            <span class="key-name">{{ key.name }}</span>
-            <span class="key-preview">{{ key.apiKey | slice: 0 : 8 }}...</span>
-          </div>
-          <button
-            mat-icon-button
-            (click)="$event.stopPropagation(); copyApiKey(key.apiKey)">
-            <fa-icon [icon]="faCopy"></fa-icon>
-          </button>
-        </div>
-      </mat-option>
-    </mat-select>
-  </mat-form-field>
+<!-- Loading: three-column skeleton, not a spinner. -->
+<div *ngIf="loading" class="docs-three-col docs-loading">
+  <div class="docs-nav">
+    <df-skeleton variant="table-row" [count]="8"></df-skeleton>
+  </div>
+  <div class="docs-center">
+    <df-skeleton variant="card" [count]="1"></df-skeleton>
+    <df-skeleton variant="line" [count]="6"></df-skeleton>
+  </div>
+  <div class="docs-console">
+    <df-skeleton variant="card" [count]="1"></df-skeleton>
+  </div>
 </div>
 
-<div #swaggerInjectedContentContainer class="custom-swagger-content-wrapper">
-  <div
-    #healthBannerElement
-    class="api-health-banner"
-    *ngIf="healthStatus"
-    [ngClass]="{
-      'status-loading': healthStatus === 'loading',
-      'status-healthy': healthStatus === 'healthy',
-      'status-unhealthy': healthStatus === 'unhealthy',
-      'status-warning': healthStatus === 'warning',
-    }">
-    <div *ngIf="healthStatus === 'loading'">
-      <p>{{ 'apiHealthBanner.loading' | transloco }}</p>
+<!-- Empty: no documented operations. -->
+<df-empty-state
+  *ngIf="!loading && !hasOperations"
+  icon="description"
+  [title]="'apiDocs.empty.title' | transloco"
+  [description]="'apiDocs.empty.description' | transloco"
+  [actionLabel]="'apiDocs.rawSpec.open' | transloco"
+  (action)="toggleAdvanced()"></df-empty-state>
+
+<!-- Three-column docs. -->
+<div *ngIf="!loading && hasOperations" class="docs-three-col">
+  <!-- LEFT: operation nav -->
+  <nav class="docs-nav" aria-label="API operations">
+    <ng-container *ngFor="let group of groups; trackBy: trackByGroup">
+      <p class="docs-nav__group df-eyebrow">{{ group.tag }}</p>
+      <mat-nav-list dense>
+        <a
+          mat-list-item
+          *ngFor="let op of group.operations; trackBy: trackByOperation"
+          class="docs-op"
+          [class.is-active]="isSelected(op)"
+          [ngClass]="methodClass(op.method)"
+          (click)="selectOperation(op)">
+          <span class="docs-op__method">{{ op.method }}</span>
+          <span class="docs-op__path">{{ op.path }}</span>
+        </a>
+      </mat-nav-list>
+    </ng-container>
+  </nav>
+
+  <!-- CENTER: schema + prose -->
+  <section class="docs-center" *ngIf="selectedOp as op">
+    <div class="op-method-bar" [ngClass]="methodClass(op.method)">
+      <span class="op-method-bar__method">{{ op.method }}</span>
+      <span class="op-method-bar__path">{{ op.path }}</span>
     </div>
-    <div *ngIf="healthStatus === 'healthy'">
-      <p>{{ 'apiHealthBanner.healthy' | transloco }}</p>
-    </div>
-    <div *ngIf="healthStatus === 'unhealthy'">
-      <p>
-        {{ 'apiHealthBanner.unhealthyBase' | transloco }}
-        <button
-          mat-button
-          color="accent"
-          class="view-details-button"
-          (click)="toggleUnhealthyErrorDetails()">
-          {{
-            (showUnhealthyErrorDetails
-              ? 'apiHealthBanner.hideDetails'
-              : 'apiHealthBanner.viewDetails'
-            ) | transloco
-          }}
-        </button>
+
+    <h2 class="docs-center__summary" *ngIf="op.summary">{{ op.summary }}</h2>
+    <p class="docs-center__prose" *ngIf="op.description">
+      {{ op.description }}
+    </p>
+
+    <ng-container *ngIf="op.parameters.length">
+      <p class="df-eyebrow docs-section-label">
+        {{ 'apiDocs.section.parameters' | transloco }}
       </p>
-      <div *ngIf="showUnhealthyErrorDetails" class="unhealthy-error-details">
-        <pre>{{ healthError }}</pre>
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>{{ 'apiDocs.param.name' | transloco }}</th>
+            <th>{{ 'apiDocs.param.in' | transloco }}</th>
+            <th>{{ 'apiDocs.param.type' | transloco }}</th>
+            <th>{{ 'apiDocs.param.required' | transloco }}</th>
+            <th>{{ 'apiDocs.param.description' | transloco }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let p of op.parameters; trackBy: trackByParam">
+            <td class="docs-table__name">{{ p.name }}</td>
+            <td>{{ p.location }}</td>
+            <td class="docs-table__type">{{ p.type }}</td>
+            <td>
+              <df-badge
+                *ngIf="p.required"
+                variant="danger"
+                [label]="'apiDocs.param.requiredLabel' | transloco"></df-badge>
+            </td>
+            <td>{{ p.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-container>
+
+    <ng-container *ngIf="op.requestBodySchema">
+      <p class="df-eyebrow docs-section-label">
+        {{ 'apiDocs.section.requestBody' | transloco }}
+      </p>
+      <pre class="docs-schema">{{ op.requestBodySchema }}</pre>
+    </ng-container>
+
+    <ng-container *ngIf="op.responses.length">
+      <p class="df-eyebrow docs-section-label">
+        {{ 'apiDocs.section.responses' | transloco }}
+      </p>
+      <table class="docs-table">
+        <thead>
+          <tr>
+            <th>{{ 'apiDocs.response.code' | transloco }}</th>
+            <th>{{ 'apiDocs.response.description' | transloco }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of op.responses; trackBy: trackByResponse">
+            <td class="docs-table__type">{{ r.code }}</td>
+            <td>{{ r.description }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-container>
+  </section>
+
+  <!-- RIGHT: runnable example + live console -->
+  <aside class="docs-console" *ngIf="selectedOp as op">
+    <div class="console-card">
+      <div class="console-card__head">
+        <p class="df-eyebrow">{{ 'apiDocs.example.title' | transloco }}</p>
+        <mat-button-toggle-group
+          class="lang-switch"
+          [(ngModel)]="snippetLang"
+          aria-label="Snippet language">
+          <mat-button-toggle value="js">
+            {{ 'apiDocs.lang.js' | transloco }}
+          </mat-button-toggle>
+          <mat-button-toggle value="python">
+            {{ 'apiDocs.lang.python' | transloco }}
+          </mat-button-toggle>
+          <mat-button-toggle value="curl">
+            {{ 'apiDocs.lang.curl' | transloco }}
+          </mat-button-toggle>
+          <mat-button-toggle value="mcp" class="lang-switch__mcp">
+            {{ 'apiDocs.lang.mcp' | transloco }}
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+
+      <div class="console-card__keyrow" *ngIf="apiKeys.length">
+        <mat-form-field appearance="outline" class="console-key-select">
+          <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
+          <mat-select [(ngModel)]="selectedApiKey">
+            <mat-option [value]="null">
+              {{ 'apiDocs.apiKeys.session' | transloco }}
+            </mat-option>
+            <mat-option
+              *ngFor="let key of apiKeys; trackBy: trackByApiKey"
+              [value]="key.apiKey">
+              {{ key.name }} ({{ key.apiKey | slice: 0 : 8 }}...)
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="console-card__snippet">
+        <button
+          mat-icon-button
+          class="snippet-copy"
+          [matTooltip]="'apiDocs.example.copy' | transloco"
+          (click)="copySnippet()">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+        <pre class="snippet-code">{{ snippet }}</pre>
       </div>
     </div>
-    <div *ngIf="healthStatus === 'warning'">
-      <p>
-        {{ 'apiHealthBanner.warningDefault' | transloco }}
-      </p>
-    </div>
-  </div>
 
-  <df-api-quickstart
-    *ngIf="serviceName"
-    [apiDocJson]="apiDocJson"
-    [serviceName]="serviceName"></df-api-quickstart>
-  <div *ngIf="apiDocJson?.info?.group === 'Database'" class="expand-schema-row">
-    <mat-slide-toggle
-      [(ngModel)]="expandSchema"
-      (ngModelChange)="reloadApiDocs()">
-      Populate table/field names in API docs
-    </mat-slide-toggle>
-    <div class="expand-schema-hint">
-      When enabled, the API documentation will include live table and field
-      names from your database. (May be slow for large databases)
+    <div class="console-card console-card--tryit">
+      <p class="df-eyebrow console-card__label">
+        {{ 'apiDocs.console.title' | transloco }}
+      </p>
+      <df-try-it
+        [method]="op.method"
+        [baseUrl]="serviceBaseUrl"
+        [path]="op.path"
+        [serviceName]="serviceName || undefined"
+        [apiKey]="selectedApiKey || undefined"
+        (sent)="onTryItSent($event)"></df-try-it>
     </div>
-  </div>
+  </aside>
 </div>
 
-<div #apiDocumentation class="swagger-ui"></div>
+<!-- Advanced / raw spec: swagger demoted behind a toggle, not deleted. -->
+<div *ngIf="!loading" class="raw-spec">
+  <button
+    mat-button
+    class="raw-spec__toggle"
+    (click)="toggleAdvanced()">
+    <mat-icon>{{ showAdvanced ? 'expand_less' : 'expand_more' }}</mat-icon>
+    {{
+      (showAdvanced ? 'apiDocs.rawSpec.hide' : 'apiDocs.rawSpec.show')
+        | transloco
+    }}
+  </button>
+
+  <div *ngIf="showAdvanced" class="raw-spec__body">
+    <div
+      *ngIf="apiDocJson?.info?.group === 'Database'"
+      class="expand-schema-row">
+      <mat-slide-toggle
+        [(ngModel)]="expandSchema"
+        (ngModelChange)="reloadApiDocs()">
+        {{ 'apiDocs.rawSpec.expandSchema' | transloco }}
+      </mat-slide-toggle>
+      <div class="expand-schema-hint">
+        {{ 'apiDocs.rawSpec.expandSchemaHint' | transloco }}
+      </div>
+    </div>
+    <div #apiDocumentation class="swagger-ui"></div>
+  </div>
+</div>
