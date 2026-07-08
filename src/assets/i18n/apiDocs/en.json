@@ -1,13 +1,4 @@
 {
-  "table": {
-    "header": {
-      "name": "Service Name",
-      "label": "Label",
-      "description": "Description",
-      "group": "Group",
-      "type": "Type"
-    }
-  },
   "downloadApiDoc": "Download Api Documentation",
   "subtitle": "Reference generated from the live OpenAPI spec. Pick an operation, then run it.",
   "apiKeys": {
@@ -34,6 +25,13 @@
     "addToCall": "Add to the test call"
   },
   "table": {
+    "header": {
+      "name": "Service Name",
+      "label": "Label",
+      "description": "Description",
+      "group": "Group",
+      "type": "Type"
+    },
     "pick": "Table",
     "hint": "Pick a table to call a real endpoint."
   },
