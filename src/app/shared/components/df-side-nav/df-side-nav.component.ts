@@ -208,7 +208,9 @@ export class DfSideNavComponent implements OnInit {
     // redirect and the section-overview cards resolve to it). Drop just the
     // duplicate Admin Settings nav entry so Logs no longer shows in both
     // pillars; the route itself is untouched.
-    const adminSettings = nav.find(item => item.route === ROUTES.ADMIN_SETTINGS);
+    const adminSettings = nav.find(
+      item => item.route === ROUTES.ADMIN_SETTINGS
+    );
     if (adminSettings?.subRoutes) {
       adminSettings.subRoutes = adminSettings.subRoutes.filter(
         sub => sub.path !== `/${ROUTES.ADMIN_SETTINGS}/${ROUTES.LOGS}`

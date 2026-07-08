@@ -61,7 +61,8 @@
   text-decoration: none;
   transition:
     border-color var(--df-duration-fast, 120ms) var(--df-ease-standard, ease),
-    background-color var(--df-duration-fast, 120ms) var(--df-ease-standard, ease);
+    background-color var(--df-duration-fast, 120ms)
+      var(--df-ease-standard, ease);
 
   &:hover {
     border-color: var(--df-accent);

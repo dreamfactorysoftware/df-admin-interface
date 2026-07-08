@@ -14,10 +14,7 @@ export class ChunkErrorHandler implements ErrorHandler {
 
   handleError(error: unknown): void {
     if (this.isChunkLoadError(error) && this.canReload()) {
-      sessionStorage.setItem(
-        ChunkErrorHandler.RELOAD_KEY,
-        String(Date.now())
-      );
+      sessionStorage.setItem(ChunkErrorHandler.RELOAD_KEY, String(Date.now()));
       window.location.reload();
       return;
     }
