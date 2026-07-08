@@ -101,6 +101,7 @@
     "rateLimit": "Rate limit",
     "noUsage": "No usage yet",
     "noCap": "No cap",
+    "roleLink": "Open the {{role}} role",
     "meterAria": "{{consumed}} of {{cap}} calls per {{period}} used",
     "empty": {
       "title": "No API keys yet",

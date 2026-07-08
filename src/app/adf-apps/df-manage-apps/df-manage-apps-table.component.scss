@@ -9,6 +9,25 @@
   white-space: nowrap;
 }
 
+// Role name as a link into the role it scopes. Accent-colored, underline on
+// hover/focus only, so the row stays calm until you reach for the role.
+.df-role-link {
+  color: var(--df-accent);
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--df-accent);
+    outline-offset: 2px;
+    border-radius: var(--df-radius-sm);
+  }
+}
+
 // A metric with no real source: quiet, unmistakably empty, never a fake zero.
 .df-metric-empty {
   color: var(--df-text-faint);
