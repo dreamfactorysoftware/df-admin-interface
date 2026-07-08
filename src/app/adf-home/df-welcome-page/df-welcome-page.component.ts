@@ -108,54 +108,52 @@ export class DfWelcomePageComponent {
     private storageService: DFStorageService,
     @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService
   ) {
+    // Color is back, but coordinated: each card names a semantic tint
+    // category and the card component pulls the wash + icon/heading color
+    // from the --df-tint-<category>-* tokens. No color literals here, so
+    // light / dark / phosphor all repaint by construction.
     this.generateApiCardsData = [
       {
         icon: this.faProjectDiagram,
         headerTextKey: 'home.welcomePage.apiManagementCard.header',
         textKey: 'home.welcomePage.apiManagementCard.description',
         route: this.apiConnectionsRoute,
-        bgColor: 'rgba(127, 17, 224, 0.1)',
-        headerColor: 'rgb(127, 17, 224)',
+        category: 'build',
       },
       {
         icon: this.faDatabase,
         headerTextKey: 'home.welcomePage.apiTypesCard.header',
         textKey: 'home.welcomePage.apiTypesCard.description',
         route: this.apiTypesRoute,
-        bgColor: 'rgba(92,35,154, 0.1)',
-        headerColor: 'rgb(92,35,154)',
+        category: 'data',
       },
       {
         icon: this.faShieldAlt,
         headerTextKey: 'home.welcomePage.securityCard.header',
         textKey: 'home.welcomePage.securityCard.description',
         route: this.securityRoute,
-        bgColor: 'rgb(235,253,245)',
-        headerColor: 'rgb(25,97,80)',
+        category: 'security',
       },
       {
         icon: this.faCogs,
         headerTextKey: 'home.welcomePage.systemCard.header',
         textKey: 'home.welcomePage.systemCard.description',
         route: this.systemRoute,
-        bgColor: 'rgb(255,251,236)',
-        headerColor: 'rgb(136,72,43)',
+        category: 'system',
       },
       {
         icon: this.faUsersCog,
         headerTextKey: 'home.welcomePage.adminSettingsCard.header',
         textKey: 'home.welcomePage.adminSettingsCard.description',
         route: this.adminSettingsRoute,
-        bgColor: 'rgba(80,105,137, 0.1)',
-        headerColor: 'rgb(80,105,137)',
+        category: 'admin',
       },
       {
         icon: this.faMagic,
         headerTextKey: 'home.welcomePage.aiGatewayCard.header',
         textKey: 'home.welcomePage.aiGatewayCard.description',
         route: this.aiSetupRoute,
-        bgColor: 'rgba(217, 54, 138, 0.1)',
-        headerColor: 'rgb(217, 54, 138)',
+        category: 'ai',
       },
     ];
   }

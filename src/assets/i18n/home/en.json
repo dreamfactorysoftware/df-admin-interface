@@ -15,27 +15,27 @@
     "generateYourApis": "DreamFactory API Management",
     "apiManagementCard": {
       "header": "API Management",
-      "description": "Build, secure, document, and test governed APIs"
+      "description": "Generate a REST API from your database, then secure, document, and test it"
     },
     "apiTypesCard": {
       "header": "API Types",
-      "description": "Choose databases, files, network services, scripts, or utilities"
+      "description": "Turn a database, file store, script, or remote service into a REST API"
     },
     "securityCard": {
       "header": "Security",
-      "description": "Manage authentication, rate limits, roles, and API keys"
+      "description": "Control who reaches your APIs with roles, API keys, and rate limits"
     },
     "systemCard": {
       "header": "System",
-      "description": "Check runtime health, logs, cache, scheduler, and platform settings"
+      "description": "Watch runtime health, read logs, clear cache, and schedule background jobs"
     },
     "adminSettingsCard": {
       "header": "Admin Settings",
-      "description": "Manage admins, users, schema, files, and diagnostics"
+      "description": "Manage admins and users, inspect your schema, and run diagnostics"
     },
     "aiGatewayCard": {
       "header": "AI Data Gateway",
-      "description": "Connect AI to governed DreamFactory data, chat, MCP, and usage"
+      "description": "Give an AI assistant governed access to your data over chat and MCP"
     },
     "connectToDatabaseCard": {
       "header": "Connect to Database",
@@ -69,7 +69,8 @@
     "hearFromYouText": "Has DreamFactory made a difference in your organization? Are you doing something novel and interesting with our software? We'd love to add your story to the Dreamfactory.com user showcase! E-mail us at <a href=\"mailto:info@dreamfactory.com\">info@dreamfactory.com</a> with your project details and we'll add your organization name, URL, and story to our site!",
     "clientPlatformHeading": "Click on a client platform below to download a sample application and learn how to make API calls:",
     "nativeExamplesHeading": "Native Examples",
-    "javaScriptExamplesHeading": "JavaScript Examples"
+    "javaScriptExamplesHeading": "JavaScript Examples",
+    "intro": "Your starting point for turning data into secure REST APIs. Pick a task below to generate an API, lock down access, or connect an AI assistant."
   },
   "quickstartPage": {
     "quickstartHeading": "Quickstart",
