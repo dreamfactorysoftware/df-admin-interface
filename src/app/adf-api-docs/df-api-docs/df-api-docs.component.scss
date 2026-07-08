@@ -10,7 +10,7 @@
      This screen reaches that scroller only by overflowing with
      overflow VISIBLE all the way up.
    - Therefore: NEVER put height, max-height, overflow, overflow-x
-     or contain on :host or the full-page .docs-three-col wrapper.
+     or contain on :host or the full-page .docs-two-col wrapper.
    - Independent scroll for the left nav / right console is achieved
      with position: sticky + a self-scoped max-height + overflow on
      the INNER rail only. Sticky does not clip the ancestor height
@@ -52,13 +52,13 @@
   }
 }
 
-/* ---- three-column grid (NO height/overflow here) ---- */
-.docs-three-col {
+/* ---- two-column grid (NO height/overflow here) ---- */
+/* LEFT = wide endpoint list (full names). RIGHT = split metadata / test. */
+.docs-two-col {
   display: grid;
   grid-template-columns:
-    minmax(200px, 240px)
-    minmax(0, 1fr)
-    minmax(340px, 440px);
+    minmax(280px, 360px)
+    minmax(0, 1fr);
   gap: var(--df-space-5);
   align-items: start;
   margin-top: var(--df-space-5);
@@ -83,16 +83,22 @@
 }
 
 .docs-op {
+  /* Full endpoint names: the row grows to fit and wraps rather than truncating,
+     so long `/_schema/{table_name}/_field/{field_name}` paths read in full. */
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--df-space-2);
-  height: var(--df-row-height);
+  min-height: var(--df-row-height);
+  height: auto;
+  padding-top: var(--df-space-1);
+  padding-bottom: var(--df-space-1);
   border-left: 3px solid transparent;
   border-radius: 0 var(--df-radius-sm) var(--df-radius-sm) 0;
 
   &__method {
     flex: 0 0 auto;
     width: 3.6em;
+    padding-top: 0.2em;
     font-family: var(--df-font-mono);
     font-size: var(--df-font-size-xs);
     font-weight: var(--df-font-weight-medium);
@@ -101,9 +107,11 @@
 
   &__path {
     flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+    line-height: var(--df-lh-tight);
     font-family: var(--df-font-mono);
     font-size: var(--df-font-size-xs);
     color: var(--df-text-2);
@@ -115,9 +123,45 @@
   }
 }
 
-/* ---- center: schema + prose ---- */
-.docs-center {
+/* mat-list-item forces a fixed row height + single-line ellipsis on its text
+   wrapper; override so the full path can wrap. */
+.docs-op.mat-mdc-list-item {
+  height: auto;
+
+  ::ng-deep .mdc-list-item__content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--df-space-2);
+    white-space: normal;
+  }
+
+  ::ng-deep .mat-mdc-list-item-unscoped-content {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
+/* ---- right column: metadata (top, scroll) over test (bottom) ----
+   Sticky + self-scoped max-height keeps page scroll intact (see SCROLL
+   CONTRACT above); the two halves scroll independently inside it. */
+.docs-right {
+  position: sticky;
+  top: var(--df-space-4);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-4);
   min-width: 0;
+  max-height: calc(100vh - var(--df-space-8));
+}
+
+/* TOP HALF: endpoint metadata, its own scroll. */
+.docs-meta {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--df-space-2);
 
   &__summary {
     margin: var(--df-space-4) 0 var(--df-space-2);
@@ -131,6 +175,74 @@
     font-size: var(--df-font-size-sm);
     line-height: var(--df-lh-base);
     color: var(--df-text-2);
+  }
+}
+
+/* BOTTOM HALF: live test area. */
+.docs-test {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+
+  &__label {
+    margin: 0;
+  }
+
+  &__tablepick {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__table-select {
+    flex: 0 1 24rem;
+    min-width: 16rem;
+  }
+
+  &__table-hint {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    line-height: var(--df-lh-base);
+  }
+}
+
+/* Clickable metadata parameter -> adds itself to the test call (FB6.8). */
+.docs-param-add {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--df-space-1);
+  padding: 2px var(--df-space-2);
+  margin: -2px 0;
+  border: 1px solid transparent;
+  border-radius: var(--df-radius-sm);
+  background: none;
+  cursor: pointer;
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-sm);
+  color: var(--df-text);
+
+  &__icon {
+    font-size: var(--df-font-size-md, 1.6rem);
+    width: var(--df-font-size-md, 1.6rem);
+    height: var(--df-font-size-md, 1.6rem);
+    color: var(--df-accent);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--df-border);
+    background: var(--df-hover);
+    outline: none;
+
+    .docs-param-add__icon {
+      opacity: 1;
+    }
   }
 }
 
@@ -208,17 +320,7 @@
   overflow-x: auto;
 }
 
-/* ---- right: runnable example + live console ---- */
-.docs-console {
-  position: sticky;
-  top: var(--df-space-4);
-  align-self: start;
-  display: flex;
-  flex-direction: column;
-  gap: var(--df-space-4);
-  min-width: 0;
-}
-
+/* ---- runnable example + filter cards ---- */
 .console-card {
   border: 1px solid var(--df-border);
   border-radius: var(--df-radius);
@@ -230,14 +332,6 @@
     flex-direction: column;
     gap: var(--df-space-2);
     margin-bottom: var(--df-space-3);
-  }
-
-  &__keyrow {
-    margin-bottom: var(--df-space-2);
-
-    .console-key-select {
-      width: 100%;
-    }
   }
 
   &__label {
@@ -377,15 +471,21 @@
   margin-top: var(--df-space-4);
 }
 
-/* ---- responsive: stack below the three-column breakpoint ---- */
+/* ---- responsive: stack below the two-column breakpoint ---- */
 @media (max-width: 1100px) {
-  .docs-three-col {
+  .docs-two-col {
     grid-template-columns: 1fr;
   }
   .docs-nav,
-  .docs-console {
+  .docs-right {
     position: static;
     max-height: none;
     overflow: visible;
+  }
+  /* Stacked: let the halves flow with the page instead of self-scrolling. */
+  .docs-meta,
+  .docs-test {
+    overflow: visible;
+    flex: 0 0 auto;
   }
 }

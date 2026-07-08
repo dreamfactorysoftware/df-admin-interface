@@ -24,6 +24,45 @@
     width: 11rem;
   }
 
+  // Locked verb: a static chip that reads as the request's method, tinted by
+  // category so it matches the operation picked on the left.
+  &__method-chip {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    height: var(--df-field-height);
+    padding: 0 var(--df-space-3);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    background: var(--df-surface-2);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+    font-weight: var(--df-font-weight-heading);
+    text-transform: uppercase;
+    color: var(--df-text);
+
+    &.m-get {
+      border-color: var(--df-tint-data-fg);
+      color: var(--df-tint-data-fg);
+    }
+    &.m-post {
+      border-color: var(--df-tint-security-fg);
+      color: var(--df-tint-security-fg);
+    }
+    &.m-put {
+      border-color: var(--df-tint-system-fg);
+      color: var(--df-tint-system-fg);
+    }
+    &.m-patch {
+      border-color: var(--df-tint-docs-fg);
+      color: var(--df-tint-docs-fg);
+    }
+    &.m-delete {
+      border-color: var(--df-danger);
+      color: var(--df-danger);
+    }
+  }
+
   &__path {
     flex: 1 1 auto;
   }
@@ -64,6 +103,20 @@
 
   &__identity-name {
     font-weight: var(--df-font-weight-medium);
+  }
+
+  // "Session (You)" is the obvious, safe default: badge it in the accent so it
+  // stands apart from the scoped keys below it.
+  &__identity-default {
+    margin-left: var(--df-space-2);
+    padding: 0 var(--df-space-2);
+    border-radius: var(--df-radius-pill, var(--df-radius-sm));
+    background: var(--df-accent-soft, var(--df-hover));
+    color: var(--df-accent);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--df-tracking-eyebrow);
   }
 
   &__identity-meta {

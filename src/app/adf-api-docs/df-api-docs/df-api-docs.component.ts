@@ -23,7 +23,7 @@ import {
   SESSION_TOKEN_HEADER,
   API_KEY_HEADER,
 } from 'src/app/shared/constants/http-headers';
-import { NgIf, NgFor, NgClass, SlicePipe } from '@angular/common';
+import { NgIf, NgFor, NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environments/environment';
 import { ApiKeysService } from '../services/api-keys.service';
@@ -123,7 +123,6 @@ const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
     NgIf,
     NgFor,
     NgClass,
-    SlicePipe,
     DfBadgeComponent,
     DfSkeletonComponent,
     DfEmptyStateComponent,
@@ -136,8 +135,21 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   // Swagger container only exists once the raw-spec panel is opened.
   @ViewChild('apiDocumentation') apiDocElement: ElementRef | undefined;
 
+  // Live console handle: lets a metadata click (a parameter/filter) push a row
+  // straight into the test call below.
+  @ViewChild(DfTryItComponent) tryIt?: DfTryItComponent;
+
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
+
+  // Table picker (spec FB6.9): when an operation targets `/_table/{table_name}`
+  // there is no real table to call, so we introspect the service's tables and
+  // let the user pick one. Selecting rewrites the path to a concrete table.
+  tableNames: string[] = [];
+  selectedTable: string | null = null;
+  // Real columns (name + type) of the effective table, driving both the filter
+  // builder field list and the prefilled sample body.
+  tableColumns: Array<{ name: string; type: string }> = [];
 
   // Three-column model.
   loading = true;
@@ -221,10 +233,9 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
           )
         )
         .subscribe(keys => {
+          // Do NOT pre-select a key: the console defaults to the session
+          // identity so a call returns data out of the box.
           this.apiKeys = keys;
-          if (!this.selectedApiKey && keys.length) {
-            this.selectedApiKey = keys[0].apiKey;
-          }
         })
     );
   }
@@ -328,18 +339,63 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
 
   selectOperation(op: DocOperation): void {
     this.selectedOp = op;
-    // A new operation means a fresh filter and, when it targets a real table,
-    // fresh column options for the visual builder.
+    // A new operation resets the filter, the picked table, and the introspected
+    // columns. Then re-hydrate for the new op.
     this.currentFilter = '';
     this.tableFields = [];
-    this.loadTableFields(op);
+    this.tableColumns = [];
+    this.tableNames = [];
+    this.selectedTable = null;
+    if (this.pathHasTableTemplate(op.path)) {
+      // `/_table/{table_name}` — offer the service's real tables to pick from.
+      this.loadTableNames();
+    } else {
+      // Concrete `/_table/<name>` — introspect its columns directly.
+      this.introspectTable(op.path);
+    }
   }
 
-  /** True when the selected op is a table-collection GET, i.e. a `?filter=`
-   *  actually shapes the response. Gates the filter builder in the console. */
+  /** True when the op path carries the `{table_name}` placeholder and therefore
+   *  cannot be called until a real table is chosen. */
+  private pathHasTableTemplate(path: string): boolean {
+    return /_table\/\{table_name\}/.test(path);
+  }
+
+  /** Show the table dropdown for placeholder `/_table/{table_name}` ops. */
+  get showTablePicker(): boolean {
+    return (
+      !!this.serviceName &&
+      !!this.selectedOp &&
+      this.pathHasTableTemplate(this.selectedOp.path)
+    );
+  }
+
+  /** The path actually run: the placeholder resolved to the picked table when
+   *  there is one, otherwise the op's own path. */
+  get effectivePath(): string {
+    const op = this.selectedOp;
+    if (!op) {
+      return '';
+    }
+    if (this.selectedTable && this.pathHasTableTemplate(op.path)) {
+      return op.path.replace('{table_name}', this.selectedTable);
+    }
+    return op.path;
+  }
+
+  /** True when a `?filter=` actually shapes the (effective) response: a table
+   *  collection GET. Gates the filter builder in the console. */
   get showFilterBuilder(): boolean {
     const op = this.selectedOp;
-    return !!op && op.method === 'GET' && /_table\//.test(op.path);
+    return !!op && op.method === 'GET' && /_table\//.test(this.effectivePath);
+  }
+
+  onTableSelected(name: string): void {
+    this.selectedTable = name;
+    this.currentFilter = '';
+    this.tableFields = [];
+    this.tableColumns = [];
+    this.introspectTable(this.effectivePath);
   }
 
   /** Pull the table name out of a `/_table/<name>` path. Braced OpenAPI
@@ -350,29 +406,57 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     return m ? m[1] : null;
   }
 
-  /** Best-effort schema introspection so the field slot lists real columns.
-   *  Silent on failure: the builder still works with a free-text field. */
-  private loadTableFields(op: DocOperation): void {
-    if (!this.serviceName || op.method !== 'GET') {
+  private get effectiveTable(): string | null {
+    return this.tableFromPath(this.effectivePath);
+  }
+
+  /** List the service's real tables so a `{table_name}` op becomes callable.
+   *  Silent on failure. */
+  private loadTableNames(): void {
+    if (!this.serviceName) {
       return;
     }
-    const table = this.tableFromPath(op.path);
+    this.subscriptions.push(
+      this.http
+        .get<{ resource?: Array<{ name: string }> }>(
+          `${BASE_URL}/${this.serviceName}/_table`,
+          { params: { fields: 'name' }, context: toastOff() }
+        )
+        .pipe(
+          map(res => (res.resource ?? []).map(r => r.name).filter(Boolean)),
+          catchError(() => of([] as string[]))
+        )
+        .subscribe(names => (this.tableNames = names))
+    );
+  }
+
+  /** Best-effort schema introspection so the field slot lists real columns AND
+   *  the sample body can be prefilled with them. Silent on failure. */
+  private introspectTable(path: string): void {
+    if (!this.serviceName) {
+      return;
+    }
+    const table = this.tableFromPath(path);
     if (!table) {
       return;
     }
     this.subscriptions.push(
       this.http
-        .get<{ field?: Array<{ name: string }> }>(
+        .get<{ field?: Array<{ name: string; type?: string }> }>(
           `${BASE_URL}/${this.serviceName}/_schema/${table}`,
-          { params: { fields: 'name' }, context: toastOff() }
+          { params: { fields: 'name,type' }, context: toastOff() }
         )
         .pipe(
-          map(res => (res.field ?? []).map(f => f.name)),
-          catchError(() => of([] as string[]))
+          map(res => res.field ?? []),
+          catchError(() => of([] as Array<{ name: string; type?: string }>))
         )
-        .subscribe(names => {
-          if (this.selectedOp === op) {
-            this.tableFields = names;
+        .subscribe(fields => {
+          if (this.effectiveTable === table) {
+            this.tableColumns = fields.map(f => ({
+              name: f.name,
+              type: f.type ?? '',
+            }));
+            this.tableFields = this.tableColumns.map(c => c.name);
           }
         })
     );
@@ -380,6 +464,126 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
 
   onFilterChange(filter: string): void {
     this.currentFilter = filter;
+  }
+
+  // ---- sample request body (FB6.6) ----------------------------------------
+
+  private methodTakesBody(method: string): boolean {
+    return method === 'POST' || method === 'PUT' || method === 'PATCH';
+  }
+
+  /** A prefilled, helpful request body for write operations. Real table columns
+   *  win (wrapped in the DreamFactory `{resource:[...]}` envelope); otherwise
+   *  the operation's own request-body schema is sampled. Undefined = no body,
+   *  so the console leaves its editor untouched. */
+  get sampleBody(): string | undefined {
+    const op = this.selectedOp;
+    if (!op || !this.methodTakesBody(op.method)) {
+      return undefined;
+    }
+    if (this.tableColumns.length) {
+      const row: Record<string, unknown> = {};
+      this.tableColumns
+        .filter(c => !/^id$/i.test(c.name))
+        .slice(0, 10)
+        .forEach(c => (row[c.name] = this.sampleForType(c.type)));
+      return JSON.stringify({ resource: [row] }, null, 2);
+    }
+    return this.sampleFromSchemaJson(op.requestBodySchema);
+  }
+
+  /** Map a DreamFactory/OpenAPI type to a representative placeholder value. */
+  private sampleForType(type: string): unknown {
+    switch ((type || '').toLowerCase()) {
+      case 'integer':
+      case 'int':
+      case 'id':
+      case 'reference':
+        return 0;
+      case 'number':
+      case 'float':
+      case 'double':
+      case 'decimal':
+        return 0;
+      case 'boolean':
+      case 'bool':
+        return false;
+      case 'timestamp':
+      case 'datetime':
+      case 'datetime_on_create':
+      case 'datetime_on_update':
+        return '2025-01-01T00:00:00Z';
+      case 'date':
+        return '2025-01-01';
+      case 'time':
+        return '00:00:00';
+      default:
+        return 'string';
+    }
+  }
+
+  private sampleFromSchemaJson(schemaStr: string | null): string | undefined {
+    if (!schemaStr) {
+      return undefined;
+    }
+    try {
+      const sample = this.sampleFromSchema(JSON.parse(schemaStr), 0);
+      if (sample === undefined) {
+        return undefined;
+      }
+      const text = JSON.stringify(sample, null, 2);
+      return text === '{}' || text === '[]' ? undefined : text;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private sampleFromSchema(schema: any, depth: number): unknown {
+    if (!schema || depth > 6) {
+      return undefined;
+    }
+    if (schema.example !== undefined) {
+      return schema.example;
+    }
+    if (schema.default !== undefined) {
+      return schema.default;
+    }
+    if (schema.type === 'object' || schema.properties) {
+      const out: Record<string, unknown> = {};
+      const props = schema.properties ?? {};
+      Object.keys(props).forEach(k => {
+        const value = this.sampleFromSchema(props[k], depth + 1);
+        if (value !== undefined) {
+          out[k] = value;
+        }
+      });
+      return out;
+    }
+    if (schema.type === 'array' || schema.items) {
+      const item = this.sampleFromSchema(schema.items, depth + 1);
+      return item === undefined ? [] : [item];
+    }
+    return this.sampleForType(schema.type);
+  }
+
+  // ---- metadata -> test call (FB6.8) --------------------------------------
+
+  /** Only query/header params meaningfully add to the request builder; path
+   *  params are resolved by the table picker / path field. */
+  isAddableParam(p: DocParameter): boolean {
+    return p.location === 'query' || p.location === 'header';
+  }
+
+  /** Click a parameter in the metadata table to drop it into the live console,
+   *  ready for a value. */
+  addParamToTest(p: DocParameter): void {
+    if (!this.isAddableParam(p)) {
+      return;
+    }
+    this.tryIt?.injectParam(
+      p.name,
+      p.location === 'header' ? 'header' : 'query'
+    );
   }
 
   isSelected(op: DocOperation): boolean {
@@ -399,7 +603,7 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   }
 
   private get fullUrl(): string {
-    const path = this.selectedOp?.path ?? '';
+    const path = this.effectivePath;
     const base = `${window.location.origin}${this.serviceBaseUrl}${path}`;
     if (this.currentFilter) {
       return `${base}?filter=${encodeURIComponent(this.currentFilter)}`;
@@ -649,6 +853,7 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   }
 
   trackByApiKey = (_: number, key: ApiKeyInfo): string => key.apiKey;
+  trackByTable = (_: number, name: string): string => name;
   trackByGroup = (_: number, group: DocGroup): string => group.tag;
   trackByOperation = (_: number, op: DocOperation): string => op.id;
   trackByParam = (_: number, p: DocParameter): string =>

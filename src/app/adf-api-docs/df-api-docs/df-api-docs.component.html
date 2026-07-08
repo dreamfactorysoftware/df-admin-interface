@@ -43,16 +43,14 @@
   }}</pre>
 </div>
 
-<!-- Loading: three-column skeleton, not a spinner. -->
-<div *ngIf="loading" class="docs-three-col docs-loading">
+<!-- Loading: two-column skeleton, not a spinner. -->
+<div *ngIf="loading" class="docs-two-col docs-loading">
   <div class="docs-nav">
     <df-skeleton variant="table-row" [count]="8"></df-skeleton>
   </div>
-  <div class="docs-center">
+  <div class="docs-right">
     <df-skeleton variant="card" [count]="1"></df-skeleton>
     <df-skeleton variant="line" [count]="6"></df-skeleton>
-  </div>
-  <div class="docs-console">
     <df-skeleton variant="card" [count]="1"></df-skeleton>
   </div>
 </div>
@@ -66,9 +64,9 @@
   [actionLabel]="'apiDocs.rawSpec.open' | transloco"
   (action)="toggleAdvanced()"></df-empty-state>
 
-<!-- Three-column docs. -->
-<div *ngIf="!loading && hasOperations" class="docs-three-col">
-  <!-- LEFT: operation nav -->
+<!-- Two-column docs: wide endpoint list + split right (metadata / test). -->
+<div *ngIf="!loading && hasOperations" class="docs-two-col">
+  <!-- LEFT: endpoint list, full names (no truncation) -->
   <nav class="docs-nav" aria-label="API operations">
     <ng-container *ngFor="let group of groups; trackBy: trackByGroup">
       <p class="docs-nav__group df-eyebrow">{{ group.tag }}</p>
@@ -87,149 +85,169 @@
     </ng-container>
   </nav>
 
-  <!-- CENTER: schema + prose -->
-  <section class="docs-center" *ngIf="selectedOp as op">
-    <div class="op-method-bar" [ngClass]="methodClass(op.method)">
-      <span class="op-method-bar__method">{{ op.method }}</span>
-      <span class="op-method-bar__path">{{ op.path }}</span>
-    </div>
-
-    <h2 class="docs-center__summary" *ngIf="op.summary">{{ op.summary }}</h2>
-    <p class="docs-center__prose" *ngIf="op.description">
-      {{ op.description }}
-    </p>
-
-    <ng-container *ngIf="op.parameters.length">
-      <p class="df-eyebrow docs-section-label">
-        {{ 'apiDocs.section.parameters' | transloco }}
-      </p>
-      <table class="docs-table">
-        <thead>
-          <tr>
-            <th>{{ 'apiDocs.param.name' | transloco }}</th>
-            <th>{{ 'apiDocs.param.in' | transloco }}</th>
-            <th>{{ 'apiDocs.param.type' | transloco }}</th>
-            <th>{{ 'apiDocs.param.required' | transloco }}</th>
-            <th>{{ 'apiDocs.param.description' | transloco }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let p of op.parameters; trackBy: trackByParam">
-            <td class="docs-table__name">{{ p.name }}</td>
-            <td>{{ p.location }}</td>
-            <td class="docs-table__type">{{ p.type }}</td>
-            <td>
-              <df-badge
-                *ngIf="p.required"
-                variant="danger"
-                [label]="'apiDocs.param.requiredLabel' | transloco"></df-badge>
-            </td>
-            <td>{{ p.description }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </ng-container>
-
-    <ng-container *ngIf="op.requestBodySchema">
-      <p class="df-eyebrow docs-section-label">
-        {{ 'apiDocs.section.requestBody' | transloco }}
-      </p>
-      <pre class="docs-schema">{{ op.requestBodySchema }}</pre>
-    </ng-container>
-
-    <ng-container *ngIf="op.responses.length">
-      <p class="df-eyebrow docs-section-label">
-        {{ 'apiDocs.section.responses' | transloco }}
-      </p>
-      <table class="docs-table">
-        <thead>
-          <tr>
-            <th>{{ 'apiDocs.response.code' | transloco }}</th>
-            <th>{{ 'apiDocs.response.description' | transloco }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let r of op.responses; trackBy: trackByResponse">
-            <td class="docs-table__type">{{ r.code }}</td>
-            <td>{{ r.description }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </ng-container>
-  </section>
-
-  <!-- RIGHT: runnable example + live console -->
-  <aside class="docs-console" *ngIf="selectedOp as op">
-    <div class="console-card">
-      <div class="console-card__head">
-        <p class="df-eyebrow">{{ 'apiDocs.example.title' | transloco }}</p>
-        <mat-button-toggle-group
-          class="lang-switch"
-          [(ngModel)]="snippetLang"
-          aria-label="Snippet language">
-          <mat-button-toggle value="js">
-            {{ 'apiDocs.lang.js' | transloco }}
-          </mat-button-toggle>
-          <mat-button-toggle value="python">
-            {{ 'apiDocs.lang.python' | transloco }}
-          </mat-button-toggle>
-          <mat-button-toggle value="curl">
-            {{ 'apiDocs.lang.curl' | transloco }}
-          </mat-button-toggle>
-          <mat-button-toggle value="mcp" class="lang-switch__mcp">
-            {{ 'apiDocs.lang.mcp' | transloco }}
-          </mat-button-toggle>
-        </mat-button-toggle-group>
+  <!-- RIGHT: metadata (top, scroll) over the live test area (bottom) -->
+  <div class="docs-right" *ngIf="selectedOp as op">
+    <!-- TOP HALF: endpoint metadata, scrollable -->
+    <section class="docs-meta">
+      <div class="op-method-bar" [ngClass]="methodClass(op.method)">
+        <span class="op-method-bar__method">{{ op.method }}</span>
+        <span class="op-method-bar__path">{{ effectivePath }}</span>
       </div>
 
-      <div class="console-card__keyrow" *ngIf="apiKeys.length">
-        <mat-form-field appearance="outline" class="console-key-select">
-          <mat-label>{{ 'apiDocs.apiKeys.label' | transloco }}</mat-label>
-          <mat-select [(ngModel)]="selectedApiKey">
-            <mat-option [value]="null">
-              {{ 'apiDocs.apiKeys.session' | transloco }}
-            </mat-option>
+      <h2 class="docs-meta__summary" *ngIf="op.summary">{{ op.summary }}</h2>
+      <p class="docs-meta__prose" *ngIf="op.description">
+        {{ op.description }}
+      </p>
+
+      <ng-container *ngIf="op.parameters.length">
+        <p class="df-eyebrow docs-section-label">
+          {{ 'apiDocs.section.parameters' | transloco }}
+        </p>
+        <table class="docs-table">
+          <thead>
+            <tr>
+              <th>{{ 'apiDocs.param.name' | transloco }}</th>
+              <th>{{ 'apiDocs.param.in' | transloco }}</th>
+              <th>{{ 'apiDocs.param.type' | transloco }}</th>
+              <th>{{ 'apiDocs.param.required' | transloco }}</th>
+              <th>{{ 'apiDocs.param.description' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of op.parameters; trackBy: trackByParam">
+              <td class="docs-table__name">
+                <button
+                  *ngIf="isAddableParam(p)"
+                  type="button"
+                  class="docs-param-add"
+                  [matTooltip]="'apiDocs.param.addToCall' | transloco"
+                  (click)="addParamToTest(p)">
+                  <span>{{ p.name }}</span>
+                  <mat-icon class="docs-param-add__icon">add</mat-icon>
+                </button>
+                <span *ngIf="!isAddableParam(p)">{{ p.name }}</span>
+              </td>
+              <td>{{ p.location }}</td>
+              <td class="docs-table__type">{{ p.type }}</td>
+              <td>
+                <df-badge
+                  *ngIf="p.required"
+                  variant="danger"
+                  [label]="
+                    'apiDocs.param.requiredLabel' | transloco
+                  "></df-badge>
+              </td>
+              <td>{{ p.description }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+
+      <ng-container *ngIf="op.requestBodySchema">
+        <p class="df-eyebrow docs-section-label">
+          {{ 'apiDocs.section.requestBody' | transloco }}
+        </p>
+        <pre class="docs-schema">{{ op.requestBodySchema }}</pre>
+      </ng-container>
+
+      <ng-container *ngIf="op.responses.length">
+        <p class="df-eyebrow docs-section-label">
+          {{ 'apiDocs.section.responses' | transloco }}
+        </p>
+        <table class="docs-table">
+          <thead>
+            <tr>
+              <th>{{ 'apiDocs.response.code' | transloco }}</th>
+              <th>{{ 'apiDocs.response.description' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of op.responses; trackBy: trackByResponse">
+              <td class="docs-table__type">{{ r.code }}</td>
+              <td>{{ r.description }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+
+      <!-- Runnable example: a copy-paste reference in curl / Python / JS / MCP. -->
+      <div class="console-card">
+        <div class="console-card__head">
+          <p class="df-eyebrow">{{ 'apiDocs.example.title' | transloco }}</p>
+          <mat-button-toggle-group
+            class="lang-switch"
+            [(ngModel)]="snippetLang"
+            aria-label="Snippet language">
+            <mat-button-toggle value="js">
+              {{ 'apiDocs.lang.js' | transloco }}
+            </mat-button-toggle>
+            <mat-button-toggle value="python">
+              {{ 'apiDocs.lang.python' | transloco }}
+            </mat-button-toggle>
+            <mat-button-toggle value="curl">
+              {{ 'apiDocs.lang.curl' | transloco }}
+            </mat-button-toggle>
+            <mat-button-toggle value="mcp" class="lang-switch__mcp">
+              {{ 'apiDocs.lang.mcp' | transloco }}
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        <div class="console-card__snippet">
+          <button
+            mat-icon-button
+            class="snippet-copy"
+            [matTooltip]="'apiDocs.example.copy' | transloco"
+            (click)="copySnippet()">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+          <pre class="snippet-code">{{ snippet }}</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- BOTTOM HALF: live test area (identity + key/role live in df-try-it) -->
+    <section class="docs-test">
+      <p class="df-eyebrow docs-test__label">
+        {{ 'apiDocs.console.title' | transloco }}
+      </p>
+
+      <!-- Table picker: turn `/_table/{table_name}` into a real, callable table. -->
+      <div class="docs-test__tablepick" *ngIf="showTablePicker">
+        <mat-form-field appearance="outline" class="docs-test__table-select">
+          <mat-label>{{ 'apiDocs.table.pick' | transloco }}</mat-label>
+          <mat-select
+            [ngModel]="selectedTable"
+            (ngModelChange)="onTableSelected($event)">
             <mat-option
-              *ngFor="let key of apiKeys; trackBy: trackByApiKey"
-              [value]="key.apiKey">
-              {{ key.name }} ({{ key.apiKey | slice: 0 : 8 }}...)
+              *ngFor="let tname of tableNames; trackBy: trackByTable"
+              [value]="tname">
+              {{ tname }}
             </mat-option>
           </mat-select>
         </mat-form-field>
+        <span class="docs-test__table-hint" *ngIf="!selectedTable">
+          {{ 'apiDocs.table.hint' | transloco }}
+        </span>
       </div>
 
-      <div class="console-card__snippet">
-        <button
-          mat-icon-button
-          class="snippet-copy"
-          [matTooltip]="'apiDocs.example.copy' | transloco"
-          (click)="copySnippet()">
-          <mat-icon>content_copy</mat-icon>
-        </button>
-        <pre class="snippet-code">{{ snippet }}</pre>
+      <div class="console-card console-card--filter" *ngIf="showFilterBuilder">
+        <df-filter-builder
+          [fields]="tableFields"
+          [filter]="currentFilter"
+          (filterChange)="onFilterChange($event)"></df-filter-builder>
       </div>
-    </div>
 
-    <div class="console-card console-card--filter" *ngIf="showFilterBuilder">
-      <df-filter-builder
-        [fields]="tableFields"
-        (filterChange)="onFilterChange($event)"></df-filter-builder>
-    </div>
-
-    <div class="console-card console-card--tryit">
-      <p class="df-eyebrow console-card__label">
-        {{ 'apiDocs.console.title' | transloco }}
-      </p>
       <df-try-it
         [method]="op.method"
+        [lockMethod]="true"
         [baseUrl]="serviceBaseUrl"
-        [path]="op.path"
+        [path]="effectivePath"
         [serviceName]="serviceName || undefined"
-        [apiKey]="selectedApiKey || undefined"
         [filter]="currentFilter"
+        [body]="sampleBody"
         (sent)="onTryItSent($event)"></df-try-it>
-    </div>
-  </aside>
+    </section>
+  </div>
 </div>
 
 <!-- Advanced / raw spec: swagger demoted behind a toggle, not deleted. -->

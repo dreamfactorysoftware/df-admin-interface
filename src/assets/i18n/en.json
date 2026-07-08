@@ -818,6 +818,7 @@
     "identityLabel": "Test as",
     "identityHint": "Re-fires under the selected key's role. Fields that role cannot read are dimmed.",
     "readOnly": "Read-only",
+    "sessionDefault": "Default",
     "tabs": {
       "params": "Params",
       "headers": "Headers",
