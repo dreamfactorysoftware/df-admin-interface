@@ -211,22 +211,45 @@
         {{ 'apiDocs.console.title' | transloco }}
       </p>
 
-      <!-- Table picker: turn `/_table/{table_name}` into a real, callable table. -->
-      <div class="docs-test__tablepick" *ngIf="showTablePicker">
-        <mat-form-field appearance="outline" class="docs-test__table-select">
-          <mat-label>{{ 'apiDocs.table.pick' | transloco }}</mat-label>
-          <mat-select
-            [ngModel]="selectedTable"
-            (ngModelChange)="onTableSelected($event)">
-            <mat-option
-              *ngFor="let tname of tableNames; trackBy: trackByTable"
-              [value]="tname">
-              {{ tname }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-        <span class="docs-test__table-hint" *ngIf="!selectedTable">
-          {{ 'apiDocs.table.hint' | transloco }}
+      <!-- Path-token pickers: turn every `{token}` the operation presents into a
+           real, callable value. Enumerable tokens (table / field / procedure /
+           function names) are dropdowns of live values; a `{field_name}` picker
+           cascades off the chosen table. Anything else stays a text input. -->
+      <div class="docs-test__tablepick" *ngIf="showTokenPickers">
+        <ng-container *ngFor="let t of pathTokens; trackBy: trackByToken">
+          <mat-form-field
+            *ngIf="isEnumerableToken(t); else tokenText"
+            appearance="outline"
+            class="docs-test__table-select">
+            <mat-label>{{
+              t.labelKey ? (t.labelKey | transloco) : humanizeToken(t.token)
+            }}</mat-label>
+            <mat-select
+              [ngModel]="tokenValues[t.token] || null"
+              (ngModelChange)="onTokenSelected(t, $event)">
+              <mat-option
+                *ngFor="let opt of tokenOptions[t.token]; trackBy: trackByOption"
+                [value]="opt">
+                {{ opt }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <ng-template #tokenText>
+            <mat-form-field
+              appearance="outline"
+              class="docs-test__table-select">
+              <mat-label>{{
+                t.labelKey ? (t.labelKey | transloco) : humanizeToken(t.token)
+              }}</mat-label>
+              <input
+                matInput
+                [ngModel]="tokenValues[t.token] || ''"
+                (ngModelChange)="onTokenSelected(t, $event)" />
+            </mat-form-field>
+          </ng-template>
+        </ng-container>
+        <span class="docs-test__table-hint" *ngIf="hasUnresolvedToken">
+          {{ 'apiDocs.token.hint' | transloco }}
         </span>
       </div>
 

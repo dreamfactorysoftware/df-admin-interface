@@ -9,6 +9,7 @@ import SwaggerUI from 'swagger-ui';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -92,6 +93,18 @@ interface DocResponse {
   description: string;
 }
 
+/** How a single `{token}` in an operation path is resolved into a real value. */
+type TokenKind = 'table' | 'field' | 'proc' | 'func' | 'text';
+
+/** One `{token}` placeholder parsed out of an operation's path. `labelKey` is an
+ *  i18n key for the enumerable kinds; a free-text token carries `null` and falls
+ *  back to its (humanized) name. */
+interface PathToken {
+  token: string;
+  kind: TokenKind;
+  labelKey: string | null;
+}
+
 /** A left-nav group: a resource/tag and the operations under it. */
 interface DocGroup {
   tag: string;
@@ -112,6 +125,7 @@ const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   imports: [
     MatButtonModule,
     MatFormFieldModule,
+    MatInputModule,
     MatSelectModule,
     MatIconModule,
     MatButtonToggleModule,
@@ -142,14 +156,21 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   apiDocJson: ApiDocJson;
   apiKeys: ApiKeyInfo[] = [];
 
-  // Table picker (spec FB6.9): when an operation targets `/_table/{table_name}`
-  // there is no real table to call, so we introspect the service's tables and
-  // let the user pick one. Selecting rewrites the path to a concrete table.
-  tableNames: string[] = [];
-  selectedTable: string | null = null;
-  // Real columns (name + type) of the effective table, driving both the filter
-  // builder field list and the prefilled sample body.
+  // Path-token pickers (FB12): every `{token}` an operation's path presents gets
+  // a control so the call can be made concrete. Enumerable tokens (table / field
+  // / procedure / function names) become dropdowns backed by live introspection;
+  // anything else stays an editable text input. `pathTokens` is the ordered set
+  // parsed from the op path, `tokenValues` the chosen substitution per token, and
+  // `tokenOptions` the resolved dropdown choices per token.
+  pathTokens: PathToken[] = [];
+  tokenValues: Record<string, string> = {};
+  tokenOptions: Record<string, string[]> = {};
+  // Real columns (name + type) of the selected table, driving both the filter
+  // builder field list, the prefilled sample body, AND the `{field_name}` picker.
   tableColumns: Array<{ name: string; type: string }> = [];
+  // Guards async schema introspection against cascade races: a newer table pick
+  // must win over an in-flight response for the previously selected one.
+  private tableSeq = 0;
 
   // Three-column model.
   loading = true;
@@ -339,48 +360,145 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
 
   selectOperation(op: DocOperation): void {
     this.selectedOp = op;
-    // A new operation resets the filter, the picked table, and the introspected
+    // A new operation resets the filter, the token pickers, and the introspected
     // columns. Then re-hydrate for the new op.
     this.currentFilter = '';
     this.tableFields = [];
     this.tableColumns = [];
-    this.tableNames = [];
-    this.selectedTable = null;
-    if (this.pathHasTableTemplate(op.path)) {
-      // `/_table/{table_name}` — offer the service's real tables to pick from.
-      this.loadTableNames();
+    this.pathTokens = this.parsePathTokens(op.path);
+    this.tokenValues = {};
+    this.tokenOptions = {};
+    if (this.pathTokens.length) {
+      // Templated path — resolve every `{token}` into its picker.
+      this.pathTokens.forEach(t => this.resolveToken(t));
     } else {
-      // Concrete `/_table/<name>` — introspect its columns directly.
-      this.introspectTable(op.path);
+      // Concrete `/_table/<name>` — introspect its columns for the filter
+      // builder + sample body.
+      const table = this.tableFromPath(op.path);
+      if (table) {
+        this.loadTableSchema(table);
+      }
     }
   }
 
-  /** True when the op path carries the `{table_name}` placeholder and therefore
-   *  cannot be called until a real table is chosen. */
-  private pathHasTableTemplate(path: string): boolean {
-    return /_table\/\{table_name\}/.test(path);
+  // ---- path tokens (FB12) --------------------------------------------------
+
+  /** Parse `{token}` placeholders out of a path, in order, de-duplicated. */
+  private parsePathTokens(path: string): PathToken[] {
+    const out: PathToken[] = [];
+    const seen = new Set<string>();
+    const re = /\{([^}]+)\}/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(path)) !== null) {
+      const token = m[1];
+      if (seen.has(token)) {
+        continue;
+      }
+      seen.add(token);
+      out.push({
+        token,
+        kind: this.tokenKind(token),
+        labelKey: this.tokenLabelKey(token),
+      });
+    }
+    return out;
   }
 
-  /** Show the table dropdown for placeholder `/_table/{table_name}` ops. */
-  get showTablePicker(): boolean {
-    return (
-      !!this.serviceName &&
-      !!this.selectedOp &&
-      this.pathHasTableTemplate(this.selectedOp.path)
+  private tokenKind(token: string): TokenKind {
+    switch (token) {
+      case 'table_name':
+        return 'table';
+      case 'field_name':
+        return 'field';
+      case 'procedure_name':
+        return 'proc';
+      case 'function_name':
+        return 'func';
+      default:
+        return 'text';
+    }
+  }
+
+  private tokenLabelKey(token: string): string | null {
+    switch (this.tokenKind(token)) {
+      case 'table':
+        return 'apiDocs.token.table';
+      case 'field':
+        return 'apiDocs.token.field';
+      case 'proc':
+        return 'apiDocs.token.procedure';
+      case 'func':
+        return 'apiDocs.token.function';
+      default:
+        return null;
+    }
+  }
+
+  /** True for tokens backed by a dropdown of real values (vs a text input). */
+  isEnumerableToken(t: PathToken): boolean {
+    return t.kind !== 'text';
+  }
+
+  /** A human label for a free-text token: its name with spaces for underscores.
+   *  Bound as data, not a hardcoded UI string. */
+  humanizeToken(token: string): string {
+    return token.replace(/_/g, ' ');
+  }
+
+  /** Kick off the resolver for a token when the operation is selected. Field
+   *  tokens wait for a table to be chosen (the cascade), unless the path already
+   *  carries a concrete table. */
+  private resolveToken(t: PathToken): void {
+    switch (t.kind) {
+      case 'table':
+        this.loadTableOptions(t);
+        break;
+      case 'proc':
+        this.loadResourceOptions('_proc', t);
+        break;
+      case 'func':
+        this.loadResourceOptions('_func', t);
+        break;
+      case 'field': {
+        const table = this.tableFromPath(this.effectivePath);
+        if (table) {
+          this.loadTableSchema(table);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  /** Show the token-picker block whenever the selected op carries a placeholder. */
+  get showTokenPickers(): boolean {
+    return !!this.selectedOp && this.pathTokens.length > 0;
+  }
+
+  /** True while any enumerable token has no chosen value: the effective path is
+   *  not yet concrete, so surface the hint. */
+  get hasUnresolvedToken(): boolean {
+    return this.pathTokens.some(
+      t => this.isEnumerableToken(t) && !this.tokenValues[t.token]
     );
   }
 
-  /** The path actually run: the placeholder resolved to the picked table when
-   *  there is one, otherwise the op's own path. */
+  /** The path actually run: every `{token}` replaced by its chosen value.
+   *  Unset tokens keep their `{token}` placeholder. */
   get effectivePath(): string {
     const op = this.selectedOp;
     if (!op) {
       return '';
     }
-    if (this.selectedTable && this.pathHasTableTemplate(op.path)) {
-      return op.path.replace('{table_name}', this.selectedTable);
-    }
-    return op.path;
+    let path = op.path;
+    this.pathTokens.forEach(t => {
+      const value = this.tokenValues[t.token];
+      if (value) {
+        path = path.replace(`{${t.token}}`, value);
+      }
+    });
+    return path;
   }
 
   /** True when a `?filter=` actually shapes the (effective) response: a table
@@ -390,12 +508,21 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     return !!op && op.method === 'GET' && /_table\//.test(this.effectivePath);
   }
 
-  onTableSelected(name: string): void {
-    this.selectedTable = name;
-    this.currentFilter = '';
-    this.tableFields = [];
-    this.tableColumns = [];
-    this.introspectTable(this.effectivePath);
+  onTokenSelected(t: PathToken, value: string): void {
+    this.tokenValues[t.token] = value;
+    if (t.kind === 'table') {
+      // Cascade: a new table resets the filter, the introspected columns, and
+      // any dependent `{field_name}` token, then refreshes them for the pick.
+      this.currentFilter = '';
+      this.tableFields = [];
+      this.tableColumns = [];
+      const fieldTok = this.pathTokens.find(x => x.kind === 'field');
+      if (fieldTok) {
+        this.tokenValues[fieldTok.token] = '';
+        this.tokenOptions[fieldTok.token] = [];
+      }
+      this.loadTableSchema(value);
+    }
   }
 
   /** Pull the table name out of a `/_table/<name>` path. Braced OpenAPI
@@ -406,13 +533,9 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     return m ? m[1] : null;
   }
 
-  private get effectiveTable(): string | null {
-    return this.tableFromPath(this.effectivePath);
-  }
-
-  /** List the service's real tables so a `{table_name}` op becomes callable.
+  /** List the service's real tables so a `{table_name}` token becomes a picker.
    *  Silent on failure. */
-  private loadTableNames(): void {
+  private loadTableOptions(t: PathToken): void {
     if (!this.serviceName) {
       return;
     }
@@ -426,20 +549,44 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
           map(res => (res.resource ?? []).map(r => r.name).filter(Boolean)),
           catchError(() => of([] as string[]))
         )
-        .subscribe(names => (this.tableNames = names))
+        .subscribe(names => (this.tokenOptions[t.token] = names))
     );
   }
 
-  /** Best-effort schema introspection so the field slot lists real columns AND
-   *  the sample body can be prefilled with them. Silent on failure. */
-  private introspectTable(path: string): void {
+  /** List a service's stored procedures / functions (`_proc` / `_func`) so those
+   *  tokens become pickers. A service with none silently yields an empty list.
+   *  The endpoint may return bare name strings or `{name}` objects; handle both. */
+  private loadResourceOptions(resource: '_proc' | '_func', t: PathToken): void {
     if (!this.serviceName) {
       return;
     }
-    const table = this.tableFromPath(path);
-    if (!table) {
+    this.subscriptions.push(
+      this.http
+        .get<{ resource?: Array<string | { name?: string }> }>(
+          `${BASE_URL}/${this.serviceName}/${resource}`,
+          { context: toastOff() }
+        )
+        .pipe(
+          map(res =>
+            (res.resource ?? [])
+              .map(r => (typeof r === 'string' ? r : r?.name))
+              .filter((n): n is string => !!n)
+          ),
+          catchError(() => of([] as string[]))
+        )
+        .subscribe(names => (this.tokenOptions[t.token] = names))
+    );
+  }
+
+  /** Introspect one table's schema. Feeds the filter builder + sample body
+   *  columns AND, when the path carries a `{field_name}` token, that token's
+   *  dropdown (the cascade). Sequence-guarded so a superseded pick never wins.
+   *  Silent on failure. */
+  private loadTableSchema(table: string): void {
+    if (!this.serviceName) {
       return;
     }
+    const seq = ++this.tableSeq;
     this.subscriptions.push(
       this.http
         .get<{ field?: Array<{ name: string; type?: string }> }>(
@@ -451,12 +598,17 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
           catchError(() => of([] as Array<{ name: string; type?: string }>))
         )
         .subscribe(fields => {
-          if (this.effectiveTable === table) {
-            this.tableColumns = fields.map(f => ({
-              name: f.name,
-              type: f.type ?? '',
-            }));
-            this.tableFields = this.tableColumns.map(c => c.name);
+          if (seq !== this.tableSeq) {
+            return;
+          }
+          this.tableColumns = fields.map(f => ({
+            name: f.name,
+            type: f.type ?? '',
+          }));
+          this.tableFields = this.tableColumns.map(c => c.name);
+          const fieldTok = this.pathTokens.find(x => x.kind === 'field');
+          if (fieldTok) {
+            this.tokenOptions[fieldTok.token] = this.tableFields;
           }
         })
     );
@@ -853,7 +1005,8 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   }
 
   trackByApiKey = (_: number, key: ApiKeyInfo): string => key.apiKey;
-  trackByTable = (_: number, name: string): string => name;
+  trackByToken = (_: number, t: PathToken): string => t.token;
+  trackByOption = (_: number, option: string): string => option;
   trackByGroup = (_: number, group: DocGroup): string => group.tag;
   trackByOperation = (_: number, op: DocOperation): string => op.id;
   trackByParam = (_: number, p: DocParameter): string =>

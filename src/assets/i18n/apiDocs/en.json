@@ -35,6 +35,13 @@
     "pick": "Table",
     "hint": "Pick a table to call a real endpoint."
   },
+  "token": {
+    "table": "Table",
+    "field": "Field",
+    "procedure": "Procedure",
+    "function": "Function",
+    "hint": "Choose a value for each placeholder to call a real endpoint."
+  },
   "response": {
     "code": "Code",
     "description": "Description"
