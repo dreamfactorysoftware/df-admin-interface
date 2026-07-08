@@ -50,6 +50,11 @@ describe('DfAiChatComponent (polling lifecycle)', () => {
       },
       router: {},
       cdr: { markForCheck: () => undefined },
+      // resolveRate() (fired by selectService) reads this.http; act-as scope
+      // chips read this.scope. Neither is exercised by these poll tests, so a
+      // no-op stub keeps selectService from throwing.
+      http: { get: () => of({}) },
+      scope: { reachForRole: () => of([]) },
       chatServices: [],
       sessions: [],
       selectedServiceName: 'demo',

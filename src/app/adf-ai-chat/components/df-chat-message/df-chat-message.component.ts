@@ -1,9 +1,33 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faRobot, faUser } from '@fortawesome/free-solid-svg-icons';
+import {
+  faRobot,
+  faUser,
+  faCopy,
+  faCheck,
+  faRotateRight,
+  faCode,
+} from '@fortawesome/free-solid-svg-icons';
 import { ChatMessage, ToolCall } from '../../types/chat';
 import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-result.component';
+import { estimateCost, formatUSD } from 'src/app/adf-ai-usage/utils/cost';
+import { ProviderRates } from 'src/app/adf-ai-usage/types/usage';
+
+/** One rendered piece of inline markdown inside a text segment. */
+interface InlineToken {
+  kind: 'text' | 'bold' | 'italic' | 'code' | 'link';
+  text: string;
+  href?: string;
+}
 
 @Component({
   selector: 'df-chat-message',
@@ -11,8 +35,8 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
   // OnPush is safe here: the parent never mutates a ChatMessage in place —
   // messages always arrive as fresh objects from the API poll (or a fresh
   // optimistic object), so the `message` input reference changes whenever
-  // content changes. This confines the 1s poll-tick re-render to messages
-  // whose input identity actually changed.
+  // content changes. Local view state (showRaw, copied) flips only from this
+  // component's own handlers, which mark it dirty under OnPush.
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FontAwesomeModule, DfChatToolResultComponent],
   template: `
@@ -35,15 +59,39 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           <fa-icon [icon]="faRobot"></fa-icon>
         </div>
         <div class="msg__bubble">
-          <ng-container *ngIf="message.content">
+          <!-- Raw view: verbatim content, markdown literal -->
+          <pre *ngIf="showRaw" class="msg__raw">{{ message.content }}</pre>
+
+          <ng-container *ngIf="!showRaw && message.content">
             <ng-container *ngFor="let seg of segments; trackBy: trackSeg">
               <pre
                 *ngIf="seg.type === 'code'"
                 class="msg__code"><code>{{ seg.text }}</code></pre>
-              <p *ngIf="seg.type === 'text'">{{ seg.text }}</p>
+              <p *ngIf="seg.type === 'text'">
+                <ng-container
+                  *ngFor="let tok of inlineTokens(seg.text); trackBy: trackTok"
+                  ><ng-container [ngSwitch]="tok.kind"
+                    ><strong *ngSwitchCase="'bold'">{{ tok.text }}</strong
+                    ><em *ngSwitchCase="'italic'">{{ tok.text }}</em
+                    ><code *ngSwitchCase="'code'" class="msg__inline-code">{{
+                      tok.text
+                    }}</code
+                    ><a
+                      *ngSwitchCase="'link'"
+                      [href]="tok.href"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >{{ tok.text }}</a
+                    ><span *ngSwitchDefault>{{ tok.text }}</span></ng-container
+                  ></ng-container
+                >
+              </p>
             </ng-container>
           </ng-container>
-          <p *ngIf="!message.content" class="msg__empty">(no text response)</p>
+          <p *ngIf="!showRaw && !message.content" class="msg__empty">
+            (no text response)
+          </p>
+
           <div *ngIf="hasToolCalls" class="msg__tool-calls">
             <div
               *ngFor="let tc of message.tool_calls; trackBy: trackToolCall"
@@ -59,16 +107,54 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
               }}</pre>
             </div>
           </div>
-          <div *ngIf="hasUsage" class="msg__usage">
-            <span *ngIf="message.input_tokens != null"
-              >in {{ message.input_tokens }}t</span
-            >
-            <span *ngIf="message.output_tokens != null"
-              >out {{ message.output_tokens }}t</span
-            >
-            <span *ngIf="message.latency_ms != null"
-              >{{ message.latency_ms }}ms</span
-            >
+
+          <!-- Metering chip row: tokens + cost + latency, from the same
+               usage record adf-ai-usage reads. Cost is derived from the
+               connection's provider rate; omitted when no rate resolves. -->
+          <div *ngIf="hasUsage" class="msg__meter df-numeric">
+            <span *ngIf="message.input_tokens != null" class="msg__chip">
+              <span class="msg__chip-label">in</span
+              >{{ fmtNum(message.input_tokens) }}
+            </span>
+            <span *ngIf="message.output_tokens != null" class="msg__chip">
+              <span class="msg__chip-label">out</span
+              >{{ fmtNum(message.output_tokens) }}
+            </span>
+            <span
+              *ngIf="costText"
+              class="msg__chip msg__chip--cost"
+              [title]="costTitle">
+              {{ costText }}
+            </span>
+            <span *ngIf="message.latency_ms != null" class="msg__chip">
+              {{ fmtLatency(message.latency_ms) }}
+            </span>
+          </div>
+
+          <!-- Hover actions -->
+          <div class="msg__actions">
+            <button
+              type="button"
+              class="msg__action"
+              [title]="copied ? 'Copied' : 'Copy'"
+              (click)="copy()">
+              <fa-icon [icon]="copied ? faCheck : faCopy"></fa-icon>
+            </button>
+            <button
+              type="button"
+              class="msg__action"
+              title="Regenerate"
+              (click)="regenerate.emit(message)">
+              <fa-icon [icon]="faRotateRight"></fa-icon>
+            </button>
+            <button
+              type="button"
+              class="msg__action"
+              [class.msg__action--on]="showRaw"
+              [title]="showRaw ? 'Show formatted' : 'View raw'"
+              (click)="showRaw = !showRaw">
+              <fa-icon [icon]="faCode"></fa-icon>
+            </button>
           </div>
         </div>
       </div>
@@ -107,6 +193,13 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
             background: var(--chat-surface-2);
             border: 1px solid var(--chat-border-2);
           }
+
+          // Hover actions surface only over the assistant bubble.
+          &:hover .msg__actions,
+          .msg__bubble:focus-within .msg__actions {
+            opacity: 1;
+            pointer-events: auto;
+          }
         }
 
         &--system {
@@ -134,6 +227,7 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
         }
 
         &__bubble {
+          position: relative;
           padding: 0.75rem 1rem;
           border-radius: var(--df-radius);
           max-width: min(720px, 80%);
@@ -148,12 +242,40 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
               margin-bottom: 0;
             }
           }
+
+          strong {
+            font-weight: 600;
+          }
+
+          a {
+            color: var(--df-accent);
+            text-decoration: underline;
+          }
         }
 
         &__empty {
           color: var(--chat-text-faint);
           font-style: italic;
           font-size: 1.3rem;
+        }
+
+        &__raw {
+          margin: 0;
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+          font-size: 13px;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          word-break: break-word;
+          color: var(--df-code-text);
+        }
+
+        &__inline-code {
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+          font-size: 0.92em;
+          padding: 0.1rem 0.35rem;
+          border-radius: var(--df-radius-sm);
+          background: var(--chat-code-bg);
+          color: var(--df-code-text);
         }
 
         &__code {
@@ -228,15 +350,79 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
           font-size: 11px;
         }
 
-        &__usage {
+        // Metering chips: tabular, quiet, one line. df-numeric on the row.
+        &__meter {
           display: flex;
-          gap: 0.75rem;
+          flex-wrap: wrap;
+          gap: 0.375rem;
           margin-top: 0.5rem;
           padding-top: 0.5rem;
           border-top: 1px dashed var(--chat-border-2);
+        }
+
+        &__chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.3rem;
+          padding: 0.1rem 0.45rem;
+          border-radius: var(--df-radius-sm);
+          background: var(--chat-hover);
+          border: 1px solid var(--chat-border-2);
           font-size: 11px;
-          color: var(--chat-text-faint);
+          line-height: 1.6;
+          color: var(--chat-text-2);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+
+          &--cost {
+            color: var(--df-text);
+            border-color: var(--df-accent-border, var(--chat-border-2));
+          }
+        }
+
+        &__chip-label {
+          color: var(--chat-text-faint);
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          font-size: 10px;
+        }
+
+        &__actions {
+          position: absolute;
+          top: -0.75rem;
+          right: 0.5rem;
+          display: flex;
+          gap: 0.125rem;
+          padding: 0.125rem;
+          border-radius: var(--df-radius-sm);
+          background: var(--chat-surface);
+          border: 1px solid var(--chat-border-2);
+          box-shadow: var(--df-shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.2));
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.12s ease;
+        }
+
+        &__action {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 2rem;
+          height: 2rem;
+          background: none;
+          border: none;
+          border-radius: var(--df-radius-sm);
+          color: var(--chat-text-muted);
+          cursor: pointer;
+          font-size: 1.2rem;
+
+          &:hover {
+            background: var(--chat-hover);
+            color: var(--df-text);
+          }
+
+          &--on {
+            color: var(--df-accent);
+          }
         }
       }
     `,
@@ -244,9 +430,24 @@ import { DfChatToolResultComponent } from '../df-chat-tool-result/df-chat-tool-r
 })
 export class DfChatMessageComponent {
   @Input({ required: true }) message!: ChatMessage;
+  /** Provider rate used to derive per-message cost. Null = no cost chip. */
+  @Input() rate: ProviderRates | null = null;
+  /** Model label, shown in the cost chip tooltip so the estimate is honest. */
+  @Input() model?: string;
+
+  @Output() regenerate = new EventEmitter<ChatMessage>();
+
+  private cdr = inject(ChangeDetectorRef);
 
   faRobot = faRobot;
   faUser = faUser;
+  faCopy = faCopy;
+  faCheck = faCheck;
+  faRotateRight = faRotateRight;
+  faCode = faCode;
+
+  showRaw = false;
+  copied = false;
 
   get hasToolCalls(): boolean {
     return !!(this.message.tool_calls && this.message.tool_calls.length);
@@ -304,12 +505,67 @@ export class DfChatMessageComponent {
     return i;
   }
 
+  trackTok(i: number): number {
+    return i;
+  }
+
   get hasUsage(): boolean {
     return (
       this.message.input_tokens != null ||
       this.message.output_tokens != null ||
       this.message.latency_ms != null
     );
+  }
+
+  /** Derived per-message cost, using the same estimator + rate the usage
+   *  dashboard uses. Null (chip omitted) when no rate resolved or there are
+   *  no token counts to price. Never a fabricated figure. */
+  get costText(): string | null {
+    if (!this.rate) {
+      return null;
+    }
+    const inTok = this.message.input_tokens;
+    const outTok = this.message.output_tokens;
+    if (inTok == null && outTok == null) {
+      return null;
+    }
+    return formatUSD(estimateCost(inTok ?? 0, outTok ?? 0, this.rate));
+  }
+
+  get costTitle(): string {
+    const provider = this.model || this.rate?.provider || 'provider';
+    return `Estimated from ${provider} rates`;
+  }
+
+  fmtNum(n: number | null | undefined): string {
+    return (n ?? 0).toLocaleString('en-US');
+  }
+
+  fmtLatency(ms: number | null | undefined): string {
+    if (ms == null) {
+      return '';
+    }
+    if (ms >= 1000) {
+      return `${(ms / 1000).toFixed(ms >= 10000 ? 0 : 1)}s`;
+    }
+    return `${ms}ms`;
+  }
+
+  copy(): void {
+    const text = this.message.content ?? '';
+    const done = () => {
+      this.copied = true;
+      this.cdr.markForCheck();
+      setTimeout(() => {
+        this.copied = false;
+        this.cdr.markForCheck();
+      }, 1500);
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => {
+        /* clipboard denied: no-op */
+      });
+    }
   }
 
   /** Memo for segments: without it the getter returned a fresh array of
@@ -323,13 +579,8 @@ export class DfChatMessageComponent {
 
   /**
    * Split assistant content into text + fenced-code segments. Pure-text
-   * binding only — no innerHTML, so there is no XSS surface.
-   *
-   * ponytail: inline markdown (**bold**, *italic*, `code`) renders as
-   * literal asterisks (rollout punch item 3). Verified there is no
-   * markdown pipeline anywhere in this repo or its history to wire up;
-   * fixing it means adding a sanctioned renderer + sanitizer dependency
-   * (e.g. marked + DOMPurify), which is an integration-level decision.
+   * binding only — no innerHTML, so there is no XSS surface. Inline markdown
+   * inside each text segment is rendered structurally by inlineTokens().
    */
   get segments(): Array<{ type: 'text' | 'code'; text: string }> {
     const content = this.message.content ?? '';
@@ -367,6 +618,74 @@ export class DfChatMessageComponent {
     }
     if (out.length === 0) {
       out.push({ type: 'text', text: c });
+    }
+    return out;
+  }
+
+  /** Memo for inline tokens: keyed by the raw segment string. Cleared when
+   *  the source content changes so it cannot grow unbounded across a
+   *  streaming response. */
+  private inlineCache = new Map<string, InlineToken[]>();
+  private inlineCacheFor = '';
+
+  /**
+   * Render inline markdown (bold, italic, inline code, links) as structural
+   * tokens. Fixes rollout punch item 3: assistant bubbles previously showed
+   * literal ** and * because content was bound as plain text. This tokenizes
+   * without innerHTML — every token renders through Angular's text/attr
+   * bindings, so there is no HTML-injection surface (link href is bound and
+   * sanitized by Angular, which blocks javascript: URLs).
+   */
+  inlineTokens(text: string): InlineToken[] {
+    const content = this.message.content ?? '';
+    if (this.inlineCacheFor !== content) {
+      this.inlineCacheFor = content;
+      this.inlineCache.clear();
+    }
+    const hit = this.inlineCache.get(text);
+    if (hit) {
+      return hit;
+    }
+    const toks = this.parseInline(text);
+    this.inlineCache.set(text, toks);
+    return toks;
+  }
+
+  private parseInline(s: string): InlineToken[] {
+    const out: InlineToken[] = [];
+    // Order matters: inline code first (protects its literal contents),
+    // then bold, then italic, then links. No nesting — flat tokens are
+    // enough to kill the literal-asterisk artifact.
+    const re =
+      /(`[^`\n]+`)|(\*\*[^*\n]+\*\*|__[^_\n]+__)|(\*[^*\s][^*\n]*\*|_[^_\s][^_\n]*_)|(\[[^\]\n]+\]\([^)\s]+\))/g;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s))) {
+      if (m.index > last) {
+        out.push({ kind: 'text', text: s.slice(last, m.index) });
+      }
+      const g = m[0];
+      if (m[1]) {
+        out.push({ kind: 'code', text: g.slice(1, -1) });
+      } else if (m[2]) {
+        out.push({ kind: 'bold', text: g.slice(2, -2) });
+      } else if (m[3]) {
+        out.push({ kind: 'italic', text: g.slice(1, -1) });
+      } else if (m[4]) {
+        const mm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(g);
+        if (mm) {
+          out.push({ kind: 'link', text: mm[1], href: mm[2] });
+        } else {
+          out.push({ kind: 'text', text: g });
+        }
+      }
+      last = m.index + g.length;
+    }
+    if (last < s.length) {
+      out.push({ kind: 'text', text: s.slice(last) });
+    }
+    if (out.length === 0) {
+      out.push({ kind: 'text', text: s });
     }
     return out;
   }
