@@ -1,5 +1,5 @@
 <div class="details-section">
-  <div class="action-bar" style="align-items: center; padding: 0 0 8px">
+  <div class="action-bar log-toolbar">
     <button mat-flat-button class="save-btn" (click)="goBack()">
       {{ 'goBack' | transloco }}
     </button>
@@ -14,5 +14,5 @@
   <df-ace-editor
     [readonly]="true"
     [value]="content"
-    class="full-width"></df-ace-editor>
+    class="full-width log-editor"></df-ace-editor>
 </div>

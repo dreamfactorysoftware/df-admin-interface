@@ -93,7 +93,7 @@ import {
         height: 100%;
         width: 380px;
         border-left: 1px solid var(--df-border);
-        background: #fafafa;
+        background: var(--df-bg);
         overflow: hidden;
       }
 
@@ -103,14 +103,14 @@ import {
         justify-content: space-between;
         padding: 8px 12px;
         border-bottom: 1px solid var(--df-border);
-        background: #f5f5f5;
+        background: var(--df-surface-2);
 
         .detail-title {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--df-text-2);
+          letter-spacing: 0.06em;
+          color: var(--df-text-muted);
         }
 
         .close-btn {
@@ -140,13 +140,13 @@ import {
             font-size: 12px;
             font-weight: 600;
             color: var(--df-text);
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-type-badge {
             font-size: 10px;
             color: var(--df-text-faint);
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-badges {
@@ -160,19 +160,19 @@ import {
             }
 
             .badge-pk {
-              --mdc-chip-elevated-container-color: #7b1fa2;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent);
+              --mdc-chip-label-text-color: var(--df-accent-contrast);
             }
 
             .badge-fk {
-              --mdc-chip-elevated-container-color: #1565c0;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent-soft);
+              --mdc-chip-label-text-color: var(--df-accent-strong);
             }
           }
         }
 
         .field-value {
-          font-size: 13px;
+          font-size: 1.3rem;
           color: var(--df-text);
           word-break: break-word;
 
@@ -180,7 +180,7 @@ import {
             display: inline-block;
             font-size: 11px;
             padding: 1px 8px;
-            border-radius: 4px;
+            border-radius: var(--df-radius-sm);
             background: var(--df-surface-2);
             color: var(--df-text-faint);
             font-style: italic;
@@ -188,10 +188,10 @@ import {
 
           .json-value {
             font-size: 12px;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             background: var(--df-surface-2);
             border: 1px solid var(--df-border);
-            border-radius: 4px;
+            border-radius: var(--df-radius-sm);
             padding: 8px;
             margin: 4px 0 0;
             overflow-x: auto;
@@ -224,24 +224,13 @@ import {
       }
 
       .ref-link {
-        color: #1565c0;
+        color: var(--df-accent);
         cursor: pointer;
         font-size: 11px;
         text-decoration: none;
         &:hover {
+          color: var(--df-accent-strong);
           text-decoration: underline;
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .row-detail-panel {
-          background: #1e1e1e;
-        }
-        .detail-header {
-          background: #2c2c2c;
-        }
-        .ref-link {
-          color: #64b5f6;
         }
       }
     `,

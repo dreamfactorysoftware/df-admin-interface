@@ -259,10 +259,10 @@
   </mat-form-field>
 
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()">
+    <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary">
+    <button class="save-btn" mat-flat-button color="primary">
       <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
       <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
     </button>

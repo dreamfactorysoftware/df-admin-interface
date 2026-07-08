@@ -17,6 +17,23 @@ const POLL_MS = 5000;
 @Component({
   selector: 'df-log-viewer',
   templateUrl: './df-log-viewer.component.html',
+  // Departure chrome only (tokens, hairline frame, corner scale);
+  // the live-tail behavior below is untouched.
+  styles: [
+    `
+      .log-toolbar {
+        align-items: center;
+        padding: 0 0 12px;
+      }
+
+      .log-editor {
+        display: block;
+        border: 1px solid var(--df-border);
+        border-radius: var(--df-radius-sm);
+        overflow: hidden;
+      }
+    `,
+  ],
   standalone: true,
   imports: [
     DfAceEditorComponent,

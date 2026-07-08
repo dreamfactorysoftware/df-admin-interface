@@ -1,3 +1,5 @@
+// Field details, departure treatment. Tokens only; form fields ride
+// the global --df-* chrome from src/styles.scss.
 form {
   .mat-mdc-form-field {
     padding-bottom: 10px;
@@ -10,5 +12,12 @@ form {
     .mat-mdc-slide-toggle {
       padding-bottom: 10px;
     }
+  }
+
+  .action-bar {
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+    border-top: 1px solid var(--df-border-2);
   }
 }

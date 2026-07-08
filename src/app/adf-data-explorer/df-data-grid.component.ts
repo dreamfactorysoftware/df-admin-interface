@@ -597,7 +597,7 @@ interface ColumnFilter {
         height: 49px;
         box-sizing: border-box;
         border-bottom: 1px solid var(--df-border);
-        background: #fafafa;
+        background: var(--df-surface-2);
         flex-shrink: 0;
 
         .toolbar-left {
@@ -606,13 +606,14 @@ interface ColumnFilter {
           gap: 10px;
 
           .toolbar-icon {
-            color: #7b1fa2;
+            color: var(--df-accent);
             font-size: 16px;
           }
 
           .table-title {
-            font-size: 15px;
-            font-weight: 500;
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
             color: var(--df-text);
           }
 
@@ -630,25 +631,11 @@ interface ColumnFilter {
           gap: 2px;
 
           button.active {
-            color: #7b1fa2;
+            color: var(--df-accent);
           }
 
           .clear-filters-btn {
-            color: #ef6c00;
-          }
-        }
-      }
-
-      :host-context(.dark-theme) .grid-toolbar {
-        background: #303030;
-        .toolbar-left {
-          .toolbar-icon {
-            color: #ce93d8;
-          }
-        }
-        .toolbar-right {
-          button.active {
-            color: #ce93d8;
+            color: var(--df-warning, var(--df-accent));
           }
         }
       }
@@ -666,7 +653,7 @@ interface ColumnFilter {
         justify-content: space-between;
         padding: 2px 12px;
         border-bottom: 1px solid var(--df-border);
-        background: #fafafa;
+        background: var(--df-surface-2);
         flex-shrink: 0;
         font-size: 12px;
         color: var(--df-text-muted);
@@ -690,7 +677,7 @@ interface ColumnFilter {
 
             .page-size-select {
               border: 1px solid var(--df-border);
-              border-radius: 4px;
+              border-radius: var(--df-radius-sm);
               padding: 2px 4px;
               font-size: 12px;
               background: var(--df-surface);
@@ -723,13 +710,6 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .top-pagination {
-        background: #303030;
-        .page-size-select {
-          background: #2c2c2c !important;
-        }
-      }
-
       .loading-state,
       .error-state,
       .empty-state {
@@ -757,7 +737,12 @@ interface ColumnFilter {
           left: 0;
           right: 0;
           height: 3px;
-          background: linear-gradient(90deg, transparent, #7b1fa2, transparent);
+          background: linear-gradient(
+            90deg,
+            transparent,
+            var(--df-accent),
+            transparent
+          );
           animation: loading-bar 1s infinite;
           z-index: 10;
         }
@@ -776,51 +761,31 @@ interface ColumnFilter {
         height: 100%;
         overflow: scroll;
 
-        /* Fat always-visible scrollbars */
+        /* Fat always-visible scrollbars, token-tinted for all themes */
         &::-webkit-scrollbar {
           width: 14px;
           height: 14px;
         }
         &::-webkit-scrollbar-track {
-          background: #e8e8e8;
+          background: var(--df-surface-2);
         }
         &::-webkit-scrollbar-thumb {
-          background: #a0a0a0;
+          background: var(--df-text-faint);
           border-radius: 7px;
-          border: 2px solid #e8e8e8;
+          border: 3px solid var(--df-surface);
           &:hover {
-            background: #808080;
+            background: var(--df-text-muted);
           }
           &:active {
-            background: #666;
+            background: var(--df-text-2);
           }
         }
         &::-webkit-scrollbar-corner {
-          background: #e8e8e8;
+          background: var(--df-surface-2);
         }
 
         scrollbar-width: auto;
-        scrollbar-color: #a0a0a0 #e8e8e8;
-      }
-
-      :host-context(.dark-theme) .table-scroll {
-        &::-webkit-scrollbar-track {
-          background: #252525;
-        }
-        &::-webkit-scrollbar-thumb {
-          background: #555;
-          border-color: #252525;
-          &:hover {
-            background: #6a6a6a;
-          }
-          &:active {
-            background: #7a7a7a;
-          }
-        }
-        &::-webkit-scrollbar-corner {
-          background: #252525;
-        }
-        scrollbar-color: #555 #252525;
+        scrollbar-color: var(--df-text-faint) var(--df-surface-2);
       }
 
       .data-table {
@@ -831,11 +796,17 @@ interface ColumnFilter {
           position: relative;
           flex: none;
           font-weight: 600;
-          font-size: 12px;
+          font-size: 11px;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: var(--df-text-2);
-          background: #f5f5f5;
+          letter-spacing: 0.06em;
+          color: var(--df-text-muted);
+          /* Sticky header: opaque token layering (surface under the
+             translucent surface-2 wash) so rows never bleed through. */
+          background-color: var(--df-surface);
+          background-image: linear-gradient(
+            var(--df-surface-2),
+            var(--df-surface-2)
+          );
           white-space: nowrap;
           padding: 0 16px;
           border-right: 1px solid var(--df-border);
@@ -863,10 +834,10 @@ interface ColumnFilter {
               transition: background 0.15s;
             }
             &:hover::after {
-              background: #7b1fa2;
+              background: var(--df-accent);
             }
             &:hover {
-              background: rgba(123, 31, 162, 0.08);
+              background: var(--df-accent-soft);
             }
           }
         }
@@ -874,7 +845,12 @@ interface ColumnFilter {
         .filter-cell {
           flex: none;
           padding: 4px 8px;
-          background: #f5f5f5;
+          /* Sticky like the header row: opaque token layering */
+          background-color: var(--df-surface);
+          background-image: linear-gradient(
+            var(--df-surface-2),
+            var(--df-surface-2)
+          );
           border-right: 1px solid var(--df-border);
           overflow: hidden;
           box-sizing: border-box;
@@ -888,7 +864,7 @@ interface ColumnFilter {
           .filter-op {
             flex-shrink: 0;
             border: 1px solid var(--df-border);
-            border-radius: 4px;
+            border-radius: var(--df-radius-sm);
             padding: 3px 4px;
             font-size: 11px;
             background: var(--df-surface);
@@ -898,7 +874,7 @@ interface ColumnFilter {
             max-width: 90px;
 
             &:focus {
-              border-color: #7b1fa2;
+              border-color: var(--df-accent);
             }
           }
 
@@ -906,7 +882,7 @@ interface ColumnFilter {
             flex: 1;
             min-width: 0;
             border: 1px solid var(--df-border);
-            border-radius: 4px;
+            border-radius: var(--df-radius-sm);
             padding: 4px 8px;
             font-size: 12px;
             background: var(--df-surface);
@@ -915,7 +891,7 @@ interface ColumnFilter {
             box-sizing: border-box;
 
             &:focus {
-              border-color: #7b1fa2;
+              border-color: var(--df-accent);
             }
 
             &::placeholder {
@@ -927,14 +903,14 @@ interface ColumnFilter {
 
         .data-cell {
           flex: none;
-          font-size: 13px;
+          font-size: 1.3rem;
           padding: 0 16px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           border-right: 1px solid var(--df-border-2);
           color: var(--df-text);
-          font-family: 'Roboto Mono', monospace;
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           box-sizing: border-box;
 
           &.null-cell {
@@ -944,11 +920,11 @@ interface ColumnFilter {
         }
 
         tr.mat-mdc-row:hover {
-          background: rgba(123, 31, 162, 0.04);
+          background: var(--df-hover);
         }
 
         tr.mat-mdc-row {
-          height: 36px;
+          height: 44px;
         }
 
         tr.clickable-row {
@@ -956,7 +932,7 @@ interface ColumnFilter {
         }
 
         tr.selected-row {
-          background: rgba(123, 31, 162, 0.08) !important;
+          background: var(--df-accent-soft) !important;
         }
 
         tr.mat-mdc-header-row {
@@ -968,42 +944,6 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .data-table {
-        .header-cell {
-          background: #383838;
-
-          .resize-handle:hover {
-            background: rgba(206, 147, 216, 0.1);
-          }
-          .resize-handle:hover::after {
-            background: #ce93d8;
-          }
-        }
-        .filter-cell {
-          background: #383838;
-
-          .filter-op {
-            background: #2c2c2c;
-            &:focus {
-              border-color: #ce93d8;
-            }
-          }
-
-          .filter-input {
-            background: #2c2c2c;
-            &:focus {
-              border-color: #ce93d8;
-            }
-          }
-        }
-        tr.mat-mdc-row:hover {
-          background: rgba(206, 147, 216, 0.06);
-        }
-        tr.selected-row {
-          background: rgba(206, 147, 216, 0.12) !important;
-        }
-      }
-
       /* Footer status bar */
       .grid-footer {
         display: flex;
@@ -1011,7 +951,7 @@ interface ColumnFilter {
         gap: 16px;
         padding: 4px 12px;
         border-top: 1px solid var(--df-border);
-        background: #f5f5f5;
+        background: var(--df-surface-2);
         flex-shrink: 0;
         font-size: 12px;
         color: var(--df-text-muted);
@@ -1047,17 +987,13 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .grid-footer {
-        background: #2c2c2c;
-      }
-
       /* Quick search in toolbar */
       .quick-search {
         display: flex;
         align-items: center;
-        background: #f5f5f5;
+        background: var(--df-surface);
         border: 1px solid var(--df-border);
-        border-radius: 4px;
+        border-radius: var(--df-radius-sm);
         padding: 0 6px;
         height: 28px;
         gap: 4px;
@@ -1101,17 +1037,13 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .quick-search {
-        background: #2c2c2c;
-      }
-
       /* API call bar */
       .api-call-bar {
         display: flex;
         flex-direction: column;
         padding: 4px 12px;
         border-bottom: 1px solid var(--df-border);
-        background: #f0f4f8;
+        background: var(--df-surface-2);
         flex-shrink: 0;
         font-size: 12px;
         overflow: hidden;
@@ -1119,7 +1051,7 @@ interface ColumnFilter {
 
         .api-call-desc {
           font-size: 11px;
-          color: #607d8b;
+          color: var(--df-text-muted);
           line-height: 1.4;
           padding: 2px 0;
         }
@@ -1134,11 +1066,12 @@ interface ColumnFilter {
           flex-shrink: 0;
           font-weight: 700;
           font-size: 11px;
-          color: white;
-          background: #43a047;
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-family: 'Roboto Mono', monospace;
+          color: var(--df-success);
+          background: var(--df-success-soft);
+          border: 1px solid var(--df-success-border);
+          padding: 1px 6px;
+          border-radius: var(--df-radius-sm);
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         .api-url {
@@ -1147,12 +1080,12 @@ interface ColumnFilter {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-family: 'Roboto Mono', monospace;
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 12px;
-          color: #37474f;
+          color: var(--df-text-2);
           cursor: pointer;
           &:hover {
-            color: #1565c0;
+            color: var(--df-accent-strong);
           }
         }
 
@@ -1175,7 +1108,7 @@ interface ColumnFilter {
 
           .options-label {
             font-size: 11px;
-            color: #9e9e9e;
+            color: var(--df-text-faint);
             font-weight: 500;
           }
 
@@ -1184,8 +1117,8 @@ interface ColumnFilter {
             align-items: center;
             gap: 4px;
             font-size: 11px;
-            color: #616161;
-            font-family: 'Roboto Mono', monospace;
+            color: var(--df-text-muted);
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             cursor: pointer;
             white-space: nowrap;
 
@@ -1194,32 +1127,7 @@ interface ColumnFilter {
               height: 12px;
               margin: 0;
               cursor: pointer;
-              accent-color: #7b1fa2;
-            }
-          }
-        }
-      }
-
-      :host-context(.dark-theme) .api-call-bar {
-        background: #1a2332;
-        .api-call-desc {
-          color: #78909c;
-        }
-        .api-url {
-          color: #b0bec5;
-          &:hover {
-            color: #64b5f6;
-          }
-        }
-        .api-call-options,
-        .api-call-related {
-          .options-label {
-            color: #616161;
-          }
-          .api-option {
-            color: #9e9e9e;
-            input[type='checkbox'] {
-              accent-color: #ce93d8;
+              accent-color: var(--df-accent);
             }
           }
         }
@@ -1230,13 +1138,9 @@ interface ColumnFilter {
         font-size: 14px;
         width: 14px;
         height: 14px;
-        color: #7b1fa2;
+        color: var(--df-accent);
         margin-right: 2px;
         vertical-align: middle;
-      }
-
-      :host-context(.dark-theme) .pk-icon {
-        color: #ce93d8;
       }
 
       /* FK link cells */
@@ -1248,13 +1152,13 @@ interface ColumnFilter {
         display: inline-flex;
         align-items: center;
         gap: 3px;
-        color: #7b1fa2;
+        color: var(--df-accent);
         text-decoration: none;
         cursor: pointer;
         transition: color 0.15s;
 
         &:hover {
-          color: #4a148c;
+          color: var(--df-accent-strong);
           text-decoration: underline;
         }
 
@@ -1271,13 +1175,6 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .fk-link {
-        color: #ce93d8;
-        &:hover {
-          color: #f3e5f5;
-        }
-      }
-
       /* Navigation filter bar */
       .nav-filter-bar {
         display: flex;
@@ -1285,16 +1182,16 @@ interface ColumnFilter {
         gap: 8px;
         padding: 4px 12px;
         border-bottom: 1px solid var(--df-border);
-        background: #f3e5f5;
+        background: var(--df-accent-soft);
         flex-shrink: 0;
         font-size: 12px;
-        color: #4a148c;
+        color: var(--df-text-2);
 
         .nav-filter-icon {
           font-size: 16px;
           width: 16px;
           height: 16px;
-          color: #7b1fa2;
+          color: var(--df-accent);
         }
 
         .nav-filter-text {
@@ -1305,11 +1202,12 @@ interface ColumnFilter {
           white-space: nowrap;
 
           code {
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             font-size: 11px;
-            background: rgba(123, 31, 162, 0.1);
+            background: var(--df-surface);
+            border: 1px solid var(--df-border-2);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: 4px;
           }
         }
 
@@ -1318,25 +1216,10 @@ interface ColumnFilter {
           width: 24px;
           height: 24px;
           line-height: 24px;
-          color: #7b1fa2;
+          color: var(--df-accent);
           mat-icon {
             font-size: 16px;
           }
-        }
-      }
-
-      :host-context(.dark-theme) .nav-filter-bar {
-        background: #2d1b3d;
-        color: #e1bee7;
-
-        .nav-filter-icon {
-          color: #ce93d8;
-        }
-        .nav-filter-text code {
-          background: rgba(206, 147, 216, 0.15);
-        }
-        .nav-filter-clear {
-          color: #ce93d8;
         }
       }
 

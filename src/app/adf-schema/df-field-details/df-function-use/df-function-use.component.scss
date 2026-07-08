@@ -1,0 +1,22 @@
+// DB function accordion, departure treatment: flat bordered surface
+// on the shared corner scale instead of an elevation shadow.
+.keys-accordion {
+  mat-expansion-panel {
+    box-shadow: none !important;
+    border: 1px solid var(--df-border-2);
+    border-radius: var(--df-radius) !important;
+    background: var(--df-surface);
+  }
+
+  mat-panel-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--df-text);
+  }
+
+  mat-panel-description {
+    font-size: 1.3rem;
+    color: var(--df-text-muted);
+  }
+}
