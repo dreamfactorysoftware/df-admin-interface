@@ -795,6 +795,7 @@
     "copy": "Copy",
     "copied": "Copied",
     "runNote": "Reads the first rows from {{table}} and returns 200.",
+    "previewNote": "Reads the first rows from {{table}}. Add a working key to run it.",
     "mcpNote": "Point any MCP client at this service. Its tables become scoped tools under the same key.",
     "tabs": {
       "curl": "curl",

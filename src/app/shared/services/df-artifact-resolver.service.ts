@@ -67,7 +67,10 @@ export class DfArtifactResolverService {
       const working: Array<{ option: ArtifactKeyOption; table: string }> = [];
       const rest: ArtifactKeyOption[] = [];
       for (const c of candidates) {
-        const option: ArtifactKeyOption = { label: c.label, apiKey: c.apiKey };
+        const option: ArtifactKeyOption = {
+          label: c.label,
+          apiKey: c.apiKey,
+        };
         const tryTables = (
           c.grantsAll ? tables : c.tables.filter(t => tables.includes(t))
         ).slice(0, 5);
@@ -89,19 +92,21 @@ export class DfArtifactResolverService {
           }
         }
         if (hit) {
-          working.push({ option, table: hit });
+          // Proven 200: this is the only kind of key the card may claim runs.
+          working.push({ option: { ...option, verified: true }, table: hit });
         } else {
           rest.push(option);
         }
       }
-      let keys: ArtifactKeyOption[];
-      if (working.length) {
-        sampleTable = working[0].table;
-        keys = [...working.map(w => w.option), ...rest];
-      } else {
-        keys = rest;
+      // Nothing probed 200 (e.g. every candidate key is expired or scoped away):
+      // never surface an unproven key as the default that "returns 200". Fall
+      // back to the card's YOUR_API_KEY placeholder instead of fabricating a hit.
+      if (!working.length) {
+        return { apiKey: '', sampleTable, keys: [] };
       }
-      return { apiKey: keys[0]?.apiKey ?? '', sampleTable, keys };
+      sampleTable = working[0].table;
+      const keys = [...working.map(w => w.option), ...rest];
+      return { apiKey: keys[0].apiKey, sampleTable, keys };
     } catch {
       return { apiKey: '', sampleTable, keys: [] };
     }
@@ -128,7 +133,14 @@ export class DfArtifactResolverService {
       let grantsAll = false;
       const tables: string[] = [];
       for (const a of role?.roleServiceAccessByRoleId ?? []) {
-        if (a?.serviceId !== serviceId || ((a?.verbMask ?? 0) & 1) === 0) {
+        // A null/undefined service_id is DreamFactory's "all services" grant
+        // (e.g. the API Explorer role). It reaches this service too, so the key
+        // that actually returns 200 session-less isn't skipped for lacking an
+        // exact service_id row. GET bit (verbMask & 1) still required.
+        const svc = a?.serviceId;
+        const appliesToService =
+          svc === serviceId || svc === null || svc === undefined;
+        if (!appliesToService || ((a?.verbMask ?? 0) & 1) === 0) {
           continue;
         }
         const comp: string = a?.component ?? '';

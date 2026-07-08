@@ -107,7 +107,10 @@
           context: {
             id: 'curl',
             code: curlSnippet,
-            note: t('runNote', { table: sampleTable })
+            note:
+              activeKeyVerified
+                ? t('runNote', { table: sampleTable })
+                : t('previewNote', { table: sampleTable })
           }
         "></ng-container>
     </mat-tab>
@@ -119,7 +122,10 @@
           context: {
             id: 'javascript',
             code: javascriptSnippet,
-            note: t('runNote', { table: sampleTable })
+            note:
+              activeKeyVerified
+                ? t('runNote', { table: sampleTable })
+                : t('previewNote', { table: sampleTable })
           }
         "></ng-container>
     </mat-tab>
@@ -131,7 +137,10 @@
           context: {
             id: 'python',
             code: pythonSnippet,
-            note: t('runNote', { table: sampleTable })
+            note:
+              activeKeyVerified
+                ? t('runNote', { table: sampleTable })
+                : t('previewNote', { table: sampleTable })
           }
         "></ng-container>
     </mat-tab>

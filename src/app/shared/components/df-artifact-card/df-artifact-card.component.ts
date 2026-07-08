@@ -26,6 +26,13 @@ export interface ArtifactKeyOption {
   apiKey: string;
   /** Optional role name shown as a hint beside the label. */
   role?: string;
+  /**
+   * True only when this key was PROVEN to return 200 by the resolver's
+   * session-less probe. Drives whether the card may claim "returns 200"; an
+   * unproven or placeholder key gets a neutral note instead. Never assert the
+   * status code for a key we did not actually run.
+   */
+  verified?: boolean;
 }
 
 /** Framework/tab identity for the emitted copy events and per-block state. */
@@ -153,6 +160,19 @@ export class DfArtifactCardComponent {
     }
     const chosen = this.keyOptions.find(k => k.apiKey === this.selectedKey);
     return (chosen ?? this.keyOptions[0]).apiKey;
+  }
+
+  /**
+   * Whether the active key was proven to return 200 by the resolver. Only then
+   * may the run note assert the status code; the placeholder and any unproven
+   * key fall back to a neutral note so the card never fabricates a 200.
+   */
+  get activeKeyVerified(): boolean {
+    if (!this.hasKey) {
+      return false;
+    }
+    const chosen = this.keyOptions.find(k => k.apiKey === this.selectedKey);
+    return !!(chosen ?? this.keyOptions[0]).verified;
   }
 
   /** Service base with any trailing slash trimmed. */
