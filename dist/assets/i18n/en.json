@@ -73,6 +73,7 @@
   "packages": "Packages",
   "launchpad": "LaunchPad",
   "goBack": "Go back",
+  "liveTail": "Live",
   "verbs": {
     "get": "GET (read)",
     "post": "POST (create)",
