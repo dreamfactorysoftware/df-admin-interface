@@ -19,8 +19,8 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: var(--df-space-3);
+  padding-bottom: var(--df-space-3);
 
   .search-input {
     height: 80% !important;
@@ -29,7 +29,7 @@
 }
 
 .bottom-action-bar {
-  margin-top: 16px;
+  margin-top: var(--df-space-4);
   display: flex;
   flex-direction: row;
   justify-content: center;
@@ -54,8 +54,8 @@
 // Error state: same flat bordered treatment as the chat error panel
 // (df-ai-chat __error): danger-soft wash inside a danger hairline.
 .table-error-panel {
-  margin-bottom: 12px;
-  padding: 12px 16px;
+  margin-bottom: var(--df-space-3);
+  padding: var(--df-space-3) var(--df-space-4);
   border: 1px solid var(--df-danger-border);
   border-radius: var(--df-radius-sm);
   background-color: var(--df-danger-soft);
@@ -64,8 +64,8 @@
   .table-error-headline {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: var(--df-space-3);
+    margin-bottom: var(--df-space-2);
 
     fa-icon {
       color: var(--df-danger);
@@ -92,8 +92,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: var(--df-space-4);
+  padding: var(--df-space-4);
   text-align: center;
 
   .empty-state-message {
@@ -105,6 +105,40 @@
   }
 }
 
+// Meridian table spec (section 1.7): --df-row-height rows, alpha-hairline
+// separators, no zebra. Row height overrides Material's default density so
+// the whole catalog lands on the 38px rhythm.
+.mat-mdc-row {
+  height: var(--df-row-height) !important;
+}
+.mat-mdc-cell,
+.mat-mdc-header-cell {
+  border-bottom: 1px solid var(--df-border-2);
+}
+
+// Numeric / id / hash columns: tabular figures (global .df-numeric utility)
+// plus right alignment, including the sort-header content flex.
+.mat-mdc-cell.df-numeric,
+.mat-mdc-header-cell.df-numeric {
+  text-align: right;
+}
+.mat-mdc-header-cell.df-numeric .mat-sort-header-container {
+  justify-content: flex-end;
+}
+
+// Hover-revealed row actions (spec 1.7): the trailing actions cell stays at
+// opacity 0 until the row is hovered or anything inside it takes focus. Never
+// display:none, so the buttons keep their place in tab order.
+.df-row-actions button {
+  opacity: 0;
+  transition: opacity var(--df-duration-fast) var(--df-ease-standard);
+}
+.mat-mdc-row:hover .df-row-actions button,
+.mat-mdc-row:focus-within .df-row-actions button,
+.df-row-actions button:focus-visible {
+  opacity: 1;
+}
+
 .clickable {
   &.mat-mdc-row {
     outline: 0;
@@ -112,18 +146,19 @@
       cursor: pointer;
     }
   }
-  &.mat-mdc-row:focus,
-  &.mat-mdc-row:focus-within {
-    .mat-mdc-cell:first-child {
-      border-left: 2px solid var(--df-accent);
-    }
-  }
-
-  &.mat-mdc-row:focus,
-  &.mat-mdc-row:focus-within,
+  // Quiet whole-row hover tint.
   &.mat-mdc-row:hover {
     .mat-mdc-cell {
       background-color: var(--df-hover);
+    }
+  }
+  // Quiet selection / active state: a keyboard-focused or focus-within row
+  // rides --df-accent-soft instead of the previous loud accent border. Doubles
+  // as the visible-focus indicator for keyboard navigation.
+  &.mat-mdc-row:focus,
+  &.mat-mdc-row:focus-within {
+    .mat-mdc-cell {
+      background-color: var(--df-accent-soft);
     }
   }
 }
