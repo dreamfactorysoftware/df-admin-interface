@@ -21,6 +21,9 @@ interface ArtifactCandidate {
   apiKey: string;
   tables: string[];
   grantsAll: boolean;
+  // True when the key's role grants any write verb (POST/PUT/PATCH/DELETE) on
+  // this service. Used only to prefer a read-only key as the default curl.
+  writeCapable: boolean;
 }
 
 /**
@@ -64,7 +67,11 @@ export class DfArtifactResolverService {
         return { apiKey: '', sampleTable, keys: [] };
       }
       const origin = window.location.origin;
-      const working: Array<{ option: ArtifactKeyOption; table: string }> = [];
+      const working: Array<{
+        option: ArtifactKeyOption;
+        table: string;
+        score: number;
+      }> = [];
       const rest: ArtifactKeyOption[] = [];
       for (const c of candidates) {
         const option: ArtifactKeyOption = {
@@ -74,6 +81,10 @@ export class DfArtifactResolverService {
         const tryTables = (
           c.grantsAll ? tables : c.tables.filter(t => tables.includes(t))
         ).slice(0, 5);
+        // Least-privilege ranking of proven-200 keys: read-only beats
+        // write-capable, and a narrowly-scoped role beats an all-tables grant.
+        // Lower score wins the default slot.
+        const score = (c.writeCapable ? 2 : 0) + (c.grantsAll ? 1 : 0);
         let hit = '';
         for (const t of tryTables) {
           try {
@@ -98,7 +109,11 @@ export class DfArtifactResolverService {
         }
         if (hit) {
           // Proven 200: this is the only kind of key the card may claim runs.
-          working.push({ option: { ...option, verified: true }, table: hit });
+          working.push({
+            option: { ...option, verified: true },
+            table: hit,
+            score,
+          });
         } else {
           rest.push(option);
         }
@@ -109,6 +124,10 @@ export class DfArtifactResolverService {
       if (!working.length) {
         return { apiKey: '', sampleTable, keys: [] };
       }
+      // Stable sort: least-privilege key takes the default slot; ties keep the
+      // original probe order (first working key wins). sampleTable follows the
+      // chosen default so the rendered curl and its table stay consistent.
+      working.sort((a, b) => a.score - b.score);
       sampleTable = working[0].table;
       const keys = [...working.map(w => w.option), ...rest];
       return { apiKey: keys[0].apiKey, sampleTable, keys };
@@ -130,12 +149,16 @@ export class DfArtifactResolverService {
         { context: silent() }
       )
     );
-    const perRole = new Map<number, { tables: string[]; grantsAll: boolean }>();
+    const perRole = new Map<
+      number,
+      { tables: string[]; grantsAll: boolean; writeCapable: boolean }
+    >();
     for (const role of rolesRes?.resource ?? []) {
       if (role?.isActive === false) {
         continue;
       }
       let grantsAll = false;
+      let writeCapable = false;
       const tables: string[] = [];
       for (const a of role?.roleServiceAccessByRoleId ?? []) {
         // A null/undefined service_id is DreamFactory's "all services" grant
@@ -145,7 +168,17 @@ export class DfArtifactResolverService {
         const svc = a?.serviceId;
         const appliesToService =
           svc === serviceId || svc === null || svc === undefined;
-        if (!appliesToService || ((a?.verbMask ?? 0) & 1) === 0) {
+        if (!appliesToService) {
+          continue;
+        }
+        const verbMask = a?.verbMask ?? 0;
+        // POST/PUT/PATCH/DELETE bits (2|4|8|16 = 30): the key can mutate data,
+        // so it's a poorer least-privilege default than a GET-only key.
+        if ((verbMask & 30) !== 0) {
+          writeCapable = true;
+        }
+        // Read-scope resolution below needs the GET bit.
+        if ((verbMask & 1) === 0) {
           continue;
         }
         const comp: string = a?.component ?? '';
@@ -162,7 +195,7 @@ export class DfArtifactResolverService {
         }
       }
       if (grantsAll || tables.length) {
-        perRole.set(role.id, { tables, grantsAll });
+        perRole.set(role.id, { tables, grantsAll, writeCapable });
       }
     }
     if (!perRole.size) {
@@ -194,6 +227,7 @@ export class DfArtifactResolverService {
           apiKey: app.apiKey,
           tables: grant.tables,
           grantsAll: grant.grantsAll,
+          writeCapable: grant.writeCapable,
         });
       }
     });

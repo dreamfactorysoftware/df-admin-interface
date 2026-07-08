@@ -71,6 +71,28 @@ function friendlyMessage(message: string): string {
   return message;
 }
 
+// DSN / connection-string key=value pairs (PDO `host=`, `dbname=`, `user=`,
+// `password=`; ODBC `Server=`, `Uid=`, `Pwd=`, `Data Source=`) and the
+// PDO/MySQL "for user 'x'@'host'" clause. The headline `message` is already
+// replaced via friendlyMessage, but the raw body still carries these; mask
+// them before the raw body leaves the app on the clipboard.
+const DSN_KEY_VALUE_REGEX =
+  /\b(host(?:name)?|server|data\s*source|dbname|database|user(?:\s*(?:name|id))?|uid|password|pwd|port)(\s*=\s*)[^;,\s"']+/gi;
+const DB_USER_AT_HOST_REGEX = /\buser\s+'[^']*'@'[^']*'/gi;
+const DB_FOR_USER_REGEX = /\bfor\s+user\s+'[^']*'/gi;
+
+/**
+ * Mask connection-string internals (DSN host, hostname, DB user, password)
+ * so the raw body is safe to copy into a support ticket. Keeps the rest of
+ * the raw text intact for triage; only the sensitive tokens are redacted.
+ */
+export function scrubDbInternals(text: string): string {
+  return text
+    .replace(DSN_KEY_VALUE_REGEX, (_m, key: string, eq: string) => `${key}${eq}***`)
+    .replace(DB_USER_AT_HOST_REGEX, "user '***'@'***'")
+    .replace(DB_FOR_USER_REGEX, "for user '***'");
+}
+
 /** Collect context.resource[] / context.error[] messages; guards every step:
  * DF types context as string | object and 500s send `context: null`. */
 function collectFields(context: unknown): AppErrorField[] {
@@ -279,7 +301,7 @@ export function formatForSupport(e: AppError): string {
       lines.push(`  - ${f.field ? `${f.field}: ` : ''}${f.message}`)
     );
   }
-  lines.push(`Raw: ${rawAsText(e.raw)}`);
+  lines.push(`Raw: ${scrubDbInternals(rawAsText(e.raw))}`);
   return lines.join('\n');
 }
 
