@@ -993,6 +993,13 @@
     "live": "Live",
     "liveTip": "Activity refreshes automatically",
     "agentsTitle": "Agents",
+    "ownerTip": "Owner",
+    "lastActiveTip": "Last active",
+    "neverActive": "never active",
+    "kill": {
+      "title": "Deactivate this agent?",
+      "message": "Its key is rejected on the next request. You can reactivate the agent at any time."
+    },
     "viewScope": "Show what this agent can reach",
     "reach": "Resolved reach",
     "reachHint": "The services and tables this agent's role grants.",
