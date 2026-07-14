@@ -5,13 +5,18 @@ import { FormsModule } from '@angular/forms';
 import { silent } from '../shared/utilities/http-contexts';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import {
+  MatSlideToggleChange,
+  MatSlideToggleModule,
+} from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoModule } from '@ngneat/transloco';
+import { DfConfirmDialogComponent } from '../shared/components/df-confirm-dialog/df-confirm-dialog.component';
 import { DfPageHeaderComponent } from '../shared/components/df-page-header/df-page-header.component';
 import { DfBadgeComponent } from '../shared/components/df-badge/df-badge.component';
 import { DfEmptyStateComponent } from '../shared/components/df-empty-state/df-empty-state.component';
@@ -339,17 +344,28 @@ type CallRow = {
               </df-badge>
               <strong>{{ a.name }}</strong>
               <span class="tag">{{ roleName(a.roleId) }}</span>
+              <span
+                class="muted nowrap"
+                *ngIf="a.ownerId != null"
+                matTooltip="{{ t('ownerTip') }}"
+                >{{ ownerName(a.ownerId) }}</span
+              >
               <span class="muted" *ngIf="a.description">{{
                 a.description
               }}</span>
               <span class="spacer"></span>
+              <span
+                class="muted ttl nowrap"
+                matTooltip="{{ t('lastActiveTip') }}"
+                >{{ a.lastActiveAt ? lastActive(a) : t('neverActive') }}</span
+              >
               <code class="key" matTooltip="Agent API key">{{
                 maskKey(a.apiKey)
               }}</code>
               <span class="muted ttl">TTL {{ a.keyTtlHours }}h</span>
               <mat-slide-toggle
                 [checked]="a.isActive"
-                (change)="toggleActive(a, $event.checked)"
+                (change)="toggleActive(a, $event)"
                 matTooltip="Revoke / restore key"></mat-slide-toggle>
               <button mat-icon-button (click)="startEdit(a)" matTooltip="Edit">
                 <mat-icon>edit</mat-icon>
@@ -960,6 +976,7 @@ type CallRow = {
 export class DfAgentsComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   private usage = inject(UsageService);
+  private dialog = inject(MatDialog);
 
   agents: Agent[] = [];
   requests: AccessRequest[] = [];
@@ -1158,6 +1175,9 @@ export class DfAgentsComponent implements OnInit, OnDestroy {
   roleName(id: number | null): string {
     return this.roles.find(r => r.id === id)?.name ?? (id ? 'role ' + id : '-');
   }
+  ownerName(id: number | null): string {
+    return this.users.find(u => u.id === id)?.name ?? (id ? 'user ' + id : '-');
+  }
   agentName(id: number): string {
     return this.agents.find(a => a.id === id)?.name ?? 'agent ' + id;
   }
@@ -1173,19 +1193,43 @@ export class DfAgentsComponent implements OnInit, OnDestroy {
   // Date.now() comparison stays live so keys still flip to expired over time.
   private memoAgents: Agent[] | null = null;
   private memoExpiresAt = new Map<number, number>();
+  private memoLastActive = new Map<number, string>();
+
+  private syncAgentMemos(): void {
+    if (this.memoAgents === this.agents) return;
+    this.memoAgents = this.agents;
+    this.memoExpiresAt.clear();
+    this.memoLastActive.clear();
+  }
 
   expired(a: Agent): boolean {
     if (!a.keyIssuedAt) return false;
-    if (this.memoAgents !== this.agents) {
-      this.memoAgents = this.agents;
-      this.memoExpiresAt.clear();
-    }
+    this.syncAgentMemos();
     let expiresAt = this.memoExpiresAt.get(a.id);
     if (expiresAt === undefined) {
       expiresAt = new Date(a.keyIssuedAt).getTime() + a.keyTtlHours * 3600_000;
       this.memoExpiresAt.set(a.id, expiresAt);
     }
     return Date.now() > expiresAt;
+  }
+
+  // Relative "last seen" label, memoized per data load (refresh() polls every
+  // 20s and replaces the agents array, so the label never drifts far).
+  lastActive(a: Agent): string {
+    if (!a.lastActiveAt) return '';
+    this.syncAgentMemos();
+    let label = this.memoLastActive.get(a.id);
+    if (label === undefined) {
+      const mins = Math.floor(
+        (Date.now() - new Date(a.lastActiveAt).getTime()) / 60_000
+      );
+      if (mins < 1) label = 'just now';
+      else if (mins < 60) label = `${mins}m ago`;
+      else if (mins < 48 * 60) label = `${Math.floor(mins / 60)}h ago`;
+      else label = `${Math.floor(mins / 1440)}d ago`;
+      this.memoLastActive.set(a.id, label);
+    }
+    return label;
   }
 
   // ---- agent CRUD --------------------------------------------------------
@@ -1237,7 +1281,25 @@ export class DfAgentsComponent implements OnInit, OnDestroy {
 
   // Revoke = deactivate the key (the backing app is deactivated in lock-step,
   // so the key is rejected on the next request). Restore by toggling back on.
-  toggleActive(a: Agent, active: boolean): void {
+  // Killing is confirmed first (df-confirm-dialog, same pattern as
+  // df-manage-table); reactivating is not, it only restores access.
+  toggleActive(a: Agent, ev: MatSlideToggleChange): void {
+    if (ev.checked) {
+      this.patchActive(a, true);
+      return;
+    }
+    this.dialog
+      .open(DfConfirmDialogComponent, {
+        data: { title: 'agents.kill.title', message: 'agents.kill.message' },
+      })
+      .afterClosed()
+      .subscribe(confirmed => {
+        if (confirmed) this.patchActive(a, false);
+        else ev.source.checked = true; // put the toggle back, nothing changed
+      });
+  }
+
+  private patchActive(a: Agent, active: boolean): void {
     this.http
       .patch(`/api/v2/agents/agents/${a.id}`, { isActive: active })
       .subscribe({
