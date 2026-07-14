@@ -88,7 +88,10 @@ const DB_FOR_USER_REGEX = /\bfor\s+user\s+'[^']*'/gi;
  */
 export function scrubDbInternals(text: string): string {
   return text
-    .replace(DSN_KEY_VALUE_REGEX, (_m, key: string, eq: string) => `${key}${eq}***`)
+    .replace(
+      DSN_KEY_VALUE_REGEX,
+      (_m, key: string, eq: string) => `${key}${eq}***`
+    )
     .replace(DB_USER_AT_HOST_REGEX, "user '***'@'***'")
     .replace(DB_FOR_USER_REGEX, "for user '***'");
 }

@@ -110,7 +110,9 @@
                 [ngModel]="tokenValues[tk.token] || ''"
                 (ngModelChange)="onTokenSelected(tk, $event)"
                 [attr.aria-label]="
-                  tk.labelKey ? (tk.labelKey | transloco) : humanizeToken(tk.token)
+                  tk.labelKey
+                    ? (tk.labelKey | transloco)
+                    : humanizeToken(tk.token)
                 ">
                 <option value="" disabled>
                   {{
