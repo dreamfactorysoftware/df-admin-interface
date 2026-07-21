@@ -578,6 +578,22 @@
       <ng-container formGroupName="config">
         <!-- Network Service Configuration -->
         <ng-container *ngIf="this.isNetworkService">
+          <!-- Prefill Base URL, parameters and headers from a cURL command -->
+          <div *ngIf="showCurlImport" class="curl-import-action full-width">
+            <button
+              mat-stroked-button
+              type="button"
+              color="primary"
+              data-testid="open-curl-import"
+              (click)="openCurlImport()">
+              <fa-icon [icon]="faFileImport"></fa-icon>
+              <span>{{ 'services.curlImport.button' | transloco }}</span>
+            </button>
+            <span class="curl-import-action__hint">
+              {{ 'services.curlImport.buttonHint' | transloco }}
+            </span>
+          </div>
+
           <!-- Required Fields (Base URL) - Always visible at the top -->
           <ng-container *ngFor="let item of networkRequiredFields">
             <df-dynamic-field

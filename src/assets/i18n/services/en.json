@@ -59,5 +59,20 @@
     "testYourApi": "Test Your API Now",
     "exploreLater": "I'll explore later",
     "autoRedirectTest": "Redirecting to API testing playground..."
+  },
+  "curlImport": {
+    "button": "Import from cURL",
+    "buttonHint": "Prefill the base URL, parameters and headers from a cURL command.",
+    "title": "Import from cURL",
+    "hint": "Paste a cURL command. The URL, query parameters, headers and supported CURL options are mapped onto this service's configuration. Nothing is saved until you save the service.",
+    "commandLabel": "cURL command",
+    "placeholder": "curl -X GET 'https://api.example.com/v1/users?limit=10' -H 'Authorization: Bearer TOKEN'",
+    "preview": "Preview",
+    "baseUrl": "Base URL",
+    "method": "Method",
+    "parameters": "Parameters",
+    "headers": "Headers",
+    "curlOptions": "CURL Options",
+    "import": "Import"
   }
 }

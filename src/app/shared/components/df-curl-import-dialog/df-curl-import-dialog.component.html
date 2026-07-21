@@ -1,0 +1,111 @@
+<h1 mat-dialog-title>{{ 'services.curlImport.title' | transloco }}</h1>
+
+<div mat-dialog-content class="curl-import-content">
+  <p class="curl-import-hint">
+    {{ 'services.curlImport.hint' | transloco }}
+  </p>
+
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>{{ 'services.curlImport.commandLabel' | transloco }}</mat-label>
+    <textarea
+      matInput
+      rows="7"
+      spellcheck="false"
+      data-testid="curl-import-command"
+      [placeholder]="'services.curlImport.placeholder' | transloco"
+      [(ngModel)]="command"
+      (ngModelChange)="onCommandChange()"></textarea>
+  </mat-form-field>
+
+  <div *ngIf="error" class="curl-import-error" data-testid="curl-import-error">
+    <fa-icon [icon]="faTriangleExclamation"></fa-icon>
+    <span>{{ error }}</span>
+  </div>
+
+  <ng-container *ngIf="parsed">
+    <h2 class="curl-import-section">
+      {{ 'services.curlImport.preview' | transloco }}
+    </h2>
+
+    <dl class="curl-import-summary">
+      <dt>{{ 'services.curlImport.baseUrl' | transloco }}</dt>
+      <dd data-testid="curl-import-base-url">{{ parsed.baseUrl }}</dd>
+      <dt>{{ 'services.curlImport.method' | transloco }}</dt>
+      <dd>{{ parsed.method }}</dd>
+    </dl>
+
+    <ng-template #keyValueTable let-rows let-caption="caption">
+      <ng-container *ngIf="rows.length">
+        <h3 class="curl-import-section">{{ caption }} ({{ rows.length }})</h3>
+        <table mat-table [dataSource]="rows" class="full-width">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'name' | transloco }}
+            </th>
+            <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+          </ng-container>
+          <ng-container matColumnDef="value">
+            <th mat-header-cell *matHeaderCellDef>
+              {{ 'value' | transloco }}
+            </th>
+            <td mat-cell *matCellDef="let row" class="curl-import-value">
+              {{ row.value }}
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="keyValueColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: keyValueColumns"></tr>
+        </table>
+      </ng-container>
+    </ng-template>
+
+    <ng-container
+      *ngTemplateOutlet="
+        keyValueTable;
+        context: {
+          $implicit: parsed.parameters,
+          caption: 'services.curlImport.parameters' | transloco,
+        }
+      "></ng-container>
+    <ng-container
+      *ngTemplateOutlet="
+        keyValueTable;
+        context: {
+          $implicit: parsed.headers,
+          caption: 'services.curlImport.headers' | transloco,
+        }
+      "></ng-container>
+    <ng-container
+      *ngTemplateOutlet="
+        keyValueTable;
+        context: {
+          $implicit: optionEntries,
+          caption: 'services.curlImport.curlOptions' | transloco,
+        }
+      "></ng-container>
+
+    <div
+      *ngIf="parsed.warnings.length"
+      class="curl-import-warnings"
+      data-testid="curl-import-warnings">
+      <div class="curl-import-warning" *ngFor="let warning of parsed.warnings">
+        <fa-icon [icon]="faTriangleExclamation"></fa-icon>
+        <span>{{ warning }}</span>
+      </div>
+    </div>
+  </ng-container>
+</div>
+
+<div mat-dialog-actions>
+  <button mat-flat-button mat-dialog-close type="button">
+    {{ 'cancel' | transloco }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    data-testid="curl-import-submit"
+    [disabled]="!parsed"
+    (click)="onImport()">
+    {{ 'services.curlImport.import' | transloco }}
+  </button>
+</div>

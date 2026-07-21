@@ -35,6 +35,8 @@ import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-
 import { DfAiAllowedRolesComponent } from 'src/app/shared/components/df-ai-allowed-roles/df-ai-allowed-roles.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
+import { DfCurlImportDialogComponent } from 'src/app/shared/components/df-curl-import-dialog/df-curl-import-dialog.component';
+import { ParsedCurl } from 'src/app/shared/utilities/curl-parser';
 
 import { ConfigSchema, ServiceType } from 'src/app/shared/types/service';
 import {
@@ -46,6 +48,7 @@ import {
   faPenToSquare,
   faTrashCan,
   faPlus,
+  faFileImport,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -196,6 +199,7 @@ export class DfServiceDetailsComponent implements OnInit {
   faPenToSquare = faPenToSquare;
   faTrashCan = faTrashCan;
   faPlus = faPlus;
+  faFileImport = faFileImport;
   serviceData: Service;
   selectedServiceTypeLable: string;
   configSchema: Array<ConfigSchema>;
@@ -1571,6 +1575,87 @@ export class DfServiceDetailsComponent implements OnInit {
 
   get showNetworkAdvancedOptions(): boolean {
     return this.isNetworkService;
+  }
+
+  // cURL import only makes sense where the schema exposes a base URL to point
+  // at, which is what the HTTP (rws) style services provide.
+  get showCurlImport(): boolean {
+    return (
+      this.isNetworkService &&
+      this.viewSchema.some(field => field.name === 'baseUrl')
+    );
+  }
+
+  openCurlImport(): void {
+    this.dialog
+      .open(DfCurlImportDialogComponent, { width: '46rem' })
+      .afterClosed()
+      .subscribe((parsed?: ParsedCurl) => {
+        if (parsed) {
+          this.applyCurlImport(parsed);
+        }
+      });
+  }
+
+  // Verb bitmask used by rws_parameters_config.action / rws_headers_config.action.
+  private static readonly VERB_MASK: Record<string, number> = {
+    GET: 1,
+    POST: 2,
+    PUT: 4,
+    PATCH: 8,
+    DELETE: 16,
+  };
+
+  private applyCurlImport(parsed: ParsedCurl): void {
+    const config = this.serviceForm.get('config');
+    if (!config) {
+      return;
+    }
+
+    const setIfPresent = (name: string, value: any) => {
+      const control = config.get(name);
+      if (control) {
+        control.setValue(value);
+        control.markAsDirty();
+      }
+    };
+
+    // A verb we cannot represent (HEAD, OPTIONS) leaves action at 0, which the
+    // backend treats as "applies to every verb".
+    const action = DfServiceDetailsComponent.VERB_MASK[parsed.method] ?? 0;
+
+    setIfPresent('baseUrl', parsed.baseUrl);
+
+    setIfPresent(
+      'parameters',
+      parsed.parameters.map(param => ({
+        name: param.name,
+        value: param.value,
+        exclude: false,
+        outbound: true,
+        cacheKey: false,
+        action,
+      }))
+    );
+
+    setIfPresent(
+      'headers',
+      parsed.headers.map(header => ({
+        name: header.name,
+        value: header.value,
+        passFromClient: false,
+        action,
+      }))
+    );
+
+    if (Object.keys(parsed.options).length) {
+      // CURL options are an object field, so merge rather than clobber whatever
+      // the user already configured.
+      const existing = config.get('options')?.value ?? {};
+      setIfPresent('options', { ...existing, ...parsed.options });
+    }
+
+    this.serviceForm.markAsDirty();
   }
 
   getConfigControl(name: string) {
