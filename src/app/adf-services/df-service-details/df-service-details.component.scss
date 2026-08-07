@@ -997,3 +997,20 @@ mat-icon {
   display: block;
   margin-bottom: var(--df-space-5);
 }
+
+.curl-import-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+
+  fa-icon {
+    margin-right: 0.5rem;
+  }
+
+  &__hint {
+    font-size: 0.85rem;
+    opacity: 0.7;
+  }
+}
