@@ -445,6 +445,25 @@ export function parseCurl(input: string): ParsedCurl {
     throw new CurlParseError('No URL found in the command.');
   }
 
+  // Warn when the URL carries a scheme other than http/https. curl accepts
+  // file:, gopher:, dict: and similar, which an rws service will then send
+  // server-side. Those can read local files or reach internal hosts. This is
+  // a warning, not a block: the manual base_url field accepts any value too,
+  // and schemeless or relative base URLs stay valid. The match needs a slash
+  // after the colon so a schemeless host:port (e.g. localhost:8080) is left
+  // alone.
+  const schemeMatch = baseUrl.match(/^([a-z][a-z0-9+.-]*):(?=\/)/i);
+  if (schemeMatch) {
+    const scheme = schemeMatch[1].toLowerCase();
+    if (scheme !== 'http' && scheme !== 'https') {
+      warnings.push(
+        `The URL uses the "${scheme}" scheme, not http or https. The service ` +
+          `sends requests with that scheme server-side, which can read local ` +
+          `files or reach internal hosts. Import only if you trust the source.`
+      );
+    }
+  }
+
   const body = bodyParts.length ? bodyParts.join('&') : undefined;
 
   // `-G` moves the body into the query string.
