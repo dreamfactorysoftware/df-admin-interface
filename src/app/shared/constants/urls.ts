@@ -34,4 +34,5 @@ export enum URLS {
   LOOKUP_KEYS = `${BASE_URL}/system/lookup`,
   FILES = `${BASE_URL}/files`,
   LOGS = `${BASE_URL}/logs`,
+  SCHEMA_CONTRACT = `${BASE_URL}/system/schema_contract`,
 }

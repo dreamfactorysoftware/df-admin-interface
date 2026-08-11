@@ -813,6 +813,17 @@ export const routes: Routes = [
         },
       },
       {
+        path: ROUTES.SCHEMA_CONTRACTS,
+        loadComponent: () =>
+          import('./adf-schema-contracts/df-manage-schema-contracts/df-manage-schema-contracts.component').then(
+            m => m.DfManageSchemaContractsComponent
+          ),
+        data: {
+          groups: ['Database'],
+          system: false,
+        },
+      },
+      {
         path: ROUTES.USERS,
         children: [
           {
