@@ -282,7 +282,14 @@ export class DfSideNavComponent implements OnInit {
     // Redirect-backed items (linkPath, e.g. API Builder) must match on
     // their destination URL: the redirect's own path never appears in
     // router.url, so matching nav.path alone can never highlight them.
-    return this.router.url.startsWith(nav.linkPath ?? nav.path);
+    //
+    // Match on a segment boundary, not a bare string prefix: sibling routes
+    // whose paths share a prefix (e.g. /admin-settings/schema and
+    // /admin-settings/schema-contracts) would otherwise both highlight. Active
+    // when the current url equals the path or is a child route of it.
+    const path = nav.linkPath ?? nav.path;
+    const url = this.router.url.split('?')[0].split('#')[0];
+    return url === path || url.startsWith(path + '/');
   }
 
   // Nav routes are static, so the label key is computed once per route
