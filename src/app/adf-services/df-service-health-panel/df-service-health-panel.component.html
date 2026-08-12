@@ -1,0 +1,39 @@
+<ng-container *ngIf="health as h">
+  <!-- Passing: one quiet line. Nothing to act on, so it stays out of the way
+       of the config form below. -->
+  <p class="health-panel__ok" *ngIf="!h.rules.length; else issues">
+    <fa-icon [icon]="faCircleCheck" aria-hidden="true"></fa-icon>
+    <span>{{ 'services.health.level.success' | transloco }}</span>
+  </p>
+
+  <ng-template #issues>
+    <section
+      class="health-panel"
+      [class.health-panel--danger]="h.level === 'danger'"
+      [attr.aria-label]="'services.health.panelAria' | transloco">
+      <header class="health-panel__head">
+        <fa-icon [icon]="faShieldHalved" aria-hidden="true"></fa-icon>
+        <span class="df-eyebrow">{{
+          'services.health.header' | transloco
+        }}</span>
+        <df-badge
+          [variant]="h.level"
+          [label]="'services.health.level.' + h.level | transloco"></df-badge>
+      </header>
+
+      <ul class="health-panel__rules">
+        <li *ngFor="let rule of h.rules" class="health-panel__rule">
+          <span class="health-panel__reason">{{
+            'services.health.rules.' + rule.id | transloco
+          }}</span>
+          <!-- No fix link is rendered when no single config surface clears the
+               rule (deprecated), rather than inventing a destination. -->
+          <a *ngIf="rule.fix" class="health-panel__fix" [routerLink]="rule.fix">
+            {{ 'services.health.fix.' + rule.id | transloco }}
+            <fa-icon [icon]="faArrowRight" aria-hidden="true"></fa-icon>
+          </a>
+        </li>
+      </ul>
+    </section>
+  </ng-template>
+</ng-container>

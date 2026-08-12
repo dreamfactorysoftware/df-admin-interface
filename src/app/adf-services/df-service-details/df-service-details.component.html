@@ -482,6 +482,18 @@
     </mat-stepper>
   </ng-container>
   <ng-template #notDatabaseEdit>
+    <!-- Health: the Services table chip, opened up where you would act on it.
+         Top of the page for every service type, since the pages diverge
+         sharply below this point. Edit only (nothing to score during create)
+         and never for the read-only DreamFactory Platform APIs. -->
+    <df-service-health-panel
+      *ngIf="edit && serviceData?.id && !isPlatformService"
+      class="service-health-panel"
+      [serviceId]="serviceData.id"
+      [serviceName]="serviceData.name"
+      [deprecated]="serviceData.deprecated">
+    </df-service-health-panel>
+
     <!-- Meridian Phase 1: service Overview. Viewing an existing database
          service opens on the Live API Card — a real base URL, a scoped key,
          and a runnable curl — before the config form. -->
