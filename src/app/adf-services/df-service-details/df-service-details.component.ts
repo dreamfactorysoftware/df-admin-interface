@@ -115,6 +115,7 @@ import {
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 import { DfScopeMatrixComponent } from 'src/app/shared/components/df-scope-matrix/df-scope-matrix.component';
+import { DfServiceHealthPanelComponent } from '../df-service-health-panel/df-service-health-panel.component';
 import { DfPipelineStripComponent } from 'src/app/shared/components/df-pipeline-strip/df-pipeline-strip.component';
 import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
 import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
@@ -200,11 +201,18 @@ interface ServiceResponse {
     DfArtifactCardComponent,
     DfScopeMatrixComponent,
     DfPipelineStripComponent,
+    DfServiceHealthPanelComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
+  /** DreamFactory Platform APIs route (data.system). Those services are not
+   * role-governed the way a user service is, so they are not health-scored. */
+  isPlatformService = false;
+  /** Route group ('Database', 'File', 'Script', ...). Selects the health
+   * panel's connection-probe endpoint. */
+  serviceGroup: string | null = null;
   isNetworkService = false;
   isScriptService = false;
   isFile = false;
@@ -442,6 +450,12 @@ export class DfServiceDetailsComponent implements OnInit {
         if (route['groups'] && route['groups'][0] === 'MCP') {
           this.isMcp = true;
         }
+        this.serviceGroup = route['groups']?.[0] ?? null;
+        // Set on the DF_PLATFORM_APIS route (and inherited by its children).
+        this.isPlatformService =
+          route['system'] ||
+          this.activatedRoute.snapshot.parent?.data?.['system'] ||
+          false;
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes.filter(

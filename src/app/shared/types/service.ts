@@ -96,6 +96,8 @@ export interface ServiceRow {
   deprecated?: boolean;
   /** Derived client-side (no backend field); see DfServiceHealthService. */
   health?: ServiceHealth;
+  /** Live connection check for this row; see DfServiceProbeService. */
+  probe?: 'checking' | 'ok' | 'failed' | 'unsupported';
 }
 
 export type ServiceHealthLevel = 'success' | 'warning' | 'danger';
@@ -106,7 +108,7 @@ export type ServiceHealthLevel = 'success' | 'warning' | 'danger';
  * clears it (omitted when there is no safe destination, never fabricated).
  */
 export interface ServiceHealthRule {
-  id: 'noAccess' | 'noRateLimit' | 'noDocs' | 'deprecated';
+  id: 'noAccess' | 'deprecated' | 'cannotConnect';
   level: 'warning' | 'danger';
   fix?: Array<string | number>;
 }
