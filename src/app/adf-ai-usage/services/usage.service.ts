@@ -385,6 +385,28 @@ export class UsageService {
     }).pipe(map(b => b));
   }
 
+  /**
+   * One filtered usage window, used by the task estimator: 90d calibration
+   * reads and the pre/post meter snapshots around a real run. Silent + null
+   * on failure so callers degrade to "not enough metered history" instead
+   * of toasting per analytics fetch.
+   */
+  loadWindow(
+    period: string,
+    filter: { app_id?: number; service_id?: number } = {}
+  ): Observable<UsageResponse | null> {
+    let params = new HttpParams().set('period', period);
+    if (filter.app_id != null) {
+      params = params.set('app_id', String(filter.app_id));
+    }
+    if (filter.service_id != null) {
+      params = params.set('service_id', String(filter.service_id));
+    }
+    return this.http
+      .get<UsageResponse>('/_internal/ai/usage', { params, context: silent() })
+      .pipe(catchError(() => of(null)));
+  }
+
   private getServicesLookup(): Observable<Map<number, ServiceLookupRow>> {
     this.servicesLookup$ ??= this.listServices().pipe(shareReplay(1));
     return this.servicesLookup$;

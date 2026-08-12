@@ -42,6 +42,7 @@ import { DfUsageStackedAreaComponent } from './components/df-usage-stacked-area/
 import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.component';
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
 import { DfCostEstimatorComponent } from './components/df-cost-estimator/df-cost-estimator.component';
+import { DfTaskEstimatorComponent } from './components/df-task-estimator/df-task-estimator.component';
 import {
   DfCostByDimensionComponent,
   DimensionSeriesPoint,
@@ -108,6 +109,7 @@ export interface BudgetRow {
     DfUsageBarsComponent,
     DfUsageSummaryComponent,
     DfCostEstimatorComponent,
+    DfTaskEstimatorComponent,
     DfCostByDimensionComponent,
     DfExpensiveCallsComponent,
     DfSpendBreakdownComponent,
