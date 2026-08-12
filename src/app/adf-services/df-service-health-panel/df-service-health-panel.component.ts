@@ -7,7 +7,14 @@ import {
   OnInit,
   SimpleChanges,
 } from '@angular/core';
-import { NgFor, NgIf } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import {
+  NgFor,
+  NgIf,
+  NgSwitch,
+  NgSwitchCase,
+  NgSwitchDefault,
+} from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -17,27 +24,41 @@ import {
   faShieldHalved,
 } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
+import { catchError, of, tap } from 'rxjs';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
-import { ServiceHealth } from 'src/app/shared/types/service';
+import { DfErrorDetailComponent } from 'src/app/shared/components/df-error-detail/df-error-detail.component';
+import { BASE_URL } from 'src/app/shared/constants/urls';
+import {
+  ServiceHealth,
+  ServiceHealthLevel,
+} from 'src/app/shared/types/service';
+import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
+import { toastOff } from 'src/app/shared/utilities/http-contexts';
+import { healthCheckEndpointsInfo } from 'src/app/adf-api-docs/constants/health-check-endpoints';
 import { DfServiceHealthService } from '../df-manage-services/df-service-health.service';
 
+/** Live connection check for this service. `unsupported` is an honest "not
+ * checked", never folded into a pass. */
+export type ProbeState = 'idle' | 'checking' | 'ok' | 'failed' | 'unsupported';
+
 /**
- * df-service-health-panel — the Services table's Health chip, opened up on the
- * service's own page.
+ * df-service-health-panel — what is actually wrong with this service, on the
+ * page where you would fix it.
  *
- * The table chip hides its reasons behind a menu, which is fine for scanning a
- * list but useless where you would act on them. Here each failing rule is a
- * row: the consequence in plain words plus the deep link to the config that
- * clears it. A passing service collapses to one quiet line rather than a
- * green wall - there is nothing to act on, so it should not compete with the
- * config form below it.
+ * Two independent signals, deliberately kept apart:
  *
- * Scoring is not duplicated: DfServiceHealthService.derive() is the one
- * definition of service health, shared with the table, and its context is
- * cached app-wide so opening a service costs no extra request.
+ *  - Governance, from DfServiceHealthService.derive(): does any role grant a
+ *    key access, is it deprecated. Read from the role graph, cached app-wide,
+ *    identical to the Services table's Access chip.
+ *  - Connection, probed live here: the same request the API Docs page makes
+ *    (/_schema for a database, / for file storage, per
+ *    healthCheckEndpointsInfo). Nothing else in DF re-checks a connection
+ *    after creation - df-core's ServiceHealthChecker only fires on
+ *    static::created and persists nothing - so a password that rotted after
+ *    setup is invisible until something asks the service. This asks.
  *
- * The host renders nothing until the context resolves, and nothing at all for
- * a service with no id (the create flow has nothing to score yet).
+ * A type with no mapped probe endpoint (scripting, remote, auth) reports that
+ * it was not checked rather than claiming health it cannot prove.
  */
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -49,20 +70,30 @@ import { DfServiceHealthService } from '../df-manage-services/df-service-health.
   imports: [
     NgIf,
     NgFor,
+    NgSwitch,
+    NgSwitchCase,
+    NgSwitchDefault,
     RouterLink,
     TranslocoPipe,
     FontAwesomeModule,
     DfBadgeComponent,
+    DfErrorDetailComponent,
   ],
 })
 export class DfServiceHealthPanelComponent implements OnInit, OnChanges {
   /** Service being edited. No id (create flow) renders nothing. */
   @Input() serviceId?: number | null;
   @Input() serviceName = '';
+  /** Route group ('Database', 'File', ...); selects the probe endpoint. */
+  @Input() serviceGroup?: string | null;
   /** Opt-in flag; only set when the service explicitly carries it. */
   @Input() deprecated?: boolean;
 
   health?: ServiceHealth;
+  probe: ProbeState = 'idle';
+  /** Kept as the normalized AppError, not a string, so df-error-detail can
+   * offer the status, the request and the (DSN-scrubbed) raw body. */
+  probeError: AppError | null = null;
 
   readonly faShieldHalved = faShieldHalved;
   readonly faCircleCheck = faCircleCheck;
@@ -70,19 +101,41 @@ export class DfServiceHealthPanelComponent implements OnInit, OnChanges {
 
   constructor(
     private healthService: DfServiceHealthService,
+    private http: HttpClient,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     this.score();
+    this.runProbe();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     // The details page fills serviceData in after its resolver settles, so the
-    // id can arrive later than the first render.
+    // inputs can arrive later than the first render.
     if (changes['serviceId'] || changes['deprecated']) {
       this.score();
     }
+    if (
+      changes['serviceId'] ||
+      changes['serviceName'] ||
+      changes['serviceGroup']
+    ) {
+      this.runProbe();
+    }
+  }
+
+  /** Worst of the two signals. A failed connection outranks anything derived. */
+  get level(): ServiceHealthLevel {
+    if (this.probe === 'failed') {
+      return 'danger';
+    }
+    return this.health?.level ?? 'success';
+  }
+
+  /** True while there is something to show in the box rather than one line. */
+  get hasFindings(): boolean {
+    return this.probe === 'failed' || !!this.health?.rules.length;
   }
 
   private score(): void {
@@ -105,5 +158,54 @@ export class DfServiceHealthPanelComponent implements OnInit, OnChanges {
         );
         this.cdr.markForCheck();
       });
+  }
+
+  private runProbe(): void {
+    if (!this.serviceId || !this.serviceName) {
+      this.probe = 'idle';
+      return;
+    }
+    const endpoint = this.serviceGroup
+      ? healthCheckEndpointsInfo[this.serviceGroup]?.[0]?.endpoint
+      : undefined;
+    if (!endpoint) {
+      this.probe = 'unsupported';
+      this.probeError = null;
+      return;
+    }
+
+    const name = this.serviceName;
+    this.probe = 'checking';
+    this.probeError = null;
+    this.http
+      // Left as JSON on purpose: DF returns the driver's own words in an
+      // { error: { message } } envelope, and normalizeError can only read that
+      // out of a parsed body. Requesting text (as the API Docs probe does)
+      // collapses "SQLSTATE[28000] Access denied for user ..." into the
+      // generic "errors.http5xx" fallback, which is the one thing the reader
+      // needs. toastOff so a dead connection reports here rather than throwing
+      // a global error toast on page open.
+      .get(`${BASE_URL}/${name}${endpoint}`, {
+        context: toastOff(),
+      })
+      .pipe(
+        tap(() => {
+          if (this.serviceName === name) {
+            this.probe = 'ok';
+          }
+        }),
+        catchError((error: unknown) => {
+          if (this.serviceName === name) {
+            this.probe = 'failed';
+            this.probeError = normalizeError(error, {
+              url: `${BASE_URL}/${name}${endpoint}`,
+              method: 'GET',
+            });
+          }
+          return of(null);
+        }),
+        untilDestroyed(this)
+      )
+      .subscribe(() => this.cdr.markForCheck());
   }
 }

@@ -60,7 +60,7 @@
           *ngIf="
             column.columnDef !== 'actions' &&
             column.columnDef !== 'scripting' &&
-            column.columnDef !== 'health'
+            column.columnDef !== 'access'
           ">
           <th
             mat-header-cell
@@ -107,7 +107,7 @@
         </ng-container>
         <ng-container
           [matColumnDef]="column.columnDef"
-          *ngIf="column.columnDef === 'health'">
+          *ngIf="column.columnDef === 'access'">
           <th mat-header-cell *matHeaderCellDef class="df-eyebrow">
             {{ column.header | transloco }}
           </th>
@@ -119,11 +119,13 @@
                   class="df-health-chip"
                   [matMenuTriggerFor]="healthMenu"
                   (click)="$event.stopPropagation()"
-                  [attr.aria-label]="'services.health.whyAria' | transloco">
+                  [attr.aria-label]="
+                    'services.access.chip.whyAria' | transloco
+                  ">
                   <df-badge
                     [variant]="health.level"
                     [label]="
-                      'services.health.level.' + health.level | transloco
+                      'services.access.chip.level.' + health.level | transloco
                     "></df-badge>
                 </button>
                 <mat-menu #healthMenu="matMenu">
@@ -141,7 +143,7 @@
                 <df-badge
                   variant="success"
                   [label]="
-                    'services.health.level.success' | transloco
+                    'services.access.chip.level.success' | transloco
                   "></df-badge>
               </ng-template>
             </ng-container>

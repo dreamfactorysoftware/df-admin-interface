@@ -55,6 +55,16 @@
     flex: 1 1 20rem;
   }
 
+  // The normalized reason under the headline. The raw driver text lives in
+  // the df-error-detail expander below it, not here.
+  &__detail {
+    display: block;
+    margin-top: var(--df-space-1);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    overflow-wrap: anywhere;
+  }
+
   &__fix {
     display: inline-flex;
     align-items: center;
@@ -89,6 +99,11 @@
 
     fa-icon {
       color: var(--df-success);
+    }
+
+    // Checking / not-checked: neutral, since neither is a pass.
+    &--muted fa-icon {
+      color: var(--df-text-muted);
     }
   }
 }

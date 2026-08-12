@@ -1,39 +1,72 @@
-<ng-container *ngIf="health as h">
-  <!-- Passing: one quiet line. Nothing to act on, so it stays out of the way
-       of the config form below. -->
-  <p class="health-panel__ok" *ngIf="!h.rules.length; else issues">
-    <fa-icon [icon]="faCircleCheck" aria-hidden="true"></fa-icon>
-    <span>{{ 'services.health.level.success' | transloco }}</span>
-  </p>
+<ng-container *ngIf="health || probe !== 'idle'">
+  <!-- Findings: the box. Connection first (it outranks governance), then the
+       derived rules. -->
+  <section
+    *ngIf="hasFindings; else clean"
+    class="health-panel"
+    [class.health-panel--danger]="level === 'danger'"
+    [attr.aria-label]="'services.health.panelAria' | transloco">
+    <header class="health-panel__head">
+      <fa-icon [icon]="faShieldHalved" aria-hidden="true"></fa-icon>
+      <span class="df-eyebrow">{{ 'services.health.header' | transloco }}</span>
+      <df-badge
+        [variant]="level"
+        [label]="'services.health.level.' + level | transloco"></df-badge>
+    </header>
 
-  <ng-template #issues>
-    <section
-      class="health-panel"
-      [class.health-panel--danger]="h.level === 'danger'"
-      [attr.aria-label]="'services.health.panelAria' | transloco">
-      <header class="health-panel__head">
-        <fa-icon [icon]="faShieldHalved" aria-hidden="true"></fa-icon>
-        <span class="df-eyebrow">{{
-          'services.health.header' | transloco
+    <ul class="health-panel__rules">
+      <li *ngIf="probe === 'failed'" class="health-panel__rule">
+        <span class="health-panel__reason">
+          {{ 'services.health.probe.failed' | transloco }}
+          <ng-container *ngIf="probeError">
+            <!-- AppError.message may be a translation key or the server's own
+                 sentence; transloco passes unknown keys through unchanged. -->
+            <span class="health-panel__detail">{{
+              probeError.message | transloco
+            }}</span>
+            <!-- Status, request and the DSN-scrubbed raw body, plus
+                 copy-for-support. Driver internals stay behind the expander by
+                 the same convention the rest of the app follows. -->
+            <df-error-detail [error]="probeError"></df-error-detail>
+          </ng-container>
+        </span>
+      </li>
+
+      <li *ngFor="let rule of health?.rules" class="health-panel__rule">
+        <span class="health-panel__reason">{{
+          'services.health.rules.' + rule.id | transloco
         }}</span>
-        <df-badge
-          [variant]="h.level"
-          [label]="'services.health.level.' + h.level | transloco"></df-badge>
-      </header>
+        <!-- No fix link is rendered when no single config surface clears the
+             rule (deprecated), rather than inventing a destination. -->
+        <a *ngIf="rule.fix" class="health-panel__fix" [routerLink]="rule.fix">
+          {{ 'services.health.fix.' + rule.id | transloco }}
+          <fa-icon [icon]="faArrowRight" aria-hidden="true"></fa-icon>
+        </a>
+      </li>
+    </ul>
+  </section>
 
-      <ul class="health-panel__rules">
-        <li *ngFor="let rule of h.rules" class="health-panel__rule">
-          <span class="health-panel__reason">{{
-            'services.health.rules.' + rule.id | transloco
-          }}</span>
-          <!-- No fix link is rendered when no single config surface clears the
-               rule (deprecated), rather than inventing a destination. -->
-          <a *ngIf="rule.fix" class="health-panel__fix" [routerLink]="rule.fix">
-            {{ 'services.health.fix.' + rule.id | transloco }}
-            <fa-icon [icon]="faArrowRight" aria-hidden="true"></fa-icon>
-          </a>
-        </li>
-      </ul>
-    </section>
+  <!-- Nothing to act on: one quiet line, honest about what was checked. -->
+  <ng-template #clean>
+    <p
+      class="health-panel__ok"
+      [class.health-panel__ok--muted]="probe !== 'ok'">
+      <!-- The check mark is reserved for a connection that actually answered;
+           "checking" and "not checked" get the neutral shield. -->
+      <fa-icon
+        [icon]="probe === 'ok' ? faCircleCheck : faShieldHalved"
+        aria-hidden="true"></fa-icon>
+      <span [ngSwitch]="probe">
+        <ng-container *ngSwitchCase="'checking'">{{
+          'services.health.probe.checking' | transloco
+        }}</ng-container>
+        <ng-container *ngSwitchCase="'unsupported'">{{
+          'services.health.probe.unsupported' | transloco
+        }}</ng-container>
+        <ng-container *ngSwitchDefault>{{
+          'services.health.probe.ok' | transloco
+        }}</ng-container>
+      </span>
+    </p>
   </ng-template>
 </ng-container>

@@ -210,6 +210,9 @@ export class DfServiceDetailsComponent implements OnInit {
   /** DreamFactory Platform APIs route (data.system). Those services are not
    * role-governed the way a user service is, so they are not health-scored. */
   isPlatformService = false;
+  /** Route group ('Database', 'File', 'Script', ...). Selects the health
+   * panel's connection-probe endpoint. */
+  serviceGroup: string | null = null;
   isNetworkService = false;
   isScriptService = false;
   isFile = false;
@@ -447,6 +450,7 @@ export class DfServiceDetailsComponent implements OnInit {
         if (route['groups'] && route['groups'][0] === 'MCP') {
           this.isMcp = true;
         }
+        this.serviceGroup = route['groups']?.[0] ?? null;
         // Set on the DF_PLATFORM_APIS route (and inherited by its children).
         this.isPlatformService =
           route['system'] ||

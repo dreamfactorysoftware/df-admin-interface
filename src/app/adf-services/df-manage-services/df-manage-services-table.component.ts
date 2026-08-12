@@ -199,11 +199,15 @@ export class DfManageServicesTableComponent
       header: 'type',
     },
     {
-      columnDef: 'health',
-      // Rendered by the shared table's dedicated 'health' branch (df-badge +
+      // The list column scores governance only - it never opens a connection,
+      // so it is named for what it measures. A live connection check needs one
+      // request per service; that runs on the service's own page instead
+      // (df-service-health-panel), not once per row here.
+      columnDef: 'access',
+      // Rendered by the shared table's dedicated 'access' branch (df-badge +
       // "why" mat-menu); cell() is unused for this column.
       cell: (row: ServiceRow) => row.health?.level,
-      header: 'services.health.header',
+      header: 'services.access.chip.header',
     },
     {
       columnDef: 'scripting',
