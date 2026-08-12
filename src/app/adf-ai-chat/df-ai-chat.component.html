@@ -137,12 +137,18 @@
               title="Ask anything about your data"
               description="This assistant answers over the services and tables its role can reach."></df-empty-state>
           </div>
+          <!-- Suggestion chips only ever appear on the newest message (the
+               child renders them solely for assistant messages) and never
+               while a reply is in flight; a picked chip goes through the
+               same send flow as typed input. -->
           <df-chat-message
-            *ngFor="let m of messages; trackBy: trackMsg"
+            *ngFor="let m of messages; trackBy: trackMsg; let isLast = last"
             [message]="m"
             [rate]="chatRate"
             [model]="chatModel"
+            [showSuggestions]="isLast && !awaitingAssistant"
             (regenerate)="regenerateFrom($event)"
+            (suggestionSelected)="send($event)"
             class="ai-chat__message"></df-chat-message>
           <div *ngIf="awaitingAssistant" class="ai-chat__thinking">
             <mat-spinner diameter="16"></mat-spinner>

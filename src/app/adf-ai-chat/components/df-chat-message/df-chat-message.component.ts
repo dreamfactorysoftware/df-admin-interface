@@ -29,6 +29,20 @@ interface InlineToken {
   href?: string;
 }
 
+/** Suggested-follow-up chips parsed from a trailing suggestions fence. */
+const MAX_SUGGESTIONS = 4;
+/** Defensive per-chip length cap: longer lines are dropped, not truncated. */
+const MAX_SUGGESTION_CHARS = 120;
+/** Stray leading bullet/number tolerated on a suggestion line. */
+const SUGGESTION_BULLET_RE = /^(?:[-*•]|\d{1,2}[.)])\s+(.+)$/;
+
+/** Parsed view of one assistant message's content. */
+interface ParsedContent {
+  content: string;
+  segs: Array<{ type: 'text' | 'code'; text: string }>;
+  suggestions: string[];
+}
+
 @Component({
   selector: 'df-chat-message',
   standalone: true,
@@ -129,6 +143,25 @@ interface InlineToken {
             <span *ngIf="message.latency_ms != null" class="msg__chip">
               {{ fmtLatency(message.latency_ms) }}
             </span>
+          </div>
+
+          <!-- Suggested follow-ups: parsed from a trailing suggestions fence
+               in the assistant content. The parent gates visibility to the
+               newest assistant message while no reply is in flight; clicking
+               a chip sends its text through the normal send flow. -->
+          <div
+            *ngIf="showSuggestions && !showRaw && suggestions.length"
+            class="msg__suggestions"
+            role="group"
+            aria-label="Suggested follow-ups">
+            <button
+              *ngFor="let s of suggestions; trackBy: trackSuggestion"
+              type="button"
+              class="msg__suggestion"
+              [title]="s"
+              (click)="suggestionSelected.emit(s)">
+              {{ s }}
+            </button>
           </div>
 
           <!-- Hover actions -->
@@ -386,6 +419,48 @@ interface InlineToken {
           font-size: 10px;
         }
 
+        // Suggested follow-ups: real buttons (keyboard-focusable), styled as
+        // accent-tinted pills so they read as actions, not metering chips.
+        // Theme tokens keep them correct in dark mode for free.
+        &__suggestions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.375rem;
+          margin-top: 0.5rem;
+          padding-top: 0.5rem;
+          border-top: 1px dashed var(--chat-border-2);
+        }
+
+        &__suggestion {
+          max-width: 100%;
+          padding: 0.25rem 0.75rem;
+          border: 1px solid var(--df-accent-border, var(--chat-border-2));
+          border-radius: 999px;
+          background: var(--df-accent-soft);
+          color: var(--df-accent);
+          font: inherit;
+          font-size: 1.2rem;
+          line-height: 1.5;
+          text-align: left;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          cursor: pointer;
+          transition:
+            background 120ms ease,
+            color 120ms ease;
+
+          &:hover {
+            background: var(--df-accent);
+            color: var(--df-accent-contrast);
+          }
+
+          &:focus-visible {
+            outline: none;
+            box-shadow: var(--df-focus-ring);
+          }
+        }
+
         &__actions {
           position: absolute;
           top: -0.75rem;
@@ -434,8 +509,13 @@ export class DfChatMessageComponent {
   @Input() rate: ProviderRates | null = null;
   /** Model label, shown in the cost chip tooltip so the estimate is honest. */
   @Input() model?: string;
+  /** Suggestion chips render only on the newest assistant message while no
+   *  reply is in flight — both facts live in the parent, so it gates here. */
+  @Input() showSuggestions = false;
 
   @Output() regenerate = new EventEmitter<ChatMessage>();
+  /** A suggestion chip was clicked; its text becomes the next user message. */
+  @Output() suggestionSelected = new EventEmitter<string>();
 
   private cdr = inject(ChangeDetectorRef);
 
@@ -568,14 +648,11 @@ export class DfChatMessageComponent {
     }
   }
 
-  /** Memo for segments: without it the getter returned a fresh array of
-   *  fresh objects per CD cycle, so the default *ngFor differ destroyed and
-   *  rebuilt every <p>/<pre> on every tick of the 1s chat poll. Keyed on
-   *  message.content, which is the getter's only input. */
-  private segCache: {
-    content: string;
-    segs: Array<{ type: 'text' | 'code'; text: string }>;
-  } | null = null;
+  /** Memo for segments + suggestions: without it the getter returned a fresh
+   *  array of fresh objects per CD cycle, so the default *ngFor differ
+   *  destroyed and rebuilt every <p>/<pre> on every tick of the 1s chat poll.
+   *  Keyed on message.content, which is the getters' only input. */
+  private segCache: ParsedContent | null = null;
 
   /**
    * Split assistant content into text + fenced-code segments. Pure-text
@@ -583,21 +660,33 @@ export class DfChatMessageComponent {
    * inside each text segment is rendered structurally by inlineTokens().
    */
   get segments(): Array<{ type: 'text' | 'code'; text: string }> {
-    const content = this.message.content ?? '';
-    if (this.segCache?.content !== content) {
-      this.segCache = { content, segs: this.computeSegments(content) };
-    }
-    return this.segCache.segs;
+    return this.parsed.segs;
   }
 
-  private computeSegments(
-    c: string
-  ): Array<{ type: 'text' | 'code'; text: string }> {
+  /** Chip labels from a trailing suggestions fence; empty when there is none.
+   *  Rendering is further gated by the showSuggestions input. */
+  get suggestions(): string[] {
+    return this.parsed.suggestions;
+  }
+
+  private get parsed(): ParsedContent {
+    const content = this.message.content ?? '';
+    if (this.segCache?.content !== content) {
+      this.segCache = { content, ...this.computeSegments(content) };
+    }
+    return this.segCache;
+  }
+
+  private computeSegments(c: string): {
+    segs: Array<{ type: 'text' | 'code'; text: string }>;
+    suggestions: string[];
+  } {
     if (!c) {
-      return [];
+      return { segs: [], suggestions: [] };
     }
     const out: Array<{ type: 'text' | 'code'; text: string }> = [];
-    const re = /```[a-zA-Z0-9_-]*\n([\s\S]*?)```/g;
+    let suggestions: string[] = [];
+    const re = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
     let last = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(c))) {
@@ -607,8 +696,23 @@ export class DfChatMessageComponent {
           out.push({ type: 'text', text });
         }
       }
-      out.push({ type: 'code', text: m[1] });
-      last = m.index + m[0].length;
+      // A CLOSED trailing ```suggestions fence carries follow-up chips: strip
+      // it from the rendered segments and surface its lines instead. Only the
+      // trailing fence qualifies — a mid-message suggestions fence (e.g. the
+      // assistant quoting its own format) stays visible as ordinary code, as
+      // does a trailing fence whose lines all fail validation. An UNCLOSED
+      // fence never matches this regex and renders as literal text.
+      const end = m.index + m[0].length;
+      const lines =
+        m[1] === 'suggestions' && !c.slice(end).trim()
+          ? this.parseSuggestionLines(m[2])
+          : [];
+      if (lines.length) {
+        suggestions = lines;
+      } else {
+        out.push({ type: 'code', text: m[2] });
+      }
+      last = end;
     }
     if (last < c.length) {
       const text = c.slice(last);
@@ -616,10 +720,36 @@ export class DfChatMessageComponent {
         out.push({ type: 'text', text });
       }
     }
-    if (out.length === 0) {
+    if (out.length === 0 && suggestions.length === 0) {
       out.push({ type: 'text', text: c });
     }
+    return { segs: out, suggestions };
+  }
+
+  /** Trimmed, deduped, non-empty lines of a suggestions fence — tolerating
+   *  stray bullets/numbers/quotes the model may add — capped defensively at
+   *  MAX_SUGGESTIONS chips of MAX_SUGGESTION_CHARS each. */
+  private parseSuggestionLines(inner: string): string[] {
+    const out: string[] = [];
+    for (const raw of inner.split(/\r?\n/)) {
+      let line = raw.trim();
+      const b = SUGGESTION_BULLET_RE.exec(line);
+      if (b) {
+        line = b[1].trim();
+      }
+      line = line.replace(/^["'`]+|["'`]+$/g, '').trim();
+      if (line && line.length <= MAX_SUGGESTION_CHARS && !out.includes(line)) {
+        out.push(line);
+        if (out.length === MAX_SUGGESTIONS) {
+          break;
+        }
+      }
+    }
     return out;
+  }
+
+  trackSuggestion(i: number): number {
+    return i;
   }
 
   /** Memo for inline tokens: keyed by the raw segment string. Cleared when
