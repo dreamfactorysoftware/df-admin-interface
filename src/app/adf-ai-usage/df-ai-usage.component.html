@@ -481,6 +481,11 @@
         [connectionProviders]="connectionProviders"
         [defaultRates]="defaultRates"
         [summary]="summary"></df-cost-estimator>
+
+      <!-- Task-based what-if: route a described task to an agent, price it
+           from the meter's own history BEFORE running, then optionally run
+           for real and compare actual metered spend to the estimate. -->
+      <df-task-estimator (ran)="refresh()"></df-task-estimator>
     </ng-container>
 
     <ng-container *ngIf="mcpTotalRequests > 0">
