@@ -16,10 +16,15 @@
     },
     "rules": {
       "noAccess": "No role grants access. This service is unreachable by any key.",
-      "deprecated": "Marked deprecated. Migrate consumers off this service."
+      "deprecated": "Marked deprecated. Migrate consumers off this service.",
+      "cannotConnect": "Cannot reach this service. Check its host and credentials."
     },
     "fix": {
       "noAccess": "Create a role"
+    },
+    "chip": {
+      "checking": "Checking…",
+      "notChecked": "Not checked"
     }
   },
   "details": "Details",
@@ -89,15 +94,6 @@
     "autoRedirectTest": "Opening the API testing playground"
   },
   "access": {
-    "chip": {
-      "header": "Access",
-      "whyAria": "Why this service needs attention",
-      "level": {
-        "success": "Granted",
-        "warning": "Needs attention",
-        "danger": "Action required"
-      }
-    },
     "eyebrow": "Access",
     "title": "Who can reach this service",
     "description": "Every role is a row, every HTTP verb a column. Green is full access, amber is filtered, muted is none. Derived live from the role graph.",
