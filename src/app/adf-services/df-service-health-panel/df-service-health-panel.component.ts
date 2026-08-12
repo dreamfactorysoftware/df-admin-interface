@@ -7,7 +7,6 @@ import {
   OnInit,
   SimpleChanges,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import {
   NgFor,
   NgIf,
@@ -24,22 +23,18 @@ import {
   faShieldHalved,
 } from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
-import { catchError, of, tap } from 'rxjs';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
 import { DfErrorDetailComponent } from 'src/app/shared/components/df-error-detail/df-error-detail.component';
-import { BASE_URL } from 'src/app/shared/constants/urls';
 import {
   ServiceHealth,
   ServiceHealthLevel,
 } from 'src/app/shared/types/service';
-import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
-import { toastOff } from 'src/app/shared/utilities/http-contexts';
-import { healthCheckEndpointsInfo } from 'src/app/adf-api-docs/constants/health-check-endpoints';
+import { AppError } from 'src/app/shared/utilities/app-error';
+import {
+  DfServiceProbeService,
+  ProbeState,
+} from '../df-manage-services/df-service-probe.service';
 import { DfServiceHealthService } from '../df-manage-services/df-service-health.service';
-
-/** Live connection check for this service. `unsupported` is an honest "not
- * checked", never folded into a pass. */
-export type ProbeState = 'idle' | 'checking' | 'ok' | 'failed' | 'unsupported';
 
 /**
  * df-service-health-panel — what is actually wrong with this service, on the
@@ -90,7 +85,9 @@ export class DfServiceHealthPanelComponent implements OnInit, OnChanges {
   @Input() deprecated?: boolean;
 
   health?: ServiceHealth;
-  probe: ProbeState = 'idle';
+  /** 'idle' only until an id arrives; every other state comes from the shared
+   * probe service, which the Services list uses too. */
+  probe: ProbeState | 'idle' = 'idle';
   /** Kept as the normalized AppError, not a string, so df-error-detail can
    * offer the status, the request and the (DSN-scrubbed) raw body. */
   probeError: AppError | null = null;
@@ -101,7 +98,7 @@ export class DfServiceHealthPanelComponent implements OnInit, OnChanges {
 
   constructor(
     private healthService: DfServiceHealthService,
-    private http: HttpClient,
+    private probeService: DfServiceProbeService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -165,47 +162,19 @@ export class DfServiceHealthPanelComponent implements OnInit, OnChanges {
       this.probe = 'idle';
       return;
     }
-    const endpoint = this.serviceGroup
-      ? healthCheckEndpointsInfo[this.serviceGroup]?.[0]?.endpoint
-      : undefined;
-    if (!endpoint) {
-      this.probe = 'unsupported';
-      this.probeError = null;
-      return;
-    }
-
     const name = this.serviceName;
-    this.probe = 'checking';
     this.probeError = null;
-    this.http
-      // Left as JSON on purpose: DF returns the driver's own words in an
-      // { error: { message } } envelope, and normalizeError can only read that
-      // out of a parsed body. Requesting text (as the API Docs probe does)
-      // collapses "SQLSTATE[28000] Access denied for user ..." into the
-      // generic "errors.http5xx" fallback, which is the one thing the reader
-      // needs. toastOff so a dead connection reports here rather than throwing
-      // a global error toast on page open.
-      .get(`${BASE_URL}/${name}${endpoint}`, {
-        context: toastOff(),
-      })
-      .pipe(
-        tap(() => {
-          if (this.serviceName === name) {
-            this.probe = 'ok';
-          }
-        }),
-        catchError((error: unknown) => {
-          if (this.serviceName === name) {
-            this.probe = 'failed';
-            this.probeError = normalizeError(error, {
-              url: `${BASE_URL}/${name}${endpoint}`,
-              method: 'GET',
-            });
-          }
-          return of(null);
-        }),
-        untilDestroyed(this)
-      )
-      .subscribe(() => this.cdr.markForCheck());
+    this.probeService
+      .probe(name, this.serviceGroup)
+      .pipe(untilDestroyed(this))
+      .subscribe(result => {
+        // Guard against a verdict that lands after the inputs moved on.
+        if (this.serviceName !== name) {
+          return;
+        }
+        this.probe = result.state;
+        this.probeError = result.error ?? null;
+        this.cdr.markForCheck();
+      });
   }
 }

@@ -15,7 +15,7 @@ import {
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { Service, ServiceRow, ServiceType } from 'src/app/shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
-import { UntilDestroy } from '@ngneat/until-destroy';
+import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
@@ -24,6 +24,7 @@ import {
   DfServiceHealthService,
   ServiceHealthContext,
 } from './df-service-health.service';
+import { DfServiceProbeService } from './df-service-probe.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
@@ -54,12 +55,16 @@ export class DfManageServicesTableComponent
     @Inject(SERVICE_TYPE_SERVICE_TOKEN)
     private serviceTypeService: DfBaseCrudService,
     private healthService: DfServiceHealthService,
+    private probeService: DfServiceProbeService,
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
   private healthContext?: ServiceHealthContext;
+  /** Route group ('Database', 'File', ...) - picks the probe endpoint for
+   * every row on this page, the same way the service page picks its own. */
+  private serviceGroup: string | null = null;
 
   override ngOnInit(): void {
     // Call parent's ngOnInit first to set up the data source
@@ -71,10 +76,17 @@ export class DfManageServicesTableComponent
     this.healthService.getContext().subscribe(context => {
       this.healthContext = context;
       if (this.dataSource.data.length) {
-        this.dataSource.data = this.dataSource.data.map(row => ({
-          ...row,
-          health: this.healthService.derive(row, context),
-        }));
+        // Mutated in place, not re-spread: a probe verdict may already have
+        // landed on these rows, and new row objects would orphan the
+        // subscriptions still holding the old ones. withProbe re-applies the
+        // connection rule that derive() alone knows nothing about.
+        this.dataSource.data.forEach(row => {
+          row.health = this.healthService.withProbe(
+            this.healthService.derive(row, context),
+            row.probe === 'failed'
+          );
+        });
+        this.dataSource.data = [...this.dataSource.data];
       }
     });
 
@@ -86,6 +98,10 @@ export class DfManageServicesTableComponent
         this._activatedRoute.snapshot.parent?.data?.['system'] ||
         false;
       this.serviceTypes = data?.serviceTypes ?? [];
+      this.serviceGroup =
+        routeData['groups']?.[0] ??
+        this._activatedRoute.snapshot.parent?.data?.['groups']?.[0] ??
+        null;
       this.allowCreate = !this.system;
       if (!data?.resource) {
         this.loadTableData(routeData);
@@ -199,15 +215,11 @@ export class DfManageServicesTableComponent
       header: 'type',
     },
     {
-      // The list column scores governance only - it never opens a connection,
-      // so it is named for what it measures. A live connection check needs one
-      // request per service; that runs on the service's own page instead
-      // (df-service-health-panel), not once per row here.
-      columnDef: 'access',
-      // Rendered by the shared table's dedicated 'access' branch (df-badge +
+      columnDef: 'health',
+      // Rendered by the shared table's dedicated 'health' branch (df-badge +
       // "why" mat-menu); cell() is unused for this column.
       cell: (row: ServiceRow) => row.health?.level,
-      header: 'services.access.chip.header',
+      header: 'services.health.header',
     },
     {
       columnDef: 'scripting',
@@ -239,8 +251,37 @@ export class DfManageServicesTableComponent
       if (this.healthContext) {
         row.health = this.healthService.derive(row, this.healthContext);
       }
+      this.probeRow(row);
       return row;
     });
+  }
+
+  /**
+   * Ask each row on the current page whether it can actually answer.
+   *
+   * Scoped to the rendered page (the table pages server-side, so
+   * dataSource.data is exactly what is on screen), never the whole catalog:
+   * every probe opens a real connection. Verdicts are cached per service by
+   * DfServiceProbeService, so paging back and forth does not re-ask.
+   */
+  private probeRow(row: ServiceRow): void {
+    this.probeService
+      .probe(row.name, this.serviceGroup)
+      .pipe(untilDestroyed(this))
+      .subscribe(result => {
+        row.probe = result.state;
+        row.health = this.healthService.withProbe(
+          row.health,
+          result.state === 'failed'
+        );
+        // The row object is mutated in place, so nudge the data source to
+        // repaint the one column that changed. Skipped for the synchronous
+        // 'checking' emission, which happens while this page is still being
+        // mapped and is not in dataSource yet.
+        if (this.dataSource.data.includes(row)) {
+          this.dataSource.data = [...this.dataSource.data];
+        }
+      });
   }
 
   private scriptingFor(serviceName: string): string {

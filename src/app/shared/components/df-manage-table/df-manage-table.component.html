@@ -60,7 +60,7 @@
           *ngIf="
             column.columnDef !== 'actions' &&
             column.columnDef !== 'scripting' &&
-            column.columnDef !== 'access'
+            column.columnDef !== 'health'
           ">
           <th
             mat-header-cell
@@ -107,7 +107,7 @@
         </ng-container>
         <ng-container
           [matColumnDef]="column.columnDef"
-          *ngIf="column.columnDef === 'access'">
+          *ngIf="column.columnDef === 'health'">
           <th mat-header-cell *matHeaderCellDef class="df-eyebrow">
             {{ column.header | transloco }}
           </th>
@@ -119,13 +119,11 @@
                   class="df-health-chip"
                   [matMenuTriggerFor]="healthMenu"
                   (click)="$event.stopPropagation()"
-                  [attr.aria-label]="
-                    'services.access.chip.whyAria' | transloco
-                  ">
+                  [attr.aria-label]="'services.health.whyAria' | transloco">
                   <df-badge
                     [variant]="health.level"
                     [label]="
-                      'services.access.chip.level.' + health.level | transloco
+                      'services.health.level.' + health.level | transloco
                     "></df-badge>
                 </button>
                 <mat-menu #healthMenu="matMenu">
@@ -139,11 +137,19 @@
                   </a>
                 </mat-menu>
               </ng-container>
+              <!-- Nothing failing. The chip still has to say which of those
+                   two it means: a service whose type has no connection check
+                   is "not checked", never "Healthy". -->
               <ng-template #healthyChip>
                 <df-badge
-                  variant="success"
+                  [variant]="row.probe === 'ok' ? 'success' : 'neutral'"
                   [label]="
-                    'services.access.chip.level.success' | transloco
+                    (row.probe === 'ok'
+                      ? 'services.health.level.success'
+                      : row.probe === 'unsupported'
+                        ? 'services.health.chip.notChecked'
+                        : 'services.health.chip.checking'
+                    ) | transloco
                   "></df-badge>
               </ng-template>
             </ng-container>

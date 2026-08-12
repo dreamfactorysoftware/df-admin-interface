@@ -95,6 +95,36 @@ export class DfServiceHealthService {
   }
 
   /**
+   * Fold a live connection verdict into a derived health result.
+   *
+   * Kept separate from derive() because the two signals are read from
+   * different places: governance from the role graph (one cached read for the
+   * whole catalog), the connection from the service itself (one request per
+   * service). The connection is the stronger signal - a service that cannot
+   * answer is broken no matter who is allowed to call it - so it leads the
+   * rule list and forces the level to danger.
+   */
+  withProbe(health: ServiceHealth | undefined, failed: boolean): ServiceHealth {
+    const rules = (health?.rules ?? []).filter(
+      rule => rule.id !== 'cannotConnect'
+    );
+    if (!failed) {
+      return {
+        level: rules.some(r => r.level === 'danger')
+          ? 'danger'
+          : rules.length
+            ? 'warning'
+            : 'success',
+        rules,
+      };
+    }
+    return {
+      level: 'danger',
+      rules: [{ id: 'cannotConnect', level: 'danger' }, ...rules],
+    };
+  }
+
+  /**
    * Pure scoring of one service against a fetched context. Only failing rules
    * are returned; an empty list means healthy. `level` rolls up to the worst
    * failing rule.
