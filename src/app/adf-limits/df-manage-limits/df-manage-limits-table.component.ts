@@ -18,6 +18,9 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { LimitTableRowData } from '../types';
 import { Actions } from 'src/app/shared/types/table';
 
+/** Shown when a limit is not scoped to a user, service, or role. */
+const PLACEHOLDER = '-';
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-limits-table',
@@ -116,9 +119,14 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
         limitType: limit.type,
         limitRate: `${limit.rate} / ${limit.period}`,
         limitCounter: `${limit.limitCacheByLimitId[0].attempts} / ${limit.limitCacheByLimitId[0].max}`,
-        user: limit.userId,
-        service: limit.serviceId,
-        role: limit.roleId,
+        // The user/service/role columns show the related record's name. The
+        // relations come back on every fetch (see refreshTable's `related`);
+        // a limit that is not scoped to one has a null relation, not a
+        // missing name, so fall back to '-' rather than printing the raw id.
+        user:
+          limit.userByUserId?.name ?? limit.userByUserId?.email ?? PLACEHOLDER,
+        service: limit.serviceByServiceId?.name ?? PLACEHOLDER,
+        role: limit.roleByRoleId?.name ?? PLACEHOLDER,
         active: limit.isActive,
       };
     });
