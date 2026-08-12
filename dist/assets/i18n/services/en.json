@@ -9,8 +9,6 @@
     },
     "rules": {
       "noAccess": "No role grants access. This service is unreachable by any key.",
-      "noRateLimit": "No rate limit. Requests are uncapped.",
-      "noDocs": "No API docs. Consumers have no reference to call it.",
       "deprecated": "Marked deprecated. Migrate consumers off this service."
     }
   },
