@@ -8,6 +8,12 @@
       "danger": "Action required"
     },
     "panelAria": "Health issues for this service",
+    "probe": {
+      "checking": "Checking the connection…",
+      "ok": "Connected. No issues found.",
+      "failed": "Cannot reach this service.",
+      "unsupported": "No issues found. This API type has no automatic connection check."
+    },
     "rules": {
       "noAccess": "No role grants access. This service is unreachable by any key.",
       "deprecated": "Marked deprecated. Migrate consumers off this service."
@@ -83,6 +89,15 @@
     "autoRedirectTest": "Opening the API testing playground"
   },
   "access": {
+    "chip": {
+      "header": "Access",
+      "whyAria": "Why this service needs attention",
+      "level": {
+        "success": "Granted",
+        "warning": "Needs attention",
+        "danger": "Action required"
+      }
+    },
     "eyebrow": "Access",
     "title": "Who can reach this service",
     "description": "Every role is a row, every HTTP verb a column. Green is full access, amber is filtered, muted is none. Derived live from the role graph.",
