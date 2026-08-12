@@ -7,9 +7,13 @@
       "warning": "Needs attention",
       "danger": "Action required"
     },
+    "panelAria": "Health issues for this service",
     "rules": {
       "noAccess": "No role grants access. This service is unreachable by any key.",
       "deprecated": "Marked deprecated. Migrate consumers off this service."
+    },
+    "fix": {
+      "noAccess": "Create a role"
     }
   },
   "details": "Details",
