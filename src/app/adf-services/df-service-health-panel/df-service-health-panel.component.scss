@@ -1,0 +1,109 @@
+// df-service-health-panel — failing governance rules for one service, rendered
+// where you can act on them. Tokens only (light/dark/phosphor repaint for
+// free); the warning wash matches the Home exposure strip so the two read as
+// the same vocabulary.
+
+.health-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+  padding: var(--df-space-3) var(--df-space-4);
+  border: 1px solid var(--df-warning-border);
+  border-radius: var(--df-radius);
+  background: var(--df-warning-soft);
+  color: var(--df-text);
+
+  fa-icon {
+    color: var(--df-warning);
+  }
+
+  &--danger {
+    border-color: var(--df-danger-border);
+    background: var(--df-danger-soft);
+
+    fa-icon {
+      color: var(--df-danger);
+    }
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-2);
+  }
+
+  &__rules {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  // Reason and fix on one line on desktop; the fix wraps under on narrow
+  // viewports rather than squeezing the sentence.
+  &__rule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--df-space-2) var(--df-space-3);
+  }
+
+  &__reason {
+    flex: 1 1 20rem;
+  }
+
+  // The normalized reason under the headline. The raw driver text lives in
+  // the df-error-detail expander below it, not here.
+  &__detail {
+    display: block;
+    margin-top: var(--df-space-1);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  &__fix {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-1);
+    color: var(--df-accent);
+    font-weight: var(--df-font-weight-medium);
+    text-decoration: none;
+    white-space: nowrap;
+
+    fa-icon {
+      color: currentColor;
+    }
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--df-focus-ring);
+      border-radius: var(--df-radius-sm, var(--df-radius));
+    }
+  }
+
+  // A passing service gets a line, not a box: nothing to act on.
+  &__ok {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-2);
+    margin: 0;
+    color: var(--df-text-muted);
+
+    fa-icon {
+      color: var(--df-success);
+    }
+
+    // Checking / not-checked: neutral, since neither is a pass.
+    &--muted fa-icon {
+      color: var(--df-text-muted);
+    }
+  }
+}

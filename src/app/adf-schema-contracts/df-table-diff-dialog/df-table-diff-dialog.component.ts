@@ -185,7 +185,7 @@ interface ReportViewModel {
         padding: 24px;
       }
       .error {
-        color: #b00020;
+        color: var(--df-danger);
         gap: 8px;
         align-items: center;
       }
@@ -195,19 +195,19 @@ interface ReportViewModel {
         justify-content: space-between;
         align-items: flex-start;
         padding-bottom: 12px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        border-bottom: 1px solid var(--df-border-2);
       }
       .meta div {
         font-size: 13px;
         margin-bottom: 2px;
       }
       .meta code {
-        background: #f5f5f5;
+        background: var(--df-surface-2);
         padding: 1px 4px;
         border-radius: 3px;
       }
       .meta em {
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--df-text-muted);
         font-style: italic;
       }
 
@@ -218,16 +218,16 @@ interface ReportViewModel {
         font-weight: 600;
         font-size: 12px;
         letter-spacing: 0.5px;
-        background: #fff3e0;
-        color: #e65100;
+        background: var(--df-warning-soft);
+        color: var(--df-warning);
 
         &.good {
-          background: #e8f5e9;
-          color: #1b5e20;
+          background: var(--df-success-soft);
+          color: var(--df-success);
         }
         &.bad {
-          background: #ffebee;
-          color: #b71c1c;
+          background: var(--df-danger-soft);
+          color: var(--df-danger);
         }
       }
 
@@ -241,22 +241,22 @@ interface ReportViewModel {
           font-size: 12px;
           padding: 2px 8px;
           border-radius: 4px;
-          background: #f5f5f5;
+          background: var(--df-surface-2);
 
           &.breaking {
-            background: #ffebee;
-            color: #b71c1c;
+            background: var(--df-danger-soft);
+            color: var(--df-danger);
           }
           &.maybe {
-            background: #fff3e0;
-            color: #e65100;
+            background: var(--df-warning-soft);
+            color: var(--df-warning);
           }
           &.additive {
-            background: #fffde7;
-            color: #795548;
+            background: var(--df-accent-soft);
+            color: var(--df-accent);
           }
           &.cosmetic {
-            color: rgba(0, 0, 0, 0.55);
+            color: var(--df-text-muted);
           }
         }
       }
@@ -271,13 +271,13 @@ interface ReportViewModel {
           grid-template-columns: 220px 1fr;
           gap: 12px;
           padding: 8px 0;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+          border-bottom: 1px solid var(--df-border-2);
           align-items: baseline;
 
           .kind {
             font-family: monospace;
             font-size: 12px;
-            color: rgba(0, 0, 0, 0.7);
+            color: var(--df-text-muted);
           }
           .path {
             font-weight: 500;
@@ -287,7 +287,7 @@ interface ReportViewModel {
             margin-top: 4px;
           }
           pre {
-            background: #fafafa;
+            background: var(--df-surface-2);
             padding: 8px;
             border-radius: 4px;
             font-size: 11px;
@@ -296,26 +296,26 @@ interface ReportViewModel {
           }
 
           &.severity-breaking {
-            border-left: 3px solid #b71c1c;
+            border-left: 3px solid var(--df-danger);
             padding-left: 8px;
           }
           &.severity-potentially_breaking {
-            border-left: 3px solid #e65100;
+            border-left: 3px solid var(--df-warning);
             padding-left: 8px;
           }
           &.severity-additive {
-            border-left: 3px solid #fbc02d;
+            border-left: 3px solid var(--df-accent);
             padding-left: 8px;
           }
           &.severity-cosmetic {
-            border-left: 3px solid rgba(0, 0, 0, 0.2);
+            border-left: 3px solid var(--df-border);
             padding-left: 8px;
           }
         }
       }
 
       .candidate-json {
-        background: #fafafa;
+        background: var(--df-surface-2);
         padding: 12px;
         border-radius: 4px;
         font-size: 11px;
@@ -326,7 +326,7 @@ interface ReportViewModel {
       .no-drift {
         padding: 24px 0;
         text-align: center;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
       }
     `,
   ],

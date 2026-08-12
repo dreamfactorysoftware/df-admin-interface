@@ -14,7 +14,7 @@
 
     .subhead {
       margin: 0;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--df-text-muted);
       font-size: 14px;
     }
   }
@@ -104,17 +104,17 @@
           font-size: 16px;
           font-weight: 500;
           white-space: nowrap;
-          color: #6a1b9a;
+          color: var(--df-accent);
         }
       }
       .label {
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
       }
       &.breaking .value {
-        color: #d32f2f;
+        color: var(--df-danger);
       }
     }
   }
@@ -124,7 +124,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
-    color: #b00020;
+    color: var(--df-danger);
     font-size: 13px;
   }
 
@@ -138,7 +138,7 @@
         font-weight: 500;
       }
       small {
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
       }
     }
 
@@ -149,11 +149,11 @@
       height: 18px;
       margin-right: 4px;
       &.muted {
-        color: rgba(0, 0, 0, 0.35);
+        color: var(--df-text-muted);
       }
     }
     .muted {
-      color: rgba(0, 0, 0, 0.4);
+      color: var(--df-text-muted);
     }
 
     .actions-col {
@@ -176,24 +176,24 @@
     text-transform: capitalize;
 
     &-red {
-      background: #ffebee;
-      color: #b71c1c;
+      background: var(--df-danger-soft);
+      color: var(--df-danger);
     }
     &-orange {
-      background: #fff3e0;
-      color: #e65100;
+      background: var(--df-warning-soft);
+      color: var(--df-warning);
     }
     &-yellow {
-      background: #fffde7;
-      color: #795548;
+      background: var(--df-accent-soft);
+      color: var(--df-accent);
     }
     &-green {
-      background: #e8f5e9;
-      color: #1b5e20;
+      background: var(--df-success-soft);
+      color: var(--df-success);
     }
     &-grey {
-      background: #f5f5f5;
-      color: rgba(0, 0, 0, 0.55);
+      background: var(--df-surface-2);
+      color: var(--df-text-muted);
     }
   }
 
@@ -205,7 +205,7 @@
 
   .empty-state {
     text-align: center;
-    color: rgba(0, 0, 0, 0.5);
+    color: var(--df-text-muted);
     padding: 48px 16px;
     font-size: 14px;
   }
