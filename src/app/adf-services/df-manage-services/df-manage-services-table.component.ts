@@ -107,6 +107,15 @@ export class DfManageServicesTableComponent
         this.loadTableData(routeData);
       }
       if (this.system) {
+        // Health does not apply to the DreamFactory Platform APIs: they are
+        // reached with an admin session rather than a role grant (so the
+        // governance rule is meaningless on them) and the route defines no
+        // service group, so there is no connection to probe either. Drop the
+        // column rather than fill it with "Not checked". Reassigning the array
+        // is what invalidates the displayedColumns memo.
+        this.columns = this.columns.filter(
+          column => column.columnDef !== 'health'
+        );
         this.actions = {
           default: this.actions.default,
           additional:
@@ -265,6 +274,9 @@ export class DfManageServicesTableComponent
    * DfServiceProbeService, so paging back and forth does not re-ask.
    */
   private probeRow(row: ServiceRow): void {
+    if (this.system) {
+      return;
+    }
     this.probeService
       .probe(row.name, this.serviceGroup)
       .pipe(untilDestroyed(this))
