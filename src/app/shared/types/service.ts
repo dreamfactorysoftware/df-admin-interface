@@ -106,7 +106,7 @@ export type ServiceHealthLevel = 'success' | 'warning' | 'danger';
  * clears it (omitted when there is no safe destination, never fabricated).
  */
 export interface ServiceHealthRule {
-  id: 'noAccess' | 'noRateLimit' | 'noDocs' | 'deprecated';
+  id: 'noAccess' | 'deprecated';
   level: 'warning' | 'danger';
   fix?: Array<string | number>;
 }

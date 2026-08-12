@@ -1,10 +1,6 @@
 import { Inject, Injectable } from '@angular/core';
-import { catchError, forkJoin, map, Observable, of, shareReplay } from 'rxjs';
-import {
-  LIMIT_SERVICE_TOKEN,
-  ROLE_SERVICE_TOKEN,
-  SERVICES_SERVICE_TOKEN,
-} from 'src/app/shared/constants/tokens';
+import { catchError, map, Observable, of, shareReplay } from 'rxjs';
+import { ROLE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ROUTES } from 'src/app/shared/types/routes';
@@ -16,76 +12,56 @@ import {
 
 /**
  * Everything needed to score every service, fetched once and diffed locally.
- * Sets hold explicit per-service grants/limits/docs; the `hasGlobal*` flags
- * cover the null-serviceId case (a role or limit that applies to all services).
+ * The set holds explicit per-service grants; `hasGlobalGrant` covers the
+ * null-serviceId case (a role grant that applies to all services).
  */
 export interface ServiceHealthContext {
   grantedServiceIds: Set<number>;
   hasGlobalGrant: boolean;
-  limitedServiceIds: Set<number>;
-  hasGlobalLimit: boolean;
-  documentedServiceIds: Set<number>;
 }
 
 /**
  * Derives the API Health chip client-side (Meridian spec 3.2/3.3). No backend
- * change: three list reads (roles + their service-access grants, rate limits,
- * services with their doc relation) are folded into a context, then each
- * service is scored against it. Every read degrades to empty on failure so a
- * missing signal omits its rule rather than fabricating a pass/fail.
+ * change: one list read (roles + their service-access grants) is folded into a
+ * context, then each service is scored against it. The read degrades to empty
+ * on failure so a missing signal omits its rule rather than fabricating a
+ * pass/fail.
+ *
+ * Health covers only signals that actually make a service unusable or unsafe.
+ * Two earlier rules were dropped because neither tracked service health:
+ *  - noDocs read `service_doc_by_service_id`, which is populated only when an
+ *    admin uploads a *custom* OpenAPI override. Every service gets a spec
+ *    generated from its type at runtime, so that relation is empty on a
+ *    healthy install and the rule flagged the entire catalog.
+ *  - noRateLimit flagged every service on any install without limits, which is
+ *    the norm (limits are a licensed feature), so it was noise, not a signal.
  *
  * The context is cached (shareReplay) for the lifetime of the app; call
- * reset() after a grant/limit/doc is created so the next chip re-derives.
+ * reset() after a grant is created so the next chip re-derives.
  */
 @Injectable({ providedIn: 'root' })
 export class DfServiceHealthService {
   private context$?: Observable<ServiceHealthContext>;
 
   constructor(
-    @Inject(ROLE_SERVICE_TOKEN) private roleService: DfBaseCrudService,
-    @Inject(LIMIT_SERVICE_TOKEN) private limitService: DfBaseCrudService,
-    @Inject(SERVICES_SERVICE_TOKEN) private serviceService: DfBaseCrudService
+    @Inject(ROLE_SERVICE_TOKEN) private roleService: DfBaseCrudService
   ) {}
 
   getContext(): Observable<ServiceHealthContext> {
     if (!this.context$) {
-      this.context$ = forkJoin({
-        roles: this.roleService
-          .getAll<GenericListResponse<any>>({
-            related: 'role_service_access_by_role_id',
-            fields: 'id,name,is_active',
-            limit: 1000,
-            showSpinner: false,
-            errorHandling: 'toast-off',
-          })
-          .pipe(catchError(() => of({ resource: [] as any[] }))),
-        limits: this.limitService
-          .getAll<GenericListResponse<any>>({
-            fields: 'id,service_id,is_active',
-            limit: 1000,
-            showSpinner: false,
-            errorHandling: 'toast-off',
-          })
-          .pipe(catchError(() => of({ resource: [] as any[] }))),
-        docs: this.serviceService
-          .getAll<GenericListResponse<any>>({
-            related: 'service_doc_by_service_id',
-            fields: 'id',
-            limit: 1000,
-            showSpinner: false,
-            errorHandling: 'toast-off',
-          })
-          .pipe(catchError(() => of({ resource: [] as any[] }))),
-      }).pipe(
-        map(({ roles, limits, docs }) =>
-          this.buildContext(
-            roles.resource ?? [],
-            limits.resource ?? [],
-            docs.resource ?? []
-          )
-        ),
-        shareReplay(1)
-      );
+      this.context$ = this.roleService
+        .getAll<GenericListResponse<any>>({
+          related: 'role_service_access_by_role_id',
+          fields: 'id,name,is_active',
+          limit: 1000,
+          showSpinner: false,
+          errorHandling: 'toast-off',
+        })
+        .pipe(
+          catchError(() => of({ resource: [] as any[] })),
+          map(roles => this.buildContext(roles.resource ?? [])),
+          shareReplay(1)
+        );
     }
     return this.context$;
   }
@@ -95,11 +71,7 @@ export class DfServiceHealthService {
     this.context$ = undefined;
   }
 
-  private buildContext(
-    roles: any[],
-    limits: any[],
-    docs: any[]
-  ): ServiceHealthContext {
+  private buildContext(roles: any[]): ServiceHealthContext {
     const grantedServiceIds = new Set<number>();
     let hasGlobalGrant = false;
     for (const role of roles) {
@@ -119,37 +91,7 @@ export class DfServiceHealthService {
       }
     }
 
-    const limitedServiceIds = new Set<number>();
-    let hasGlobalLimit = false;
-    for (const limit of limits) {
-      if (limit?.isActive === false) {
-        continue;
-      }
-      if (limit?.serviceId == null) {
-        hasGlobalLimit = true;
-      } else {
-        limitedServiceIds.add(limit.serviceId);
-      }
-    }
-
-    const documentedServiceIds = new Set<number>();
-    for (const service of docs) {
-      const doc = service?.serviceDocByServiceId;
-      const present = Array.isArray(doc)
-        ? doc.length > 0
-        : !!(doc && (doc.content || doc.id));
-      if (present) {
-        documentedServiceIds.add(service.id);
-      }
-    }
-
-    return {
-      grantedServiceIds,
-      hasGlobalGrant,
-      limitedServiceIds,
-      hasGlobalLimit,
-      documentedServiceIds,
-    };
+    return { grantedServiceIds, hasGlobalGrant };
   }
 
   /**
@@ -170,22 +112,6 @@ export class DfServiceHealthService {
           ROUTES.ROLE_BASED_ACCESS,
           ROUTES.CREATE,
         ],
-      });
-    }
-
-    if (!ctx.hasGlobalLimit && !ctx.limitedServiceIds.has(row.id)) {
-      rules.push({
-        id: 'noRateLimit',
-        level: 'warning',
-        fix: ['/', ROUTES.API_SECURITY, ROUTES.RATE_LIMITING, ROUTES.CREATE],
-      });
-    }
-
-    if (!ctx.documentedServiceIds.has(row.id)) {
-      rules.push({
-        id: 'noDocs',
-        level: 'warning',
-        fix: ['/', ROUTES.API_CONNECTIONS, ROUTES.API_DOCS, row.name],
       });
     }
 
