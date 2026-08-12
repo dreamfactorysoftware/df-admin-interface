@@ -8,7 +8,6 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { EMAIL_TEMPLATES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { TranslocoService } from '@ngneat/transloco';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { MatDialog } from '@angular/material/dialog';
 import {
   EmailTemplate,
@@ -28,6 +27,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfEmailTemplatesTableComponent extends DfManageTableComponent<EmailTemplateRow> {
+  override emptyStateMessage = 'emptyState.emailTemplates.message';
+  override emptyStateActionLabel = 'emptyState.emailTemplates.action';
   constructor(
     @Inject(EMAIL_TEMPLATES_SERVICE_TOKEN)
     private emailTemplateService: DfBaseCrudService,
@@ -75,15 +76,6 @@ export class DfEmailTemplatesTableComponent extends DfManageTableComponent<Email
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.emailTemplateService
-      .getAll<GenericListResponse<EmailTemplate>>({
-        limit,
-        offset,
-        filter,
-      })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.emailTemplateService, { limit, offset, filter });
   }
 }

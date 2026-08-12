@@ -21,6 +21,9 @@ const navIcons = [
   'api-connections',
   'api-security',
   'system-settings',
+  'api-builder',
+  'agents',
+  'alerts',
 ];
 
 export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
@@ -40,6 +43,10 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
           ? { labelPath: route.data['navLabelPath'] }
           : {}),
       };
+      // FB4: only top-level pillars carry an icon. A route named like a pillar
+      // (e.g. api-builder under api-types) must render icon-less when it sits
+      // nested, matching every other nested sibling. root === '' == top level.
+      const icon = root === '' ? findIconForRoute(route as string) : '';
       if (route.children) {
         const subRoutes = transformRoutes(
           route.children,
@@ -50,14 +57,14 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
           ...navMetadata,
           subRoutes: subRoutes.length ? subRoutes : undefined,
           route: route.path as ROUTES,
-          icon: findIconForRoute(route as string),
+          icon,
         };
       }
       return {
         path: `${root}/${route.path}`,
         ...navMetadata,
         route: route.path as ROUTES,
-        icon: findIconForRoute(route as string),
+        icon,
       };
     });
 }

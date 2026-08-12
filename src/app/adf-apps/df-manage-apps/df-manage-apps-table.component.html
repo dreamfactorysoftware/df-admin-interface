@@ -1,0 +1,291 @@
+<!--
+  Virtual-keys table. Extends the shared manage-table markup, but the key list
+  earns three live columns: tokens + spend (real, from the AI usage aggregate)
+  and a rate-limit meter (real consumed-vs-cap from the limit cache). Every
+  metric is nullable and renders an honest empty when no real source exists.
+-->
+<div class="top-action-bar">
+  <button
+    *ngIf="allowCreate"
+    mat-mini-fab
+    class="save-btn"
+    data-testid="manage-table-create"
+    [attr.aria-label]="'newEntry' | transloco"
+    (click)="createRow()"
+    type="button">
+    <fa-icon [icon]="faPlus" size="xl"></fa-icon>
+  </button>
+  <ng-content select="[topActions]"></ng-content>
+  <div class="spacer"></div>
+  <mat-form-field
+    *ngIf="allowFilter"
+    class="search-input"
+    appearance="outline"
+    subscriptSizing="dynamic">
+    <mat-label>{{ 'search' | transloco }}</mat-label>
+    <input matInput [formControl]="currentFilter" />
+  </mat-form-field>
+</div>
+<ng-container
+  *ngIf="{
+    currentPageSize: currentPageSize$ | async,
+  } as data">
+  <mat-progress-bar
+    *ngIf="tableState === 'loading'"
+    class="table-loading-bar"
+    mode="indeterminate"></mat-progress-bar>
+  <div class="table-error-panel" *ngIf="tableState === 'error' && tableError">
+    <div class="table-error-headline">
+      <fa-icon [icon]="faTriangleExclamation" size="lg"></fa-icon>
+      <span>{{ tableError.message | transloco }}</span>
+      <button mat-stroked-button type="button" (click)="retryLastFetch()">
+        {{ 'retry' | transloco }}
+      </button>
+    </div>
+    <df-error-detail [error]="tableError"></df-error-detail>
+  </div>
+  <div class="table-container" [class.table-stale]="tableState === 'loading'">
+    <table
+      mat-table
+      [dataSource]="dataSource"
+      matSort
+      (matSortChange)="announceSortChange($event)">
+      <ng-container *ngFor="let column of columns">
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="
+            column.columnDef !== 'actions' && column.columnDef !== 'meter'
+          ">
+          <th
+            mat-header-cell
+            *matHeaderCellDef
+            mat-sort-header
+            class="df-eyebrow"
+            [class.df-numeric]="
+              isNumericColumn(column.columnDef) ||
+              column.columnDef === 'tokens' ||
+              column.columnDef === 'spend'
+            "
+            [attr.sortActionDescription]="
+              sortDescription(column.header!) | async
+            ">
+            {{ column.header | transloco }}
+          </th>
+          <td
+            mat-cell
+            *matCellDef="let row"
+            [class.df-numeric]="
+              isNumericColumn(column.columnDef) ||
+              column.columnDef === 'tokens' ||
+              column.columnDef === 'spend'
+            ">
+            <fa-icon
+              *ngIf="column.columnDef === 'active'"
+              [icon]="activeIcon(isCellActive(column?.cell(row)))"
+              size="lg"
+              [class]="
+                isCellActive(column?.cell(row)) ? 'active' : 'inactive'
+              "></fa-icon>
+            <ng-container *ngIf="column.columnDef === 'tokens'">
+              <span *ngIf="row.tokens !== null; else noMetric">{{
+                row.tokens | number
+              }}</span>
+            </ng-container>
+            <ng-container *ngIf="column.columnDef === 'spend'">
+              <span *ngIf="row.spendUsd !== null; else noMetric">{{
+                row.spendUsd | currency: 'USD' : 'symbol' : '1.2-2'
+              }}</span>
+            </ng-container>
+            <ng-container *ngIf="column.columnDef === 'role'">
+              <a
+                *ngIf="row.roleId !== null && row.role; else plainRole"
+                class="df-role-link"
+                [routerLink]="[
+                  '/api-connections/role-based-access',
+                  row.roleId,
+                ]"
+                [attr.aria-label]="
+                  'apps.virtualKey.roleLink' | transloco: { role: row.role }
+                "
+                (click)="$event.stopPropagation()">
+                {{ row.role }}
+              </a>
+              <ng-template #plainRole>{{ row.role }}</ng-template>
+            </ng-container>
+            <ng-container
+              *ngIf="
+                column.columnDef !== 'active' &&
+                column.columnDef !== 'tokens' &&
+                column.columnDef !== 'spend' &&
+                column.columnDef !== 'role'
+              ">
+              {{ column?.cell(row) }}
+            </ng-container>
+          </td>
+        </ng-container>
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="column.columnDef === 'meter'">
+          <th mat-header-cell *matHeaderCellDef class="df-eyebrow">
+            {{ column.header | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let row" class="df-meter-cell">
+            <ng-container *ngIf="row.meter; else noCap">
+              <div
+                class="df-meter"
+                [class]="'df-meter--' + row.meter.variant"
+                role="meter"
+                [attr.aria-valuenow]="row.meter.consumed"
+                [attr.aria-valuemax]="row.meter.cap"
+                [attr.aria-label]="
+                  'apps.virtualKey.meterAria'
+                    | transloco
+                      : {
+                          consumed: row.meter.consumed,
+                          cap: row.meter.cap,
+                          period: row.meter.period,
+                        }
+                ">
+                <div class="df-meter-track">
+                  <div
+                    class="df-meter-fill"
+                    [style.width.%]="row.meter.ratio * 100"></div>
+                </div>
+                <span class="df-meter-label df-numeric">{{
+                  row.meter.label
+                }}</span>
+              </div>
+            </ng-container>
+            <ng-template #noCap>
+              <span class="df-metric-empty">{{
+                'apps.virtualKey.noCap' | transloco
+              }}</span>
+            </ng-template>
+          </td>
+        </ng-container>
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="column.columnDef === 'actions'"
+          stickyEnd>
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td class="actions df-row-actions" mat-cell *matCellDef="let row">
+            <ng-container
+              *ngIf="actions.additional && actions.additional.length > 0">
+              <ng-container
+                *ngIf="actions.additional.length === 1; else multiple">
+                <button
+                  class="action-btn"
+                  *ngIf="actions.additional[0].icon; else regular"
+                  mat-icon-button
+                  [attr.aria-label]="
+                    actions.additional[0].ariaLabel.key
+                      | transloco
+                        : { param: actions.additional[0].ariaLabel.param }
+                  "
+                  (click)="actions.additional[0].function(row)"
+                  (click)="$event.stopPropagation()"
+                  type="button">
+                  <fa-icon
+                    [icon]="actions.additional[0].icon"
+                    size="xs"></fa-icon>
+                </button>
+                <ng-template #regular>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    [attr.aria-label]="
+                      actions.additional[0].ariaLabel.key
+                        | transloco
+                          : { param: actions.additional[0].ariaLabel.param }
+                    "
+                    (click)="actions.additional[0].function(row)"
+                    (click)="$event.stopPropagation()"
+                    type="button">
+                    {{ actions.additional[0].label | transloco }}
+                  </button>
+                </ng-template>
+              </ng-container>
+              <ng-template #multiple>
+                <button
+                  mat-icon-button
+                  [matMenuTriggerFor]="actionsMenu"
+                  (click)="$event.stopPropagation()"
+                  aria-label="Actions"
+                  type="button">
+                  <fa-icon [icon]="faEllipsisV" size="xs"></fa-icon>
+                </button>
+                <mat-menu #actionsMenu="matMenu">
+                  <button
+                    type="button"
+                    *ngFor="let action of actions.additional"
+                    mat-menu-item
+                    [attr.aria-label]="
+                      action.ariaLabel.key
+                        | transloco: { param: action.ariaLabel.param }
+                    "
+                    (click)="action.function(row)"
+                    [disabled]="isActionDisabled(action, row)">
+                    {{ action.label | transloco }}
+                  </button>
+                </mat-menu>
+              </ng-template>
+            </ng-container>
+          </td>
+        </ng-container>
+      </ng-container>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr
+        [attr.tabindex]="isClickable(row) ? 0 : -1"
+        mat-row
+        *matRowDef="let row; columns: displayedColumns"
+        [class.clickable]="isClickable(row)"
+        (click)="callDefaultAction(row)"
+        (keydown)="handleKeyDown($event, row)"></tr>
+
+      <tr class="mat-row no-data-row" *matNoDataRow>
+        <td class="mat-cell" [attr.colspan]="columns.length">
+          <ng-container
+            *ngIf="tableState !== 'loading' && tableState !== 'error'">
+            <ng-container *ngIf="currentFilter.value; else noFilterActive">
+              {{ 'noFilterResults' | transloco }}
+              <button
+                mat-button
+                color="primary"
+                type="button"
+                (click)="clearFilter()">
+                {{ 'clearFilter' | transloco }}
+              </button>
+            </ng-container>
+            <ng-template #noFilterActive>
+              <df-empty-state
+                [title]="'apps.virtualKey.empty.title' | transloco"
+                [description]="'apps.virtualKey.empty.description' | transloco"
+                [actionLabel]="
+                  allowCreate
+                    ? ('apps.virtualKey.empty.action' | transloco)
+                    : undefined
+                "
+                (action)="createRow()"></df-empty-state>
+            </ng-template>
+          </ng-container>
+        </td>
+      </tr>
+    </table>
+    <div class="bottom-action-bar">
+      <mat-paginator
+        [pageSize]="data.currentPageSize"
+        [pageSizeOptions]="pageSizes"
+        showFirstLastButtons
+        aria-label="'selectPage' | transloco"
+        [length]="tableLength"
+        (page)="changePage($event)">
+      </mat-paginator>
+    </div>
+  </div>
+</ng-container>
+
+<ng-template #noMetric>
+  <span class="df-metric-empty">{{
+    'apps.virtualKey.noUsage' | transloco
+  }}</span>
+</ng-template>

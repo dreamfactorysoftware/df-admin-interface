@@ -25,6 +25,8 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   imports: DfManageTableModules,
 })
 export class DfManageSchedulerTableComponent extends DfManageTableComponent<SchedulerTaskData> {
+  override emptyStateMessage = 'emptyState.scheduler.message';
+  override emptyStateActionLabel = 'emptyState.scheduler.action';
   userServices: Service[];
 
   constructor(
@@ -116,11 +118,13 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.service
-      .getAll({ limit: limit, offset: offset, filter: filter })
-      .subscribe((data: any) => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    // related matches the scheduler resolver: the service column reads
+    // serviceByServiceId and the log action reads taskLogByTaskId.
+    this.fetchTable(this.service, {
+      limit,
+      offset,
+      filter,
+      related: 'task_log_by_task_id,service_by_service_id',
+    });
   }
 }

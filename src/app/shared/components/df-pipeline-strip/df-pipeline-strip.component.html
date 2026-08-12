@@ -1,0 +1,68 @@
+<ng-container *transloco="let t; read: 'pipelineStrip'">
+  <section class="pipeline-strip" data-testid="df-pipeline-strip">
+    <!-- Loading: skeleton cards matching the node stack -->
+    <div *ngIf="loading" class="pipeline-strip__loading">
+      <df-skeleton variant="card" [count]="5"></df-skeleton>
+    </div>
+
+    <!-- Error: the chain could not be derived -->
+    <df-empty-state
+      *ngIf="!loading && errored"
+      icon="error_outline"
+      [title]="t('error.title')"
+      [description]="t('error.hint')">
+    </df-empty-state>
+
+    <!-- The chain: one hairline card per governance step -->
+    <ol
+      *ngIf="!loading && !errored && nodes.length > 0"
+      class="pipeline-strip__list">
+      <li
+        *ngFor="let node of nodes; trackBy: trackByKind"
+        class="pipeline-strip__node"
+        [class.pipeline-strip__node--open]="!node.present">
+        <div class="pipeline-strip__rail" aria-hidden="true">
+          <span
+            class="pipeline-strip__marker"
+            [class.pipeline-strip__marker--active]="node.status === 'active'"
+            [class.pipeline-strip__marker--filtered]="
+              node.status === 'filtered'
+            "
+            [class.pipeline-strip__marker--handler]="node.status === 'handler'">
+            <mat-icon>{{ node.icon }}</mat-icon>
+          </span>
+        </div>
+
+        <div class="pipeline-strip__card">
+          <div class="pipeline-strip__head">
+            <span class="pipeline-strip__name">{{
+              t('nodes.' + node.kind + '.title')
+            }}</span>
+            <df-badge
+              [variant]="badgeVariant(node)"
+              [label]="t('status.' + node.status)">
+            </df-badge>
+          </div>
+
+          <p class="pipeline-strip__detail">
+            {{ t(node.detailKey, node.detailParams) }}
+          </p>
+
+          <div class="pipeline-strip__actions">
+            <a class="pipeline-strip__link" [routerLink]="node.link">
+              {{ t('view') }}
+              <mat-icon>chevron_right</mat-icon>
+            </a>
+            <a
+              *ngIf="node.addLink"
+              class="pipeline-strip__link pipeline-strip__link--add"
+              [routerLink]="node.addLink">
+              <mat-icon>add</mat-icon>
+              {{ t('addPolicy') }}
+            </a>
+          </div>
+        </div>
+      </li>
+    </ol>
+  </section>
+</ng-container>

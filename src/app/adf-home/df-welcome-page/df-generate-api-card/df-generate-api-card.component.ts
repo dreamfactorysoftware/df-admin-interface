@@ -17,6 +17,8 @@ export class DfGenerateApiCardComponent {
   @Input() headerText: string;
   @Input() text: string;
   @Input() route: string;
-  @Input() cardFinalBackgroundColor: string;
-  @Input() cardFinalHeaderColor: string;
+  // Semantic tint category (build | data | security | system | admin | ai |
+  // docs). Drives the card wash + icon/heading color off the --df-tint-*
+  // tokens so every theme repaints for free. No color literals here.
+  @Input() category: string;
 }

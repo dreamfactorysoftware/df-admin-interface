@@ -1,0 +1,131 @@
+// df-filter-builder — visual/raw toggle compiling to ?filter=. Tokens only, no
+// color/space/type literals, so it survives light, dark, and phosphor.
+
+.filter-builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+  font-size: var(--df-font-size-sm);
+  color: var(--df-text);
+  // Own the query context so rows stack when the docs column gets tight.
+  container-type: inline-size;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--df-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__label {
+    margin: 0;
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-2);
+  }
+
+  &__raw {
+    width: 100%;
+
+    textarea {
+      font-family: var(--df-font-mono);
+      font-size: var(--df-font-size-xs);
+    }
+  }
+
+  // Compiled preview: the literal string the host drops into ?filter=.
+  &__preview {
+    display: flex;
+    align-items: baseline;
+    gap: var(--df-space-1);
+    padding: var(--df-space-2) var(--df-space-3);
+    background: var(--df-code-bg);
+    border-radius: var(--df-radius-sm);
+    overflow-x: auto;
+  }
+
+  &__preview-key {
+    flex: 0 0 auto;
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+  }
+
+  &__preview-value {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-code-text);
+    white-space: nowrap;
+  }
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--df-space-2);
+  // Wrap INSIDE the builder: field/operator/value must never spill past the
+  // card's right edge. When the host column is tight they stack, but they stay
+  // on the same row while there is room, so the three read as one control.
+  flex-wrap: wrap;
+
+  &__join,
+  &__spacer {
+    flex: 0 0 auto;
+    width: 9rem;
+    display: flex;
+    align-items: center;
+    min-height: var(--df-field-height);
+  }
+
+  &__conj {
+    width: 100%;
+  }
+
+  // Shrinkable slots (min-width:0) so a narrow card compresses them instead of
+  // pushing the value input outside the box. flex-basis keeps sane proportions.
+  &__field {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  &__op {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  &__value {
+    flex: 1 1 10rem;
+    min-width: 0;
+
+    &--empty {
+      align-self: stretch;
+    }
+  }
+
+  &__remove {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+}
+
+// Stack the row on narrow hosts (the docs right column is tight).
+@container (max-width: 34rem) {
+  .filter-row {
+    flex-wrap: wrap;
+
+    &__join,
+    &__spacer {
+      width: 100%;
+    }
+  }
+}

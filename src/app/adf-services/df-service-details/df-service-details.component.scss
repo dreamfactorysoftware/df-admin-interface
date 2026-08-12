@@ -1,27 +1,105 @@
-@use '@angular/material' as mat;
-@use 'src/theme' as theme;
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
+// ============================================================
+// Service edit form, stream 8 "departure" treatment.
+// Everything rides the global --df-* tokens (src/styles.scss),
+// so light and dark both inherit the finish. Flat bordered
+// surfaces, hairline separators, the shared corner scale, and
+// the tight departure type hierarchy. No palette literals.
+// ============================================================
 
 .grid-wrapper {
   display: flex;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 16px;
 }
 
+// ---- Meridian Phase 5: Pipeline section (request chain under the overview) ---
+// ---- Meridian Phase 3: Access section (scope matrix under the overview) ----
+.service-pipeline,
+.service-access {
+  margin-top: 3.2rem;
+  padding-top: 3.2rem;
+  border-top: 1px solid var(--df-border-2);
+
+  &__hint {
+    margin: 0 0 1.6rem;
+    max-width: 68ch;
+    color: var(--df-text-muted);
+    font-size: 1.3rem;
+    line-height: 1.5;
+  }
+}
+
+// ---- Departure type scale for in-form section headers ----
+.section-header h3,
+.basic-fields-section .section-title,
+.component-selection h3,
+.security-config-container .access-level-section h3 {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--df-text);
+}
+
+// ---- Stepper header: cleaned to a quiet tab bar ----
+:host ::ng-deep .mat-horizontal-stepper-header-container {
+  border-bottom: 1px solid var(--df-border-2);
+  margin-bottom: 8px;
+}
+:host ::ng-deep .mat-horizontal-stepper-header {
+  height: 48px;
+
+  .mat-step-label {
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--df-text-muted);
+  }
+  .mat-step-label-selected {
+    color: var(--df-text);
+  }
+  .mat-step-icon {
+    height: 22px;
+    width: 22px;
+    font-size: 1.1rem;
+    background-color: var(--df-surface-2);
+    color: var(--df-text-muted);
+    border: 1px solid var(--df-border);
+
+    .mat-icon {
+      font-size: 1.2rem;
+      height: auto;
+      width: auto;
+      line-height: 1;
+    }
+  }
+  .mat-step-icon-selected,
+  .mat-step-icon-state-edit {
+    background-color: var(--df-accent) !important;
+    color: var(--df-accent-contrast);
+    border-color: transparent;
+  }
+}
+:host ::ng-deep .mat-stepper-horizontal-line {
+  border-top-color: var(--df-border-2);
+}
+
+// ---- Service-type picker cards ----
 label.radio-card {
   cursor: pointer;
 
   .card-content-wrapper {
-    background: #fff;
-    border-radius: 5px;
+    background: var(--df-surface);
+    border-radius: var(--df-radius-sm);
     max-width: 200px;
     min-height: 200px;
     padding: 12px;
     display: grid;
-    box-shadow: 0 2px 4px 0 rgba(219, 215, 215, 0.04);
-    border: 1px solid #e3e3e3;
+    box-shadow: none;
+    border: 1px solid var(--df-border);
     background-size: contain;
     background-repeat: no-repeat;
+    transition: border-color 0.15s ease;
 
     &.not-included {
       opacity: 0.5;
@@ -34,8 +112,8 @@ label.radio-card {
     width: 20px;
     height: 20px;
     display: inline-block;
-    border: solid 2px #e3e3e3;
-    background-color: #e3e3e3;
+    border: solid 2px var(--df-border);
+    background-color: var(--df-surface-2);
     border-radius: 50%;
     position: relative;
 
@@ -58,13 +136,14 @@ label.radio-card {
     -moz-appearance: none;
     &:checked {
       + .card-content-wrapper {
-        box-shadow:
-          0 2px 4px 0 rgba(219, 215, 215, 0.5),
-          0 0 0 2px;
+        border-color: var(--df-accent);
+        box-shadow: 0 0 0 1px var(--df-accent);
         opacity: 1;
 
         .check-icon {
           transform: scale(1.2);
+          background-color: var(--df-accent);
+          border-color: var(--df-accent);
           &:before {
             transform: scale(1);
             opacity: 1;
@@ -76,8 +155,8 @@ label.radio-card {
     &:focus {
       + .card-content-wrapper {
         .check-icon {
-          box-shadow: 0 0 0 4px rgba(48, 86, 213, 0.2);
-          border-color: #3056d5;
+          box-shadow: 0 0 0 4px var(--df-accent-soft);
+          border-color: var(--df-accent);
         }
       }
     }
@@ -92,7 +171,7 @@ label.radio-card {
       height: 110px;
     }
     h4 {
-      color: #000;
+      color: var(--df-text);
     }
   }
 }
@@ -119,7 +198,7 @@ mat-icon {
   position: relative;
   top: -95px;
   right: -55px;
-  color: red;
+  color: var(--df-danger);
 }
 
 .action-bar {
@@ -133,8 +212,8 @@ mat-icon {
 
   .secondary-btn {
     background-color: transparent !important;
-    border: 1px solid mat.get-color-from-palette($df-purple-palette, 400) !important;
-    color: mat.get-color-from-palette($df-purple-palette, 400) !important;
+    border: 1px solid var(--df-accent) !important;
+    color: var(--df-accent) !important;
   }
 }
 
@@ -145,7 +224,10 @@ mat-icon {
   color: unset !important;
 }
 
-.dark-theme {
+// Dark theme (keyed off body class): radio cards deliberately stay
+// black-with-white-border over the service-type artwork, so these values
+// are intentional, not theme surfaces.
+:host-context(.dark-theme) {
   label.radio-card {
     .card-content-wrapper {
       background: #000;
@@ -169,7 +251,7 @@ mat-icon {
         background: inherit !important;
 
         span {
-          color: #2d2d2d !important;
+          color: var(--df-text) !important;
         }
       }
     }
@@ -177,22 +259,22 @@ mat-icon {
 }
 
 .security-config-container {
-  padding: 32px 0;
+  padding: 24px 0;
 
   .top-hint {
-    margin-bottom: 32px;
-    padding: 16px;
-    background: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.1);
-    border-radius: 8px;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: var(--df-accent-soft);
+    border-radius: var(--df-radius-sm);
 
     p {
       margin: 0;
-      font-size: 14px;
-      color: rgba(0, 0, 0, 0.87);
+      font-size: 1.35rem;
+      color: var(--df-text);
     }
 
     .role-link {
-      color: mat.get-color-from-palette($df-purple-palette, 400);
+      color: var(--df-accent);
       text-decoration: none;
       font-weight: 500;
       cursor: pointer;
@@ -206,8 +288,8 @@ mat-icon {
   .security-cards-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
-    margin-bottom: 40px;
+    gap: 16px;
+    margin-bottom: 32px;
 
     @media (max-width: 768px) {
       grid-template-columns: 1fr;
@@ -217,62 +299,60 @@ mat-icon {
   .security-option-card {
     position: relative;
     cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    border-radius: 12px;
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    transition: border-color 0.15s ease-in-out;
+    border-radius: var(--df-radius);
+    background: var(--df-surface);
+    border: 1px solid var(--df-border-2);
+    box-shadow: none;
     overflow: hidden;
     height: 100%;
-    min-height: 180px;
+    min-height: 160px;
     display: flex;
     flex-direction: column;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+      border-color: var(--df-accent);
     }
 
     mat-card-content {
-      padding: 32px;
+      padding: 24px;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      gap: 16px;
+      gap: 12px;
       height: 100%;
       justify-content: center;
     }
 
     h4 {
       margin: 0;
-      font-size: 24px;
-      font-weight: 500;
-      color: rgba(0, 0, 0, 0.87);
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--df-text);
     }
 
     p {
       margin: 0;
-      color: rgba(0, 0, 0, 0.6);
-      font-size: 16px;
-      line-height: 1.6;
+      color: var(--df-text-muted);
+      font-size: 1.35rem;
+      line-height: 1.5;
     }
 
     &.selected {
-      border-color: mat.get-color-from-palette($df-purple-palette, 400);
-      background-color: rgba(
-        mat.get-color-from-palette($df-purple-palette, 50),
-        0.1
-      );
+      border-color: var(--df-accent);
+      background-color: var(--df-accent-soft);
     }
   }
 
   .component-selection {
-    margin-top: 40px;
+    margin-top: 32px;
 
     .search-field {
       width: 100%;
       max-width: 400px;
-      margin-bottom: 32px;
+      margin-bottom: 24px;
 
       .mat-mdc-form-field-wrapper {
         padding-bottom: 0;
@@ -282,22 +362,23 @@ mat-icon {
     .components-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
+      gap: 12px;
+      margin-bottom: 24px;
     }
 
     .component-card {
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      border-radius: 8px;
-      transition: all 0.2s ease-in-out;
+      border: 1px solid var(--df-border-2);
+      border-radius: var(--df-radius-sm);
+      transition: border-color 0.15s ease-in-out;
       cursor: pointer;
-      background: white;
+      box-shadow: none;
+      background: var(--df-surface);
 
       mat-card-content {
-        padding: 24px;
+        padding: 16px;
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 12px;
       }
 
       .checkbox-wrapper {
@@ -305,40 +386,33 @@ mat-icon {
       }
 
       &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-color: var(--df-accent);
       }
 
       &.selected {
-        border-color: mat.get-color-from-palette($df-purple-palette, 400);
-        background-color: rgba(
-          mat.get-color-from-palette($df-purple-palette, 50),
-          0.05
-        );
+        border-color: var(--df-accent);
+        background-color: var(--df-accent-soft);
       }
     }
 
     .access-level-section {
-      margin-top: 40px;
-      padding: 32px;
-      background: white;
-      border-radius: 12px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
+      margin-top: 32px;
+      padding: 24px;
+      background: var(--df-surface);
+      border-radius: var(--df-radius);
+      border: 1px solid var(--df-border-2);
 
       .hint-widget {
-        margin: 0 0 32px 0;
-        padding: 16px;
-        background: rgba(
-          mat.get-color-from-palette($df-purple-palette, 50),
-          0.1
-        );
-        border-radius: 8px;
+        margin: 0 0 24px 0;
+        padding: 12px 16px;
+        background: var(--df-accent-soft);
+        border-radius: var(--df-radius-sm);
         display: flex;
         align-items: center;
         gap: 12px;
 
         mat-icon {
-          color: mat.get-color-from-palette($df-purple-palette, 400);
+          color: var(--df-accent);
           font-size: 20px;
           width: 20px;
           height: 20px;
@@ -346,12 +420,12 @@ mat-icon {
 
         p {
           margin: 0;
-          font-size: 14px;
-          color: rgba(0, 0, 0, 0.87);
+          font-size: 1.35rem;
+          color: var(--df-text);
         }
 
         .role-link {
-          color: mat.get-color-from-palette($df-purple-palette, 400);
+          color: var(--df-accent);
           text-decoration: none;
           font-weight: 500;
           cursor: pointer;
@@ -362,18 +436,11 @@ mat-icon {
         }
       }
 
-      h3 {
-        margin: 0 0 24px 0;
-        font-size: 24px;
-        font-weight: 500;
-        color: rgba(0, 0, 0, 0.87);
-      }
-
       .access-level-controls {
         mat-button-toggle-group {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
+          gap: 12px;
           border: none;
           width: 100%;
 
@@ -383,48 +450,45 @@ mat-icon {
         }
 
         .mat-button-toggle {
-          background: white;
-          border: 1px solid rgba(0, 0, 0, 0.12);
-          border-radius: 8px;
+          background: var(--df-surface);
+          border: 1px solid var(--df-border-2);
+          border-radius: var(--df-radius-sm);
           height: auto;
           width: 100%;
-          transition: all 0.2s ease-in-out;
+          transition: border-color 0.15s ease-in-out;
 
           &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-color: var(--df-accent);
           }
 
           .toggle-content {
-            padding: 24px;
+            padding: 16px;
             text-align: center;
 
             .toggle-text {
               h4 {
                 margin: 0;
-                font-size: 18px;
-                font-weight: 500;
-                color: rgba(0, 0, 0, 0.87);
+                font-size: 1.5rem;
+                font-weight: 600;
+                letter-spacing: -0.01em;
+                color: var(--df-text);
               }
 
               p {
-                margin: 8px 0 0 0;
-                font-size: 14px;
-                color: rgba(0, 0, 0, 0.6);
+                margin: 6px 0 0 0;
+                font-size: 1.3rem;
+                color: var(--df-text-muted);
               }
             }
           }
 
           &.mat-button-toggle-checked {
-            background: rgba(
-              mat.get-color-from-palette($df-purple-palette, 50),
-              0.1
-            );
-            border-color: mat.get-color-from-palette($df-purple-palette, 400);
+            background: var(--df-accent-soft);
+            border-color: var(--df-accent);
 
             .toggle-text {
               h4 {
-                color: mat.get-color-from-palette($df-purple-palette, 400);
+                color: var(--df-accent);
               }
             }
           }
@@ -435,9 +499,9 @@ mat-icon {
 }
 
 .action-container {
-  margin-top: 40px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(0, 0, 0, 0.12);
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--df-border-2);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -447,107 +511,21 @@ mat-icon {
   }
 }
 
-// Dark theme support
-.dark-theme {
-  .security-option-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
-
-    h4 {
-      color: rgba(255, 255, 255, 0.87);
-    }
-
-    p {
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    &.selected {
-      background-color: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.15
-      );
-    }
-  }
-
-  .component-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
-
-    &.selected {
-      background-color: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.15
-      );
-    }
-  }
-
-  .access-level-section {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
-
-    h3 {
-      color: rgba(255, 255, 255, 0.87);
-    }
-
-    .mat-button-toggle {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.12);
-
-      .toggle-text {
-        h4 {
-          color: rgba(255, 255, 255, 0.87);
-        }
-
-        p {
-          color: rgba(255, 255, 255, 0.6);
-        }
-      }
-
-      &.mat-button-toggle-checked {
-        background: rgba(
-          mat.get-color-from-palette($df-purple-palette, 400),
-          0.15
-        );
-      }
-    }
-  }
-
-  .security-config-container {
-    .top-hint {
-      background: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.1
-      );
-
-      p {
-        color: rgba(255, 255, 255, 0.87);
-      }
-    }
-  }
-}
-
 .component-selection {
-  h3 {
-    margin: 0 0 16px 0;
-    font-size: 24px;
-    font-weight: 500;
-    color: rgba(0, 0, 0, 0.87);
-  }
-
   .hint-widget {
-    margin: 0 0 32px 0;
-    padding: 16px;
-    background: rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.1);
-    border-radius: 8px;
+    margin: 0 0 24px 0;
+    padding: 12px 16px;
+    background: var(--df-accent-soft);
+    border-radius: var(--df-radius-sm);
 
     p {
       margin: 0;
-      font-size: 14px;
-      color: rgba(0, 0, 0, 0.87);
+      font-size: 1.35rem;
+      color: var(--df-text);
     }
 
     .role-link {
-      color: mat.get-color-from-palette($df-purple-palette, 400);
+      color: var(--df-accent);
       text-decoration: none;
       font-weight: 500;
       cursor: pointer;
@@ -559,34 +537,14 @@ mat-icon {
   }
 }
 
-// Add to dark theme section
-.dark-theme {
-  .component-selection {
-    h3 {
-      color: rgba(255, 255, 255, 0.87);
-    }
-
-    .hint-widget {
-      background: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.1
-      );
-
-      p {
-        color: rgba(255, 255, 255, 0.87);
-      }
-    }
-  }
-}
-
 .mcp-tools-container {
   padding: 12px 0;
 
   code {
-    font-size: 12px;
+    font-size: 1.2rem;
     padding: 3px 8px;
-    background: rgba(mat.get-color-from-palette($df-purple-palette, 500), 0.08);
-    color: mat.get-color-from-palette($df-purple-palette, 700);
+    background: var(--df-accent-soft);
+    color: var(--df-accent-strong);
     border-radius: 4px;
     white-space: nowrap;
     font-weight: 500;
@@ -619,30 +577,28 @@ mat-icon {
   th,
   td {
     text-align: left;
-    padding: 10px 12px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding: 12px;
+    border-bottom: 1px solid var(--df-border-2);
   }
 
   th {
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.5);
+    color: var(--df-text-muted);
     font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
   }
 
   td {
-    font-size: 14px;
+    font-size: 1.35rem;
   }
 
   tbody tr {
+    height: 44px;
     transition: background-color 0.15s ease;
 
     &:hover {
-      background-color: rgba(
-        mat.get-color-from-palette($df-purple-palette, 50),
-        0.3
-      );
+      background-color: var(--df-hover);
     }
   }
 }
@@ -651,31 +607,31 @@ mat-icon {
   padding: 12px 0;
 
   .custom-tools-description {
-    color: rgba(0, 0, 0, 0.6);
-    font-size: 14px;
+    color: var(--df-text-muted);
+    font-size: 1.35rem;
     line-height: 1.6;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 
   .custom-tools-actions {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 
   .no-tools-message {
-    color: rgba(0, 0, 0, 0.4);
+    color: var(--df-text-faint);
     font-style: italic;
     padding: 24px 16px;
     text-align: center;
-    border: 1px dashed rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.015);
+    border: 1px dashed var(--df-border);
+    border-radius: var(--df-radius-sm);
+    background: var(--df-surface-2);
   }
 
   code {
-    font-size: 12px;
+    font-size: 1.2rem;
     padding: 3px 8px;
-    background: rgba(mat.get-color-from-palette($df-purple-palette, 500), 0.08);
-    color: mat.get-color-from-palette($df-purple-palette, 700);
+    background: var(--df-accent-soft);
+    color: var(--df-accent-strong);
     border-radius: 4px;
     white-space: nowrap;
     font-weight: 500;
@@ -686,13 +642,13 @@ mat-icon {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: rgba(0, 0, 0, 0.6);
-    font-size: 13px;
+    color: var(--df-text-muted);
+    font-size: 1.3rem;
   }
 }
 
 .tool-type-toggle {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 
   .mat-button-toggle {
     min-width: 110px;
@@ -700,22 +656,18 @@ mat-icon {
 }
 
 .custom-tool-form {
-  background: linear-gradient(
-    135deg,
-    rgba(mat.get-color-from-palette($df-purple-palette, 50), 0.35) 0%,
-    rgba(mat.get-color-from-palette($df-purple-palette, 100), 0.15) 100%
-  );
-  border: 1px solid
-    rgba(mat.get-color-from-palette($df-purple-palette, 200), 0.4);
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius);
+  padding: 20px;
+  margin-bottom: 16px;
 
   h4 {
-    margin: 0 0 20px;
+    margin: 0 0 16px;
     font-weight: 600;
-    font-size: 16px;
-    color: mat.get-color-from-palette($df-purple-palette, 900);
+    font-size: 1.5rem;
+    letter-spacing: -0.01em;
+    color: var(--df-text);
   }
 
   .form-row {
@@ -754,15 +706,15 @@ mat-icon {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
 
       h5 {
         margin: 0;
         font-weight: 600;
-        font-size: 13px;
+        font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: rgba(0, 0, 0, 0.55);
+        letter-spacing: 0.06em;
+        color: var(--df-text-muted);
       }
     }
 
@@ -773,26 +725,21 @@ mat-icon {
     }
 
     .parameter-card {
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(0, 0, 0, 0.1);
-      border-radius: 10px;
+      background: var(--df-surface);
+      border: 1px solid var(--df-border-2);
+      border-radius: var(--df-radius);
       padding: 16px 20px 8px;
       transition:
         border-color 0.2s ease,
         box-shadow 0.2s ease;
 
       &:hover {
-        border-color: rgba(
-          mat.get-color-from-palette($df-purple-palette, 300),
-          0.5
-        );
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        border-color: var(--df-border);
       }
 
       &:focus-within {
-        border-color: mat.get-color-from-palette($df-purple-palette, 400);
-        box-shadow: 0 0 0 2px
-          rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1);
+        border-color: var(--df-accent);
+        box-shadow: 0 0 0 2px var(--df-accent-soft);
       }
     }
 
@@ -803,16 +750,13 @@ mat-icon {
       margin-bottom: 8px;
 
       .parameter-index {
-        font-size: 12px;
+        font-size: 1.2rem;
         font-weight: 600;
-        color: mat.get-color-from-palette($df-purple-palette, 500);
-        background: rgba(
-          mat.get-color-from-palette($df-purple-palette, 500),
-          0.1
-        );
-        padding: 2px 10px;
-        border-radius: 12px;
-        letter-spacing: 0.3px;
+        color: var(--df-accent-strong);
+        background: var(--df-accent-soft);
+        padding: 2px 8px;
+        border-radius: var(--df-radius-sm);
+        letter-spacing: 0.03em;
       }
 
       .parameter-remove-btn {
@@ -860,45 +804,46 @@ mat-icon {
     }
 
     .no-parameters-hint {
-      color: rgba(0, 0, 0, 0.35);
-      font-size: 13px;
+      color: var(--df-text-faint);
+      font-size: 1.3rem;
       text-align: center;
       padding: 20px 16px;
       margin: 0;
-      border: 1px dashed rgba(0, 0, 0, 0.12);
-      border-radius: 10px;
+      border: 1px dashed var(--df-border);
+      border-radius: var(--df-radius-sm);
     }
   }
 
   .inline-input {
     width: 100%;
     padding: 6px 10px;
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
-    font-size: 13px;
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    font-size: 1.3rem;
+    background: var(--df-surface);
+    color: var(--df-text);
     transition:
       border-color 0.2s ease,
       box-shadow 0.2s ease;
 
     &:focus {
       outline: none;
-      border-color: mat.get-color-from-palette($df-purple-palette, 400);
-      box-shadow: 0 0 0 2px
-        rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      border-color: var(--df-accent);
+      box-shadow: 0 0 0 2px var(--df-accent-soft);
     }
 
     &::placeholder {
-      color: rgba(0, 0, 0, 0.3);
+      color: var(--df-text-faint);
     }
   }
 
   .inline-select {
     padding: 6px 10px;
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    border-radius: 6px;
-    font-size: 13px;
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    font-size: 1.3rem;
+    background: var(--df-surface);
+    color: var(--df-text);
     cursor: pointer;
     transition:
       border-color 0.2s ease,
@@ -906,9 +851,8 @@ mat-icon {
 
     &:focus {
       outline: none;
-      border-color: mat.get-color-from-palette($df-purple-palette, 400);
-      box-shadow: 0 0 0 2px
-        rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.15);
+      border-color: var(--df-accent);
+      box-shadow: 0 0 0 2px var(--df-accent-soft);
     }
   }
 
@@ -917,9 +861,9 @@ mat-icon {
 
     .editor-label {
       display: block;
-      font-size: 13px;
+      font-size: 1.3rem;
       font-weight: 500;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--df-text-muted);
       margin-bottom: 8px;
     }
 
@@ -935,17 +879,16 @@ mat-icon {
     }
 
     .editor-wrapper {
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      border-radius: 8px;
+      border: 1px solid var(--df-border);
+      border-radius: var(--df-radius-sm);
       overflow: hidden;
       transition:
         border-color 0.2s ease,
         box-shadow 0.2s ease;
 
       &:focus-within {
-        border-color: mat.get-color-from-palette($df-purple-palette, 400);
-        box-shadow: 0 0 0 2px
-          rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.12);
+        border-color: var(--df-accent);
+        box-shadow: 0 0 0 2px var(--df-accent-soft);
       }
 
       df-ace-editor {
@@ -954,7 +897,7 @@ mat-icon {
 
         ::ng-deep .editor {
           min-height: 200px;
-          border-radius: 8px;
+          border-radius: var(--df-radius-sm);
         }
       }
 
@@ -969,8 +912,8 @@ mat-icon {
 
     .editor-hint {
       display: block;
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.45);
+      font-size: 1.2rem;
+      color: var(--df-text-faint);
       margin-top: 6px;
       padding-left: 2px;
     }
@@ -981,8 +924,8 @@ mat-icon {
     justify-content: flex-end;
     gap: 12px;
     margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: 16px;
+    border-top: 1px solid var(--df-border-2);
   }
 }
 
@@ -1013,198 +956,61 @@ mat-icon {
   }
 }
 
-.dark-theme {
-  .mcp-tools-container {
-    code {
-      background: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.15
-      );
-      color: mat.get-color-from-palette($df-purple-palette, 200);
-    }
-  }
-
-  .custom-tools-container {
-    .custom-tools-description {
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .no-tools-message {
-      color: rgba(255, 255, 255, 0.4);
-      border-color: rgba(255, 255, 255, 0.12);
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    code {
-      background: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.15
-      );
-      color: mat.get-color-from-palette($df-purple-palette, 200);
-    }
-  }
-
-  .mcp-services-table {
-    th,
-    td {
-      border-bottom-color: rgba(255, 255, 255, 0.08);
-    }
-
-    th {
-      color: rgba(255, 255, 255, 0.45);
-    }
-
-    tbody tr:hover {
-      background-color: rgba(
-        mat.get-color-from-palette($df-purple-palette, 400),
-        0.08
-      );
-    }
-  }
-
-  .custom-tool-form {
-    background: linear-gradient(
-      135deg,
-      rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.1) 0%,
-      rgba(mat.get-color-from-palette($df-purple-palette, 400), 0.05) 100%
-    );
-    border-color: rgba(
-      mat.get-color-from-palette($df-purple-palette, 400),
-      0.2
-    );
-
-    h4 {
-      color: rgba(255, 255, 255, 0.95);
-    }
-
-    .parameters-section {
-      .section-header h5 {
-        color: rgba(255, 255, 255, 0.45);
-      }
-
-      .parameter-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.1);
-
-        &:hover {
-          border-color: rgba(
-            mat.get-color-from-palette($df-purple-palette, 300),
-            0.3
-          );
-        }
-
-        &:focus-within {
-          border-color: mat.get-color-from-palette($df-purple-palette, 300);
-          box-shadow: 0 0 0 2px
-            rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.1);
-        }
-      }
-
-      .parameter-index {
-        color: mat.get-color-from-palette($df-purple-palette, 300);
-        background: rgba(
-          mat.get-color-from-palette($df-purple-palette, 300),
-          0.12
-        );
-      }
-
-      .no-parameters-hint {
-        color: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.1);
-      }
-    }
-
-    .editor-section {
-      .editor-label {
-        color: rgba(255, 255, 255, 0.6);
-      }
-
-      .editor-wrapper {
-        border-color: rgba(255, 255, 255, 0.15);
-
-        &:focus-within {
-          border-color: mat.get-color-from-palette($df-purple-palette, 300);
-          box-shadow: 0 0 0 2px
-            rgba(mat.get-color-from-palette($df-purple-palette, 300), 0.12);
-        }
-      }
-
-      .editor-hint {
-        color: rgba(255, 255, 255, 0.35);
-      }
-    }
-
-    .form-actions {
-      border-top-color: rgba(255, 255, 255, 0.08);
-    }
-  }
-}
-
 .basic-fields-section {
-  margin-bottom: 2rem;
-
-  .section-title {
-    margin-bottom: 1.5rem;
-    font-size: 1.25rem;
-    font-weight: 500;
-    color: rgba(0, 0, 0, 0.87);
-  }
+  margin-bottom: 24px;
 }
 
 .advanced-section {
-  margin-top: 2rem;
-  margin-bottom: 2rem;
+  margin-top: 24px;
+  margin-bottom: 24px;
 }
 
-.dark-theme {
-  .basic-fields-section {
-    .section-title {
-      color: rgba(255, 255, 255, 0.87);
-    }
-  }
-}
-
-// First-time user guidance styles
+// First-time user guidance
 .first-time-guidance {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-  margin: 20px 0;
-  background: linear-gradient(135deg, #f3e7ff 0%, #e8d5ff 100%);
-  border-radius: 8px;
-  border-left: 4px solid mat.get-color-from-palette($df-purple-palette, 500);
+  padding: 12px 16px;
+  margin: 16px 0;
+  background: var(--df-accent-soft);
+  border-radius: var(--df-radius-sm);
+  border-left: 3px solid var(--df-accent);
 
   .guidance-icon {
-    color: mat.get-color-from-palette($df-purple-palette, 600);
-    font-size: 20px;
+    color: var(--df-accent);
+    font-size: 18px;
     flex-shrink: 0;
   }
 
   .guidance-text {
     margin: 0;
-    color: #4a4a4a;
-    font-size: 14px;
+    color: var(--df-text-2);
+    font-size: 1.35rem;
     line-height: 1.5;
     flex: 1;
   }
 }
 
-.dark-theme {
-  .first-time-guidance {
-    background: linear-gradient(
-      135deg,
-      rgba(124, 77, 255, 0.15) 0%,
-      rgba(124, 77, 255, 0.1) 100%
-    );
-    border-left-color: mat.get-color-from-palette($df-purple-palette, 300);
+// Meridian Phase 1: spacing under the Live API Card on the service Overview,
+// before the configuration form begins.
+.service-overview-card {
+  display: block;
+  margin-bottom: var(--df-space-5);
+}
 
-    .guidance-icon {
-      color: mat.get-color-from-palette($df-purple-palette, 300);
-    }
+.curl-import-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
 
-    .guidance-text {
-      color: rgba(255, 255, 255, 0.87);
-    }
+  fa-icon {
+    margin-right: 0.5rem;
+  }
+
+  &__hint {
+    font-size: 0.85rem;
+    opacity: 0.7;
   }
 }

@@ -60,7 +60,7 @@ export class DfIntercomConfigComponent implements OnInit {
       .subscribe({
         next: () => {
           this.snackbarService.openSnackBar(
-            'Intercom configuration saved successfully',
+            'Intercom configuration saved',
             'success'
           );
           this.saving = false;

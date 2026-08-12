@@ -8,7 +8,6 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { REPORT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { ServiceReportData } from 'src/app/shared/types/reports';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
@@ -82,12 +81,7 @@ export class DfManageServiceReportTableComponent extends DfManageTableComponent<
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.service
-      .getAll<GenericListResponse<ServiceReportData>>({ limit, offset, filter })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.service, { limit, offset, filter });
   }
 
   filterQuery = getFilterQuery('serviceReports');

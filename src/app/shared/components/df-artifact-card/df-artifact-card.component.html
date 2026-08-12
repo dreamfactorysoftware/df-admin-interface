@@ -1,0 +1,182 @@
+<section class="artifact-card" *transloco="let t; read: 'artifactCard'">
+  <!-- Header: identity + switchers -->
+  <header class="artifact-card__head">
+    <div class="artifact-card__intro">
+      <span class="df-eyebrow">{{ t('eyebrow') }}</span>
+      <h3 class="artifact-card__title">{{ t('title') }}</h3>
+      <p class="artifact-card__subtitle">{{ t('subtitle') }}</p>
+    </div>
+
+    <div class="artifact-card__switchers">
+      <mat-form-field
+        *ngIf="hasKey"
+        appearance="outline"
+        class="artifact-card__field">
+        <mat-label>{{ t('keyLabel') }}</mat-label>
+        <mat-select
+          [value]="selectedKey ?? keyOptions[0].apiKey"
+          (selectionChange)="selectedKey = $event.value"
+          panelClass="artifact-card__panel">
+          <mat-option
+            *ngFor="let opt of keyOptions; trackBy: trackByLabel"
+            [value]="opt.apiKey">
+            {{ opt.label
+            }}<span *ngIf="opt.role" class="artifact-card__opt-role">
+              &middot; {{ opt.role }}</span
+            >
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="artifact-card__field">
+        <mat-label>{{ t('formatLabel') }}</mat-label>
+        <mat-select
+          [value]="format"
+          (selectionChange)="format = $event.value"
+          panelClass="artifact-card__panel">
+          <mat-option value="json">JSON</mat-option>
+          <mat-option value="xml">XML</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </header>
+
+  <!-- Meta strip: real base URL + auth header -->
+  <dl class="artifact-card__meta">
+    <div class="artifact-card__meta-row">
+      <dt class="df-eyebrow">{{ t('baseUrlLabel') }}</dt>
+      <dd class="artifact-card__meta-val">
+        <code class="artifact-card__inline">{{ resolvedBase }}</code>
+        <button
+          type="button"
+          mat-icon-button
+          class="artifact-card__copy"
+          [attr.aria-label]="t('copy')"
+          [matTooltip]="copiedBlock === 'baseUrl' ? t('copied') : t('copy')"
+          (click)="onCopy('baseUrl', resolvedBase)">
+          <fa-icon
+            [icon]="copiedBlock === 'baseUrl' ? faCheck : faCopy"
+            [class.is-copied]="copiedBlock === 'baseUrl'"></fa-icon>
+        </button>
+      </dd>
+    </div>
+
+    <div class="artifact-card__meta-row">
+      <dt class="df-eyebrow">{{ t('authHeaderLabel') }}</dt>
+      <dd class="artifact-card__meta-val" *ngIf="hasKey; else noKey">
+        <code class="artifact-card__inline"
+          >{{ headerName }}: {{ activeKey }}</code
+        >
+        <button
+          type="button"
+          mat-icon-button
+          class="artifact-card__copy"
+          [attr.aria-label]="t('copy')"
+          [matTooltip]="copiedBlock === 'authHeader' ? t('copied') : t('copy')"
+          (click)="onCopy('authHeader', headerName + ': ' + activeKey)">
+          <fa-icon
+            [icon]="copiedBlock === 'authHeader' ? faCheck : faCopy"
+            [class.is-copied]="copiedBlock === 'authHeader'"></fa-icon>
+        </button>
+      </dd>
+      <ng-template #noKey>
+        <dd class="artifact-card__meta-val artifact-card__nokey">
+          <df-badge variant="neutral" [label]="t('noKeyBadge')"></df-badge>
+          <span class="artifact-card__nokey-hint">{{ t('noKeyHint') }}</span>
+          <button
+            type="button"
+            mat-button
+            class="artifact-card__nokey-cta"
+            (click)="createKey.emit()">
+            <fa-icon [icon]="faPlus"></fa-icon>
+            {{ t('createKey') }}
+          </button>
+        </dd>
+      </ng-template>
+    </div>
+  </dl>
+
+  <!-- Framework tabs -->
+  <mat-tab-group
+    class="artifact-card__tabs"
+    animationDuration="0ms"
+    disableRipple
+    [mat-stretch-tabs]="false">
+    <mat-tab [label]="t('tabs.curl')">
+      <ng-container
+        *ngTemplateOutlet="
+          block;
+          context: {
+            id: 'curl',
+            code: curlSnippet,
+            note: activeKeyVerified
+              ? t('runNote', { table: sampleTable })
+              : t('previewNote', { table: sampleTable }),
+          }
+        "></ng-container>
+    </mat-tab>
+
+    <mat-tab [label]="t('tabs.javascript')">
+      <ng-container
+        *ngTemplateOutlet="
+          block;
+          context: {
+            id: 'javascript',
+            code: javascriptSnippet,
+            note: activeKeyVerified
+              ? t('runNote', { table: sampleTable })
+              : t('previewNote', { table: sampleTable }),
+          }
+        "></ng-container>
+    </mat-tab>
+
+    <mat-tab [label]="t('tabs.python')">
+      <ng-container
+        *ngTemplateOutlet="
+          block;
+          context: {
+            id: 'python',
+            code: pythonSnippet,
+            note: activeKeyVerified
+              ? t('runNote', { table: sampleTable })
+              : t('previewNote', { table: sampleTable }),
+          }
+        "></ng-container>
+    </mat-tab>
+
+    <mat-tab>
+      <ng-template mat-tab-label>
+        {{ t('tabs.mcp') }}
+        <df-badge
+          class="artifact-card__mcp-badge"
+          variant="ai"
+          [dot]="false"
+          label="MCP"></df-badge>
+      </ng-template>
+      <ng-container
+        *ngTemplateOutlet="
+          block;
+          context: { id: 'mcp', code: mcpSnippet, note: t('mcpNote') }
+        "></ng-container>
+    </mat-tab>
+  </mat-tab-group>
+
+  <!-- One code-block template, reused per tab -->
+  <ng-template #block let-id="id" let-code="code" let-note="note">
+    <div class="artifact-card__block">
+      <div class="artifact-card__code-head">
+        <span class="artifact-card__note">{{ note }}</span>
+        <button
+          type="button"
+          mat-button
+          class="artifact-card__copy-btn"
+          [class.is-copied]="copiedBlock === id"
+          (click)="onCopy(id, code)">
+          <fa-icon [icon]="copiedBlock === id ? faCheck : faCopy"></fa-icon>
+          {{ copiedBlock === id ? t('copied') : t('copy') }}
+        </button>
+      </div>
+      <pre class="artifact-card__code"><code>{{ code }}</code></pre>
+    </div>
+  </ng-template>
+</section>

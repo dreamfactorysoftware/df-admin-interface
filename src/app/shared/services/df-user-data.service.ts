@@ -72,6 +72,10 @@ export class DfUserDataService {
     }
   }
 
+  get isLoggedIn(): boolean {
+    return this.isLoggedInSubject.value;
+  }
+
   set isLoggedIn(isLoggedIn: boolean) {
     this.isLoggedInSubject.next(isLoggedIn);
     if (!isLoggedIn) {

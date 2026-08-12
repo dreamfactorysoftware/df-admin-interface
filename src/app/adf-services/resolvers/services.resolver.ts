@@ -1,12 +1,14 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
-import { forkJoin, map, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 import {
   SERVICES_SERVICE_TOKEN,
   SERVICE_TYPE_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
 import { GenericListResponse, Meta } from 'src/app/shared/types/generic-http';
 import { Service, ServiceType } from 'src/app/shared/types/service';
+import { PLATFORM_SERVICES_FILTER } from 'src/app/shared/constants/services';
 
 export const servicesResolver =
   (
@@ -46,9 +48,7 @@ export const servicesResolver =
               limit,
               sort: 'name',
               filter: `${
-                system
-                  ? '(created_by_id is null) and (name != "api_docs") and '
-                  : ''
+                system ? `${PLATFORM_SERVICES_FILTER} and ` : ''
               }(type in ("${serviceTypes.map(src => src.name).join('","')}"))${
                 filter ? ` and ${filter}` : ''
               }`,
@@ -59,7 +59,10 @@ export const servicesResolver =
                 serviceTypes,
               }))
             );
-        })
+        }),
+        // List resolver: complete navigation on failure so the table shell
+        // renders the error state with Retry.
+        catchError(err => of(emptyListWithError(err)))
       );
     }
 
@@ -68,10 +71,15 @@ export const servicesResolver =
         limit,
         sort: 'name',
         filter: `${
-          system ? '(created_by_id is null) and (name != "api_docs")' : ''
+          system ? PLATFORM_SERVICES_FILTER : ''
         }${filter ? filter : ''}`,
       })
-      .pipe(map(services => ({ ...services })));
+      .pipe(
+        map(services => ({ ...services })),
+        // List resolver: complete navigation on failure so the table shell
+        // renders the error state with Retry.
+        catchError(err => of(emptyListWithError(err)))
+      );
   };
 
 export const serviceResolver: ResolveFn<Service | undefined> = (

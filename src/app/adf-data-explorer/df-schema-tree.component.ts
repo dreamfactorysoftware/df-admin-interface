@@ -79,7 +79,7 @@ import { TableInfo } from './services/data-explorer.service';
       <!-- Error -->
       <div class="error-state" *ngIf="error && !loading">
         <mat-icon color="warn">error_outline</mat-icon>
-        <span>{{ error }}</span>
+        <span>{{ error | transloco }}</span>
         <button mat-stroked-button color="primary" (click)="retry.emit()">
           {{ t('dataExplorer.retry') }}
         </button>
@@ -100,7 +100,7 @@ import { TableInfo } from './services/data-explorer.service';
         class="table-list">
         <a
           mat-list-item
-          *ngFor="let table of filteredTables"
+          *ngFor="let table of filteredTables; trackBy: trackByTableName"
           (click)="tableSelected.emit(table)"
           [class.selected]="selectedTable?.name === table.name"
           class="table-item">
@@ -125,10 +125,11 @@ import { TableInfo } from './services/data-explorer.service';
         padding: 0 12px 0 8px;
         height: 49px;
         box-sizing: border-box;
-        border-bottom: 1px solid #e0e0e0;
-        font-weight: 500;
-        font-size: 14px;
-        color: #424242;
+        border-bottom: 1px solid var(--df-border);
+        font-weight: 600;
+        font-size: 1.4rem;
+        letter-spacing: -0.01em;
+        color: var(--df-text);
 
         .back-btn {
           flex-shrink: 0;
@@ -151,7 +152,7 @@ import { TableInfo } from './services/data-explorer.service';
         }
 
         .header-icon {
-          color: #7b1fa2;
+          color: var(--df-accent);
           font-size: 16px;
           flex-shrink: 0;
         }
@@ -162,14 +163,6 @@ import { TableInfo } from './services/data-explorer.service';
           text-overflow: ellipsis;
           flex: 1;
           min-width: 0;
-        }
-      }
-
-      :host-context(.dark-theme) .panel-header {
-        border-bottom-color: #424242;
-        color: #e0e0e0;
-        .header-icon {
-          color: #ce93d8;
         }
       }
 
@@ -211,25 +204,18 @@ import { TableInfo } from './services/data-explorer.service';
         padding: 8px 16px 4px;
         font-size: 11px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #9e9e9e;
+        letter-spacing: 0.06em;
+        color: var(--df-text-muted);
         font-weight: 600;
 
         .tables-count {
-          background: #e0e0e0;
+          background: var(--df-surface-2);
+          border: 1px solid var(--df-border-2);
           border-radius: 10px;
           padding: 1px 8px;
           font-size: 11px;
           font-weight: 500;
-          color: #616161;
-        }
-      }
-
-      :host-context(.dark-theme) .tables-header {
-        color: #757575;
-        .tables-count {
-          background: #424242;
-          color: #bdbdbd;
+          color: var(--df-text-muted);
         }
       }
 
@@ -242,8 +228,8 @@ import { TableInfo } from './services/data-explorer.service';
         gap: 12px;
         padding: 32px 16px;
         text-align: center;
-        color: #757575;
-        font-size: 13px;
+        color: var(--df-text-muted);
+        font-size: 1.3rem;
       }
 
       .table-list {
@@ -255,7 +241,7 @@ import { TableInfo } from './services/data-explorer.service';
       .table-item {
         height: 40px !important;
         padding: 0 16px !important;
-        font-size: 13px;
+        font-size: 1.3rem;
         cursor: pointer;
 
         ::ng-deep .mdc-list-item__primary-text {
@@ -265,7 +251,7 @@ import { TableInfo } from './services/data-explorer.service';
         }
 
         .table-icon {
-          color: #7b1fa2;
+          color: var(--df-accent);
           font-size: 13px;
           margin-right: 10px;
           flex-shrink: 0;
@@ -279,18 +265,13 @@ import { TableInfo } from './services/data-explorer.service';
           pointer-events: none;
         }
 
-        &.selected {
-          background: rgba(123, 31, 162, 0.08);
-          font-weight: 500;
+        &:hover {
+          background: var(--df-hover);
         }
-      }
 
-      :host-context(.dark-theme) .table-item {
-        .table-icon {
-          color: #ce93d8;
-        }
         &.selected {
-          background: rgba(206, 147, 216, 0.12);
+          background: var(--df-accent-soft);
+          font-weight: 500;
         }
       }
     `,
@@ -317,6 +298,10 @@ export class DfSchemaTreeComponent implements OnChanges {
     if (changes['tables']) {
       this.filterTables();
     }
+  }
+
+  trackByTableName(_index: number, table: TableInfo): string {
+    return table.name;
   }
 
   filterTables(): void {

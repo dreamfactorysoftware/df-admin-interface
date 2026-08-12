@@ -20,6 +20,7 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { finalize } from 'rxjs/operators';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import {
   DimensionSeriesRowRaw,
   ExpensiveCallRowRaw,
@@ -36,11 +37,12 @@ import {
   TimeBucket,
   UsageSummary,
 } from './types/usage';
-import { ratesFromBundle } from './utils/cost';
+import { formatUSD, ratesFromBundle } from './utils/cost';
 import { DfUsageStackedAreaComponent } from './components/df-usage-stacked-area/df-usage-stacked-area.component';
 import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.component';
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
 import { DfCostEstimatorComponent } from './components/df-cost-estimator/df-cost-estimator.component';
+import { DfTaskEstimatorComponent } from './components/df-task-estimator/df-task-estimator.component';
 import {
   DfCostByDimensionComponent,
   DimensionSeriesPoint,
@@ -49,12 +51,27 @@ import {
   DfExpensiveCallsComponent,
   ExpensiveCallRow,
 } from './components/df-expensive-calls/df-expensive-calls.component';
+import {
+  DfSpendBreakdownComponent,
+  SpendSlice,
+} from './components/df-spend-breakdown/df-spend-breakdown.component';
 
 interface ActiveFilterChip {
   dimension: keyof UsageFilters;
   value: string | number;
   label: string;
 }
+
+/** The primary lens applied across every chart. Each maps to a real filter
+ *  dimension the backend already aggregates by; picking a member narrows the
+ *  whole dashboard through that identity. There is no `tag` scope because
+ *  ai_usage_log has no tag column — inventing one would fabricate data. */
+export type ScopeDim = 'none' | 'tenant' | 'role' | 'key';
+
+/** Budget health, derived from spend-vs-cap ratios, driving the token color
+ *  of the meter (ok = success, warning >= 0.8 or projected over, danger =
+ *  already over cap). */
+export type BudgetStatus = 'ok' | 'warning' | 'danger';
 
 /** Budget row enriched with the resolved service label + computed ratios for
  *  cleaner template binding. */
@@ -69,6 +86,7 @@ export interface BudgetRow {
   onTrack: boolean;
   daysIntoMonth: number;
   daysInMonth: number;
+  status: BudgetStatus;
 }
 
 @Component({
@@ -91,8 +109,10 @@ export interface BudgetRow {
     DfUsageBarsComponent,
     DfUsageSummaryComponent,
     DfCostEstimatorComponent,
+    DfTaskEstimatorComponent,
     DfCostByDimensionComponent,
     DfExpensiveCallsComponent,
+    DfSpendBreakdownComponent,
   ],
   templateUrl: './df-ai-usage.component.html',
   styleUrls: ['./df-ai-usage.component.scss'],
@@ -105,6 +125,24 @@ export class DfAiUsageComponent implements OnInit {
   errorMessage: string | null = null;
   bundle: UsageBundle | null = null;
   range: TimeRange = '7d';
+
+  // ─── Scope lens (tenant / role / key) ─────────────────────────────────
+  // A single, promoted lens over the whole dashboard. Selecting a member
+  // writes a single-value filter into `filters` on the mapped dimension, so
+  // the backend re-aggregates and EVERY chart re-slices. It is the same
+  // mechanism as the detailed Filters card, surfaced as one prominent
+  // control. `tenant` = AI Connection (the budget/billing boundary),
+  // `role` = RBAC role, `key` = App / API key.
+  scopeDim: ScopeDim = 'none';
+  scopeValue: number | null = null;
+  private readonly scopeFilterKey: Record<
+    Exclude<ScopeDim, 'none'>,
+    keyof UsageFilters
+  > = {
+    tenant: 'service_id',
+    role: 'role_id',
+    key: 'app_id',
+  };
 
   // Filter state. Mutated in place via toggleFilter / removeChip; refresh()
   // is called once after each mutation. Sent as-is to the backend.
@@ -125,6 +163,7 @@ export class DfAiUsageComponent implements OnInit {
   byModel: GroupRow[] = [];
   byErrorClass: GroupRow[] = [];
   budgets: BudgetRow[] = [];
+  visibleBudgets: BudgetRow[] = []; // budgets narrowed to the active scope
   budgetWarnings: BudgetRow[] = []; // those projected to exceed budget
   activeChips: ActiveFilterChip[] = [];
 
@@ -138,6 +177,15 @@ export class DfAiUsageComponent implements OnInit {
   costByProviderSeries: DimensionSeriesPoint[] = [];
   /** Top N most expensive single calls in the window. */
   expensiveCalls: ExpensiveCallRow[] = [];
+
+  // ─── Categorical spend breakdowns (share of the bill) ─────────────────
+  // "By model" is real (by_model carries cost_usd). "By tag" has NO backing:
+  // ai_usage_log has no tag column and the aggregator exposes no tag
+  // dimension, so per the data rule that breakdown is omitted, never faked.
+  spendByModel: SpendSlice[] = [];
+  /** True only when at least one model actually cost money — gates whether
+   *  the by-model breakdown panel renders at all (omit, not empty). */
+  hasModelSpend = false;
 
   // MCP-side views — distinct from the AI panels because MCP is INBOUND
   // traffic from external AI agents (Claude Desktop, Cursor). Token cost is
@@ -191,10 +239,12 @@ export class DfAiUsageComponent implements OnInit {
           this.recomputeViews();
         },
         error: err => {
-          this.errorMessage =
-            err?.error?.error?.message ??
-            err?.message ??
-            'Failed to load usage.';
+          // This dashboard renders plain English strings; keep the fallback
+          // when normalizeError yields an errors.* i18n key.
+          const message = normalizeError(err).message;
+          this.errorMessage = message.startsWith('errors.')
+            ? 'Failed to load usage.'
+            : message;
         },
       });
   }
@@ -202,6 +252,81 @@ export class DfAiUsageComponent implements OnInit {
   setRange(range: TimeRange): void {
     this.range = range;
     this.refresh();
+  }
+
+  /** Switch the primary lens. Clears the previously-scoped dimension's
+   *  filter, then waits for a member to be picked before re-querying. */
+  setScopeDim(dim: ScopeDim): void {
+    if (dim === this.scopeDim) return;
+    const hadFilter = this.clearScopeFilter();
+    this.scopeDim = dim;
+    this.scopeValue = null;
+    // Only re-query if clearing the old scope actually changed the filter
+    // set; picking the new dimension alone doesn't narrow anything yet.
+    if (hadFilter) {
+      this.refresh();
+    }
+  }
+
+  /** Pick a specific member within the active scope. Writes a single-value
+   *  filter on the mapped dimension so every chart re-slices. */
+  onScopeValueChange(value: number | null): void {
+    this.scopeValue = value;
+    if (this.scopeDim === 'none') return;
+    const key = this.scopeFilterKey[this.scopeDim];
+    this.filters = { ...this.filters, [key]: value == null ? [] : [value] };
+    this.refresh();
+  }
+
+  /** Options for the scope member picker, drawn from the same lookups the
+   *  detailed filters use. */
+  scopeMemberOptions(): { id: number; label: string }[] {
+    switch (this.scopeDim) {
+      case 'tenant':
+        return this.serviceOptions;
+      case 'role':
+        return this.roleOptions;
+      case 'key':
+        return this.appOptions;
+      default:
+        return [];
+    }
+  }
+
+  scopeMemberLabel(): string {
+    switch (this.scopeDim) {
+      case 'tenant':
+        return 'Connection';
+      case 'role':
+        return 'Role';
+      case 'key':
+        return 'API key';
+      default:
+        return '';
+    }
+  }
+
+  /** Keep the scope member picker in sync with the underlying filter, so
+   *  clearing the matching chip in the Filters card also resets the lens. */
+  private syncScopeValue(): void {
+    if (this.scopeDim === 'none') {
+      this.scopeValue = null;
+      return;
+    }
+    const list = this.filters[this.scopeFilterKey[this.scopeDim]] as number[];
+    this.scopeValue = list.length === 1 ? list[0] : null;
+  }
+
+  /** Clear the filter bound to the current scope dimension. Returns whether
+   *  anything was actually removed. */
+  private clearScopeFilter(): boolean {
+    if (this.scopeDim === 'none') return false;
+    const key = this.scopeFilterKey[this.scopeDim];
+    if ((this.filters[key] as Array<string | number>).length > 0) {
+      this.filters = { ...this.filters, [key]: [] };
+      return true;
+    }
+    return false;
   }
 
   jumpToService(row: GroupRow): void {
@@ -247,6 +372,8 @@ export class DfAiUsageComponent implements OnInit {
 
   clearFilters(): void {
     this.filters = createEmptyFilters();
+    this.scopeDim = 'none';
+    this.scopeValue = null;
     this.refresh();
   }
 
@@ -277,6 +404,7 @@ export class DfAiUsageComponent implements OnInit {
       this.byModel = [];
       this.byErrorClass = [];
       this.budgets = [];
+      this.visibleBudgets = [];
       this.budgetWarnings = [];
       this.connectionProviders = new Map();
       this.costInputSessions = [];
@@ -286,6 +414,8 @@ export class DfAiUsageComponent implements OnInit {
       this.costByAppSeries = [];
       this.costByProviderSeries = [];
       this.expensiveCalls = [];
+      this.spendByModel = [];
+      this.hasModelSpend = false;
       return;
     }
 
@@ -334,7 +464,7 @@ export class DfAiUsageComponent implements OnInit {
       const id = row.role_id ?? 0;
       const label = id
         ? (this.bundle?.roles.get(id) ?? `role #${id}`)
-        : '— no role —';
+        : '(no role)';
       return this.toRow(String(id), label, row);
     });
 
@@ -349,7 +479,7 @@ export class DfAiUsageComponent implements OnInit {
       const id = row.app_id ?? 0;
       const label = id
         ? (this.bundle?.apps.get(id) ?? `app #${id}`)
-        : '— no app —';
+        : '(no app)';
       return this.toRow(String(id), label, row);
     });
 
@@ -362,6 +492,16 @@ export class DfAiUsageComponent implements OnInit {
       base.costPer1kTokens = n(row.cost_per_1k_tokens);
       return base;
     });
+
+    // Categorical "share of spend by model" — same real by_model rows, cast
+    // to the breakdown's shape. Zero-cost members are dropped inside the
+    // component; if nothing is priced the whole panel is omitted upstream.
+    this.spendByModel = this.byModel.map(row => ({
+      key: row.key,
+      label: row.label,
+      costUsd: row.costUsd,
+    }));
+    this.hasModelSpend = this.spendByModel.some(s => s.costUsd > 0);
 
     // Multi-dim cost-over-time series. Each one is mapped to display
     // labels HERE so the chart component stays generic / reusable.
@@ -412,20 +552,29 @@ export class DfAiUsageComponent implements OnInit {
       const spent = n(row.spent_month_usd);
       const projected = n(row.projected_month_end_usd);
       const svc = this.bundle?.services.get(row.service_id);
+      const spentRatio = budget > 0 ? spent / budget : 0;
+      const projectedRatio = budget > 0 ? projected / budget : 0;
       return {
         serviceId: row.service_id,
         serviceLabel: svc?.label || svc?.name || `service #${row.service_id}`,
         budgetUsd: budget,
         spentMonthUsd: spent,
         projectedMonthEndUsd: projected,
-        spentRatio: budget > 0 ? spent / budget : 0,
-        projectedRatio: budget > 0 ? projected / budget : 0,
+        spentRatio,
+        projectedRatio,
         onTrack: row.on_track,
         daysIntoMonth: row.days_into_month,
         daysInMonth: row.days_in_month,
+        status: this.budgetStatus(spentRatio, projectedRatio, row.on_track),
       };
     });
     this.budgetWarnings = this.budgets.filter(b => !b.onTrack);
+    // Budgets are per-connection (the aggregator ignores request filters), so
+    // narrow the panel to the scoped connection when the tenant lens is set.
+    this.visibleBudgets =
+      this.scopeDim === 'tenant' && this.scopeValue != null
+        ? this.budgets.filter(b => b.serviceId === this.scopeValue)
+        : this.budgets;
 
     const services = this.bundle?.services;
     const providerFallback = r.by_provider[0]?.provider ?? 'unknown';
@@ -464,6 +613,7 @@ export class DfAiUsageComponent implements OnInit {
       .sort((a, b) => a.label.localeCompare(b.label));
 
     this.activeChips = this.buildActiveChips();
+    this.syncScopeValue();
 
     this.recomputeMcpViews();
   }
@@ -547,7 +697,7 @@ export class DfAiUsageComponent implements OnInit {
       const id = row.app_id ?? 0;
       const label = id
         ? (this.bundle?.apps.get(id) ?? `app #${id}`)
-        : '— no app —';
+        : '(no app)';
       return {
         key: String(id),
         label,
@@ -678,13 +828,37 @@ export class DfAiUsageComponent implements OnInit {
   }
 
   formatUsd(v: number): string {
-    if (!Number.isFinite(v)) return '$0.00';
-    if (v > 0 && v < 0.01) return '<$0.01';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: v < 1 ? 4 : 2,
-    }).format(v);
+    // Delegates to the shared, hoisted Intl formatters — this is called from
+    // *ngFor rows in the template, i.e. rows × change-detection cycles.
+    return formatUSD(v);
+  }
+
+  /** Classify a budget into ok / warning / danger for token-driven meter
+   *  color. Already over cap = danger; projected to blow the cap or past 80%
+   *  of it = warning; otherwise ok. */
+  private budgetStatus(
+    spentRatio: number,
+    projectedRatio: number,
+    onTrack: boolean
+  ): BudgetStatus {
+    if (spentRatio >= 1) return 'danger';
+    if (!onTrack || projectedRatio >= 1 || spentRatio >= 0.8) return 'warning';
+    return 'ok';
+  }
+
+  // trackBy helpers for the template's *ngFor loops — without them the
+  // default differ tears down and rebuilds every row whenever the source
+  // array is replaced (each fetch/filter change).
+  trackBudget(_: number, b: BudgetRow): number {
+    return b.serviceId;
+  }
+
+  trackChip(_: number, chip: ActiveFilterChip): string {
+    return `${String(chip.dimension)}:${chip.value}`;
+  }
+
+  trackOptionId(_: number, o: { id: number }): number {
+    return o.id;
   }
 
   /** Map raw error_class identifier into a human label for the bars panel. */
@@ -759,10 +933,10 @@ export class DfAiUsageComponent implements OnInit {
       const appId = r.app_id ?? 0;
       const userLabel = userId
         ? (this.bundle?.users.get(userId) ?? `user #${userId}`)
-        : '—';
+        : '-';
       const appLabel = appId
         ? (this.bundle?.apps.get(appId) ?? `app #${appId}`)
-        : '—';
+        : '-';
       const svc = this.bundle?.services.get(r.service_id);
       const serviceLabel =
         svc?.label || svc?.name || `service #${r.service_id}`;

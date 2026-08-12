@@ -2,7 +2,6 @@
   <ng-container topActions>
     <button
       class="save-btn"
-      [class]="(isDarkMode | async) ? 'dark-theme' : ''"
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'files.createFolder' | transloco"
@@ -11,7 +10,6 @@
     </button>
     <button
       class="save-btn"
-      [class]="(isDarkMode | async) ? 'dark-theme' : ''"
       mat-mini-fab
       color="primary"
       [attr.aria-label]="'importList' | transloco"

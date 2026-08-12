@@ -18,7 +18,10 @@
   </div>
 
   <div class="section-landing__stats" *ngIf="stats.length">
-    <div class="section-stat" *ngFor="let stat of stats">
+    <div
+      class="section-stat"
+      *ngFor="let stat of stats"
+      [attr.data-category]="stat.category">
       <mat-icon *ngIf="stat.icon">{{ stat.icon }}</mat-icon>
       <span>{{ stat.label }}</span>
       <strong>{{ stat.value }}</strong>
@@ -37,6 +40,8 @@
           <a
             *ngIf="!card.disabled; else disabledCard"
             class="section-card"
+            [attr.data-tint]="card.tint || null"
+            [attr.data-category]="card.category || null"
             [routerLink]="card.route"
             [attr.aria-label]="card.title">
             <div class="section-card__icon">
@@ -55,7 +60,10 @@
             </div>
           </a>
           <ng-template #disabledCard>
-            <article class="section-card section-card--disabled">
+            <article
+              class="section-card section-card--disabled"
+              [attr.data-tint]="card.tint || null"
+              [attr.data-category]="card.category || null">
               <div class="section-card__icon">
                 <mat-icon>{{ card.icon }}</mat-icon>
               </div>

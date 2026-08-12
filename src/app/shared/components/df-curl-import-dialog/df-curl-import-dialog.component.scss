@@ -1,0 +1,63 @@
+.curl-import-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 34rem;
+  max-width: 44rem;
+}
+
+.curl-import-hint {
+  margin: 0 0 1rem;
+  opacity: 0.75;
+}
+
+.full-width {
+  width: 100%;
+}
+
+textarea[matInput] {
+  font-family: monospace;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.curl-import-section {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 1rem 0 0.5rem;
+}
+
+.curl-import-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+
+  dt {
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.curl-import-value {
+  overflow-wrap: anywhere;
+}
+
+.curl-import-error,
+.curl-import-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.curl-import-error {
+  color: var(--mdc-theme-error, #b3261e);
+}
+
+.curl-import-warnings {
+  margin-top: 1rem;
+}

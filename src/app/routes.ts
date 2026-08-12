@@ -34,6 +34,7 @@ import {
 } from './adf-schema/resolvers/df-schema.resolver';
 import { DfGlobalLookupKeysResolver } from './adf-config/resolvers/df-global-lookup-keys.resolver';
 import { ServiceRoutes } from './adf-services/routes';
+import { ApiBuilderRoutes } from './adf-api-builder/routes';
 import { servicesResolver } from './adf-services/resolvers/services.resolver';
 import { HomeRoutes } from './adf-home/routes';
 import { provideTranslocoScope } from '@ngneat/transloco';
@@ -53,7 +54,7 @@ import { systemEventsResolver } from './adf-services/resolvers/system-events.res
 import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
 import { licenseGuard } from './shared/guards/license.guard';
 import { globalLicenseGuard } from './shared/guards/global-license.guard';
-import { errorGaurd } from './shared/guards/error.guard';
+import { errorGuard } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
 import { rootAdminGuard } from './shared/guards/admin.guard';
 import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
@@ -70,7 +71,7 @@ export const routes: Routes = [
       import('./shared/components/df-error/df-error.component').then(
         m => m.DfErrorComponent
       ),
-    canActivate: [errorGaurd],
+    canActivate: [errorGuard],
   },
   {
     path: ROUTES.AUTH,
@@ -93,6 +94,29 @@ export const routes: Routes = [
     canActivate: [licenseGuard],
   },
   {
+    path: ROUTES.API_BUILDER,
+    redirectTo: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+    pathMatch: 'full',
+    // navLinkPath lets the side-nav link straight to the destination and
+    // match it for the active state; a redirect's own path never appears
+    // in router.url, so without this the item could never highlight.
+    data: {
+      navLinkPath: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+    },
+  },
+  {
+    path: ROUTES.ALERTS,
+    loadComponent: () =>
+      import('./adf-alerts/df-alerts.component').then(m => m.DfAlertsComponent),
+    canActivate: [loggedInGuard],
+  },
+  {
+    path: ROUTES.AGENTS,
+    loadComponent: () =>
+      import('./adf-agents/df-agents.component').then(m => m.DfAgentsComponent),
+    canActivate: [loggedInGuard],
+  },
+  {
     path: ROUTES.API_CONNECTIONS,
     children: [
       {
@@ -111,6 +135,13 @@ export const routes: Routes = [
               import('./adf-section-overviews/df-api-types-overview.component').then(
                 m => m.DfApiTypesOverviewComponent
               ),
+          },
+          {
+            path: ROUTES.API_BUILDER,
+            children: ApiBuilderRoutes,
+            data: {
+              groups: SERVICE_GROUPS[ROUTES.API_BUILDER],
+            },
           },
           {
             path: ROUTES.DATABASE,
@@ -295,6 +326,11 @@ export const routes: Routes = [
             resolve: {
               data: apiDocResolver,
             },
+            // Angular reuses this component when navigating between services;
+            // re-run the resolver on every :name change so the doc (and the
+            // component's serviceName / token pickers) refresh for the new
+            // service instead of showing the previously-loaded one.
+            runGuardsAndResolvers: 'paramsChange',
           },
         ],
         providers: [provideTranslocoScope('apiDocs')],
@@ -771,6 +807,17 @@ export const routes: Routes = [
           },
         ],
         providers: [provideTranslocoScope('schema')],
+        data: {
+          groups: ['Database'],
+          system: false,
+        },
+      },
+      {
+        path: ROUTES.SCHEMA_CONTRACTS,
+        loadComponent: () =>
+          import('./adf-schema-contracts/df-manage-schema-contracts/df-manage-schema-contracts.component').then(
+            m => m.DfManageSchemaContractsComponent
+          ),
         data: {
           groups: ['Database'],
           system: false,

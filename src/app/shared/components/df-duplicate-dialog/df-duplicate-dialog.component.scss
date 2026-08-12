@@ -1,3 +1,6 @@
+@use '../df-dialog-surface' as *;
+@include df-dialog-surface;
+
 .full-width {
   width: 100%;
 }

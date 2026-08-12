@@ -1,6 +1,8 @@
 import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { inject } from '@angular/core';
+import { catchError, of } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 import { BASE_SERVICE_TOKEN } from '../../shared/constants/tokens';
 
 import {
@@ -12,9 +14,16 @@ export const schemaResolver: ResolveFn<
   GenericListResponse<Array<{ name: string; label: string }>>
 > = (route: ActivatedRouteSnapshot) => {
   const dbName = route.paramMap.get('name') as string;
-  return inject(BASE_SERVICE_TOKEN).get(`${dbName}/_schema`, {
-    fields: ['name', 'label'].join(','),
-  });
+  // List branch only: complete navigation on failure so the table shell
+  // renders the error state with Retry.
+  return inject(BASE_SERVICE_TOKEN)
+    .get<GenericListResponse<Array<{ name: string; label: string }>>>(
+      `${dbName}/_schema`,
+      {
+        fields: ['name', 'label'].join(','),
+      }
+    )
+    .pipe(catchError(err => of(emptyListWithError(err))));
 };
 
 export const DfTableDetailsResolver: ResolveFn<TableDetailsType> = (

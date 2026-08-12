@@ -25,6 +25,8 @@ export class DfApiDocsListComponent implements OnInit {
     });
   }
 
+  trackByName = (_: number, service: { name: string }): string => service.name;
+
   onServiceSelect(service: any) {
     // Store the service ID before navigation
     this.currentServiceService.setCurrentServiceId(service.id);

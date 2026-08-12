@@ -246,3 +246,12 @@ export const GOLD_SERVICES: Array<ServiceType> = [
     configSchema: [],
   },
 ];
+
+/** Filter for the "DreamFactory Platform APIs" screen: only the services a
+ * default install ships with. created_by_id alone is a weak proxy (anything
+ * seeded or script-created is also null), so pair it with the well-known
+ * default names.
+ * ponytail: name allowlist; if install profiles ever ship different default
+ * sets, move this list to a backend-provided flag. */
+export const PLATFORM_SERVICES_FILTER =
+  '(name in ("system","files","logs","db","email","user")) and (created_by_id is null)';

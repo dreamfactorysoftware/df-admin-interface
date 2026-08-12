@@ -19,6 +19,11 @@ import { UntilDestroy } from '@ngneat/until-destroy';
 import { DfDuplicateDialogComponent } from 'src/app/shared/components/df-duplicate-dialog/df-duplicate-dialog.component';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { catchError, forkJoin, map, of, switchMap, throwError } from 'rxjs';
+import { PLATFORM_SERVICES_FILTER } from 'src/app/shared/constants/services';
+import {
+  DfServiceHealthService,
+  ServiceHealthContext,
+} from './df-service-health.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-services-table',
@@ -34,6 +39,8 @@ export class DfManageServicesTableComponent
   extends DfManageTableComponent<ServiceRow>
   implements OnInit
 {
+  override emptyStateMessage = 'emptyState.services.message';
+  override emptyStateActionLabel = 'emptyState.services.action';
   serviceTypes: Array<ServiceType> = [];
   system = false;
   private scopedByGroups = false;
@@ -46,14 +53,30 @@ export class DfManageServicesTableComponent
     private serviceService: DfBaseCrudService,
     @Inject(SERVICE_TYPE_SERVICE_TOKEN)
     private serviceTypeService: DfBaseCrudService,
+    private healthService: DfServiceHealthService,
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
   }
 
+  private healthContext?: ServiceHealthContext;
+
   override ngOnInit(): void {
     // Call parent's ngOnInit first to set up the data source
     super.ngOnInit();
+
+    // Score the catalog client-side. The context loads once; mapDataToTable
+    // (every fetch path funnels through it) derives per-row health when it is
+    // ready, and this re-derives whatever rows already rendered first.
+    this.healthService.getContext().subscribe(context => {
+      this.healthContext = context;
+      if (this.dataSource.data.length) {
+        this.dataSource.data = this.dataSource.data.map(row => ({
+          ...row,
+          health: this.healthService.derive(row, context),
+        }));
+      }
+    });
 
     // Then subscribe to route data for additional setup
     this._activatedRoute.data.subscribe(routeData => {
@@ -127,14 +150,12 @@ export class DfManageServicesTableComponent
           const filter =
             serviceTypes.length > 0
               ? `${
-                  this.system
-                    ? '(created_by_id is null) and (name != "api_docs") and '
-                    : ''
+                  this.system ? `${PLATFORM_SERVICES_FILTER} and ` : ''
                 }(type in ("${serviceTypes.map(src => src.name).join('","')}"))`
               : this.scopedByGroups
                 ? '(id = -1)'
                 : this.system
-                  ? '(created_by_id is null) and (name != "api_docs")'
+                  ? PLATFORM_SERVICES_FILTER
                   : undefined;
 
           return this.serviceService
@@ -178,6 +199,13 @@ export class DfManageServicesTableComponent
       header: 'type',
     },
     {
+      columnDef: 'health',
+      // Rendered by the shared table's dedicated 'health' branch (df-badge +
+      // "why" mat-menu); cell() is unused for this column.
+      cell: (row: ServiceRow) => row.health?.level,
+      header: 'services.health.header',
+    },
+    {
       columnDef: 'scripting',
       cell: (row: ServiceRow) => row.scripting,
       header: 'Scripting',
@@ -187,23 +215,35 @@ export class DfManageServicesTableComponent
     },
   ];
 
-  override mapDataToTable(data: any[]): ServiceRow[] {
-    // Skip event scripts request if we're only looking at API Types
-    const isApiTypesOnly =
-      this.serviceTypes.length === 1 &&
-      this.serviceTypes[0].name === 'api_type';
+  private eventScripts: Service[] = [];
 
-    // Map the data without checking event scripts for API Types
-    return data.map(service => ({
-      id: service.id,
-      name: service.name,
-      label: service.label,
-      description: service.description,
-      scripting: 'not', // Always set a default value
-      active: service.isActive,
-      deletable: service.deletable,
-      type: service.type,
-    }));
+  override mapDataToTable(data: any[]): ServiceRow[] {
+    return data.map(service => {
+      const row: ServiceRow = {
+        id: service.id,
+        name: service.name,
+        label: service.label,
+        description: service.description,
+        scripting: this.scriptingFor(service.name),
+        active: service.isActive,
+        deletable: service.deletable,
+        type: service.type,
+        // Opt-in signal; absent on stock DF services so the deprecated rule
+        // never fires unless a service explicitly carries the flag.
+        deprecated: service.deprecated === true,
+      };
+      if (this.healthContext) {
+        row.health = this.healthService.derive(row, this.healthContext);
+      }
+      return row;
+    });
+  }
+
+  private scriptingFor(serviceName: string): string {
+    const match = this.eventScripts.find(script =>
+      script.name.includes(serviceName)
+    );
+    return match ? match.name : 'not';
   }
 
   filterQuery = getFilterQuery('services');
@@ -230,38 +270,31 @@ export class DfManageServicesTableComponent
       filter = `${filter ? `(${filter}) and ` : ''}(id = -1)`;
     }
 
+    this.fetchTable(this.serviceService, { limit, offset, filter, refresh });
+    this.loadEventScripts();
+  }
+
+  /**
+   * Scripting-column enrichment. Runs alongside the main fetch: whichever
+   * lands last wins (mapDataToTable reads the cache; this patches rows in
+   * place). Deliberate degradation: on failure the table still renders with
+   * scripting 'not'; the default-on interceptor surfaces the failure toast.
+   */
+  private loadEventScripts(): void {
+    const isApiTypesOnly =
+      this.serviceTypes.length === 1 &&
+      this.serviceTypes[0].name === 'api_type';
+    if (isApiTypesOnly) {
+      return;
+    }
     this.serviceService
-      .getAll<GenericListResponse<Service>>({
-        limit,
-        offset,
-        filter,
-        refresh,
-      })
-      .subscribe(data => {
-        const mappedData = this.mapDataToTable(data.resource);
-
-        // Only make event scripts request if not viewing API Types
-        const isApiTypesOnly =
-          this.serviceTypes.length === 1 &&
-          this.serviceTypes[0].name === 'api_type';
-
-        if (!isApiTypesOnly) {
-          this.serviceService
-            .getEventScripts<GenericListResponse<Service>>()
-            .subscribe(scriptsData => {
-              const scripts = scriptsData.resource;
-              mappedData.forEach(service => {
-                const match = scripts.find(script =>
-                  script.name.includes(service.name)
-                );
-                service.scripting = match ? match.name : 'not';
-              });
-              this.dataSource.data = mappedData;
-            });
-        } else {
-          this.dataSource.data = mappedData;
-        }
-        this.tableLength = data.meta.count;
+      .getEventScripts<GenericListResponse<Service>>()
+      .pipe(catchError(() => of({ resource: [] as Service[] })))
+      .subscribe(scriptsData => {
+        this.eventScripts = scriptsData.resource;
+        this.dataSource.data.forEach(row => {
+          row.scripting = this.scriptingFor(row.name);
+        });
       });
   }
 

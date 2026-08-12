@@ -92,8 +92,8 @@ import {
         flex-direction: column;
         height: 100%;
         width: 380px;
-        border-left: 1px solid #e0e0e0;
-        background: #fafafa;
+        border-left: 1px solid var(--df-border);
+        background: var(--df-bg);
         overflow: hidden;
       }
 
@@ -102,15 +102,15 @@ import {
         align-items: center;
         justify-content: space-between;
         padding: 8px 12px;
-        border-bottom: 1px solid #e0e0e0;
-        background: #f5f5f5;
+        border-bottom: 1px solid var(--df-border);
+        background: var(--df-surface-2);
 
         .detail-title {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: #616161;
+          letter-spacing: 0.06em;
+          color: var(--df-text-muted);
         }
 
         .close-btn {
@@ -128,7 +128,7 @@ import {
 
       .field-entry {
         padding: 8px 12px;
-        border-bottom: 1px solid #f0f0f0;
+        border-bottom: 1px solid var(--df-border-2);
 
         .field-label {
           display: flex;
@@ -139,14 +139,14 @@ import {
           .field-key {
             font-size: 12px;
             font-weight: 600;
-            color: #424242;
-            font-family: 'Roboto Mono', monospace;
+            color: var(--df-text);
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-type-badge {
             font-size: 10px;
-            color: #9e9e9e;
-            font-family: 'Roboto Mono', monospace;
+            color: var(--df-text-faint);
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-badges {
@@ -160,38 +160,38 @@ import {
             }
 
             .badge-pk {
-              --mdc-chip-elevated-container-color: #7b1fa2;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent);
+              --mdc-chip-label-text-color: var(--df-accent-contrast);
             }
 
             .badge-fk {
-              --mdc-chip-elevated-container-color: #1565c0;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent-soft);
+              --mdc-chip-label-text-color: var(--df-accent-strong);
             }
           }
         }
 
         .field-value {
-          font-size: 13px;
-          color: #212121;
+          font-size: 1.3rem;
+          color: var(--df-text);
           word-break: break-word;
 
           .null-badge {
             display: inline-block;
             font-size: 11px;
             padding: 1px 8px;
-            border-radius: 4px;
-            background: #eeeeee;
-            color: #9e9e9e;
+            border-radius: var(--df-radius-sm);
+            background: var(--df-surface-2);
+            color: var(--df-text-faint);
             font-style: italic;
           }
 
           .json-value {
             font-size: 12px;
-            font-family: 'Roboto Mono', monospace;
-            background: #f5f5f5;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+            background: var(--df-surface-2);
+            border: 1px solid var(--df-border);
+            border-radius: var(--df-radius-sm);
             padding: 8px;
             margin: 4px 0 0;
             overflow-x: auto;
@@ -205,7 +205,7 @@ import {
         }
 
         &.null-value .field-value {
-          color: #9e9e9e;
+          color: var(--df-text-faint);
         }
 
         .field-ref {
@@ -218,53 +218,19 @@ import {
             font-size: 14px;
             width: 14px;
             height: 14px;
-            color: #9e9e9e;
+            color: var(--df-text-faint);
           }
         }
       }
 
       .ref-link {
-        color: #1565c0;
+        color: var(--df-accent);
         cursor: pointer;
         font-size: 11px;
         text-decoration: none;
         &:hover {
+          color: var(--df-accent-strong);
           text-decoration: underline;
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .row-detail-panel {
-          background: #1e1e1e;
-          border-left-color: #424242;
-        }
-        .detail-header {
-          background: #2c2c2c;
-          border-bottom-color: #424242;
-          .detail-title {
-            color: #bdbdbd;
-          }
-        }
-        .field-entry {
-          border-bottom-color: #2c2c2c;
-          .field-label .field-key {
-            color: #e0e0e0;
-          }
-          .field-value {
-            color: #e0e0e0;
-            .null-badge {
-              background: #333;
-              color: #757575;
-            }
-            .json-value {
-              background: #2c2c2c;
-              border-color: #424242;
-              color: #e0e0e0;
-            }
-          }
-        }
-        .ref-link {
-          color: #64b5f6;
         }
       }
     `,

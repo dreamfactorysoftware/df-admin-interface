@@ -4,7 +4,8 @@ import { inject } from '@angular/core';
 import { LimitType } from 'src/app/shared/types/limit';
 import { LIMIT_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
-import { of, switchMap } from 'rxjs';
+import { catchError, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 
 export const limitsResolver =
   (
@@ -20,11 +21,16 @@ export const limitsResolver =
         } else {
           const id = route.paramMap.get('id');
           if (!id) {
-            return limitsService.getAll<GenericListResponse<LimitType>>({
-              limit,
-              sort: 'name',
-              related: 'limit_cache_by_limit_id',
-            });
+            // List branch only: complete navigation on failure so the table
+            // shell renders the error state with Retry. The detail branch
+            // below keeps its own error contract.
+            return limitsService
+              .getAll<GenericListResponse<LimitType>>({
+                limit,
+                sort: 'name',
+                related: 'limit_cache_by_limit_id',
+              })
+              .pipe(catchError(err => of(emptyListWithError(err))));
           }
           return limitsService.get<LimitType>(id);
         }

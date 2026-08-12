@@ -10,7 +10,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { Router, ActivatedRoute } from '@angular/router';
 import { TranslocoService } from '@ngneat/transloco';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { Service, ServiceType } from 'src/app/shared/types/service';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -114,16 +113,13 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
     offset?: number,
     filter?: string
   ): void {
-    this.servicesService
-      .getAll<GenericListResponse<Service>>({
-        limit: 100 || limit,
-        offset,
-        filter: `(type not like "%swagger%")${filter ? ` and ${filter}` : ''}`,
-      })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    // ponytail: `100 || limit` predates this sweep (always 100, likely meant
+    // `limit || 100`); preserved verbatim so the sweep stays behavior-neutral.
+    this.fetchTable(this.servicesService, {
+      limit: 100 || limit,
+      offset,
+      filter: `(type not like "%swagger%")${filter ? ` and ${filter}` : ''}`,
+    });
   }
 
   filterQuery = getFilterQuery('apiDocs');

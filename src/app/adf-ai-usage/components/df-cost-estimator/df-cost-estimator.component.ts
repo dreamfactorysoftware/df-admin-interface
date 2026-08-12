@@ -29,7 +29,7 @@ interface ProviderBreakdown {
           <span class="cost__total">{{ formatUSD(totalCost) }}</span>
         </header>
         <p class="cost__hint">
-          The "Estimated cost" tile above is the source of truth — it uses the
+          The "Estimated cost" tile above is the source of truth: it uses the
           rates you configured on each AI Connection at log-time. This panel
           lets you experiment with different rates against the same token
           counts, so you can model what a price change would do without editing
@@ -78,8 +78,8 @@ interface ProviderBreakdown {
         </table>
         <ng-template #noConn>
           <p class="cost__empty">
-            No AI Connections configured — can't attribute tokens to providers
-            yet.
+            No AI Connections configured, so tokens can't be attributed to
+            providers yet.
           </p>
         </ng-template>
       </mat-card-content>
@@ -103,61 +103,73 @@ interface ProviderBreakdown {
         }
         &__title {
           margin: 0;
-          font-size: 16px;
+          font-size: 1.5rem;
           font-weight: 600;
-          color: #333;
+          letter-spacing: -0.01em;
+          color: var(--df-text);
         }
         &__total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 24px;
+          font-size: 2.4rem;
           font-weight: 700;
-          color: #2e7d32;
+          color: var(--df-success);
         }
         &__hint {
           margin: 0;
-          font-size: 13px;
-          color: #666;
+          font-size: 1.3rem;
+          color: var(--df-text-2);
           line-height: 1.5;
         }
         &__empty {
-          font-size: 14px;
-          color: #999;
+          font-size: 1.4rem;
+          color: var(--df-text-2);
           font-style: italic;
         }
         &__table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 14px;
-          color: #333;
+          font-size: 1.4rem;
+          color: var(--df-text);
 
           th {
             text-align: left;
             padding: 10px 12px;
             font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #666;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            letter-spacing: 0.06em;
+            color: var(--df-text-muted);
+            border-bottom: 1px solid var(--df-border);
             font-weight: 600;
           }
           td {
             padding: 10px 12px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+            border-bottom: 1px solid var(--df-border-2);
+          }
+          tbody tr {
+            height: 44px;
+
+            &:hover {
+              background: var(--df-hover);
+            }
           }
           input {
             width: 90px;
             padding: 6px 8px;
-            background: #fff;
-            border: 1px solid rgba(0, 0, 0, 0.2);
-            border-radius: 4px;
-            color: inherit;
+            background: var(--df-surface);
+            border: 1px solid var(--df-border);
+            border-radius: var(--df-radius-sm);
+            color: var(--df-text);
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            font-size: 13px;
+            font-size: 1.3rem;
             text-align: right;
+            transition:
+              border-color 0.2s ease,
+              box-shadow 0.2s ease;
 
             &:focus {
               outline: none;
-              border-color: #7f11e0;
+              border-color: var(--df-accent);
+              box-shadow: 0 0 0 2px var(--df-accent-soft);
             }
           }
         }
@@ -166,41 +178,6 @@ interface ProviderBreakdown {
           text-align: right;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           white-space: nowrap;
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .cost {
-          &__title {
-            color: #fff;
-          }
-          &__total {
-            color: #81c784;
-          }
-          &__hint,
-          &__empty {
-            color: #bbb;
-          }
-          &__table {
-            color: #fff;
-
-            th {
-              color: #bbb;
-              border-bottom-color: rgba(255, 255, 255, 0.12);
-            }
-            td {
-              border-bottom-color: rgba(255, 255, 255, 0.06);
-            }
-            input {
-              background: rgba(255, 255, 255, 0.06);
-              border-color: rgba(255, 255, 255, 0.2);
-              color: #fff;
-
-              &:focus {
-                border-color: #bb86fc;
-              }
-            }
-          }
         }
       }
     `,

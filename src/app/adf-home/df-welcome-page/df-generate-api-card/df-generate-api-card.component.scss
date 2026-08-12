@@ -5,20 +5,61 @@
   text-decoration: none;
 }
 
+// Departure language kept (flat bordered card, same density), but color
+// is back per Captain's coordinated-tint directive (punch item 21). The
+// card wash and the icon/heading color ride the categorical --df-tint-*
+// tokens set by [data-category] below, so all three themes repaint by
+// construction and there is not a single color literal in this file.
 .df-generate-api-card {
+  // Local vars default to a neutral surface; each category overrides them.
+  --card-tint-bg: var(--df-surface);
+  --card-tint-fg: var(--df-accent);
+
   cursor: pointer;
   width: 100%;
   height: 100%;
   min-height: 160px;
   display: flex;
   flex-direction: column;
+  background-color: var(--card-tint-bg);
+  border: 1px solid var(--df-border-2);
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    // Keep the category wash on hover; signal with the accent border only
+    // so the color that "means something" never washes out on interaction.
+    border-color: var(--df-accent);
+  }
+
+  &[data-category='build'] {
+    --card-tint-bg: var(--df-tint-build-bg);
+    --card-tint-fg: var(--df-tint-build-fg);
+  }
+  &[data-category='data'] {
+    --card-tint-bg: var(--df-tint-data-bg);
+    --card-tint-fg: var(--df-tint-data-fg);
+  }
+  &[data-category='security'] {
+    --card-tint-bg: var(--df-tint-security-bg);
+    --card-tint-fg: var(--df-tint-security-fg);
+  }
+  &[data-category='system'] {
+    --card-tint-bg: var(--df-tint-system-bg);
+    --card-tint-fg: var(--df-tint-system-fg);
+  }
+  &[data-category='admin'] {
+    --card-tint-bg: var(--df-tint-admin-bg);
+    --card-tint-fg: var(--df-tint-admin-fg);
+  }
+  &[data-category='ai'] {
+    --card-tint-bg: var(--df-tint-ai-bg);
+    --card-tint-fg: var(--df-tint-ai-fg);
+  }
+  &[data-category='docs'] {
+    --card-tint-bg: var(--df-tint-docs-bg);
+    --card-tint-fg: var(--df-tint-docs-fg);
   }
 }
 
@@ -34,17 +75,25 @@
     margin-bottom: 12px;
     flex-shrink: 0;
     font-size: 2rem;
+    // Icon takes the category foreground tint.
+    color: var(--card-tint-fg);
   }
 
   .df-card-header {
-    font-size: 16px;
+    font-size: 1.6rem;
     font-weight: 600;
+    letter-spacing: -0.01em;
     margin-bottom: 8px;
     line-height: 1.3;
+    // Heading takes the category foreground tint too (per directive:
+    // "fg on icon/heading"). The tint fg tokens are tuned per theme for
+    // readable foreground contrast, so legibility holds in all three.
+    color: var(--card-tint-fg);
   }
   .df-card-description {
-    font-size: 14px;
+    font-size: 1.4rem;
     line-height: 1.5;
+    color: var(--df-text-2);
     display: -webkit-box;
     line-clamp: 3;
     -webkit-line-clamp: 3;

@@ -1,0 +1,13 @@
+@use '../df-dialog-surface' as *;
+@include df-dialog-surface;
+
+// Destructive (delete) confirm button: danger treatment, not accent. Uses the
+// soft-danger / danger-ink / danger-border pairing (the same AA-safe trio the
+// status badges use) so it stays legible in light, dark and phosphor - a solid
+// danger fill has no guaranteed contrast token in dark. Repaints the MDC filled
+// button vars the button already consumes; no literals, no !important.
+.save-btn.destructive {
+  --mdc-filled-button-container-color: var(--df-danger-soft);
+  --mdc-filled-button-label-text-color: var(--df-danger);
+  border: 1px solid var(--df-danger-border);
+}

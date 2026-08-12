@@ -36,6 +36,7 @@ yarn-error.log
 testem.log
 /typings
 /scripts/*
+!/scripts/publish.sh
 
 # System files
 .DS_Store

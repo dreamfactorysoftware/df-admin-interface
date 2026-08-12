@@ -1,0 +1,32 @@
+<details class="error-detail" [open]="expanded">
+  <summary>{{ 'errors.details' | transloco }}</summary>
+  <dl class="error-detail-grid">
+    <dt>{{ 'errors.timestamp' | transloco }}</dt>
+    <dd>{{ error.timestamp }}</dd>
+    <dt>{{ 'errors.status' | transloco }}</dt>
+    <dd>
+      {{ error.status }} ({{ error.kind
+      }}<ng-container *ngIf="error.code">, code {{ error.code }}</ng-container
+      >)
+    </dd>
+    <ng-container *ngIf="error.url">
+      <dt>{{ 'errors.request' | transloco }}</dt>
+      <dd>{{ error.method }} {{ error.url }}</dd>
+    </ng-container>
+  </dl>
+  <ul class="error-detail-fields" *ngIf="error.fields.length">
+    <li *ngFor="let field of error.fields">
+      <span *ngIf="field.field">{{ field.field }}: </span
+      >{{ field.message | transloco }}
+    </li>
+  </ul>
+  <pre class="error-detail-raw">{{ rawBody }}</pre>
+  <button
+    mat-stroked-button
+    type="button"
+    class="copy-btn"
+    (click)="copyForSupport()">
+    <fa-icon [icon]="copied ? faCheck : faCopy"></fa-icon>
+    {{ (copied ? 'errors.copied' : 'errors.copyForSupport') | transloco }}
+  </button>
+</details>

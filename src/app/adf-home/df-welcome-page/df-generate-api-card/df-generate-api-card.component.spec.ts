@@ -35,8 +35,7 @@ describe('DfGenerateApiCardComponent', () => {
     component.headerText = 'home.welcomePage.apiManagementCard.header';
     component.text = 'home.welcomePage.apiManagementCard.description';
     component.route = '/api-connections';
-    component.cardFinalBackgroundColor = '#fff';
-    component.cardFinalHeaderColor = '#000';
+    component.category = 'build';
     fixture.detectChanges();
   });
 

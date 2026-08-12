@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import { silent } from 'src/app/shared/utilities/http-contexts';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
 
@@ -307,44 +308,55 @@ export class UsageService {
       });
     });
 
+    // Silent by design: every request in this bundle degrades to an empty
+    // dataset (zero-state dashboard / "#N" name fallbacks); a toast per
+    // failed analytics fetch would be noise. Intent is annotated per request.
     return forkJoin({
-      raw: this.http.get<UsageResponse>('/_internal/ai/usage', { params }).pipe(
-        catchError(() =>
-          of({
-            period,
-            since: new Date(Date.now() - 7 * 86400000).toISOString(),
-            total_requests: 0,
-            total_input_tokens: 0,
-            total_output_tokens: 0,
-            total_cost_usd: 0,
-            errors: 0,
-            avg_latency_ms: 0,
-            latency_p50_ms: 0,
-            latency_p95_ms: 0,
-            latency_p99_ms: 0,
-            partials: 0,
-            by_service: [],
-            by_user: [],
-            by_role: [],
-            by_app: [],
-            by_provider: [],
-            by_model: [],
-            by_resource: [],
-            by_error_class: [],
-            series: [],
-            series_by_model: [],
-            series_by_user: [],
-            series_by_app: [],
-            series_by_provider: [],
-            most_expensive_calls: [],
-            filters: {},
-            budgets: [],
-            default_rates: {},
-          } as UsageResponse)
-        )
-      ),
+      raw: this.http
+        .get<UsageResponse>('/_internal/ai/usage', {
+          params,
+          context: silent(),
+        })
+        .pipe(
+          catchError(() =>
+            of({
+              period,
+              since: new Date(Date.now() - 7 * 86400000).toISOString(),
+              total_requests: 0,
+              total_input_tokens: 0,
+              total_output_tokens: 0,
+              total_cost_usd: 0,
+              errors: 0,
+              avg_latency_ms: 0,
+              latency_p50_ms: 0,
+              latency_p95_ms: 0,
+              latency_p99_ms: 0,
+              partials: 0,
+              by_service: [],
+              by_user: [],
+              by_role: [],
+              by_app: [],
+              by_provider: [],
+              by_model: [],
+              by_resource: [],
+              by_error_class: [],
+              series: [],
+              series_by_model: [],
+              series_by_user: [],
+              series_by_app: [],
+              series_by_provider: [],
+              most_expensive_calls: [],
+              filters: {},
+              budgets: [],
+              default_rates: {},
+            } as UsageResponse)
+          )
+        ),
       mcp: this.http
-        .get<McpUsageResponse>('/_internal/ai/mcp-usage', { params })
+        .get<McpUsageResponse>('/_internal/ai/mcp-usage', {
+          params,
+          context: silent(),
+        })
         .pipe(
           catchError(() =>
             of({
@@ -371,6 +383,28 @@ export class UsageService {
       roles: this.getRolesLookup(),
       apps: this.getAppsLookup(),
     }).pipe(map(b => b));
+  }
+
+  /**
+   * One filtered usage window, used by the task estimator: 90d calibration
+   * reads and the pre/post meter snapshots around a real run. Silent + null
+   * on failure so callers degrade to "not enough metered history" instead
+   * of toasting per analytics fetch.
+   */
+  loadWindow(
+    period: string,
+    filter: { app_id?: number; service_id?: number } = {}
+  ): Observable<UsageResponse | null> {
+    let params = new HttpParams().set('period', period);
+    if (filter.app_id != null) {
+      params = params.set('app_id', String(filter.app_id));
+    }
+    if (filter.service_id != null) {
+      params = params.set('service_id', String(filter.service_id));
+    }
+    return this.http
+      .get<UsageResponse>('/_internal/ai/usage', { params, context: silent() })
+      .pipe(catchError(() => of(null)));
   }
 
   private getServicesLookup(): Observable<Map<number, ServiceLookupRow>> {
@@ -401,6 +435,7 @@ export class UsageService {
           filter:
             '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp")',
         },
+        context: silent(),
       })
       .pipe(
         map(res => {
@@ -420,6 +455,7 @@ export class UsageService {
     return this.http
       .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/user`, {
         params: { fields: 'id,name,username,email' },
+        context: silent(),
       })
       .pipe(
         map(res => {
@@ -437,6 +473,7 @@ export class UsageService {
     return this.http
       .get<{ resource: RoleLookupRow[] }>(`${BASE_URL}/system/role`, {
         params: { fields: 'id,name' },
+        context: silent(),
       })
       .pipe(
         map(res => {
@@ -452,6 +489,7 @@ export class UsageService {
     return this.http
       .get<{ resource: AppLookupRow[] }>(`${BASE_URL}/system/app`, {
         params: { fields: 'id,name' },
+        context: silent(),
       })
       .pipe(
         map(res => {

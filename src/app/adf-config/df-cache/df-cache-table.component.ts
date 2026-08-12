@@ -42,6 +42,7 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
+    this.cacheService = cacheService;
   }
 
   override allowCreate = false;
@@ -101,7 +102,9 @@ export class DfCacheTableComponent extends DfManageTableComponent<CacheRow> {
 
   filterQuery = getFilterQuery();
 
-  refreshTable = () => null;
+  refreshTable(): void {
+    this.fetchTable(this.cacheService, { fields: '*' });
+  }
 }
 
 @Component({

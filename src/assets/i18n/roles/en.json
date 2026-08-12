@@ -4,10 +4,12 @@
   "app": "App",
   "appRoleAssigned": "{{assigned}}/{{total}} app roles assigned",
   "noRoles": "No roles assigned.",
+  "createSuccess": "Role created. Assign it to an API key or user to put it to work.",
 
   "rolesOverview": {
     "heading": "Roles Overview",
     "description": "Roles provide a way to grant or deny API access to specific services or apps.",
+    "nameHint": "Name the role for what it grants, like read-only or billing-admin. You will attach it to API keys and users.",
     "error": {
       "name": "The name field is required."
     }
@@ -38,7 +40,7 @@
     "noAccess": "This role grants no service access.",
     "noVerbs": "no verbs",
     "noAccessLabel": "no access",
-    "footer": "This role can ONLY access the services and components listed under \"Allowed\" above. All other data is invisible to anything operating under this role — including AI.",
+    "footer": "This role can ONLY access the services and components listed under \"Allowed\" above. All other data is invisible to anything operating under this role, including AI.",
     "back": "Back to role",
     "action": "View scope",
     "errorRecovery": "Back to roles list"

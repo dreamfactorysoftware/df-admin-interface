@@ -1,9 +1,10 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpHeaders } from '@angular/common/http';
 import { RequestOptions } from 'src/app/shared/types/generic-http';
 import { readAsText } from 'src/app/shared/utilities/file';
 import { map, switchMap } from 'rxjs';
 import { Inject, Injectable } from '@angular/core';
 import { URL_TOKEN } from '../constants/tokens';
+import { ERROR_HANDLING, SUCCESS_TOAST } from '../utilities/http-contexts';
 
 @Injectable()
 export class DfBaseCrudService {
@@ -27,7 +28,7 @@ export class DfBaseCrudService {
   get<T>(id: string | number, options?: Partial<RequestOptions>) {
     return this.http.get<T>(
       `${this.url}/${id}`,
-      this.getOptions({ snackbarError: 'server', ...options })
+      this.getOptions({ ...options })
     );
   }
 
@@ -80,13 +81,13 @@ export class DfBaseCrudService {
   }
 
   legacyDelete(endpoint: string, options?: Partial<RequestOptions>) {
-    const { headers, params } = this.getOptions({
-      snackbarError: 'server',
+    const { headers, params, context } = this.getOptions({
       ...options,
     });
     return this.http.post(`${this.url}/${endpoint}`, null, {
       headers: { ...headers, 'X-Http-Method': 'DELETE' },
       params,
+      context,
     });
   }
 
@@ -99,17 +100,14 @@ export class DfBaseCrudService {
       : id
         ? `${this.url}/${id}`
         : `${this.url}`;
-    return this.http.delete(
-      url,
-      this.getOptions({ snackbarError: 'server', ...options })
-    );
+    return this.http.delete(url, this.getOptions({ ...options }));
   }
 
   patch<T, S>(id: string | number, data: S, options?: Partial<RequestOptions>) {
     return this.http.patch<T>(
       `${this.url}/${id}`,
       data,
-      this.getOptions({ snackbarError: 'server', ...options })
+      this.getOptions({ ...options })
     );
   }
 
@@ -120,7 +118,6 @@ export class DfBaseCrudService {
           this.url,
           data,
           this.getOptions({
-            snackbarError: 'server',
             contentType: file.type,
             ...options,
           })
@@ -140,7 +137,6 @@ export class DfBaseCrudService {
       `${this.url}/${location}`,
       formData,
       this.getOptions({
-        snackbarError: 'server',
         ...options,
       })
     );
@@ -151,7 +147,6 @@ export class DfBaseCrudService {
     return this.http
       .get(url, {
         ...this.getOptions({
-          snackbarError: 'server',
           ...options,
         }),
       })
@@ -163,7 +158,6 @@ export class DfBaseCrudService {
     return this.http.get(url, {
       responseType: 'blob',
       ...this.getOptions({
-        snackbarError: 'server',
         ...options,
       }),
     });
@@ -172,6 +166,7 @@ export class DfBaseCrudService {
   getOptions(options: Partial<RequestOptions>) {
     const headers: any = {};
     const params: any = {};
+    let context = new HttpContext();
     if (options.includeCacheControl !== false) {
       headers['Cache-Control'] = 'no-cache, private';
     }
@@ -179,10 +174,10 @@ export class DfBaseCrudService {
       headers['show-loading'] = '';
     }
     if (options.snackbarSuccess) {
-      headers['snackbar-success'] = options.snackbarSuccess;
+      context = context.set(SUCCESS_TOAST, options.snackbarSuccess);
     }
-    if (options.snackbarError) {
-      headers['snackbar-error'] = options.snackbarError;
+    if (options.errorHandling) {
+      context = context.set(ERROR_HANDLING, options.errorHandling);
     }
     if (options.contentType) {
       headers['Content-type'] = options.contentType;
@@ -222,6 +217,6 @@ export class DfBaseCrudService {
         params[param.key] = param.value;
       });
     }
-    return { headers, params };
+    return { headers, params, context };
   }
 }

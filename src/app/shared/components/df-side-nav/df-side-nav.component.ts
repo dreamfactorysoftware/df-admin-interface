@@ -28,6 +28,7 @@ import {
   transformRoutes,
 } from '../../utilities/route';
 import { Nav } from '../../types/nav';
+import { ROUTES } from '../../types/routes';
 import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
@@ -35,6 +36,7 @@ import { DfLicenseCheckService } from '../../services/df-license-check.service';
 import { debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
+import { DfCommandPaletteService } from '../df-command-palette/df-command-palette.service';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { CommonModule } from '@angular/common';
 import { DfSearchService } from '../../services/df-search.service';
@@ -81,6 +83,7 @@ export class DfSideNavComponent implements OnInit {
   faBars = faBars;
   hasError$ = this.errorService.hasError$;
   nav: Array<Nav> = [];
+  navGroups: Array<{ label: string; items: Array<Nav> }> = [];
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
   faMagnifyingGlass = faMagnifyingGlass;
   faUser = faUser;
@@ -105,7 +108,8 @@ export class DfSideNavComponent implements OnInit {
     private searchService: DfSearchService,
     private snackbarService: DfSnackbarService,
     private paywallService: DfPaywallService,
-    private systemConfigDataService: DfSystemConfigDataService
+    private systemConfigDataService: DfSystemConfigDataService,
+    private commandPalette: DfCommandPaletteService
   ) {}
 
   ngOnInit(): void {
@@ -151,6 +155,7 @@ export class DfSideNavComponent implements OnInit {
         } else {
           this.nav = transformRoutes(routes);
         }
+        this.navGroups = this.buildNavGroups(this.nav);
       });
     this.search.valueChanges
       .pipe(
@@ -168,24 +173,152 @@ export class DfSideNavComponent implements OnInit {
       .subscribe(license => (this.licenseType = license));
   }
   isDarkMode = this.themeService.darkMode$;
+
+  /**
+   * Pillar IA for the shell prototype: group the flat top-level nav into
+   * product pillars. Presentation-only; the route table is untouched and
+   * any item not claimed by a pillar still renders in a trailing group so
+   * restricted-access nav sets never lose entries.
+   */
+  private buildNavGroups(
+    nav: Array<Nav>
+  ): Array<{ label: string; items: Array<Nav> }> {
+    // Captain 2026-07-07: these read as sections, not top-level rows. Nest
+    // each former top-level item inside its owning expansion.
+    const nested: Array<{ child: ROUTES; parent: ROUTES }> = [
+      { child: ROUTES.API_BUILDER, parent: ROUTES.API_CONNECTIONS },
+      { child: ROUTES.AGENTS, parent: ROUTES.AI },
+      { child: ROUTES.ALERTS, parent: ROUTES.SYSTEM_SETTINGS },
+    ];
+    for (const rule of nested) {
+      const childIdx = nav.findIndex(item => item.route === rule.child);
+      const parent = nav.find(item => item.route === rule.parent);
+      if (childIdx !== -1 && parent) {
+        // FB4: only top-level pillar/parent items carry an icon. A demoted
+        // child (API Builder, Agents, Alerts) renders as icon-less text like
+        // every other nested sibling, so strip the icon as we nest it.
+        nav[childIdx].icon = '';
+        parent.subRoutes = [...(parent.subRoutes ?? []), nav[childIdx]];
+        nav.splice(childIdx, 1);
+      }
+    }
+    // FB10: Logs belongs to the System pillar only. It is reached from the
+    // System nav via the system-settings/file-logs redirect into the shared
+    // log viewer, whose route still lives at admin-settings/logs (that
+    // redirect and the section-overview cards resolve to it). Drop just the
+    // duplicate Admin Settings nav entry so Logs no longer shows in both
+    // pillars; the route itself is untouched.
+    const adminSettings = nav.find(
+      item => item.route === ROUTES.ADMIN_SETTINGS
+    );
+    if (adminSettings?.subRoutes) {
+      adminSettings.subRoutes = adminSettings.subRoutes.filter(
+        sub => sub.path !== `/${ROUTES.ADMIN_SETTINGS}/${ROUTES.LOGS}`
+      );
+    }
+    const byRoute = new Map(nav.map(item => [item.route, item]));
+    const claimed = new Set<Nav>();
+    const pick = (routeIds: Array<ROUTES>) =>
+      routeIds
+        .map(id => byRoute.get(id))
+        .filter((item): item is Nav => {
+          if (!item) return false;
+          claimed.add(item);
+          return true;
+        });
+    // Labels are transloco keys (nav.pillars.* in en.json); the template
+    // pipes them through | transloco.
+    const groups = [
+      { label: '', items: pick([ROUTES.HOME]) },
+      {
+        label: 'nav.pillars.build',
+        items: pick([ROUTES.API_CONNECTIONS]),
+      },
+      { label: 'nav.pillars.secureManage', items: pick([ROUTES.API_SECURITY]) },
+      {
+        label: 'nav.pillars.aiGateway',
+        items: pick([ROUTES.AI]),
+      },
+      {
+        label: 'nav.pillars.system',
+        items: pick([ROUTES.SYSTEM_SETTINGS, ROUTES.ADMIN_SETTINGS]),
+      },
+      { label: '', items: nav.filter(item => !claimed.has(item)) },
+    ];
+    return groups.filter(group => group.items.length);
+  }
+
+  trackByGroupLabel = (
+    index: number,
+    group: { label: string; items: Array<Nav> }
+  ) => `${index}-${group.label}`;
+
+  /** Last breadcrumb = the current page; rendered as the content H1. */
+  get currentCrumb() {
+    const crumbs = this.breadCrumbs;
+    return crumbs.length ? crumbs[crumbs.length - 1] : undefined;
+  }
+
+  /** Punch 5: detail pages publish their entity label keyed by URL
+   * (DfSnackbarService.setPageLabel); prefer it over a raw dynamic URL
+   * segment (e.g. the numeric service id) for the H1. URL keying means a
+   * stale label can never title another page. */
+  get pageLabelOverride(): string | undefined {
+    const crumb = this.currentCrumb;
+    if (!crumb || crumb.translationKey) {
+      return undefined;
+    }
+    const override = this.snackbarService.pageLabel$.value;
+    return override && override.url === this.router.url
+      ? override.label
+      : undefined;
+  }
+
   logout() {
     this.authService.logout();
   }
 
   isActive(nav: Nav) {
-    return this.router.url.startsWith(nav.path);
+    // Redirect-backed items (linkPath, e.g. API Builder) must match on
+    // their destination URL: the redirect's own path never appears in
+    // router.url, so matching nav.path alone can never highlight them.
+    //
+    // Match on a segment boundary, not a bare string prefix: sibling routes
+    // whose paths share a prefix (e.g. /admin-settings/schema and
+    // /admin-settings/schema-contracts) would otherwise both highlight. Active
+    // when the current url equals the path or is a child route of it.
+    const path = nav.linkPath ?? nav.path;
+    const url = this.router.url.split('?')[0].split('#')[0];
+    return url === path || url.startsWith(path + '/');
   }
 
+  // Nav routes are static, so the label key is computed once per route
+  // instead of allocating split/join intermediates on every CD cycle.
+  private navLabelCache = new Map<string, string>();
   navLabel(route: string) {
-    const segments = route.replace('/', '').split('/').join('.');
-    return `nav.${segments}.nav`;
+    let label = this.navLabelCache.get(route);
+    if (label === undefined) {
+      const segments = route.replace('/', '').split('/').join('.');
+      label = `nav.${segments}.nav`;
+      this.navLabelCache.set(route, label);
+    }
+    return label;
   }
 
   navLink(nav: Nav) {
     return nav.linkPath ?? nav.path;
   }
+  // Memoized on router.url: generateBreadcrumb walks the route table
+  // recursively and allocates arrays per visited route, and the side-nav
+  // renders on every page, so this ran on every CD tick app-wide.
+  private _breadCrumbs: ReturnType<typeof generateBreadcrumb> = [];
+  private _breadCrumbsUrl?: string;
   get breadCrumbs() {
-    return generateBreadcrumb(routes, this.router.url);
+    if (this._breadCrumbsUrl !== this.router.url) {
+      this._breadCrumbsUrl = this.router.url;
+      this._breadCrumbs = generateBreadcrumb(routes, this.router.url);
+    }
+    return this._breadCrumbs;
   }
 
   handleNavClick(nav: Nav) {
@@ -220,7 +353,7 @@ export class DfSideNavComponent implements OnInit {
   }
 
   handleSearchClick() {
-    this.dialog.open(DfSearchDialogComponent, { position: { top: '60px' } });
+    this.commandPalette.toggle();
   }
 
   handleLanguageChange(language: string) {

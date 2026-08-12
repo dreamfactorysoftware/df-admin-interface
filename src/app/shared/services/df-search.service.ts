@@ -75,7 +75,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('user')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {
@@ -99,7 +99,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('user')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {
@@ -123,11 +123,11 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('services')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         }),
         serviceTypes: this.serviceTypeService.getAll<
           GenericListResponse<ServiceType>
-        >({ additionalHeaders: [{ key: 'skip-error', value: 'true' }] }),
+        >({ errorHandling: 'silent' }),
       }).pipe(
         catchError(() => {
           return of(null);
@@ -216,7 +216,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('roles')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {
@@ -240,7 +240,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('apps')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {
@@ -264,7 +264,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('eventScripts')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {
@@ -292,7 +292,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('limits')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {
@@ -316,7 +316,7 @@ export class DfSearchService {
           limit: 0,
           includeCount: false,
           filter: getFilterQuery('emailTemplates')(value),
-          additionalHeaders: [{ key: 'skip-error', value: 'true' }],
+          errorHandling: 'silent',
         })
         .pipe(
           catchError(() => {

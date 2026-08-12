@@ -1,0 +1,62 @@
+// ============================================================
+// df-empty-state (Meridian Phase 0). Tokens only: every color,
+// size, space and motion value reads a --df-* token so light,
+// dark and phosphor resolve from src/styles.scss with no literal
+// to break the terminal theme. Depends on the Phase 0 type/space/
+// motion token layer owned by the tokens-theme wave.
+// ============================================================
+
+.empty-state {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+  margin: 0 auto;
+  max-width: 44ch;
+  padding: var(--df-space-8) var(--df-space-5);
+  text-align: center;
+}
+
+// Centered icon chip: soft accent wash, no shadow (flat surface language).
+.empty-state__icon {
+  align-items: center;
+  background: var(--df-accent-soft);
+  border-radius: var(--df-radius);
+  color: var(--df-accent);
+  display: inline-flex;
+  height: var(--df-space-8);
+  justify-content: center;
+  width: var(--df-space-8);
+
+  mat-icon {
+    font-size: var(--df-font-size-2xl);
+    height: var(--df-font-size-2xl);
+    line-height: 1;
+    width: var(--df-font-size-2xl);
+  }
+}
+
+.empty-state__title {
+  color: var(--df-text);
+  font-size: var(--df-font-size-lg);
+  font-weight: var(--df-font-weight-heading);
+  letter-spacing: var(--df-tracking-tight);
+  line-height: var(--df-lh-tight);
+  margin: 0;
+}
+
+.empty-state__description {
+  color: var(--df-text-2);
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
+  margin: 0;
+}
+
+.empty-state__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-2);
+  justify-content: center;
+  margin-top: var(--df-space-1);
+}

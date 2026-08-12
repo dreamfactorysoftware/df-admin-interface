@@ -1,0 +1,31 @@
+// Departure dialog surface, shared by the MatDialog-based dialogs
+// (confirm, duplicate, search, error detail).
+//
+// Root cause of the white-panel bug (stream 8 punch item 1): theme.scss
+// builds a LIGHT Material theme only, which emits
+// --mdc-dialog-container-color: white on .mat-mdc-dialog-container, and
+// .mdc-dialog__surface paints that. .dark-theme / .phosphor-theme retune
+// the --df-* tokens on <body> but never re-point the MDC dialog vars, so
+// every dialog stayed a hard white sheet in dark and phosphor.
+//
+// The surface node sits ABOVE each dialog component's host, out of reach
+// of scoped styles, so each dialog paints its own host as the surface with
+// theme tokens (the surface's own radius + overflow clip the corners). The
+// MDC type vars ARE inherited by the title/content nodes inside the host,
+// so re-declaring them here re-points the dialog type onto the tokens in
+// all three themes. No literals, no counter-!important.
+@mixin df-dialog-surface {
+  :host {
+    display: block;
+    background: var(--df-surface);
+    color: var(--df-text);
+    --mdc-dialog-subhead-color: var(--df-text);
+    --mdc-dialog-supporting-text-color: var(--df-text-2);
+  }
+
+  // Hairline between body and actions: flat bordered language.
+  mat-dialog-actions,
+  [mat-dialog-actions] {
+    border-top: 1px solid var(--df-border-2);
+  }
+}

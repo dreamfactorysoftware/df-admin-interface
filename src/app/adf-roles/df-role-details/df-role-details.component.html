@@ -5,13 +5,9 @@
   [showAlert]="showAlert"
   [alertType]="alertType"
   (alertClosed)="showAlert = false">
-  {{ alertMsg }}
+  {{ alertMsg | transloco }}
 </df-alert>
-<form
-  [formGroup]="roleForm"
-  (ngSubmit)="onSubmit()"
-  class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<form [formGroup]="roleForm" (ngSubmit)="onSubmit()" class="details-section">
   <mat-form-field
     appearance="outline"
     subscriptSizing="dynamic"
@@ -21,6 +17,10 @@
     <mat-error *ngIf="roleForm.controls['name'].hasError('required')">
       {{ 'roles.rolesOverview.error.name' | transloco }}
     </mat-error>
+    <mat-error *ngIf="roleForm.controls['name'].hasError('server')">
+      {{ roleForm.controls['name'].getError('server') }}
+    </mat-error>
+    <mat-hint>{{ 'roles.rolesOverview.nameHint' | transloco }}</mat-hint>
   </mat-form-field>
   <mat-slide-toggle formControlName="active" class="dynamic-width">{{
     'active' | transloco

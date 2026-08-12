@@ -1,0 +1,199 @@
+// df-artifact-card — the Live API Card. Tokens only; no color/space/type
+// literals so it resolves in light, dark, and phosphor. Code panels sit on the
+// always-dark --df-code-bg / --df-code-text pair the rest of the app uses.
+:host {
+  display: block;
+}
+
+.artifact-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-4);
+  padding: var(--df-space-5);
+  background-color: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+
+  // ---- header: identity + switchers ----
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--df-space-4);
+  }
+
+  &__intro {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-1);
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: var(--df-font-size-lg);
+    font-weight: var(--df-font-weight-heading);
+    line-height: var(--df-lh-tight);
+    color: var(--df-text);
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text-muted);
+  }
+
+  &__switchers {
+    display: flex;
+    gap: var(--df-space-3);
+    flex-wrap: wrap;
+  }
+
+  &__field {
+    width: 11rem;
+
+    // Kill the outline field's reserved subscript space; the card is dense.
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+
+  &__opt-role {
+    color: var(--df-text-muted);
+  }
+
+  // ---- meta strip: real base URL + auth header ----
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    margin: 0;
+    padding: var(--df-space-3) var(--df-space-4);
+    background-color: var(--df-surface-2);
+    border: 1px solid var(--df-border-2);
+    border-radius: var(--df-radius-sm);
+  }
+
+  &__meta-row {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-3);
+    min-width: 0;
+
+    dt {
+      flex: 0 0 5.5rem;
+    }
+  }
+
+  &__meta-val {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-2);
+    margin: 0;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__inline {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-2);
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: var(--df-space-1) 0;
+  }
+
+  &__copy {
+    flex: 0 0 auto;
+    color: var(--df-text-muted);
+    transition: color var(--df-duration-fast) var(--df-ease-standard);
+
+    &:hover {
+      color: var(--df-text);
+    }
+
+    .is-copied {
+      color: var(--df-success);
+    }
+  }
+
+  // ---- no-key affordance ----
+  &__nokey {
+    flex-wrap: wrap;
+  }
+
+  &__nokey-hint {
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+  }
+
+  &__nokey-cta {
+    color: var(--df-accent);
+
+    fa-icon {
+      margin-right: var(--df-space-1);
+    }
+  }
+
+  // ---- framework tabs ----
+  &__mcp-badge {
+    margin-left: var(--df-space-2);
+  }
+
+  &__block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    padding-top: var(--df-space-3);
+  }
+
+  &__code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--df-space-3);
+  }
+
+  &__note {
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+  }
+
+  &__copy-btn {
+    flex: 0 0 auto;
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    transition: color var(--df-duration-fast) var(--df-ease-standard);
+
+    fa-icon {
+      margin-right: var(--df-space-1);
+    }
+
+    &:hover {
+      color: var(--df-text);
+    }
+
+    &.is-copied {
+      color: var(--df-success);
+    }
+  }
+
+  &__code {
+    margin: 0;
+    padding: var(--df-space-4);
+    background-color: var(--df-code-bg);
+    color: var(--df-code-text);
+    border: 1px solid var(--df-border-2);
+    border-radius: var(--df-radius-sm);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+    line-height: var(--df-lh-base);
+    overflow-x: auto;
+
+    code {
+      font-family: inherit;
+      white-space: pre;
+    }
+  }
+}

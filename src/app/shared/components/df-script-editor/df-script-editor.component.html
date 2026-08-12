@@ -1,4 +1,4 @@
-<div class="details-section" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<div class="details-section">
   <div class="actions full-width">
     <input
       type="file"
@@ -23,9 +23,7 @@
       {{ 'githubFile' | transloco }}
     </button>
   </div>
-  <mat-checkbox
-    [(ngModel)]="checked"
-    (ngModelChange)="onCheckedChange($event)">
+  <mat-checkbox [(ngModel)]="checked" (ngModelChange)="onCheckedChange($event)">
     Add path to file
   </mat-checkbox>
   <ng-container *ngIf="checked">
@@ -72,11 +70,11 @@
       <mat-icon class="snapshot-icon">history</mat-icon>
       <div class="snapshot-message">
         <span class="snapshot-text" *ngIf="snapshotDisplayDate as snap">
-          Snapshot from {{ snap | date: 'medium' }} — the running script uses
+          Snapshot from {{ snap | date: 'medium' }}. The running script uses
           whatever is currently in the linked storage.
         </span>
         <span class="snapshot-text" *ngIf="!snapshotDisplayDate">
-          Snapshot — the running script uses whatever is currently in the linked
+          Snapshot. The running script uses whatever is currently in the linked
           storage.
         </span>
         <span class="snapshot-error" *ngIf="refreshError">

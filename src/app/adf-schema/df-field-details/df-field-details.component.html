@@ -1,7 +1,6 @@
 <form
   [formGroup]="fieldDetailsForm"
   class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
   (ngSubmit)="onSubmit()">
   <div class="full-width">
     <mat-form-field
@@ -217,7 +216,10 @@
     }}</mat-label>
     <mat-select formControlName="refTable">
       <mat-option
-        *ngFor="let table of referenceTableDropdownMenuOptions"
+        *ngFor="
+          let table of referenceTableDropdownMenuOptions;
+          trackBy: trackByName
+        "
         [value]="table.name">
         {{ table.name }}
       </mat-option>
@@ -232,7 +234,10 @@
     }}</mat-label>
     <mat-select formControlName="refField">
       <mat-option
-        *ngFor="let field of referenceFieldDropdownMenuOptions"
+        *ngFor="
+          let field of referenceFieldDropdownMenuOptions;
+          trackBy: trackByName
+        "
         [value]="field.name"
         >{{ field.label }}</mat-option
       >

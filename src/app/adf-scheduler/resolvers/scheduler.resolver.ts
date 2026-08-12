@@ -4,7 +4,8 @@ import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { SCHEDULER_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { SchedulerTaskData } from '../../shared/types/scheduler';
 import { DfPaywallService } from 'src/app/shared/services/df-paywall.service';
-import { of, switchMap } from 'rxjs';
+import { catchError, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 
 export const schedulerResolver: ResolveFn<
   GenericListResponse<SchedulerTaskData> | SchedulerTaskData | string
@@ -22,9 +23,14 @@ export const schedulerResolver: ResolveFn<
             related: 'task_log_by_task_id',
           });
 
-        return schedulerService.getAll<GenericListResponse<SchedulerTaskData>>({
-          related: 'task_log_by_task_id,service_by_service_id',
-        });
+        // List branch only: complete navigation on failure so the table
+        // shell renders the error state with Retry. The detail branch above
+        // keeps its own error contract.
+        return schedulerService
+          .getAll<GenericListResponse<SchedulerTaskData>>({
+            related: 'task_log_by_task_id,service_by_service_id',
+          })
+          .pipe(catchError(err => of(emptyListWithError(err))));
       }
     })
   );

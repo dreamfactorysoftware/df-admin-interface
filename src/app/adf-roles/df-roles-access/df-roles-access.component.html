@@ -33,7 +33,7 @@
                   required>
                   <mat-option [value]="0">All</mat-option>
                   <mat-option
-                    *ngFor="let option of serviceOptions"
+                    *ngFor="let option of serviceOptions; trackBy: trackById"
                     [value]="option.id"
                     >{{ option.name }}</mat-option
                   >

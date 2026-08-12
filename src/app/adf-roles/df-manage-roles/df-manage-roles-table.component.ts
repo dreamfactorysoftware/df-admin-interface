@@ -45,6 +45,8 @@ import { catchError, throwError } from 'rxjs';
   ],
 })
 export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow> {
+  override emptyStateMessage = 'emptyState.roles.message';
+  override emptyStateActionLabel = 'emptyState.roles.action';
   expandedElement: any | null;
   constructor(
     @Inject(ROLE_SERVICE_TOKEN)
@@ -137,12 +139,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.roleService
-      .getAll<GenericListResponse<RoleType>>({ limit, offset, filter })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.roleService, { limit, offset, filter });
   }
 
   duplicateRole(row: RoleRow): void {

@@ -90,7 +90,9 @@ interface NormalizedModel {
           <mat-select
             [value]="currentValue"
             (selectionChange)="select($event.value)">
-            <mat-option *ngFor="let m of models" [value]="m.id">
+            <mat-option
+              *ngFor="let m of models; trackBy: trackModel"
+              [value]="m.id">
               <span class="model-picker__option">
                 <span class="model-picker__option-label">{{ m.label }}</span>
                 <span *ngIf="m.context" class="model-picker__option-meta"
@@ -139,27 +141,20 @@ interface NormalizedModel {
   `,
   styles: [
     `
-      /* Theme-flip tokens: dark text/surfaces by default (light mode);
-         the dark-theme class restores the original light-on-dark look. */
-      :host-context(.dark-theme) {
-        --df-ai-fg: rgba(255, 255, 255, 0.85);
-        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
-        --df-ai-fg-faint: rgba(255, 255, 255, 0.55);
-        --df-ai-surface: rgba(255, 255, 255, 0.02);
-        --df-ai-surface-strong: rgba(255, 255, 255, 0.08);
-        --df-ai-border: rgba(255, 255, 255, 0.08);
-      }
-
+      /* Departure treatment: token-only chrome (light/dark/phosphor come
+         free), flat bordered panel on the shared corner scale, exemplar
+         type hierarchy. */
       .model-picker {
         display: flex;
         flex-direction: column;
         gap: 0.875rem;
         padding: 1.25rem 1.5rem;
         margin: 1rem 0;
-        background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
-        border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
-        border-radius: 8px;
-        font-size: 16px;
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
+        border-radius: var(--df-radius);
+        font-size: 1.4rem;
+        color: var(--df-text);
 
         &__header {
           display: flex;
@@ -169,7 +164,8 @@ interface NormalizedModel {
         }
         &__title {
           font-weight: 600;
-          font-size: 18px;
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
           margin-right: auto;
         }
         &__refresh,
@@ -177,7 +173,7 @@ interface NormalizedModel {
           display: inline-flex !important;
           align-items: center;
           gap: 0.4rem;
-          font-size: 0.95rem !important;
+          font-size: 1.3rem !important;
           padding: 0 0.875rem !important;
           min-height: 38px !important;
         }
@@ -196,15 +192,15 @@ interface NormalizedModel {
           flex: 1;
         }
         &__option-meta {
-          font-size: 14px;
-          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.55));
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         &__hint {
           margin: 0;
-          font-size: 15px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
+          font-size: 1.3rem;
+          color: var(--df-text-2);
           font-style: italic;
           line-height: 1.5;
         }
@@ -213,30 +209,31 @@ interface NormalizedModel {
           align-items: flex-start;
           gap: 0.5rem;
           padding: 0.625rem 0.875rem;
-          border-radius: 4px;
-          background: rgba(220, 53, 69, 0.1);
-          border: 1px solid rgba(220, 53, 69, 0.3);
-          color: #ff8585;
-          font-size: 15px;
+          border-radius: var(--df-radius-sm);
+          background: var(--df-danger-soft);
+          border: 1px solid var(--df-danger-border);
+          color: var(--df-danger);
+          font-size: 1.3rem;
         }
         &__current {
           margin: 0;
-          font-size: 15px;
-          color: var(--df-ai-fg, rgba(0, 0, 0, 0.85));
+          font-size: 1.3rem;
+          color: var(--df-text);
           display: flex;
           align-items: center;
           gap: 0.5rem;
 
           code {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            font-size: 14px;
-            background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.06));
+            font-size: 1.2rem;
+            background: var(--df-surface-2);
+            border: 1px solid var(--df-border-2);
             padding: 0.2rem 0.5rem;
-            border-radius: 3px;
+            border-radius: var(--df-radius-sm);
           }
         }
         &__current-ok {
-          color: #4ade80;
+          color: var(--df-success);
         }
       }
     `,
@@ -364,5 +361,9 @@ export class DfAiModelPickerComponent implements OnInit {
       label: m.name ?? m.id ?? 'unknown',
       context: m.context_window ?? null,
     };
+  }
+
+  trackModel(_: number, m: NormalizedModel): string {
+    return m.id;
   }
 }

@@ -2,6 +2,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { Component, Input } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { USD_4DP } from '../../utils/cost';
 
 /**
  * Top-N most expensive single AI calls in the window. The drill-down hook
@@ -65,7 +66,7 @@ export interface ExpensiveCallRow {
             </thead>
             <tbody>
               <tr
-                *ngFor="let r of data"
+                *ngFor="let r of data; trackBy: trackRow"
                 class="exp__row"
                 [class.exp__row--error]="r.status === 'error'"
                 [class.exp__row--partial]="r.status === 'partial'">
@@ -109,7 +110,12 @@ export interface ExpensiveCallRow {
   `,
   styles: [
     `
+      /* Departure: token-only chrome; 44px rows, hairline separators, 11px
+         uppercase micro-headers. Warning amber is aliased locally per theme
+         (no global --df-warning in light/dark); phosphor's token wins. */
       .exp {
+        --exp-warning: #9a5b00;
+
         mat-card-content {
           padding: 20px;
           display: flex;
@@ -124,18 +130,19 @@ export interface ExpensiveCallRow {
         }
         &__title {
           font-weight: 600;
-          color: #333;
-          font-size: 16px;
+          color: var(--df-text);
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
         }
         &__subtitle {
-          font-size: 12px;
-          color: #999;
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
         }
 
         &__empty {
           font-style: italic;
-          color: #999;
-          font-size: 13px;
+          color: var(--df-text-muted);
+          font-size: 1.3rem;
           padding: 12px 0;
         }
 
@@ -146,18 +153,18 @@ export interface ExpensiveCallRow {
         &__table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 13px;
+          font-size: 1.3rem;
         }
 
         &__th {
           text-align: left;
           font-weight: 600;
-          color: #777;
+          color: var(--df-text-muted);
           font-size: 11px;
           text-transform: uppercase;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.06em;
           padding: 8px 10px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+          border-bottom: 1px solid var(--df-border);
           white-space: nowrap;
 
           &--num,
@@ -170,26 +177,26 @@ export interface ExpensiveCallRow {
           transition: background 0.1s ease-out;
 
           &:hover {
-            background: rgba(127, 17, 224, 0.04);
+            background: var(--df-hover);
           }
 
           &--error {
-            background: rgba(244, 67, 54, 0.04);
-
-            &:hover {
-              background: rgba(244, 67, 54, 0.08);
-            }
+            background: var(--df-danger-soft);
           }
 
           &--partial {
-            background: rgba(255, 152, 0, 0.04);
+            background: color-mix(
+              in srgb,
+              var(--df-warning, var(--exp-warning)) 5%,
+              transparent
+            );
           }
         }
 
         &__td {
           padding: 10px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-          color: #333;
+          border-bottom: 1px solid var(--df-border-2);
+          color: var(--df-text);
           vertical-align: top;
 
           &--cost {
@@ -201,7 +208,7 @@ export interface ExpensiveCallRow {
           &--num {
             text-align: right;
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-            color: #666;
+            color: var(--df-text-2);
           }
 
           &--model {
@@ -209,22 +216,22 @@ export interface ExpensiveCallRow {
           }
 
           &--when {
-            color: #666;
+            color: var(--df-text-2);
             white-space: nowrap;
           }
         }
 
         &__cost {
-          color: #7f11e0;
+          color: var(--df-accent-strong);
         }
 
         &__model {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 12px;
+          font-size: 1.2rem;
         }
         &__provider {
           font-size: 11px;
-          color: #999;
+          color: var(--df-text-muted);
           margin-top: 2px;
           text-transform: capitalize;
         }
@@ -232,79 +239,42 @@ export interface ExpensiveCallRow {
         &__pill {
           display: inline-block;
           padding: 2px 8px;
-          border-radius: 999px;
+          border-radius: var(--df-radius-sm);
           font-size: 11px;
           font-weight: 500;
           text-transform: capitalize;
-          background: rgba(0, 0, 0, 0.06);
-          color: #555;
+          background: var(--df-surface-2);
+          border: 1px solid var(--df-border-2);
+          color: var(--df-text-2);
 
           &--success {
-            background: rgba(38, 166, 154, 0.15);
-            color: #00796b;
+            background: var(--df-success-soft);
+            border-color: var(--df-success-border);
+            color: var(--df-success);
           }
           &--error {
-            background: rgba(244, 67, 54, 0.12);
-            color: #c62828;
+            background: var(--df-danger-soft);
+            border-color: var(--df-danger-border);
+            color: var(--df-danger);
           }
           &--partial {
-            background: rgba(255, 152, 0, 0.15);
-            color: #e65100;
+            background: color-mix(
+              in srgb,
+              var(--df-warning, var(--exp-warning)) 12%,
+              transparent
+            );
+            border-color: color-mix(
+              in srgb,
+              var(--df-warning, var(--exp-warning)) 35%,
+              transparent
+            );
+            color: var(--df-warning, var(--exp-warning));
           }
         }
       }
 
-      :host-context(.dark-theme) {
-        .exp {
-          &__title {
-            color: #fff;
-          }
-          &__subtitle,
-          &__td--num,
-          &__td--when {
-            color: #aaa;
-          }
-          &__th {
-            color: #999;
-            border-bottom-color: rgba(255, 255, 255, 0.1);
-          }
-          &__td {
-            color: #ddd;
-            border-bottom-color: rgba(255, 255, 255, 0.04);
-          }
-          &__row:hover {
-            background: rgba(127, 17, 224, 0.12);
-          }
-          &__row--error {
-            background: rgba(244, 67, 54, 0.08);
-          }
-          &__row--partial {
-            background: rgba(255, 152, 0, 0.08);
-          }
-          &__cost {
-            color: #b388ff;
-          }
-          &__provider {
-            color: #888;
-          }
-          &__pill {
-            background: rgba(255, 255, 255, 0.08);
-            color: #ccc;
-
-            &--success {
-              background: rgba(38, 166, 154, 0.2);
-              color: #4db6ac;
-            }
-            &--error {
-              background: rgba(244, 67, 54, 0.2);
-              color: #ef9a9a;
-            }
-            &--partial {
-              background: rgba(255, 152, 0, 0.2);
-              color: #ffb74d;
-            }
-          }
-        }
+      :host-context(.dark-theme) .exp {
+        --exp-warning: #ffb74d;
       }
     `,
   ],
@@ -313,15 +283,17 @@ export class DfExpensiveCallsComponent {
   @Input() data: ExpensiveCallRow[] = [];
   @Input() title = 'Most expensive calls';
 
+  trackRow(_: number, r: ExpensiveCallRow): number {
+    return r.id;
+  }
+
   formatUsd(v: number): string {
     if (!Number.isFinite(v) || v === 0) return '$0';
     if (v < 0.01) return '<$0.01';
     if (v < 1) return `$${v.toFixed(4)}`;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 4,
-    }).format(v);
+    // Shared, hoisted formatter — this runs per row per CD cycle; building
+    // an Intl.NumberFormat per call is one of the priciest ctors in JS.
+    return USD_4DP.format(v);
   }
 
   formatTokens(v: number): string {

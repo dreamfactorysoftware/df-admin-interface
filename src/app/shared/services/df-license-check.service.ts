@@ -5,6 +5,8 @@ import { LICENSE_KEY_HEADER } from '../constants/http-headers';
 import { CheckResponse } from '../types/check';
 import { BehaviorSubject, catchError, map, tap, throwError } from 'rxjs';
 import { mapSnakeToCamel } from '../utilities/case';
+import { normalizeError } from '../utilities/app-error';
+import { silent } from '../utilities/http-contexts';
 
 @Injectable({
   providedIn: 'root',
@@ -25,6 +27,9 @@ export class DfLicenseCheckService {
         headers: {
           [LICENSE_KEY_HEADER]: licenseKey,
         },
+        // Silent by design: consumers (license initializer/guard) degrade
+        // gracefully via licenseCheck$ state instead of toasts.
+        context: silent(),
       })
       .pipe(
         map(response => mapSnakeToCamel(response)),
@@ -32,7 +37,7 @@ export class DfLicenseCheckService {
         catchError(e => {
           const errorResponse = mapSnakeToCamel(e.error);
           this.licenseCheckSubject.next(errorResponse);
-          return throwError(() => new Error(e));
+          return throwError(() => normalizeError(e));
         })
       );
   }

@@ -1,7 +1,7 @@
 {
   "fieldDetailsForm": {
-    "updateSuccess": "Database field successfully updated",
-    "createSuccess": "Database field successfully created",
+    "updateSuccess": "Database field updated",
+    "createSuccess": "Database field created",
     "controls": {
       "name": { "label": "Name", "tooltip": "The field name used by the API." },
       "alias": {

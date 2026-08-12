@@ -86,7 +86,9 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
   }
 
   ngOnInit(): void {
-    this.initialize();
+    if (!this.fieldArray) {
+      this.initialize();
+    }
   }
 
   get schemas() {
@@ -106,15 +108,24 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
         ] as Array<ConfigSchema>);
   }
 
+  // Memoized on the schema input reference: mat-table re-diffs its column
+  // defs when *matHeaderRowDef receives a new array, so allocating one per
+  // CD cycle forced a re-diff on every tick.
+  private _displayedColumns: string[] = [];
+  private _displayedColumnsSchema?: ConfigSchema;
   get displayedColumns() {
-    const columns =
-      this.schema.type === 'array'
-        ? this.schema.items === 'string'
-          ? [this.schema.name]
-          : this.schemas.map(s => s.name)
-        : ['key', 'value'];
-    columns.push('actions');
-    return columns;
+    if (this._displayedColumnsSchema !== this.schema) {
+      this._displayedColumnsSchema = this.schema;
+      const columns =
+        this.schema.type === 'array'
+          ? this.schema.items === 'string'
+            ? [this.schema.name]
+            : this.schemas.map(s => s.name)
+          : ['key', 'value'];
+      columns.push('actions');
+      this._displayedColumns = columns;
+    }
+    return this._displayedColumns;
   }
 
   getFormGroup(index: number) {
@@ -137,40 +148,40 @@ export class DfArrayFieldComponent implements OnInit, ControlValueAccessor {
 
   initialize() {
     this.fieldArray = this.fb.array([]);
+    this.updateDataSource();
   }
 
+  // Rebuilds the rows in place. Replacing `fieldArray` here would orphan the
+  // valueChanges subscription registered by registerOnChange, so any writeValue
+  // after the initial binding (e.g. a setValue from cURL import) would leave
+  // later user edits unable to propagate back to the parent form.
   writeValue(value?: Array<any> | { [key: string]: any }): void {
+    if (!this.fieldArray) {
+      this.initialize();
+    }
+    this.fieldArray.clear({ emitEvent: false });
+
     if (value && Array.isArray(value) && this.schema.type === 'array') {
-      if (this.schema.items === 'string') {
-        this.fieldArray = this.fb.array(value.map(v => new FormControl(v)));
-      } else {
-        this.fieldArray = this.fb.array(value.map(v => this.createGroup(v)));
-      }
+      value.forEach(v =>
+        this.fieldArray.push(
+          this.schema.items === 'string'
+            ? new FormControl(v)
+            : this.createGroup(v),
+          { emitEvent: false }
+        )
+      );
     } else if (value && this.schema.type === 'object') {
-      this.fieldArray = this.fb.array(
-        Object.keys(value).map(key =>
+      Object.keys(value).forEach(key =>
+        this.fieldArray.push(
           this.createGroup({
             key,
             value: (value as { [key: string]: any })[key],
-          })
+          }),
+          { emitEvent: false }
         )
       );
     }
-    this.fieldArray.valueChanges
-      .pipe(
-        map(value => {
-          if (this.schema.type === 'object') {
-            return value.reduce((acc: any, curr: any) => {
-              acc[curr.key] = curr.value;
-              return acc;
-            }, {});
-          }
-          return value;
-        })
-      )
-      .subscribe(() => {
-        this.updateDataSource();
-      });
+    this.updateDataSource();
   }
 
   registerOnChange(fn: any): void {

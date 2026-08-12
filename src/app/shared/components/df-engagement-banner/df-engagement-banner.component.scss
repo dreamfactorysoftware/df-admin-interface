@@ -1,8 +1,16 @@
+// Departure language: tokens only, hairline border instead of a shadow.
+// The accent-soft wash keeps the banner noticeable and repaints correctly
+// in light, dark, and phosphor. Solid --df-surface underneath so the
+// translucent wash never blends with content behind the fixed banner.
 .engagement-banner {
-  background-color: #ffd9b3;
-  color: #2d2d2d;
+  background-color: var(--df-surface);
+  background-image: linear-gradient(
+    var(--df-accent-soft),
+    var(--df-accent-soft)
+  );
+  color: var(--df-text);
+  border-bottom: 1px solid var(--df-border);
   padding: 12px 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   font-family: inherit;
   position: fixed;
   top: 0;
@@ -21,29 +29,30 @@
   }
 
   .banner-text {
-    font-size: 14px;
+    color: var(--df-text);
+    font-size: 1.4rem;
     font-weight: 500;
     line-height: 1.4;
   }
 
   .cta-button {
-    background-color: #7c3aed;
-    color: white;
+    background-color: var(--df-accent);
+    color: var(--df-accent-contrast);
     border: none;
     padding: 8px 20px;
-    border-radius: 4px;
-    font-size: 14px;
+    border-radius: var(--df-radius-sm);
+    font-size: 1.4rem;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s ease;
     white-space: nowrap;
 
     &:hover {
-      background-color: #6a28d9;
+      background-color: var(--df-accent-strong);
     }
 
     &:focus {
-      outline: 2px solid #7c3aed;
+      outline: 2px solid var(--df-accent);
       outline-offset: 2px;
     }
   }
@@ -67,13 +76,13 @@
     }
 
     .banner-text {
-      font-size: 13px;
+      font-size: 1.3rem;
       text-align: center;
     }
 
     .cta-button {
       padding: 8px 16px;
-      font-size: 13px;
+      font-size: 1.3rem;
     }
   }
 }

@@ -1,4 +1,9 @@
-import { Component, Input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Input,
+  OnInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
@@ -12,6 +17,10 @@ import { ChatMessage } from '../../types/chat';
 @Component({
   selector: 'df-chat-tool-result',
   standalone: true,
+  // OnPush is safe: `message` is only ever replaced (fresh API objects),
+  // never mutated in place, and `expanded` only changes from this
+  // component's own click handler (which marks it dirty under OnPush).
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FontAwesomeModule],
   template: `
     <div
@@ -45,15 +54,15 @@ import { ChatMessage } from '../../types/chat';
   styles: [
     `
       .tool-card {
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--chat-border-2);
+        border-radius: var(--df-radius-sm);
+        background: var(--chat-surface);
         overflow: hidden;
-        font-size: 14px;
+        font-size: 1.35rem;
 
         &--error {
-          border-color: rgba(220, 53, 69, 0.4);
-          background: rgba(220, 53, 69, 0.06);
+          border-color: var(--df-danger-border);
+          background: var(--df-danger-soft);
         }
 
         &__header {
@@ -70,21 +79,21 @@ import { ChatMessage } from '../../types/chat';
           font-size: inherit;
 
           &:hover {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--chat-hover);
           }
         }
 
         &__chevron {
           width: 0.75rem;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
         }
 
         &__icon {
-          color: #60a5fa;
+          color: var(--df-accent);
         }
 
         &--error &__icon {
-          color: #ff6b6b;
+          color: var(--df-danger);
         }
 
         &__title {
@@ -96,23 +105,24 @@ import { ChatMessage } from '../../types/chat';
           font-size: 11px;
           font-weight: 700;
           padding: 0.125rem 0.4rem;
-          border-radius: 3px;
-          background: rgba(220, 53, 69, 0.25);
-          color: #ff8585;
+          border-radius: 4px;
+          background: var(--df-danger-soft);
+          border: 1px solid var(--df-danger-border);
+          color: var(--df-danger);
           text-transform: uppercase;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.06em;
         }
 
         &__latency {
           margin-left: auto;
           font-size: 12px;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
         }
 
         &__body {
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          border-top: 1px solid var(--df-border-2);
           padding: 0.75rem 1rem;
-          background: rgba(0, 0, 0, 0.25);
+          background: var(--chat-code-bg);
         }
 
         &__content {
@@ -122,7 +132,7 @@ import { ChatMessage } from '../../types/chat';
           line-height: 1.5;
           white-space: pre-wrap;
           word-break: break-word;
-          color: rgba(255, 255, 255, 0.9);
+          color: var(--df-code-text);
           max-height: 320px;
           overflow: auto;
         }
@@ -130,7 +140,7 @@ import { ChatMessage } from '../../types/chat';
     `,
   ],
 })
-export class DfChatToolResultComponent {
+export class DfChatToolResultComponent implements OnInit {
   @Input({ required: true }) message!: ChatMessage;
   @Input() startExpanded = false;
   expanded = false;
@@ -140,12 +150,24 @@ export class DfChatToolResultComponent {
   faWrench = faWrench;
   faTriangleExclamation = faTriangleExclamation;
 
+  /** Memo for pretty: tool-result payloads can be KB-sized (query result
+   *  sets); JSON parse + pretty-print per CD cycle while expanded is a CD
+   *  storm during the chat poll. Keyed on message.content. */
+  private prettyCache: { content: string; text: string } | null = null;
+
   ngOnInit(): void {
     this.expanded = this.startExpanded || !!this.message.is_error;
   }
 
   get pretty(): string {
-    const raw = this.message.content ?? '';
+    const content = this.message.content ?? '';
+    if (this.prettyCache?.content !== content) {
+      this.prettyCache = { content, text: this.computePretty(content) };
+    }
+    return this.prettyCache.text;
+  }
+
+  private computePretty(raw: string): string {
     const trimmed = raw.trim();
     if (!trimmed) {
       return '(empty)';

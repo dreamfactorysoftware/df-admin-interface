@@ -1,19 +1,18 @@
-@use '@angular/material' as mat;
-
-$green-palette: mat.define-palette(mat.$green-palette);
-$red-palette: mat.define-palette(mat.$red-palette);
-$orange-palette: mat.define-palette(mat.$orange-palette);
-$blue-palette: mat.define-palette(mat.$blue-palette);
-
+// Status panel shared by inline alerts and the toast (df-snackbar reuses
+// this stylesheet; styles.scss already blanks the MDC snackbar surface).
+// Departure: opaque token surface, hairline status border, status color on
+// the icon only. The old Material pastel literals (green-100 / red-100 on
+// black text) punched through dark and phosphor.
 .alert-container {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  border: 1px solid;
-  border-radius: 5px;
-  box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
-  color: black;
+  background-color: var(--df-surface);
+  color: var(--df-text);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  font-size: 1.4rem;
 
   .alert-message {
     flex: 1;
@@ -23,31 +22,28 @@ $blue-palette: mat.define-palette(mat.$blue-palette);
     padding: 0 10px;
   }
   &.success {
-    border-color: mat.get-color-from-palette($green-palette, 300);
-    background-color: mat.get-color-from-palette($green-palette, 100);
+    border-color: var(--df-success-border);
     .alert-icon {
-      color: mat.get-color-from-palette($green-palette, 500);
+      color: var(--df-success);
     }
   }
   &.error {
-    border-color: mat.get-color-from-palette($red-palette, 300);
-    background-color: mat.get-color-from-palette($red-palette, 100);
+    border-color: var(--df-danger-border);
     .alert-icon {
-      color: mat.get-color-from-palette($red-palette, 500);
+      color: var(--df-danger);
     }
   }
   &.warning {
-    border-color: mat.get-color-from-palette($orange-palette, 300);
-    background-color: mat.get-color-from-palette($orange-palette, 100);
+    // --df-warning only exists in phosphor today; danger is the closest
+    // attention token elsewhere, so fall back through it.
+    border-color: var(--df-warning, var(--df-danger-border));
     .alert-icon {
-      color: mat.get-color-from-palette($orange-palette, 500);
+      color: var(--df-warning, var(--df-danger));
     }
   }
   &.info {
-    border-color: mat.get-color-from-palette($blue-palette, 300);
-    background-color: mat.get-color-from-palette($blue-palette, 100);
     .alert-icon {
-      color: mat.get-color-from-palette($blue-palette, 500);
+      color: var(--df-accent);
     }
   }
 }

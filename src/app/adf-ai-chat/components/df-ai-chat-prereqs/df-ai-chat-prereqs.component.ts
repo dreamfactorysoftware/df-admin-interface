@@ -44,7 +44,7 @@ interface RoleRow {
         <h4>AI Chat setup</h4>
         <p>
           An AI Chat service ties an AI Connection (the LLM) to a DreamFactory
-          Role (the data scope). Pick one of each below — your selection writes
+          Role (the data scope). Pick one of each below; your selection writes
           straight into the form.
         </p>
       </header>
@@ -85,7 +85,7 @@ interface RoleRow {
           Click one to use it for this chat service:
         </p>
         <ul *ngIf="connections.length" class="prereqs__list">
-          <li *ngFor="let c of connections">
+          <li *ngFor="let c of connections; trackBy: trackById">
             <button
               type="button"
               class="prereqs__chip"
@@ -101,8 +101,8 @@ interface RoleRow {
         </ul>
 
         <p *ngIf="!loading && connections.length === 0" class="prereqs__hint">
-          No AI Connections yet. The chat service can't run without one — use
-          the button above to create one, then come back.
+          No AI Connections yet. The chat service can't run without one. Use the
+          button above to create one, then come back.
         </p>
       </section>
 
@@ -138,7 +138,7 @@ interface RoleRow {
           Click one to scope the AI's data access:
         </p>
         <ul *ngIf="roles.length" class="prereqs__list">
-          <li *ngFor="let r of roles">
+          <li *ngFor="let r of roles; trackBy: trackById">
             <button
               type="button"
               class="prereqs__chip"
@@ -171,15 +171,14 @@ interface RoleRow {
   `,
   styles: [
     `
-      /* Theme-flip tokens: dark text/surfaces by default (light mode);
-         the dark-theme class restores the original light-on-dark look. */
+      /* Colors come from the global --df-* theme tokens (src/styles.scss).
+         The section wash is deliberately subtler than --df-surface-2, so it
+         keeps its own values, keyed off the body theme class. */
+      :host {
+        --prereqs-surface: rgba(0, 0, 0, 0.03);
+      }
       :host-context(.dark-theme) {
-        --df-ai-fg: rgba(255, 255, 255, 0.9);
-        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
-        --df-ai-fg-faint: rgba(255, 255, 255, 0.5);
-        --df-ai-surface: rgba(255, 255, 255, 0.02);
-        --df-ai-surface-strong: rgba(255, 255, 255, 0.08);
-        --df-ai-border: rgba(255, 255, 255, 0.1);
+        --prereqs-surface: rgba(255, 255, 255, 0.02);
       }
 
       .prereqs {
@@ -201,7 +200,7 @@ interface RoleRow {
           }
           p {
             margin: 0;
-            color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
+            color: var(--df-text-2);
             font-size: 15px;
             line-height: 1.55;
           }
@@ -210,7 +209,7 @@ interface RoleRow {
         &__section {
           padding: 1rem 1.25rem;
           border-radius: 6px;
-          background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
+          background: var(--prereqs-surface);
 
           &--missing {
             background: rgba(220, 53, 69, 0.06);
@@ -237,7 +236,7 @@ interface RoleRow {
         }
 
         &__kind-icon {
-          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.5));
+          color: var(--df-text-muted);
           font-size: 17px;
         }
 
@@ -248,7 +247,7 @@ interface RoleRow {
 
         &__count {
           font-size: 14px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
+          color: var(--df-text-2);
         }
 
         &__action {
@@ -281,8 +280,8 @@ interface RoleRow {
           align-items: center;
           gap: 0.5rem;
           padding: 0.55rem 1.05rem;
-          background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.05));
-          border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
+          background: var(--df-surface-2);
+          border: 1px solid var(--df-border);
           border-radius: 999px;
           font: inherit;
           font-size: 16px;
@@ -300,7 +299,7 @@ interface RoleRow {
           &--selected {
             border-color: #60a5fa;
             background: rgba(96, 165, 250, 0.18);
-            color: var(--df-ai-fg, rgba(0, 0, 0, 0.87));
+            color: var(--df-text);
           }
         }
 
@@ -315,13 +314,13 @@ interface RoleRow {
         &__pick-hint {
           margin: 0.625rem 0 0;
           font-size: 14px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
+          color: var(--df-text-2);
           font-style: italic;
         }
 
         &__link {
           font-size: 12px;
-          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.45));
+          color: var(--df-text-muted);
           text-decoration: none;
 
           &:hover {
@@ -333,7 +332,7 @@ interface RoleRow {
         &__hint {
           margin: 0.5rem 0 0;
           font-size: 13px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
+          color: var(--df-text-2);
           line-height: 1.5;
 
           code {
@@ -341,11 +340,11 @@ interface RoleRow {
             font-size: 12px;
             padding: 0.1rem 0.375rem;
             border-radius: 3px;
-            background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.06));
+            background: var(--df-surface-2);
           }
 
           strong {
-            color: var(--df-ai-fg, rgba(0, 0, 0, 0.9));
+            color: var(--df-text);
           }
         }
       }
@@ -393,5 +392,9 @@ export class DfAiChatPrereqsComponent implements OnInit {
       this.roles = roles.resource ?? [];
       this.loading = false;
     });
+  }
+
+  trackById(_: number, row: { id: number }): number {
+    return row.id;
   }
 }

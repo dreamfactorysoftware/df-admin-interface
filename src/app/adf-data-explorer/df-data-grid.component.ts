@@ -9,6 +9,7 @@ import {
   ViewChild,
   AfterViewInit,
   ChangeDetectorRef,
+  NgZone,
 } from '@angular/core';
 import { NgIf, NgFor, NgClass, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -48,6 +49,7 @@ import {
 } from './services/data-explorer.service';
 import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 
 interface FilterOp {
   value: string;
@@ -275,7 +277,7 @@ interface ColumnFilter {
           <div class="api-call-top">
             <span
               class="api-method"
-              matTooltip="HTTP method — GET retrieves records without modifying data"
+              matTooltip="HTTP method: GET retrieves records without modifying data"
               >GET</span
             >
             <code
@@ -296,7 +298,7 @@ interface ColumnFilter {
             <span class="options-label">Include:</span>
             <label
               class="api-option"
-              matTooltip="limit — Maximum number of records to return per request (currently {{
+              matTooltip="limit: Maximum number of records to return per request (currently {{
                 pageSize
               }})">
               <input
@@ -307,7 +309,7 @@ interface ColumnFilter {
             </label>
             <label
               class="api-option"
-              matTooltip="offset — Number of records to skip, used for pagination (currently {{
+              matTooltip="offset: Number of records to skip, used for pagination (currently {{
                 currentOffset
               }})">
               <input
@@ -318,7 +320,7 @@ interface ColumnFilter {
             </label>
             <label
               class="api-option"
-              matTooltip="include_count — Returns total record count in the response metadata">
+              matTooltip="include_count: Returns total record count in the response metadata">
               <input
                 type="checkbox"
                 [checked]="apiIncludeCount"
@@ -330,10 +332,10 @@ interface ColumnFilter {
             <span class="options-label">Related:</span>
             <label
               class="api-option"
-              *ngFor="let rel of cachedSchema!.related"
+              *ngFor="let rel of cachedSchema!.related; trackBy: trackByRelName"
               [matTooltip]="
                 rel.type +
-                ' — Include ' +
+                ': Include ' +
                 rel.refTable +
                 ' records linked via ' +
                 rel.field +
@@ -343,9 +345,7 @@ interface ColumnFilter {
               <input
                 type="checkbox"
                 [checked]="apiSelectedRelated[rel.name]"
-                (change)="
-                  apiSelectedRelated[rel.name] = !apiSelectedRelated[rel.name]
-                " />
+                (change)="toggleApiRelated(rel.name)" />
               {{ rel.name }}
             </label>
           </div>
@@ -360,7 +360,7 @@ interface ColumnFilter {
         <!-- Error -->
         <div class="error-state" *ngIf="error && !initialLoading">
           <mat-icon color="warn">error_outline</mat-icon>
-          <span>{{ error }}</span>
+          <span>{{ error | transloco }}</span>
           <button mat-stroked-button color="primary" (click)="loadData()">
             {{ t('dataExplorer.retry') }}
           </button>
@@ -596,8 +596,8 @@ interface ColumnFilter {
         padding: 0 12px;
         height: 49px;
         box-sizing: border-box;
-        border-bottom: 1px solid #e0e0e0;
-        background: #fafafa;
+        border-bottom: 1px solid var(--df-border);
+        background: var(--df-surface-2);
         flex-shrink: 0;
 
         .toolbar-left {
@@ -606,14 +606,15 @@ interface ColumnFilter {
           gap: 10px;
 
           .toolbar-icon {
-            color: #7b1fa2;
+            color: var(--df-accent);
             font-size: 16px;
           }
 
           .table-title {
-            font-size: 15px;
-            font-weight: 500;
-            color: #212121;
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--df-text);
           }
 
           .readonly-chip {
@@ -630,29 +631,11 @@ interface ColumnFilter {
           gap: 2px;
 
           button.active {
-            color: #7b1fa2;
+            color: var(--df-accent);
           }
 
           .clear-filters-btn {
-            color: #ef6c00;
-          }
-        }
-      }
-
-      :host-context(.dark-theme) .grid-toolbar {
-        border-bottom-color: #424242;
-        background: #303030;
-        .toolbar-left {
-          .toolbar-icon {
-            color: #ce93d8;
-          }
-          .table-title {
-            color: #e0e0e0;
-          }
-        }
-        .toolbar-right {
-          button.active {
-            color: #ce93d8;
+            color: var(--df-warning, var(--df-accent));
           }
         }
       }
@@ -669,11 +652,11 @@ interface ColumnFilter {
         align-items: center;
         justify-content: space-between;
         padding: 2px 12px;
-        border-bottom: 1px solid #e0e0e0;
-        background: #fafafa;
+        border-bottom: 1px solid var(--df-border);
+        background: var(--df-surface-2);
         flex-shrink: 0;
         font-size: 12px;
-        color: #757575;
+        color: var(--df-text-muted);
 
         .top-pagination-left {
           .page-info {
@@ -693,12 +676,12 @@ interface ColumnFilter {
             gap: 4px;
 
             .page-size-select {
-              border: 1px solid #e0e0e0;
-              border-radius: 4px;
+              border: 1px solid var(--df-border);
+              border-radius: var(--df-radius-sm);
               padding: 2px 4px;
               font-size: 12px;
-              background: white;
-              color: #424242;
+              background: var(--df-surface);
+              color: var(--df-text);
               outline: none;
               cursor: pointer;
             }
@@ -727,17 +710,6 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .top-pagination {
-        border-bottom-color: #424242;
-        background: #303030;
-        color: #9e9e9e;
-        .page-size-select {
-          background: #2c2c2c !important;
-          border-color: #424242 !important;
-          color: #e0e0e0 !important;
-        }
-      }
-
       .loading-state,
       .error-state,
       .empty-state {
@@ -747,7 +719,7 @@ interface ColumnFilter {
         justify-content: center;
         gap: 16px;
         padding: 48px 24px;
-        color: #757575;
+        color: var(--df-text-muted);
         font-size: 14px;
         flex: 1;
       }
@@ -765,7 +737,12 @@ interface ColumnFilter {
           left: 0;
           right: 0;
           height: 3px;
-          background: linear-gradient(90deg, transparent, #7b1fa2, transparent);
+          background: linear-gradient(
+            90deg,
+            transparent,
+            var(--df-accent),
+            transparent
+          );
           animation: loading-bar 1s infinite;
           z-index: 10;
         }
@@ -784,51 +761,31 @@ interface ColumnFilter {
         height: 100%;
         overflow: scroll;
 
-        /* Fat always-visible scrollbars */
+        /* Fat always-visible scrollbars, token-tinted for all themes */
         &::-webkit-scrollbar {
           width: 14px;
           height: 14px;
         }
         &::-webkit-scrollbar-track {
-          background: #e8e8e8;
+          background: var(--df-surface-2);
         }
         &::-webkit-scrollbar-thumb {
-          background: #a0a0a0;
+          background: var(--df-text-faint);
           border-radius: 7px;
-          border: 2px solid #e8e8e8;
+          border: 3px solid var(--df-surface);
           &:hover {
-            background: #808080;
+            background: var(--df-text-muted);
           }
           &:active {
-            background: #666;
+            background: var(--df-text-2);
           }
         }
         &::-webkit-scrollbar-corner {
-          background: #e8e8e8;
+          background: var(--df-surface-2);
         }
 
         scrollbar-width: auto;
-        scrollbar-color: #a0a0a0 #e8e8e8;
-      }
-
-      :host-context(.dark-theme) .table-scroll {
-        &::-webkit-scrollbar-track {
-          background: #252525;
-        }
-        &::-webkit-scrollbar-thumb {
-          background: #555;
-          border-color: #252525;
-          &:hover {
-            background: #6a6a6a;
-          }
-          &:active {
-            background: #7a7a7a;
-          }
-        }
-        &::-webkit-scrollbar-corner {
-          background: #252525;
-        }
-        scrollbar-color: #555 #252525;
+        scrollbar-color: var(--df-text-faint) var(--df-surface-2);
       }
 
       .data-table {
@@ -839,14 +796,20 @@ interface ColumnFilter {
           position: relative;
           flex: none;
           font-weight: 600;
-          font-size: 12px;
+          font-size: 11px;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: #616161;
-          background: #f5f5f5;
+          letter-spacing: 0.06em;
+          color: var(--df-text-muted);
+          /* Sticky header: opaque token layering (surface under the
+             translucent surface-2 wash) so rows never bleed through. */
+          background-color: var(--df-surface);
+          background-image: linear-gradient(
+            var(--df-surface-2),
+            var(--df-surface-2)
+          );
           white-space: nowrap;
           padding: 0 16px;
-          border-right: 1px solid #e0e0e0;
+          border-right: 1px solid var(--df-border);
           box-sizing: border-box;
 
           .resize-handle {
@@ -871,10 +834,10 @@ interface ColumnFilter {
               transition: background 0.15s;
             }
             &:hover::after {
-              background: #7b1fa2;
+              background: var(--df-accent);
             }
             &:hover {
-              background: rgba(123, 31, 162, 0.08);
+              background: var(--df-accent-soft);
             }
           }
         }
@@ -882,8 +845,13 @@ interface ColumnFilter {
         .filter-cell {
           flex: none;
           padding: 4px 8px;
-          background: #f5f5f5;
-          border-right: 1px solid #e0e0e0;
+          /* Sticky like the header row: opaque token layering */
+          background-color: var(--df-surface);
+          background-image: linear-gradient(
+            var(--df-surface-2),
+            var(--df-surface-2)
+          );
+          border-right: 1px solid var(--df-border);
           overflow: hidden;
           box-sizing: border-box;
 
@@ -895,38 +863,39 @@ interface ColumnFilter {
 
           .filter-op {
             flex-shrink: 0;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
+            border: 1px solid var(--df-border);
+            border-radius: var(--df-radius-sm);
             padding: 3px 4px;
             font-size: 11px;
-            background: white;
-            color: #424242;
+            background: var(--df-surface);
+            color: var(--df-text);
             outline: none;
             cursor: pointer;
             max-width: 90px;
 
             &:focus {
-              border-color: #7b1fa2;
+              border-color: var(--df-accent);
             }
           }
 
           .filter-input {
             flex: 1;
             min-width: 0;
-            border: 1px solid #e0e0e0;
-            border-radius: 4px;
+            border: 1px solid var(--df-border);
+            border-radius: var(--df-radius-sm);
             padding: 4px 8px;
             font-size: 12px;
-            background: white;
+            background: var(--df-surface);
+            color: var(--df-text);
             outline: none;
             box-sizing: border-box;
 
             &:focus {
-              border-color: #7b1fa2;
+              border-color: var(--df-accent);
             }
 
             &::placeholder {
-              color: #bdbdbd;
+              color: var(--df-text-faint);
               font-style: italic;
             }
           }
@@ -934,27 +903,28 @@ interface ColumnFilter {
 
         .data-cell {
           flex: none;
-          font-size: 13px;
+          font-size: 1.3rem;
           padding: 0 16px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          border-right: 1px solid #f0f0f0;
-          font-family: 'Roboto Mono', monospace;
+          border-right: 1px solid var(--df-border-2);
+          color: var(--df-text);
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           box-sizing: border-box;
 
           &.null-cell {
-            color: #bdbdbd;
+            color: var(--df-text-faint);
             font-style: italic;
           }
         }
 
         tr.mat-mdc-row:hover {
-          background: rgba(123, 31, 162, 0.04);
+          background: var(--df-hover);
         }
 
         tr.mat-mdc-row {
-          height: 36px;
+          height: 44px;
         }
 
         tr.clickable-row {
@@ -962,7 +932,7 @@ interface ColumnFilter {
         }
 
         tr.selected-row {
-          background: rgba(123, 31, 162, 0.08) !important;
+          background: var(--df-accent-soft) !important;
         }
 
         tr.mat-mdc-header-row {
@@ -974,70 +944,17 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .data-table {
-        .header-cell {
-          color: #bdbdbd;
-          background: #383838;
-          border-right-color: #424242;
-
-          .resize-handle:hover {
-            background: rgba(206, 147, 216, 0.1);
-          }
-          .resize-handle:hover::after {
-            background: #ce93d8;
-          }
-        }
-        .filter-cell {
-          background: #383838;
-          border-right-color: #424242;
-
-          .filter-op {
-            background: #2c2c2c;
-            border-color: #424242;
-            color: #e0e0e0;
-            &:focus {
-              border-color: #ce93d8;
-            }
-          }
-
-          .filter-input {
-            background: #2c2c2c;
-            border-color: #424242;
-            color: #e0e0e0;
-            &:focus {
-              border-color: #ce93d8;
-            }
-            &::placeholder {
-              color: #616161;
-            }
-          }
-        }
-        .data-cell {
-          border-right-color: #383838;
-          color: #e0e0e0;
-          &.null-cell {
-            color: #616161;
-          }
-        }
-        tr.mat-mdc-row:hover {
-          background: rgba(206, 147, 216, 0.06);
-        }
-        tr.selected-row {
-          background: rgba(206, 147, 216, 0.12) !important;
-        }
-      }
-
       /* Footer status bar */
       .grid-footer {
         display: flex;
         align-items: center;
         gap: 16px;
         padding: 4px 12px;
-        border-top: 1px solid #e0e0e0;
-        background: #f5f5f5;
+        border-top: 1px solid var(--df-border);
+        background: var(--df-surface-2);
         flex-shrink: 0;
         font-size: 12px;
-        color: #757575;
+        color: var(--df-text-muted);
 
         .footer-info {
           white-space: nowrap;
@@ -1070,19 +987,13 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .grid-footer {
-        border-top-color: #424242;
-        background: #2c2c2c;
-        color: #9e9e9e;
-      }
-
       /* Quick search in toolbar */
       .quick-search {
         display: flex;
         align-items: center;
-        background: #f5f5f5;
-        border: 1px solid #e0e0e0;
-        border-radius: 4px;
+        background: var(--df-surface);
+        border: 1px solid var(--df-border);
+        border-radius: var(--df-radius-sm);
         padding: 0 6px;
         height: 28px;
         gap: 4px;
@@ -1091,7 +1002,7 @@ interface ColumnFilter {
           font-size: 16px;
           width: 16px;
           height: 16px;
-          color: #9e9e9e;
+          color: var(--df-text-faint);
         }
 
         .search-input {
@@ -1100,9 +1011,9 @@ interface ColumnFilter {
           background: transparent;
           font-size: 12px;
           width: 140px;
-          color: #424242;
+          color: var(--df-text);
           &::placeholder {
-            color: #bdbdbd;
+            color: var(--df-text-faint);
           }
         }
 
@@ -1114,34 +1025,14 @@ interface ColumnFilter {
           background: none;
           cursor: pointer;
           padding: 0;
-          color: #9e9e9e;
+          color: var(--df-text-faint);
           mat-icon {
             font-size: 14px;
             width: 14px;
             height: 14px;
           }
           &:hover {
-            color: #616161;
-          }
-        }
-      }
-
-      :host-context(.dark-theme) .quick-search {
-        background: #2c2c2c;
-        border-color: #424242;
-        .search-input {
-          color: #e0e0e0;
-          &::placeholder {
-            color: #616161;
-          }
-        }
-        .search-icon {
-          color: #757575;
-        }
-        .search-clear {
-          color: #757575;
-          &:hover {
-            color: #bdbdbd;
+            color: var(--df-text-2);
           }
         }
       }
@@ -1151,8 +1042,8 @@ interface ColumnFilter {
         display: flex;
         flex-direction: column;
         padding: 4px 12px;
-        border-bottom: 1px solid #e0e0e0;
-        background: #f0f4f8;
+        border-bottom: 1px solid var(--df-border);
+        background: var(--df-surface-2);
         flex-shrink: 0;
         font-size: 12px;
         overflow: hidden;
@@ -1160,7 +1051,7 @@ interface ColumnFilter {
 
         .api-call-desc {
           font-size: 11px;
-          color: #607d8b;
+          color: var(--df-text-muted);
           line-height: 1.4;
           padding: 2px 0;
         }
@@ -1175,11 +1066,12 @@ interface ColumnFilter {
           flex-shrink: 0;
           font-weight: 700;
           font-size: 11px;
-          color: white;
-          background: #43a047;
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-family: 'Roboto Mono', monospace;
+          color: var(--df-success);
+          background: var(--df-success-soft);
+          border: 1px solid var(--df-success-border);
+          padding: 1px 6px;
+          border-radius: var(--df-radius-sm);
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
 
         .api-url {
@@ -1188,12 +1080,12 @@ interface ColumnFilter {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-family: 'Roboto Mono', monospace;
+          font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 12px;
-          color: #37474f;
+          color: var(--df-text-2);
           cursor: pointer;
           &:hover {
-            color: #1565c0;
+            color: var(--df-accent-strong);
           }
         }
 
@@ -1216,7 +1108,7 @@ interface ColumnFilter {
 
           .options-label {
             font-size: 11px;
-            color: #9e9e9e;
+            color: var(--df-text-faint);
             font-weight: 500;
           }
 
@@ -1225,8 +1117,8 @@ interface ColumnFilter {
             align-items: center;
             gap: 4px;
             font-size: 11px;
-            color: #616161;
-            font-family: 'Roboto Mono', monospace;
+            color: var(--df-text-muted);
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             cursor: pointer;
             white-space: nowrap;
 
@@ -1235,33 +1127,7 @@ interface ColumnFilter {
               height: 12px;
               margin: 0;
               cursor: pointer;
-              accent-color: #7b1fa2;
-            }
-          }
-        }
-      }
-
-      :host-context(.dark-theme) .api-call-bar {
-        background: #1a2332;
-        border-bottom-color: #424242;
-        .api-call-desc {
-          color: #78909c;
-        }
-        .api-url {
-          color: #b0bec5;
-          &:hover {
-            color: #64b5f6;
-          }
-        }
-        .api-call-options,
-        .api-call-related {
-          .options-label {
-            color: #616161;
-          }
-          .api-option {
-            color: #9e9e9e;
-            input[type='checkbox'] {
-              accent-color: #ce93d8;
+              accent-color: var(--df-accent);
             }
           }
         }
@@ -1272,13 +1138,9 @@ interface ColumnFilter {
         font-size: 14px;
         width: 14px;
         height: 14px;
-        color: #7b1fa2;
+        color: var(--df-accent);
         margin-right: 2px;
         vertical-align: middle;
-      }
-
-      :host-context(.dark-theme) .pk-icon {
-        color: #ce93d8;
       }
 
       /* FK link cells */
@@ -1290,13 +1152,13 @@ interface ColumnFilter {
         display: inline-flex;
         align-items: center;
         gap: 3px;
-        color: #7b1fa2;
+        color: var(--df-accent);
         text-decoration: none;
         cursor: pointer;
         transition: color 0.15s;
 
         &:hover {
-          color: #4a148c;
+          color: var(--df-accent-strong);
           text-decoration: underline;
         }
 
@@ -1313,30 +1175,23 @@ interface ColumnFilter {
         }
       }
 
-      :host-context(.dark-theme) .fk-link {
-        color: #ce93d8;
-        &:hover {
-          color: #f3e5f5;
-        }
-      }
-
       /* Navigation filter bar */
       .nav-filter-bar {
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 4px 12px;
-        border-bottom: 1px solid #e0e0e0;
-        background: #f3e5f5;
+        border-bottom: 1px solid var(--df-border);
+        background: var(--df-accent-soft);
         flex-shrink: 0;
         font-size: 12px;
-        color: #4a148c;
+        color: var(--df-text-2);
 
         .nav-filter-icon {
           font-size: 16px;
           width: 16px;
           height: 16px;
-          color: #7b1fa2;
+          color: var(--df-accent);
         }
 
         .nav-filter-text {
@@ -1347,11 +1202,12 @@ interface ColumnFilter {
           white-space: nowrap;
 
           code {
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             font-size: 11px;
-            background: rgba(123, 31, 162, 0.1);
+            background: var(--df-surface);
+            border: 1px solid var(--df-border-2);
             padding: 1px 4px;
-            border-radius: 3px;
+            border-radius: 4px;
           }
         }
 
@@ -1360,26 +1216,10 @@ interface ColumnFilter {
           width: 24px;
           height: 24px;
           line-height: 24px;
-          color: #7b1fa2;
+          color: var(--df-accent);
           mat-icon {
             font-size: 16px;
           }
-        }
-      }
-
-      :host-context(.dark-theme) .nav-filter-bar {
-        background: #2d1b3d;
-        border-bottom-color: #424242;
-        color: #e1bee7;
-
-        .nav-filter-icon {
-          color: #ce93d8;
-        }
-        .nav-filter-text code {
-          background: rgba(206, 147, 216, 0.15);
-        }
-        .nav-filter-clear {
-          color: #ce93d8;
         }
       }
 
@@ -1494,7 +1334,8 @@ export class DfDataGridComponent
 
   constructor(
     private dataExplorerService: DataExplorerService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private ngZone: NgZone
   ) {
     this.filterSubject$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
@@ -1536,6 +1377,7 @@ export class DfDataGridComponent
     this.currentOffset = 0;
     this.currentSort = undefined;
     this.columnFilters = {};
+    this.apiStateVersion++;
     this.activeFilterCount = 0;
     this.selectedRow = null;
     this.cachedSchema = null;
@@ -1555,10 +1397,13 @@ export class DfDataGridComponent
         next: schema => {
           this.cachedSchema = schema;
           this.apiSelectedRelated = {};
+          this.apiStateVersion++;
           // Force mat-table to re-render cells so FK/PK indicators and type-aware filters appear
           this.dataSource.data = [...this.dataSource.data];
           this.cdr.detectChanges();
         },
+        // Silent by design: schema enrichment (FK/PK indicators, typed
+        // filters) degrades gracefully; the grid still renders raw rows.
         error: () => {},
       });
   }
@@ -1600,8 +1445,7 @@ export class DfDataGridComponent
           this.initialLoading = false;
         },
         error: err => {
-          this.error =
-            err?.error?.error?.message || 'Failed to load table data';
+          this.error = normalizeError(err).message;
           this.loading = false;
           this.initialLoading = false;
         },
@@ -1692,19 +1536,34 @@ export class DfDataGridComponent
     this.loadData();
   }
 
-  /** Find schema FieldInfo for a JSON response key, handling camelCase vs snake_case */
+  /**
+   * Find schema FieldInfo for a JSON response key, handling camelCase vs
+   * snake_case. Memoized per schema: template cell bindings (isForeignKey/
+   * isPrimaryKey) call this O(rows x cols) per CD cycle, and the fuzzy-match
+   * fallback ran toLowerCase()+replace per schema field on every miss.
+   */
+  private fieldInfoCache = new Map<string, FieldInfo | null>();
+  private fieldInfoCacheSchema: TableSchemaResponse | null = null;
   private getFieldInfo(jsonKey: string): FieldInfo | null {
     if (!this.cachedSchema?.field) return null;
+    if (this.fieldInfoCacheSchema !== this.cachedSchema) {
+      this.fieldInfoCacheSchema = this.cachedSchema;
+      this.fieldInfoCache.clear();
+    }
+    const cached = this.fieldInfoCache.get(jsonKey);
+    if (cached !== undefined) return cached;
     // Try exact match first
     const exact = this.cachedSchema.field.find(f => f.name === jsonKey);
-    if (exact) return exact;
-    // Try case-insensitive match (camelCase vs snake_case)
+    // Then case-insensitive match (camelCase vs snake_case)
     const lower = jsonKey.toLowerCase();
-    return (
+    const result =
+      exact ||
       this.cachedSchema.field.find(
         f => f.name.toLowerCase().replace(/_/g, '') === lower
-      ) || null
-    );
+      ) ||
+      null;
+    this.fieldInfoCache.set(jsonKey, result);
+    return result;
   }
 
   /** Map a JSON response key back to the actual DB column name via schema */
@@ -1742,8 +1601,12 @@ export class DfDataGridComponent
       this.cdr.detectChanges();
     };
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    // Outside the zone: mousemove during a drag would otherwise trigger full
+    // app CD per event on top of the rAF-throttled detectChanges below.
+    this.ngZone.runOutsideAngular(() => {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
   }
 
   // --- Filter operator logic ---
@@ -1810,6 +1673,7 @@ export class DfDataGridComponent
 
   clearAllFilters(): void {
     this.columnFilters = {};
+    this.apiStateVersion++;
     this.activeFilterCount = 0;
     this.pageIndex = 0;
     this.currentOffset = 0;
@@ -1817,6 +1681,8 @@ export class DfDataGridComponent
   }
 
   private updateActiveFilterCount(): void {
+    // Called after every columnFilters edit; also invalidates the API URL cache.
+    this.apiStateVersion++;
     this.activeFilterCount = Object.keys(this.columnFilters).filter(k => {
       const f = this.columnFilters[k];
       return f.value || this.isNullOp(f.op);
@@ -1970,7 +1836,19 @@ export class DfDataGridComponent
 
   // --- API URL builder ---
 
+  // Memoized: this is bound in the template ({{ buildApiUrl() }}) and the
+  // grid fires CD per keystroke/scroll while the API bar is visible. The
+  // cheap key check below replaces URLSearchParams + Object.entries + filter
+  // string rebuilds per CD. apiStateVersion is bumped wherever the non-
+  // primitive deps (columnFilters, apiSelectedRelated) are mutated.
+  private apiStateVersion = 0;
+  private apiUrlCacheKey = '';
+  private apiUrlCache = '';
   buildApiUrl(): string {
+    const key = `${this.serviceName}|${this.tableName}|${this.apiIncludeLimit}|${this.apiIncludeOffset}|${this.apiIncludeCount}|${this.pageSize}|${this.currentOffset}|${this.currentSort}|${this.navigationFilter}|${this.apiStateVersion}`;
+    if (key === this.apiUrlCacheKey) {
+      return this.apiUrlCache;
+    }
     const base = `${window.location.origin}/api/v2/${this.serviceName}/_table/${this.tableName}`;
     const params = new URLSearchParams();
     if (this.apiIncludeLimit) {
@@ -1998,7 +1876,18 @@ export class DfDataGridComponent
       params.set('related', relatedNames.join(','));
     }
     const qs = params.toString();
-    return qs ? `${base}?${qs}` : base;
+    this.apiUrlCacheKey = key;
+    this.apiUrlCache = qs ? `${base}?${qs}` : base;
+    return this.apiUrlCache;
+  }
+
+  toggleApiRelated(name: string): void {
+    this.apiSelectedRelated[name] = !this.apiSelectedRelated[name];
+    this.apiStateVersion++;
+  }
+
+  trackByRelName(_index: number, rel: { name: string }): string {
+    return rel.name;
   }
 
   copyApiUrl(): void {

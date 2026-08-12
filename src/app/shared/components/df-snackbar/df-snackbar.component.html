@@ -1,6 +1,9 @@
 <div class="alert-container" [class]="alertType">
   <fa-icon class="alert-icon" [icon]="icon" aria-hidden="true"></fa-icon>
   <span class="alert-message" role="alert">{{ message | transloco }}</span>
+  <button mat-button *ngIf="error" (click)="openDetails()" type="button">
+    {{ 'errors.details' | transloco }}
+  </button>
   <button mat-icon-button (click)="onAction()">
     <fa-icon [icon]="faXmark"></fa-icon>
   </button>

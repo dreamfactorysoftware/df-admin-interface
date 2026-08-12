@@ -44,6 +44,8 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-chat/df-ai-chat.poll.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/utils/aggregate.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/utils/cost.spec.ts',
+    // 2026-08-11 task cost estimator: pure calibration/estimate/delta math.
+    '<rootDir>/src/app/adf-ai-usage/utils/task-estimate.spec.ts',
     '<rootDir>/src/app/shared/components/df-section-landing/df-section-landing.component.spec.ts',
     '<rootDir>/src/app/adf-home/df-welcome-page/df-generate-api-card/df-generate-api-card.component.spec.ts',
   ],

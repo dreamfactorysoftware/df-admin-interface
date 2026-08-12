@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, timer, forkJoin } from 'rxjs';
 import { catchError, map, shareReplay, switchMap, tap } from 'rxjs/operators';
+import { silent } from '../utilities/http-contexts';
 
 export interface DashboardStats {
   services: {
@@ -45,20 +46,20 @@ export class DfAnalyticsService {
 
   private fetchStats(): Observable<DashboardStats> {
     // Fetch minimal data to filter out system services.
-    // Use skip-error so roles without system permissions degrade gracefully
+    // Silent by design: roles without system permissions degrade gracefully
     // to the catchError fallback instead of triggering the error interceptor.
-    const headers = { 'skip-error': 'true' };
+    const context = silent();
     const requests = {
       services: this.http.get<any>(
         '/api/v2/system/service?fields=id,name,type&include_count=true',
-        { headers }
+        { context }
       ),
       roles: this.http.get<any>(
         '/api/v2/system/role?fields=id,name&include_count=true',
-        { headers }
+        { context }
       ),
       appKeys: this.http.get<any>('/api/v2/system/app?include_count=true', {
-        headers,
+        context,
       }),
     };
 
