@@ -4,11 +4,7 @@
   (alertClosed)="showAlert = false"
   >{{ alertMsg }}</df-alert
 >
-<form
-  [formGroup]="formGroup"
-  class="details-section"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''"
-  (ngSubmit)="onSubmit()">
+<form [formGroup]="formGroup" class="details-section" (ngSubmit)="onSubmit()">
   <mat-form-field
     appearance="outline"
     subscriptSizing="dynamic"
@@ -80,7 +76,7 @@
       <mat-label>{{ 'limits.service' | transloco }}</mat-label>
       <mat-select formControlName="serviceId">
         <mat-option
-          *ngFor="let service of serviceDropdownOptions"
+          *ngFor="let service of serviceDropdownOptions; trackBy: trackById"
           [value]="service.id"
           >{{ service.name }}
         </mat-option>
@@ -94,7 +90,9 @@
       class="dynamic-width">
       <mat-label>{{ 'limits.role' | transloco }}</mat-label>
       <mat-select formControlName="roleId">
-        <mat-option *ngFor="let role of roleDropdownOptions" [value]="role.id"
+        <mat-option
+          *ngFor="let role of roleDropdownOptions; trackBy: trackById"
+          [value]="role.id"
           >{{ role.name }}
         </mat-option>
       </mat-select>
@@ -107,7 +105,9 @@
       class="dynamic-width">
       <mat-label>{{ 'limits.user' | transloco }}</mat-label>
       <mat-select formControlName="userId">
-        <mat-option *ngFor="let user of userDropdownOptions" [value]="user.id"
+        <mat-option
+          *ngFor="let user of userDropdownOptions; trackBy: trackById"
+          [value]="user.id"
           >{{ user.name }}
         </mat-option>
       </mat-select>

@@ -2,7 +2,8 @@ import { ActivatedRouteSnapshot, ResolveFn } from '@angular/router';
 import { inject } from '@angular/core';
 import { UserProfile } from '../../shared/types/user';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
-import { map, of, switchMap } from 'rxjs';
+import { catchError, map, of, switchMap } from 'rxjs';
+import { emptyListWithError } from 'src/app/shared/utilities/app-error';
 import {
   ADMIN_SERVICE_TOKEN,
   ROLE_SERVICE_TOKEN,
@@ -17,10 +18,16 @@ export const adminsResolver =
 
     const id = route.paramMap.get('id');
     if (!id) {
-      return crudService.getAll<GenericListResponse<UserProfile>>({
-        limit,
-        sort: 'name',
-      });
+      // List branch only: complete navigation on failure so the table shell
+      // renders the error state with Retry (a throwing resolver cancels
+      // navigation with zero feedback). The detail branch below keeps its
+      // own error contract; do not blanket-catch it with a list shape.
+      return crudService
+        .getAll<GenericListResponse<UserProfile>>({
+          limit,
+          sort: 'name',
+        })
+        .pipe(catchError(err => of(emptyListWithError(err))));
     }
     return crudService
       .get<UserProfile>(id, {

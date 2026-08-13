@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { TranslocoService } from '@ngneat/transloco';
 import { catchError, map, of } from 'rxjs';
 import {
   DfSectionLandingComponent,
   SectionLandingAction,
   SectionLandingGroup,
   SectionLandingNote,
+  SectionLandingTint,
 } from '../shared/components/df-section-landing/df-section-landing.component';
 import { SERVICE_GROUPS } from '../shared/constants/serviceGroups';
 import { SERVICE_TYPE_SERVICE_TOKEN } from '../shared/constants/tokens';
@@ -13,15 +15,20 @@ import { GenericListResponse } from '../shared/types/generic-http';
 import { ROUTES } from '../shared/types/routes';
 import { ServiceType } from '../shared/types/service';
 
+// API Types overview (/api-connections/api-types). One card per source
+// category; each generates a governed REST API from a different class of
+// system. Category tints (item 21): database=data, scripting=build,
+// network=docs, file=admin, utility=system, api-builder=build. Copy is
+// user-goal and keyed through the root transloco scope.
 @Component({
   selector: 'df-api-types-overview',
   standalone: true,
   imports: [CommonModule, DfSectionLandingComponent],
   template: `
     <df-section-landing
-      eyebrow="API types"
-      title="Choose the right API source"
-      description="DreamFactory turns databases, files, remote services, scripts, and platform utilities into governed REST APIs. Pick the API type that matches the system you need to expose."
+      [eyebrow]="t('eyebrow')"
+      [title]="t('title')"
+      [description]="t('description')"
       [actions]="actions"
       [groups]="groups"
       [notes]="notes">
@@ -30,17 +37,22 @@ import { ServiceType } from '../shared/types/service';
 })
 export class DfApiTypesOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
+  private transloco = inject(TranslocoService);
   private serviceTypes: ServiceType[] | null = null;
+
+  t(key: string): string {
+    return this.transloco.translate(`sectionOverviews.apiTypes.${key}`);
+  }
 
   readonly actions: SectionLandingAction[] = [
     {
-      label: 'Create Database API',
-      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.DATABASE}/${ROUTES.CREATE}`,
-      icon: 'storage',
+      label: this.t('actionCreate'),
+      route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${ROUTES.API_BUILDER}`,
+      icon: 'api',
       primary: true,
     },
     {
-      label: 'Data Explorer',
+      label: this.t('actionExplore'),
       route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.DATA_EXPLORER}`,
       icon: 'travel_explore',
     },
@@ -49,18 +61,18 @@ export class DfApiTypesOverviewComponent implements OnInit {
   readonly notes: SectionLandingNote[] = [
     {
       icon: 'hub',
-      title: 'Data gateway pattern',
-      text: 'Each API type connects DreamFactory to a different class of enterprise system.',
+      title: this.t('noteGatewayTitle'),
+      text: this.t('noteGatewayText'),
     },
     {
       icon: 'lock',
-      title: 'Governance is shared',
-      text: 'Roles, API keys, scripting, and docs apply after the source API is created.',
+      title: this.t('noteGovernanceTitle'),
+      text: this.t('noteGovernanceText'),
     },
     {
       icon: 'extension',
-      title: 'Installed connectors only',
-      text: 'Unavailable API categories are marked by the connector types installed in this instance.',
+      title: this.t('noteInstalledTitle'),
+      text: this.t('noteInstalledText'),
     },
   ];
 
@@ -74,43 +86,64 @@ export class DfApiTypesOverviewComponent implements OnInit {
       .subscribe(serviceTypes => (this.serviceTypes = serviceTypes));
   }
 
+  // groups feeds a child [input]; a fresh array per change-detection pass
+  // forces the landing component to re-diff its cards every cycle. Rebuild
+  // only when the async-loaded serviceTypes ref changes.
+  private memoGroupsTypes: ServiceType[] | null | undefined = undefined;
+  private memoGroups: SectionLandingGroup[] = [];
+
   get groups(): SectionLandingGroup[] {
+    if (this.memoGroupsTypes !== this.serviceTypes) {
+      this.memoGroupsTypes = this.serviceTypes;
+      this.memoGroups = this.buildGroups();
+    }
+    return this.memoGroups;
+  }
+
+  private buildGroups(): SectionLandingGroup[] {
     return [
       {
-        title: 'Available API source categories',
+        title: this.t('group'),
         cards: [
           this.serviceCard(
+            'api',
+            'apiBuilder',
+            'build',
+            ROUTES.API_BUILDER,
+            SERVICE_GROUPS[ROUTES.API_BUILDER]
+          ),
+          this.serviceCard(
             'storage',
-            'Database APIs',
-            'Generate REST APIs for relational and big data sources, including tables, stored procedures, views, filters, and relationships.',
+            'database',
+            'data',
             ROUTES.DATABASE,
             SERVICE_GROUPS[ROUTES.DATABASE]
           ),
           this.serviceCard(
             'code',
-            'Scripting APIs',
-            'Expose custom server-side logic as API endpoints when the workflow needs more than a direct connector.',
+            'scripting',
+            'build',
             ROUTES.SCRIPTING,
             SERVICE_GROUPS[ROUTES.SCRIPTING]
           ),
           this.serviceCard(
             'language',
-            'Network APIs',
-            'Proxy and govern remote HTTP, SOAP, and network-accessible services through DreamFactory.',
+            'network',
+            'docs',
             ROUTES.NETWORK,
             SERVICE_GROUPS[ROUTES.NETWORK]
           ),
           this.serviceCard(
             'folder',
-            'File APIs',
-            'Expose object storage and file systems with consistent REST access and DreamFactory permissions.',
+            'file',
+            'admin',
             ROUTES.FILE,
             SERVICE_GROUPS[ROUTES.FILE]
           ),
           this.serviceCard(
             'build',
-            'Utility APIs',
-            'Add platform services such as email, cache, notification, logging, and supporting infrastructure APIs.',
+            'utility',
+            'system',
             ROUTES.UTILITY,
             SERVICE_GROUPS[ROUTES.UTILITY]
           ),
@@ -121,20 +154,21 @@ export class DfApiTypesOverviewComponent implements OnInit {
 
   private serviceCard(
     icon: string,
-    title: string,
-    text: string,
+    key: string,
+    tint: SectionLandingTint,
     route: ROUTES,
     groups: string[]
   ) {
     const count = this.countServiceTypes(groups);
     return {
       icon,
-      title,
-      text,
+      title: this.t(`${key}Title`),
+      text: this.t(`${key}Text`),
       route: `/${ROUTES.API_CONNECTIONS}/${ROUTES.API_TYPES}/${route}`,
-      action: 'Open category',
+      action: this.t(`${key}Action`),
       meta: this.connectorMeta(count),
       disabled: count === 0,
+      tint,
     };
   }
 
@@ -149,10 +183,14 @@ export class DfApiTypesOverviewComponent implements OnInit {
 
   private connectorMeta(count: number | null): string {
     if (count === null) {
-      return 'Checking connector types';
+      return this.transloco.translate(
+        'sectionOverviews.shared.connectorsChecking'
+      );
     }
     return count === 1
-      ? '1 connector type available'
-      : `${count} connector types available`;
+      ? this.transloco.translate('sectionOverviews.shared.connectorsOne')
+      : this.transloco.translate('sectionOverviews.shared.connectorsOther', {
+          count,
+        });
   }
 }

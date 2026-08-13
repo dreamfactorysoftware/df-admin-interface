@@ -1,0 +1,80 @@
+// df-toast: the floating toast surface (df-snackbar reuses this stylesheet).
+// Distinct from the inline df-alert panel: a toast is a true floating CDK
+// overlay, so it carries --df-shadow-overlay and a fade+scale entrance. The
+// inline df-alert keeps its own shadowless stylesheet.
+//
+// styles.scss blanks the MDC snackbar surface (.mdc-snackbar > * has
+// transparent bg + no shadow), so the surface below is what the user sees.
+// Tokens only; status color rides the border + icon, never a pastel fill.
+
+.alert-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--df-space-2);
+  padding: var(--df-space-2) var(--df-space-3);
+  background-color: var(--df-surface);
+  color: var(--df-text);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  box-shadow: var(--df-shadow-overlay, none);
+  font-size: var(--df-font-size-sm, 1.3rem);
+
+  // Fade + scale from 0.98 on insert (motion tokens). One-shot entrance.
+  animation: df-toast-in var(--df-duration-fast, 120ms)
+    var(--df-ease-standard, ease);
+
+  .alert-message {
+    flex: 1;
+    padding: var(--df-space-1) 0;
+  }
+  .alert-icon {
+    padding: 0 var(--df-space-1);
+  }
+
+  &.success {
+    border-color: var(--df-success-border);
+    .alert-icon {
+      color: var(--df-success);
+    }
+  }
+  &.error {
+    border-color: var(--df-danger-border);
+    .alert-icon {
+      color: var(--df-danger);
+    }
+  }
+  &.warning {
+    // --df-warning-border is added in Phase 0; fall back through the existing
+    // warning color, then danger, so the border always resolves.
+    border-color: var(
+      --df-warning-border,
+      var(--df-warning, var(--df-danger-border))
+    );
+    .alert-icon {
+      color: var(--df-warning, var(--df-danger));
+    }
+  }
+  &.info {
+    .alert-icon {
+      color: var(--df-accent);
+    }
+  }
+}
+
+@keyframes df-toast-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert-container {
+    animation: none;
+  }
+}

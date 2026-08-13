@@ -71,6 +71,115 @@ describe('DfChatMessageComponent', () => {
     });
   });
 
+  describe('suggestions', () => {
+    const chips = () =>
+      fixture.nativeElement.querySelectorAll(
+        '.msg__suggestion'
+      ) as NodeListOf<HTMLButtonElement>;
+
+    it('strips a trailing suggestions fence and surfaces its lines', () => {
+      component.message = msg({
+        content: 'Here you go.\n```suggestions\nShow revenue\nList tables\n```',
+      });
+      expect(component.segments).toEqual([
+        { type: 'text', text: 'Here you go.\n' },
+      ]);
+      expect(component.suggestions).toEqual(['Show revenue', 'List tables']);
+    });
+
+    it('tolerates stray bullets/quotes, dedupes, and caps at 4 chips', () => {
+      component.message = msg({
+        content: [
+          '```suggestions',
+          '- One',
+          '2) Two',
+          '"Three"',
+          'Three',
+          '',
+          'x'.repeat(121), // over the per-chip length cap: dropped
+          'Four',
+          'Five',
+          '```',
+        ].join('\n'),
+      });
+      expect(component.suggestions).toEqual(['One', 'Two', 'Three', 'Four']);
+    });
+
+    it('returns no suggestions when there is no suggestions fence', () => {
+      component.message = msg({
+        content: 'plain text\n```sql\nSELECT 1;\n```',
+      });
+      expect(component.suggestions).toEqual([]);
+    });
+
+    it('keeps a mid-message suggestions fence as ordinary code', () => {
+      component.message = msg({
+        content: 'Format:\n```suggestions\nExample line\n```\ntrailing text',
+      });
+      expect(component.suggestions).toEqual([]);
+      expect(component.segments).toEqual([
+        { type: 'text', text: 'Format:\n' },
+        { type: 'code', text: 'Example line\n' },
+        { type: 'text', text: '\ntrailing text' },
+      ]);
+    });
+
+    it('renders an unclosed suggestions fence as literal text, no chips', () => {
+      const content = 'reply\n```suggestions\nA\nB';
+      component.message = msg({ content });
+      expect(component.suggestions).toEqual([]);
+      expect(component.segments).toEqual([{ type: 'text', text: content }]);
+    });
+
+    it('keeps a trailing suggestions fence with no valid lines as code', () => {
+      component.message = msg({ content: 'reply\n```suggestions\n\n \n```' });
+      expect(component.suggestions).toEqual([]);
+      expect(component.segments).toEqual([
+        { type: 'text', text: 'reply\n' },
+        { type: 'code', text: '\n \n' },
+      ]);
+    });
+
+    it('renders chip buttons when showSuggestions is set and emits on click', () => {
+      fixture.componentRef.setInput(
+        'message',
+        msg({
+          content: 'Done.\n```suggestions\nShow revenue\nList tables\n```',
+        })
+      );
+      fixture.componentRef.setInput('showSuggestions', true);
+      fixture.detectChanges();
+
+      const buttons = chips();
+      expect(buttons.length).toBe(2);
+      expect(buttons[0].textContent?.trim()).toBe('Show revenue');
+      // The fence itself must not be rendered as a code block.
+      expect(fixture.nativeElement.querySelector('.msg__code')).toBeNull();
+
+      const picked: string[] = [];
+      component.suggestionSelected.subscribe((s: string) => picked.push(s));
+      buttons[1].click();
+      expect(picked).toEqual(['List tables']);
+    });
+
+    it('renders no chips while a reply is in flight (showSuggestions off)', () => {
+      fixture.componentRef.setInput(
+        'message',
+        msg({ content: 'Done.\n```suggestions\nShow revenue\n```' })
+      );
+      fixture.componentRef.setInput('showSuggestions', false);
+      fixture.detectChanges();
+      expect(chips().length).toBe(0);
+    });
+
+    it('renders no chips when the content has no suggestions fence', () => {
+      fixture.componentRef.setInput('message', msg({ content: 'plain reply' }));
+      fixture.componentRef.setInput('showSuggestions', true);
+      fixture.detectChanges();
+      expect(chips().length).toBe(0);
+    });
+  });
+
   describe('flags', () => {
     it('hasToolCalls is true when tool_calls is non-empty', () => {
       component.message = msg({

@@ -4,8 +4,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ROUTES } from 'src/app/shared/types/routes';
 import { JsonValidator } from 'src/app/shared/validators/json.validator';
 import {
+  APP_SERVICE_TOKEN,
   BASE_SERVICE_TOKEN,
   SCHEDULER_SERVICE_TOKEN,
+  USER_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
@@ -31,12 +33,17 @@ import {
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 
 import { catchError, throwError } from 'rxjs';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scheduler',
   templateUrl: './df-scheduler-details.component.html',
+  styleUrls: ['./df-scheduler-details.component.scss'],
   standalone: true,
   imports: [
     AsyncPipe,
@@ -64,7 +71,13 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
   componentDropdownOptions: string[] = [];
 
+  trackById = (_: number, item: { id: number }): number => item.id;
+  trackByValue = (_: number, item: string): string => item;
+
   scheduleToEdit: SchedulerTaskData | undefined;
+  // Optional "run as" identity dropdowns.
+  runAsApps: Array<{ id: number; name: string }> = [];
+  runAsUsers: Array<{ id: number; name: string; email?: string }> = [];
   log = '';
   alertMsg = '';
   showAlert = false;
@@ -78,6 +91,10 @@ export class DfSchedulerDetailsComponent implements OnInit {
     private router: Router,
     @Inject(BASE_SERVICE_TOKEN)
     private accessListService: DfBaseCrudService,
+    @Inject(APP_SERVICE_TOKEN)
+    private appService: DfBaseCrudService,
+    @Inject(USER_SERVICE_TOKEN)
+    private userService: DfBaseCrudService,
     private themeService: DfThemeService
   ) {}
 
@@ -92,10 +109,26 @@ export class DfSchedulerDetailsComponent implements OnInit {
       component: ['', Validators.required],
       method: ['GET', Validators.required],
       frequency: [],
+      appId: [null],
+      userId: [null],
     });
     this.activatedRoute.data.subscribe((data: any) => {
       this.userServicesDropdownOptions = data.data.resource;
     });
+
+    // Populate the optional "run as" identity dropdowns.
+    this.appService
+      .getAll<GenericListResponse<{ id: number; name: string }>>({
+        fields: 'id,name',
+        limit: 1000,
+        sort: 'name',
+      })
+      .subscribe(res => (this.runAsApps = res.resource));
+    this.userService
+      .getAll<
+        GenericListResponse<{ id: number; name: string; email: string }>
+      >({ fields: 'id,name,email', limit: 1000, sort: 'name' })
+      .subscribe(res => (this.runAsUsers = res.resource));
 
     this.activatedRoute.data.subscribe((data: any) => {
       this.scheduleToEdit = data.schedulerObject;
@@ -113,6 +146,8 @@ export class DfSchedulerDetailsComponent implements OnInit {
           component: this.scheduleToEdit.component,
           method: this.scheduleToEdit.verb,
           frequency: this.scheduleToEdit.frequency,
+          appId: this.scheduleToEdit.appId ?? null,
+          userId: this.scheduleToEdit.userId ?? null,
         });
 
         if (this.scheduleToEdit.verb !== 'GET') {
@@ -128,6 +163,14 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
     this.formGroup.get('serviceId')?.valueChanges.subscribe(data => {
       this.getServiceAccessList(data);
+    });
+
+    // The "run as user" field is hidden (*ngIf) when no app is selected, but
+    // hiding it does not clear its control. Without this, picking an app + user
+    // and then setting the app back to "None" submits a userId with no appId —
+    // an identity shape the backend does not support.
+    this.formGroup.get('appId')?.valueChanges.subscribe(appId => {
+      if (!appId) this.formGroup.get('userId')?.setValue(null);
     });
   }
 
@@ -158,11 +201,8 @@ export class DfSchedulerDetailsComponent implements OnInit {
         )
         .pipe(
           catchError(err => {
-            this.triggerAlert(
-              'error',
-              err.error.error.context.resource[0].message
-            );
-            return throwError(() => new Error(err));
+            this.showServerErrors(err);
+            return throwError(() => normalizeError(err));
           })
         )
         .subscribe(() =>
@@ -179,13 +219,26 @@ export class DfSchedulerDetailsComponent implements OnInit {
         })
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            this.triggerAlert('error', normalizeError(err).message);
+            return throwError(() => normalizeError(err));
           })
         )
         .subscribe(() =>
           this.router.navigate([ROUTES.SYSTEM_SETTINGS, ROUTES.SCHEDULER])
         );
+    }
+  }
+
+  /** Map server validation errors onto controls; banner shows whatever
+   * could not be mapped (all messages, not just the first). */
+  private showServerErrors(err: unknown) {
+    const e = normalizeError(err);
+    const leftovers = applyServerErrorsToForm(this.formGroup, e);
+    if (leftovers.length || !e.fields.length) {
+      this.triggerAlert(
+        'error',
+        leftovers.length ? leftovers.join('\n') : e.message
+      );
     }
   }
 
@@ -258,6 +311,8 @@ export class DfSchedulerDetailsComponent implements OnInit {
         payload: this.formGroup.value.payload ?? null,
         serviceId: this.formGroup.value.serviceId,
         serviceName: this.selectedService.name,
+        appId: this.formGroup.value.appId ?? null,
+        userId: this.formGroup.value.userId ?? null,
         verb: this.formGroup.value.method,
         service: {
           id: this.formGroup.value.serviceId,

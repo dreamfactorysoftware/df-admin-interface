@@ -44,6 +44,24 @@
   "sortedAsc": "Sorted ascending",
   "sortedDesc": "Sorted descending",
   "search": "Search",
+  "commandPalette": {
+    "placeholder": "Search or jump to anything",
+    "noResults": "Nothing matches that.",
+    "groups": {
+      "actions": "Actions",
+      "services": "Services",
+      "roles": "Roles",
+      "keys": "Keys",
+      "mcp": "MCP servers",
+      "docs": "Go to",
+      "recent": "Recent",
+      "suggested": "Likely next"
+    },
+    "foot": {
+      "navigate": "Navigate",
+      "select": "Open"
+    }
+  },
   "newEntry": "Create a new entry",
   "clearLimitCounter": "Clear limit counter",
   "clearLimitCounters": "Clear limit counters",
@@ -73,6 +91,7 @@
   "packages": "Packages",
   "launchpad": "LaunchPad",
   "goBack": "Go back",
+  "liveTail": "Live",
   "verbs": {
     "get": "GET (read)",
     "post": "POST (create)",
@@ -104,7 +123,72 @@
   "payload": "Payload (JSON)",
   "view": "View",
   "viewRow": "View row {{id}}",
-  "noEnteries": "No enteries found, you can create one by clicking on the button above.",
+  "noEntries": "No entries.",
+  "noEntriesCreate": "No entries yet. Create one to get started.",
+  "noFilterResults": "No results match your filter.",
+  "clearFilter": "Clear filter",
+  "retry": "Retry",
+  "skeleton": {
+    "loading": "Loading content"
+  },
+  "emptyState": {
+    "services": {
+      "message": "Services connect DreamFactory to a database, file store, or remote API so you can generate a secure REST API from it.",
+      "action": "Create a service"
+    },
+    "roles": {
+      "message": "Roles decide what an API key or user can reach, table by table and endpoint by endpoint.",
+      "action": "Create a role"
+    },
+    "apps": {
+      "message": "API keys let your apps and scripts call your generated APIs. Each key carries a role that sets what it can access.",
+      "action": "Create an API key"
+    },
+    "admins": {
+      "message": "Admins configure this instance: services, roles, and system settings. Invite the people who help you run it.",
+      "action": "Invite an admin"
+    },
+    "users": {
+      "message": "Users are the app end-users who sign in to your APIs. Add them here or let them self-register.",
+      "action": "Create a user"
+    },
+    "limits": {
+      "message": "Rate limits cap how often a user, role, or API key can call your endpoints, protecting your data sources from overload.",
+      "action": "Create a limit"
+    },
+    "scheduler": {
+      "message": "Scheduled tasks call an API endpoint on an interval you set, for syncs, cleanups, and other recurring jobs.",
+      "action": "Create a scheduled task"
+    },
+    "eventScripts": {
+      "message": "Event scripts run your own logic before or after an API call, for validation, data transforms, and integrations.",
+      "action": "Create an event script"
+    },
+    "cors": {
+      "message": "CORS entries let browser apps on other domains call your APIs. Add an origin to allow it through.",
+      "action": "Add a CORS entry"
+    },
+    "emailTemplates": {
+      "message": "Email templates define the messages DreamFactory sends for invites, password resets, and your own workflows.",
+      "action": "Create an email template"
+    }
+  },
+  "errors": {
+    "network": "Can't reach the server. Check your connection and try again.",
+    "http4xx": "The request could not be completed.",
+    "http5xx": "The server hit an error. Try again.",
+    "databaseConstraint": "That change conflicts with existing data.",
+    "unknown": "The request failed. Try again.",
+    "details": "Details",
+    "copyForSupport": "Copy for support",
+    "copied": "Copied",
+    "timestamp": "Time",
+    "status": "Status",
+    "request": "Request",
+    "pageTitle": "This page could not be loaded",
+    "goHome": "Go home",
+    "tryAgain": "Try again"
+  },
   "open": "Open",
   "noFileSelected": "No file selected",
   "toggleNav": "Toggle navigation",
@@ -112,6 +196,44 @@
   "githubFile": "Github Import",
   "schema": "Schema",
   "apiDocs": "API docs",
+  "filterBuilder": {
+    "title": "Filter",
+    "mode": {
+      "visual": "Build",
+      "raw": "Raw",
+      "aria": "Filter input mode"
+    },
+    "conj": {
+      "and": "And",
+      "or": "Or",
+      "aria": "Join conditions with"
+    },
+    "field": "Field",
+    "operator": "Operator",
+    "value": "Value",
+    "valueList": "Values (comma-separated)",
+    "rawLabel": "Filter string",
+    "rawPlaceholder": "(age > 21) and (status = 'active')",
+    "addCondition": "Add condition",
+    "removeRow": "Remove condition",
+    "clear": "Clear",
+    "op": {
+      "eq": "equals",
+      "neq": "not equals",
+      "gt": "greater than",
+      "gte": "greater or equal",
+      "lt": "less than",
+      "lte": "less or equal",
+      "like": "like",
+      "contains": "contains",
+      "startsWith": "starts with",
+      "endsWith": "ends with",
+      "in": "in",
+      "notIn": "not in",
+      "isNull": "is null",
+      "isNotNull": "is not null"
+    }
+  },
   "searchFeatures": "Search Features",
   "scriptType": "Script Type",
   "scriptTypes": {
@@ -133,9 +255,135 @@
     "title": "Quickstart: Test Your API Connection:",
     "quickStartDetails": "Start by testing your API with these sample curl commands. They return real data and confirm your connection is active.",
     "copyTooltip": "Copy",
-    "nextStepFooter": {"header": "Next Step:", "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"}
+    "nextStepFooter": {
+      "header": "Next Step:",
+      "body": "Scroll below to explore generated endpoints that allow you to read, write, and filter your data via REST"
+    }
+  },
+  "sectionOverviews": {
+    "shared": {
+      "connectorsChecking": "Checking available connectors",
+      "connectorsOne": "1 connector type available",
+      "connectorsOther": "{{count}} connector types available",
+      "providersChecking": "Checking available providers",
+      "providersOne": "1 provider type available",
+      "providersOther": "{{count}} provider types available"
+    },
+    "apiConnections": {
+      "eyebrow": "Build APIs",
+      "title": "Turn your data sources into secure REST APIs",
+      "description": "Generate a REST API from a database, file store, remote service, or script, then test it and lock it down before you hand it off. Everything you need to build and ship an API lives here.",
+      "actionGenerate": "Generate a REST API",
+      "actionDocs": "Open API Docs",
+      "groupBuild": "Build APIs",
+      "groupTest": "Test and extend",
+      "groupSecure": "Secure access",
+      "apiTypesTitle": "API Types",
+      "apiTypesText": "Generate a REST API from a database, file store, remote service, or script. DreamFactory builds and secures the endpoints for you.",
+      "apiTypesAction": "Browse API types",
+      "apiBuilderTitle": "API Builder",
+      "apiBuilderText": "Compose your existing services into one custom API with multiple endpoints and your own logic.",
+      "apiBuilderAction": "Open API Builder",
+      "apiDocsTitle": "API Docs",
+      "apiDocsText": "Read the generated OpenAPI reference and try live calls right in the browser.",
+      "apiDocsAction": "Open API Docs",
+      "dataExplorerTitle": "Data Explorer",
+      "dataExplorerText": "Browse records and confirm your filters, fields, and relationships return the data you expect.",
+      "dataExplorerAction": "Open Data Explorer",
+      "eventScriptsTitle": "Event Scripts",
+      "eventScriptsText": "Run your own logic before or after a request to validate input, reshape responses, or trigger side effects.",
+      "eventScriptsAction": "Manage event scripts",
+      "rolesTitle": "Role-Based Access",
+      "rolesText": "Control which services, tables, and endpoints each user, app, or agent is allowed to reach.",
+      "rolesAction": "Manage roles",
+      "keysTitle": "API Keys",
+      "keysText": "Issue an application key for each caller and bind it to the role it should run as.",
+      "keysAction": "Manage API keys",
+      "noteSecureTitle": "Lock it down before you share",
+      "noteSecureText": "A generated API stays open until a role and an API key say who can call it. Set both before you hand out the URL.",
+      "noteTestTitle": "Test before you hand off",
+      "noteTestText": "Confirm the shape and data of a new API in API Docs or Data Explorer before sharing any credentials.",
+      "noteConnectorsTitle": "Connectors vary by instance",
+      "noteConnectorsText": "The API types you can generate depend on the connectors installed in this DreamFactory build."
+    },
+    "apiTypes": {
+      "eyebrow": "Generate a REST API",
+      "title": "Pick the source you want to expose",
+      "description": "DreamFactory turns databases, file stores, remote services, scripts, and platform utilities into secured REST APIs. Choose the source type that matches the system you want to connect.",
+      "actionCreate": "Create a custom API",
+      "actionExplore": "Open Data Explorer",
+      "group": "Choose a source type",
+      "apiBuilderTitle": "API Builder",
+      "apiBuilderText": "Compose your existing services into one custom API with multiple endpoints and your own logic.",
+      "apiBuilderAction": "Open API Builder",
+      "databaseTitle": "Database APIs",
+      "databaseText": "Generate a REST API from a SQL or big-data database, complete with tables, views, stored procedures, filtering, and relationships.",
+      "databaseAction": "Connect a database",
+      "scriptingTitle": "Scripting APIs",
+      "scriptingText": "Expose custom server-side logic as an endpoint when a direct connector is not enough.",
+      "scriptingAction": "Create a scripted API",
+      "networkTitle": "Network APIs",
+      "networkText": "Wrap and govern a remote HTTP or SOAP service so it runs through DreamFactory security.",
+      "networkAction": "Connect a service",
+      "fileTitle": "File APIs",
+      "fileText": "Serve files and object storage over REST with the same permissions as the rest of your APIs.",
+      "fileAction": "Connect a file store",
+      "utilityTitle": "Utility APIs",
+      "utilityText": "Add platform services like email, cache, notifications, and logging to support your APIs.",
+      "utilityAction": "Add a utility",
+      "noteGatewayTitle": "One gateway for every source",
+      "noteGatewayText": "Each source type connects DreamFactory to a different class of system, but they all become REST APIs with the same shape.",
+      "noteGovernanceTitle": "Governance is shared",
+      "noteGovernanceText": "Roles, API keys, scripting, and docs all apply the same way once the source API exists.",
+      "noteInstalledTitle": "Installed connectors only",
+      "noteInstalledText": "Source types with no installed connector are marked unavailable in this instance."
+    },
+    "security": {
+      "eyebrow": "Secure access",
+      "title": "Control who can call your APIs",
+      "description": "Decide how callers prove who they are and what each one is allowed to reach. Authentication, rate limits, roles, and application keys all live here.",
+      "actionRole": "Create a role",
+      "actionKey": "Create an API key",
+      "group": "Access controls",
+      "authTitle": "Authentication",
+      "authText": "Let users sign in through LDAP, SSO, OAuth, or another installed provider.",
+      "authAction": "Manage authentication",
+      "rateTitle": "Rate Limiting",
+      "rateText": "Cap how many calls a user, role, service, IP, or key can make so no single client can overwhelm your APIs.",
+      "rateAction": "Manage rate limits",
+      "rolesTitle": "Role-Based Access",
+      "rolesText": "Define exactly which services, tables, and endpoints each caller can reach.",
+      "rolesAction": "Manage roles",
+      "keysTitle": "API Keys",
+      "keysText": "Review your application keys and the role each one grants to callers.",
+      "keysAction": "Manage API keys",
+      "notePrivilegeTitle": "Start with least privilege",
+      "notePrivilegeText": "Give a new role the narrowest access that works, then widen it only when an app or user actually needs more.",
+      "noteLimitsTitle": "Rate limits protect your services",
+      "noteLimitsText": "Limits keep a runaway or abusive client from overwhelming an expensive or sensitive API.",
+      "noteProvidersTitle": "Auth depends on installed providers",
+      "noteProvidersText": "The sign-in options you see reflect the authentication connectors installed in this instance."
+    }
   },
   "nav": {
+    "pillars": {
+      "build": "Build",
+      "secureManage": "Secure & Manage",
+      "aiGateway": "AI Gateway",
+      "system": "System"
+    },
+    "alerts": {
+      "nav": "Alerts",
+      "header": "{{nav.alerts.nav}}"
+    },
+    "agents": {
+      "nav": "Agents",
+      "header": "{{nav.agents.nav}}"
+    },
+    "api-builder": {
+      "nav": "API Builder",
+      "header": "{{nav.api-builder.nav}}"
+    },
     "error": {
       "header": "Error"
     },
@@ -208,6 +456,7 @@
       "header": "{{nav.api-connections.nav}}",
       "api-types": {
         "nav": "API Types",
+        "header": "{{nav.api-connections.api-types.nav}}",
         "database": {
           "nav": "Database",
           "header": "{{nav.api-connections.api-types.database.nav}}",
@@ -259,6 +508,10 @@
             "nav": "Create Utility API",
             "header": "{{nav.api-connections.api-types.utility.create.nav}}"
           }
+        },
+        "api-builder": {
+          "nav": "API Builder",
+          "header": "{{nav.api-connections.api-types.api-builder.nav}}"
         }
       },
       "role-based-access": {
@@ -395,8 +648,8 @@
         "header": "{{nav.system-settings.logs.nav}}",
         "create": {
           "header": "Create Log"
-          }
-        },
+        }
+      },
       "file-logs": {
         "nav": "Logs",
         "header": "{{nav.system-settings.file-logs.nav}}"
@@ -420,7 +673,9 @@
           "nav": "Create a new admin",
           "header": "{{nav.admin-settings.admins.create.nav}}"
         },
-        "edit": { "header": "{{edit}}" }
+        "edit": {
+          "header": "{{edit}}"
+        }
       },
       "schema": {
         "nav": "Schema",
@@ -443,6 +698,10 @@
           }
         }
       },
+      "schema-contracts": {
+        "nav": "Schema Contracts",
+        "header": "{{nav.admin-settings.schema-contracts.nav}}"
+      },
       "users": {
         "nav": "Users",
         "header": "Manage Users",
@@ -450,16 +709,37 @@
           "nav": "Create a new user",
           "header": "{{nav.admin-settings.users.create.nav}}"
         },
-        "edit": { "header": "{{edit}}" }
+        "edit": {
+          "header": "{{edit}}"
+        }
       },
-      "files": { "nav": "{{files}}", "header": "{{files}}" },
-      "logs": { "nav": "{{logs}}", "header": "{{logs}}" }
+      "files": {
+        "nav": "{{files}}",
+        "header": "{{files}}"
+      },
+      "logs": {
+        "nav": "{{logs}}",
+        "header": "{{logs}}"
+      }
     },
-    "profile": { "header": "Profile" },
-    "logout": { "header": "Logout" },
-    "data": { "nav": "{{data}}", "header": "{{data}}" },
-    "package-manager": { "nav": "{{packages}}", "header": "{{packages}}" },
-    "launchpad": { "nav": "{{launchpad}}", "header": "{{launchpad}}" }
+    "profile": {
+      "header": "Profile"
+    },
+    "logout": {
+      "header": "Logout"
+    },
+    "data": {
+      "nav": "{{data}}",
+      "header": "{{data}}"
+    },
+    "package-manager": {
+      "nav": "{{packages}}",
+      "header": "{{packages}}"
+    },
+    "launchpad": {
+      "nav": "{{launchpad}}",
+      "header": "{{launchpad}}"
+    }
   },
   "alerts": {
     "duplicateEmail": "Email address already exists",
@@ -472,7 +752,7 @@
   },
   "services": {
     "alerts": {
-      "duplicateSuccess": "Service duplicated successfully"
+      "duplicateSuccess": "Service duplicated"
     },
     "duplicate": {
       "title": "Duplicate Service",
@@ -482,7 +762,7 @@
   },
   "roles": {
     "alerts": {
-      "duplicateSuccess": "Role duplicated successfully"
+      "duplicateSuccess": "Role duplicated"
     },
     "duplicate": {
       "title": "Duplicate Role",
@@ -492,7 +772,7 @@
   },
   "apps": {
     "alerts": {
-      "duplicateSuccess": "App duplicated successfully"
+      "duplicateSuccess": "App duplicated"
     },
     "duplicate": {
       "title": "Duplicate App",
@@ -504,11 +784,11 @@
     "label": "Lookup Keys",
     "desc": "Lookup keys for service configuration and credentials must be made private.",
     "noKeys": "No lookup keys.",
-    "fullDesc": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely ncrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private.",
+    "fullDesc": "The DreamFactory administrator can create any number of 'key, value' pairs attached to a role. The key values are automatically substituted on the server. For example, key names can be used in the username and password fields required to hook up a SQL or NoSQL database. They can also be used in Email Templates or as parameters for external REST services. Any Lookup Key can be marked as private, and in this case the key value is securely encrypted on the server and is no longer accessible through the platform interface. Lookup keys for service configuration and credentials must be made private.",
     "alerts": {
-      "createSuccess": "Lookup keys created successfully.",
-      "updateSuccess": "Lookup keys updated successfully.",
-      "deleteSuccess": "Lookup keys deleted successfully."
+      "createSuccess": "Lookup keys created.",
+      "updateSuccess": "Lookup keys updated.",
+      "deleteSuccess": "Lookup keys deleted."
     }
   },
   "licenseExpired": {
@@ -531,5 +811,327 @@
   "engagementBanner": {
     "message": "Testing DreamFactory? Let's show you what's possible. Book your free walkthrough",
     "ctaButton": "Schedule Now"
+  },
+  "phosphor": {
+    "boot": "SHALL WE PLAY A GAME?"
+  },
+  "tryIt": {
+    "methodLabel": "HTTP method",
+    "pathPlaceholder": "/_table/{table}",
+    "send": "Send",
+    "identityLabel": "Test as",
+    "identityHint": "Re-fires under the selected key's role. Fields that role cannot read are dimmed.",
+    "readOnly": "Read-only",
+    "sessionDefault": "Default",
+    "tabs": {
+      "params": "Params",
+      "headers": "Headers",
+      "body": "Body"
+    },
+    "key": "Key",
+    "value": "Value",
+    "addParam": "Add param",
+    "addHeader": "Add header",
+    "removeRow": "Remove row",
+    "authNote": "The auth header is added from the selected identity. You do not need to set it here.",
+    "bodyPlaceholder": "{\n  \"resource\": []\n}",
+    "copy": "Copy",
+    "copyResponse": "Copy response",
+    "ms": "ms",
+    "pretty": "Pretty",
+    "raw": "Raw",
+    "deniedLabel": "Hidden from this identity",
+    "deniedTitle": "Denied",
+    "deniedBoundary": "The \"{{role}}\" role has no {{method}} grant on this resource. DreamFactory enforced the boundary, not the UI."
+  },
+  "artifactCard": {
+    "eyebrow": "Live API",
+    "title": "Your API is live",
+    "subtitle": "Real endpoint, real key. Copy a request and run it.",
+    "baseUrlLabel": "Base URL",
+    "authHeaderLabel": "Auth header",
+    "keyLabel": "Key",
+    "formatLabel": "Format",
+    "noKeyBadge": "No key yet",
+    "noKeyHint": "Create one to authenticate this request.",
+    "createKey": "Create a key",
+    "copy": "Copy",
+    "copied": "Copied",
+    "runNote": "Reads the first rows from {{table}} and returns 200.",
+    "previewNote": "Reads the first rows from {{table}}. Add a working key to run it.",
+    "mcpNote": "Point any MCP client at this service. Its tables become scoped tools under the same key.",
+    "tabs": {
+      "curl": "curl",
+      "javascript": "JavaScript",
+      "python": "Python",
+      "mcp": "MCP client"
+    }
+  },
+  "scopeMatrix": {
+    "ariaLabel": "Roles by HTTP verb access for this service",
+    "roleHeader": "Role",
+    "emptyTitle": "No roles yet",
+    "emptyHint": "Create a role to grant agents and keys scoped access to this service.",
+    "state": {
+      "full": "Full access",
+      "filtered": "Row or field filtered",
+      "none": "No access"
+    }
+  },
+  "scopeMap": {
+    "unresolvedTitle": "No identity selected",
+    "unresolvedHint": "Point this at a role, key, or agent to resolve what it can reach.",
+    "emptyTitle": "Reaches nothing",
+    "emptyHint": "This identity has no service grants. It cannot read or write any data yet.",
+    "allow": "Allow",
+    "deny": "Deny",
+    "inherited": "Inherited",
+    "explicit": "Explicit",
+    "filtered": "Filtered",
+    "filteredHint": "Narrowed to specific rows or a single table, not the whole service.",
+    "noVerbs": "No operations",
+    "grantCount": "{{count}} grant(s)"
+  },
+  "aiAllowedRoles": {
+    "title": "Allowed roles",
+    "count": "{{selected}} selected · {{available}} available",
+    "createRole": "Create new role",
+    "hint": "Pick the DreamFactory roles that may use this AI connection. Each role's data scope determines what the AI can read while operating under that role. At least one role is required before chat sessions can run.",
+    "noneWarning": "No roles selected. Chat sessions will refuse to start until at least one role is allowed.",
+    "loading": "Loading roles…",
+    "empty": "No DreamFactory roles exist yet. Create one and come back.",
+    "reachTitle": "What these roles can reach",
+    "reachHint": "Agents and keys under this connection inherit exactly this access. Anything not listed here is out of reach.",
+    "reachRole": "Operating as {{role}}"
+  },
+  "onboardingChecklist": {
+    "eyebrow": "Get started",
+    "title": "Set up your first API",
+    "subtitle": "Five steps from a datasource to an AI-ready endpoint.",
+    "done": "Done",
+    "allDoneTitle": "You're set up",
+    "allDoneSubtitle": "Every step is done. This checklist stays out of your way now.",
+    "steps": {
+      "connectDatasource": {
+        "title": "Connect a datasource",
+        "description": "Point DreamFactory at a database or file to generate its API.",
+        "cta": "Connect a datasource"
+      },
+      "generateApi": {
+        "title": "Generate an API",
+        "description": "DreamFactory builds a full REST API from your datasource schema.",
+        "cta": "View your API"
+      },
+      "createApiKey": {
+        "title": "Create an API key",
+        "description": "Issue a key so callers can authenticate against your API.",
+        "cta": "Create an API key"
+      },
+      "firstCall": {
+        "title": "Make your first call",
+        "description": "Run a request from the docs and get a live 200 back.",
+        "cta": "Make your first call"
+      },
+      "scopeRole": {
+        "title": "Scope a role for AI access",
+        "description": "Define what an AI agent can read and write through your API.",
+        "cta": "Scope a role"
+      }
+    }
+  },
+  "homeCockpit": {
+    "title": "DreamFactory",
+    "description": "See who can reach your data, through what path, at what cost.",
+    "provisionSample": "Provision sample database",
+    "provisionSampleSuccess": "Sample database created. Its API is live.",
+    "error": {
+      "title": "Home could not load",
+      "description": "The service data did not come back. Retry to load your APIs.",
+      "retry": "Retry"
+    },
+    "tiles": {
+      "totalApis": "Total APIs",
+      "scopedAccess": "Scoped access",
+      "scopedAccessTip": "Of the APIs a role can reach, the share limited to specific tables or read-only access. Higher is tighter.",
+      "deprecated": "Deprecated",
+      "requestsToday": "Requests",
+      "spendToday": "Spend"
+    },
+    "ranges": {
+      "24h": "Last 24 hours",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      "all": "All time"
+    },
+    "exposure": {
+      "label": "{{count}} services allow broad read and write access",
+      "cta": "Review access"
+    },
+    "actions": {
+      "generateApi": {
+        "title": "Generate an API from your database",
+        "desc": "Connect a database and get a secured REST API in minutes."
+      },
+      "createRole": {
+        "title": "Create a role",
+        "desc": "Scope what a key can reach, table by table."
+      },
+      "createKey": {
+        "title": "Create an API key",
+        "desc": "Issue a key bound to a role and start making calls."
+      },
+      "connectMcp": {
+        "title": "Connect an MCP server",
+        "desc": "Expose your data to agents over the Model Context Protocol."
+      },
+      "apiDocs": {
+        "title": "Open API docs",
+        "desc": "Browse and try every endpoint live in the console."
+      }
+    }
+  },
+  "agents": {
+    "subtitle": "AI agents with a scoped identity and short-lived keys. Watch what they call, at what cost, and what each can reach.",
+    "newAgent": "New agent",
+    "refresh": "Refresh",
+    "live": "Live",
+    "liveTip": "Activity refreshes automatically",
+    "agentsTitle": "Agents",
+    "ownerTip": "Owner",
+    "lastActiveTip": "Last active",
+    "neverActive": "never active",
+    "kill": {
+      "title": "Deactivate this agent?",
+      "message": "Its key is rejected on the next request. You can reactivate the agent at any time."
+    },
+    "viewScope": "Show what this agent can reach",
+    "reach": "Resolved reach",
+    "reachHint": "The services and tables this agent's role grants.",
+    "empty": {
+      "title": "No agents yet",
+      "message": "Register an AI agent to give it a scoped identity and a short-lived key."
+    },
+    "state": {
+      "active": "Active",
+      "expired": "Key expired",
+      "revoked": "Revoked"
+    },
+    "log": {
+      "title": "Gateway request log",
+      "subtitle": "Highest-cost metered calls in this window. Select a row for the full record.",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "ok": "Completed",
+      "error": "Failed",
+      "completed": "OK",
+      "failed": "Error",
+      "scoped": "Scoped",
+      "unscoped": "Unscoped",
+      "range": "Window",
+      "range24h": "Last 24h",
+      "range7d": "Last 7 days",
+      "range30d": "Last 30 days",
+      "rangeAll": "All time",
+      "empty": {
+        "title": "No agent activity yet",
+        "message": "Calls appear here once an agent or key makes a gateway request."
+      },
+      "noMatch": {
+        "title": "No matching calls",
+        "message": "No calls match this status filter in the selected window."
+      }
+    },
+    "col": {
+      "time": "Time",
+      "provider": "Provider",
+      "model": "Model",
+      "status": "Status",
+      "tokens": "Tokens in/out",
+      "cost": "Cost",
+      "latency": "Latency",
+      "scope": "Scope"
+    },
+    "drawer": {
+      "title": "Call detail",
+      "close": "Close",
+      "guardrails": "Guardrails",
+      "completed": "Completed",
+      "failed": "Failed",
+      "scopeEnforced": "Scope enforced",
+      "unscoped": "Unscoped",
+      "guardrailHint": "DreamFactory enforces the call outcome and the role scope the call ran under. Other checks are only shown when a real signal exists.",
+      "attribution": "Attribution",
+      "service": "Service",
+      "resource": "Resource",
+      "provider": "Provider",
+      "role": "Role",
+      "user": "User",
+      "app": "Key / app",
+      "when": "When",
+      "none": "None",
+      "metrics": "Metrics",
+      "tokensIn": "Tokens in",
+      "tokensOut": "Tokens out",
+      "cost": "Cost",
+      "latency": "Latency",
+      "body": "Prompt & response",
+      "bodyNote": "Prompt and response bodies are not retained by the gateway."
+    },
+    "pending": {
+      "title": "Pending access requests",
+      "empty": {
+        "title": "No pending requests",
+        "message": "When an agent asks for access it needs, the request lands here to approve or deny."
+      }
+    },
+    "activity": {
+      "title": "Agent activity",
+      "alerts": "Recent agent alerts",
+      "emptyAlerts": {
+        "title": "No agent alerts yet",
+        "message": "Agent actions appear here once df-alerts is configured with a channel."
+      }
+    }
+  },
+  "pipelineStrip": {
+    "view": "View",
+    "addPolicy": "Add policy",
+    "error": {
+      "title": "Pipeline unavailable",
+      "hint": "The request chain could not be derived. Reload to try again."
+    },
+    "status": {
+      "active": "Active",
+      "filtered": "Filtered",
+      "open": "Open",
+      "handler": "Generated"
+    },
+    "nodes": {
+      "key": {
+        "title": "API key",
+        "detail": "{{count}} keys can authenticate a request.",
+        "empty": "No key exists. Nothing can call this service yet."
+      },
+      "role": {
+        "title": "Role gate",
+        "detail": "{{count}} roles grant access to this service.",
+        "empty": "No role grants access. Requests are denied at the gate."
+      },
+      "rate": {
+        "title": "Rate limit",
+        "detail": "{{rate}} requests per {{period}}.",
+        "empty": "Unmetered. Requests are not capped."
+      },
+      "filter": {
+        "title": "Field filter",
+        "detail": "{{count}} grants narrow the rows or fields returned.",
+        "empty": "No field filters. Roles reach whole tables."
+      },
+      "handler": {
+        "title": "Generated handler",
+        "detail": "{{type}} REST API, generated from the schema.",
+        "empty": "REST API, generated from the schema."
+      }
+    }
   }
 }

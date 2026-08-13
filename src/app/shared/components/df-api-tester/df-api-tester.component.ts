@@ -13,7 +13,9 @@ import { FormsModule } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faPlay, faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 
+import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfCurrentServiceService } from 'src/app/shared/services/df-current-service.service';
 import { ApiKeysService } from '../../../adf-api-docs/services/api-keys.service';
 import { ApiKeyInfo } from 'src/app/shared/types/api-keys';
@@ -54,6 +56,7 @@ interface TestResult {
     MatIconModule,
     FormsModule,
     FontAwesomeModule,
+    DfBadgeComponent,
   ],
 })
 export class DfApiTesterComponent implements OnChanges {
@@ -226,7 +229,7 @@ export class DfApiTesterComponent implements OnChanges {
         };
         this.isTesting = false;
         this.snackBar.open(
-          `✅ Authentication successful! Access granted to ${selectedEndpoint.method} ${selectedEndpoint.endpoint}`,
+          `Access granted to ${selectedEndpoint.method} ${selectedEndpoint.endpoint}.`,
           'Close',
           {
             duration: 4000,
@@ -240,15 +243,13 @@ export class DfApiTesterComponent implements OnChanges {
           status: error.status || 0,
           error: isAuthError
             ? 'Authentication failed - Access denied'
-            : error.error?.error?.message ||
-              error.message ||
-              'Request failed due to non-authentication error',
+            : normalizeError(error).message,
         };
         this.isTesting = false;
 
         if (isAuthError) {
           this.snackBar.open(
-            '🔒 Authentication failed! Your credentials do not have access to this endpoint.',
+            'Access denied. These credentials cannot reach this endpoint.',
             'Close',
             {
               duration: 5000,
@@ -256,7 +257,7 @@ export class DfApiTesterComponent implements OnChanges {
           );
         } else {
           this.snackBar.open(
-            `✅ Authentication successful, but request failed due to other reasons (Status: ${error.status}).`,
+            `Authenticated, but the request failed (status ${error.status}).`,
             'Close',
             {
               duration: 4000,
@@ -284,34 +285,36 @@ export class DfApiTesterComponent implements OnChanges {
     this.testResult = null;
   }
 
-  getMethodColor(method: string): string {
-    switch (method.toLowerCase()) {
-      case 'get':
-        return '#61affe';
-      case 'post':
-        return '#49cc90';
-      case 'put':
-        return '#fca130';
-      case 'patch':
-        return '#50e3c2';
-      case 'delete':
-        return '#f93e3e';
-      default:
-        return '#9b9b9b';
-    }
+  trackByEndpoint(_index: number, endpoint: TestEndpoint): string {
+    return `${endpoint.method} ${endpoint.endpoint}`;
+  }
+
+  trackByKeyName(_index: number, key: ApiKeyInfo): string {
+    return key.name;
+  }
+
+  // Method badge color is a CSS class (styled off --df-* tokens), not an inline
+  // literal. Literals broke phosphor and hard-coded the swagger palette; the
+  // tokenized classes repaint per theme. Unknown methods fall back to the
+  // neutral base .method-badge style.
+  methodClass(method: string): string {
+    return 'method-' + (method || '').toLowerCase();
   }
 
   isAuthenticationError(): boolean {
     return this.testResult?.status === 401 || this.testResult?.status === 403;
   }
 
+  // Returns a token reference (not a literal) for [style.color]. Warning falls
+  // back to the component's themed --tester-warning alias until the global
+  // --df-warning token lands in light/dark.
   getResultIconColor(): string {
     if (this.testResult?.success) {
-      return '#4caf50'; // Green for success
+      return 'var(--df-success)';
     } else if (this.isAuthenticationError()) {
-      return '#f44336'; // Red for auth failure
+      return 'var(--df-danger)';
     } else {
-      return '#ff9800'; // Orange for non-auth failure (auth passed but request failed)
+      return 'var(--df-warning, var(--tester-warning))';
     }
   }
 }

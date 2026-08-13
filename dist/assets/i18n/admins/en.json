@@ -5,11 +5,11 @@
     "restrictedAdmin": "Restricted admin",
     "autoRole": "An auto-generated role will be created for this admin.",
     "roleId": "Role id: {{roleId}}",
-    "createdSuccess": "Admin created successfully",
-    "updateSuccess": "Admin updated successfully",
-    "deleteSuccess": "Admin deleted successfully",
-    "importSuccess": "Admin imported successfully",
-    "exportSuccess": "Admin exported successfully"
+    "createdSuccess": "Admin created",
+    "updateSuccess": "Admin updated",
+    "deleteSuccess": "Admin deleted",
+    "importSuccess": "Admin imported",
+    "exportSuccess": "Admin exported"
   },
   "tabs": {
     "apps": "Apps",

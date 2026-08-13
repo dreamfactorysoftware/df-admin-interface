@@ -1,12 +1,34 @@
 .ai-chat {
+  // Chat palette: aliases onto the global --df-* theme tokens (src/styles.scss;
+  // DfThemeService stamps .dark-theme on <body>). Child components (message,
+  // tool-result, session-list) inherit these vars through the DOM, so this
+  // stays the single place the chat palette is defined.
+  --chat-surface: var(--df-surface);
+  --chat-surface-2: var(--df-surface-2);
+  --chat-hover: var(--df-hover);
+  --chat-border: var(--df-border);
+  --chat-border-2: var(--df-border-2);
+  --chat-text: var(--df-text);
+  --chat-text-2: var(--df-text-2);
+  --chat-text-muted: var(--df-text-muted);
+  --chat-text-faint: var(--df-text-faint);
+  --chat-heading: var(--df-text);
+  --chat-code-bg: var(--df-code-bg);
+
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 8rem);
-  min-height: 500px;
-  margin: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
+  color: var(--chat-text);
+  // Departure: the routed content already sits on the bordered .main content
+  // card (df-side-nav, padding 20px 24px). Bleed to its edges so the card
+  // itself IS the chat surface — one bordered surface, hairlines inside.
+  margin: -20px -24px;
+  border: none;
+  background: transparent;
+  // Fit within the viewport under the DF top bar + page heading so the message
+  // input stays visible without scrolling the page. The old offset was 24rem
+  // with inner margins; the card bleed reclaims ~40px of chrome.
+  height: calc(100vh - 20rem);
+  min-height: 420px;
   overflow: hidden;
 
   &__header {
@@ -14,8 +36,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 16px;
+    min-height: 52px;
+    border-bottom: 1px solid var(--chat-border-2);
     flex-wrap: wrap;
   }
 
@@ -26,8 +49,9 @@
 
     h2 {
       margin: 0;
-      font-size: 20px;
+      font-size: 1.6rem;
       font-weight: 600;
+      letter-spacing: -0.01em;
     }
   }
 
@@ -36,33 +60,46 @@
   }
 
   &__service-name {
-    padding: 0.25rem 0.625rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    font-size: 14px;
+    padding: 2px 8px;
+    border-radius: var(--df-radius-sm);
+    background: var(--chat-surface-2);
+    border: 1px solid var(--chat-border-2);
+    font-size: 1.25rem;
+    color: var(--chat-text-2);
   }
 
   &__header-right {
     display: flex;
     align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    color: var(--chat-text-muted);
+    font-size: 1.25rem;
+  }
+
+  &__scope-group {
+    display: flex;
+    align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 14px;
   }
 
   &__scope-label {
+    font-size: 11px;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--chat-text-muted);
   }
 
   &__scope-chip {
     font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-    font-size: 13px;
-    padding: 0.2rem 0.625rem;
-    border-radius: 999px;
-    background: rgba(46, 160, 67, 0.15);
-    border: 1px solid rgba(46, 160, 67, 0.4);
-    color: #4ade80;
+    font-size: 1.2rem;
+    padding: 2px 8px;
+    border-radius: var(--df-radius-sm);
+    background: var(--df-success-soft);
+    border: 1px solid var(--df-success-border);
+    color: var(--df-success);
   }
 
   &__empty,
@@ -72,17 +109,20 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--chat-text-muted);
     text-align: center;
     padding: 2rem;
 
     h3 {
       margin: 0 0 0.5rem;
-      color: rgba(255, 255, 255, 0.85);
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--chat-heading);
     }
 
     a {
-      color: #60a5fa;
+      color: var(--df-accent);
     }
   }
 
@@ -102,6 +142,31 @@
 
   &__sidebar {
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__act-as {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.875rem 0.875rem 0;
+    flex-shrink: 0;
+    border-right: 1px solid var(--chat-border-2);
+  }
+
+  &__act-as-field {
+    width: 100%;
+  }
+
+  &__act-as-hint {
+    font-size: 1.2rem;
+    color: var(--chat-text-muted);
+  }
+
+  &__session-list {
+    flex: 1;
+    min-height: 0;
   }
 
   &__main {
@@ -113,10 +178,10 @@
   &__error {
     margin: 0.75rem 1rem;
     padding: 0.75rem 1rem;
-    border-radius: 6px;
-    background: rgba(220, 53, 69, 0.12);
-    border: 1px solid rgba(220, 53, 69, 0.4);
-    color: #ff8585;
+    border-radius: var(--df-radius-sm);
+    background: var(--df-danger-soft);
+    border: 1px solid var(--df-danger-border);
+    color: var(--df-danger);
   }
 
   &__messages {
@@ -138,10 +203,17 @@
     align-items: center;
     gap: 0.625rem;
     padding: 0.5rem 0.875rem;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 999px;
-    color: rgba(255, 255, 255, 0.65);
-    font-size: 14px;
+    background: var(--chat-surface-2);
+    border: 1px solid var(--chat-border-2);
+    border-radius: var(--df-radius-sm);
+    color: var(--chat-text-2);
+    font-size: 1.3rem;
     align-self: flex-start;
   }
+}
+
+// The .main card drops to 16px padding on small screens; match the bleed.
+:host-context(.small) .ai-chat {
+  margin: -16px;
+  height: calc(100vh - 19rem);
 }

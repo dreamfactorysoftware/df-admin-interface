@@ -1,4 +1,4 @@
-<div class="top-action-bar" [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<div class="top-action-bar">
   <button
     *ngIf="allowCreate"
     mat-mini-fab
@@ -34,9 +34,21 @@
   *ngIf="{
     currentPageSize: currentPageSize$ | async,
   } as data">
-  <div
-    class="table-container"
-    [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <mat-progress-bar
+    *ngIf="tableState === 'loading'"
+    class="table-loading-bar"
+    mode="indeterminate"></mat-progress-bar>
+  <div class="table-error-panel" *ngIf="tableState === 'error' && tableError">
+    <div class="table-error-headline">
+      <fa-icon [icon]="faTriangleExclamation" size="lg"></fa-icon>
+      <span>{{ tableError.message | transloco }}</span>
+      <button mat-stroked-button type="button" (click)="retryLastFetch()">
+        {{ 'retry' | transloco }}
+      </button>
+    </div>
+    <df-error-detail [error]="tableError"></df-error-detail>
+  </div>
+  <div class="table-container" [class.table-stale]="tableState === 'loading'">
     <table
       mat-table
       [dataSource]="dataSource"
@@ -46,18 +58,25 @@
         <ng-container
           [matColumnDef]="column.columnDef"
           *ngIf="
-            column.columnDef !== 'actions' && column.columnDef !== 'scripting'
+            column.columnDef !== 'actions' &&
+            column.columnDef !== 'scripting' &&
+            column.columnDef !== 'health'
           ">
           <th
             mat-header-cell
             *matHeaderCellDef
             mat-sort-header
+            class="df-eyebrow"
+            [class.df-numeric]="isNumericColumn(column.columnDef)"
             [attr.sortActionDescription]="
               sortDescription(column.header!) | async
             ">
             {{ column.header | transloco }}
           </th>
-          <td mat-cell *matCellDef="let row">
+          <td
+            mat-cell
+            *matCellDef="let row"
+            [class.df-numeric]="isNumericColumn(column.columnDef)">
             <fa-icon
               *ngIf="column.columnDef === 'active'"
               [icon]="activeIcon(isCellActive(column?.cell(row)))"
@@ -81,8 +100,58 @@
                 *ngIf="!!column?.cell(row)"
                 [icon]="faTriangleExclamation"
                 size="lg"
-                style="color: red"></fa-icon>
+                class="log-warning"></fa-icon>
               <span *ngIf="!!column?.cell(row) === false">{{ '-' }}</span>
+            </ng-container>
+          </td>
+        </ng-container>
+        <ng-container
+          [matColumnDef]="column.columnDef"
+          *ngIf="column.columnDef === 'health'">
+          <th mat-header-cell *matHeaderCellDef class="df-eyebrow">
+            {{ column.header | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let row">
+            <ng-container *ngIf="row.health as health">
+              <ng-container *ngIf="health.rules.length; else healthyChip">
+                <button
+                  type="button"
+                  class="df-health-chip"
+                  [matMenuTriggerFor]="healthMenu"
+                  (click)="$event.stopPropagation()"
+                  [attr.aria-label]="'services.health.whyAria' | transloco">
+                  <df-badge
+                    [variant]="health.level"
+                    [label]="
+                      'services.health.level.' + health.level | transloco
+                    "></df-badge>
+                </button>
+                <mat-menu #healthMenu="matMenu">
+                  <a
+                    *ngFor="let rule of health.rules"
+                    mat-menu-item
+                    [routerLink]="rule.fix"
+                    [disabled]="!rule.fix"
+                    (click)="$event.stopPropagation()">
+                    {{ 'services.health.rules.' + rule.id | transloco }}
+                  </a>
+                </mat-menu>
+              </ng-container>
+              <!-- Nothing failing. The chip still has to say which of those
+                   two it means: a service whose type has no connection check
+                   is "not checked", never "Healthy". -->
+              <ng-template #healthyChip>
+                <df-badge
+                  [variant]="row.probe === 'ok' ? 'success' : 'neutral'"
+                  [label]="
+                    (row.probe === 'ok'
+                      ? 'services.health.level.success'
+                      : row.probe === 'unsupported'
+                        ? 'services.health.chip.notChecked'
+                        : 'services.health.chip.checking'
+                    ) | transloco
+                  "></df-badge>
+              </ng-template>
             </ng-container>
           </td>
         </ng-container>
@@ -90,7 +159,9 @@
           [matColumnDef]="column.columnDef"
           *ngIf="column.columnDef === 'scripting'">
           <ng-container *ngIf="isDatabase; else notDatabase">
-            <th mat-header-cell *matHeaderCellDef>Scripting</th>
+            <th mat-header-cell *matHeaderCellDef class="df-eyebrow">
+              Scripting
+            </th>
             <td class="actions" mat-cell *matCellDef="let row">
               <fa-icon
                 (click)="
@@ -113,7 +184,7 @@
           *ngIf="column.columnDef === 'actions'"
           stickyEnd>
           <th mat-header-cell *matHeaderCellDef></th>
-          <td class="actions" mat-cell *matCellDef="let row">
+          <td class="actions df-row-actions" mat-cell *matCellDef="let row">
             <ng-container
               *ngIf="actions.additional && actions.additional.length > 0">
               <ng-container
@@ -189,7 +260,45 @@
 
       <tr class="mat-row no-data-row" *matNoDataRow>
         <td class="mat-cell" [attr.colspan]="columns.length">
-          {{ 'noEnteries' | transloco }}
+          <ng-container
+            *ngIf="tableState !== 'loading' && tableState !== 'error'">
+            <ng-container *ngIf="currentFilter.value; else noFilterActive">
+              {{ 'noFilterResults' | transloco }}
+              <button
+                mat-button
+                color="primary"
+                type="button"
+                (click)="clearFilter()">
+                {{ 'clearFilter' | transloco }}
+              </button>
+            </ng-container>
+            <ng-template #noFilterActive>
+              <div
+                class="empty-state"
+                *ngIf="emptyStateMessage; else genericEmpty">
+                <p class="empty-state-message">
+                  {{ emptyStateMessage | transloco }}
+                </p>
+                <button
+                  *ngIf="allowCreate"
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  data-testid="empty-state-create"
+                  (click)="createRow()">
+                  {{ emptyStateActionLabel || 'create' | transloco }}
+                </button>
+              </div>
+              <ng-template #genericEmpty>
+                {{
+                  (allowCreate && tableLength === 0
+                    ? 'noEntriesCreate'
+                    : 'noEntries'
+                  ) | transloco
+                }}
+              </ng-template>
+            </ng-template>
+          </ng-container>
         </td>
       </tr>
     </table>

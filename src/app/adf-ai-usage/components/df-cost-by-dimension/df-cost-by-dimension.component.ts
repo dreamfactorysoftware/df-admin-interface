@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
+import { USD_2DP } from '../../utils/cost';
 
 /**
  * Stacked cost-over-time chart, one layer per `bucket` value.
@@ -57,7 +58,9 @@ interface Tick {
         </div>
 
         <div *ngIf="layers.length > 0" class="cbd__legend">
-          <span *ngFor="let l of layers" class="cbd__legend-item">
+          <span
+            *ngFor="let l of layers; trackBy: trackLayer"
+            class="cbd__legend-item">
             <span class="cbd__legend-swatch" [style.background]="l.fill"></span>
             <span [class.cbd__legend-other]="l.isOther">{{ l.label }}</span>
             <span class="cbd__legend-cost">{{ formatUsd(l.totalCost) }}</span>
@@ -72,7 +75,7 @@ interface Tick {
           [attr.aria-label]="title">
           <g class="cbd__grid">
             <line
-              *ngFor="let t of yTicks"
+              *ngFor="let t of yTicks; trackBy: trackIndex"
               [attr.x1]="paddingX"
               [attr.x2]="width - paddingX"
               [attr.y1]="t.y"
@@ -80,7 +83,7 @@ interface Tick {
           </g>
 
           <path
-            *ngFor="let l of layers"
+            *ngFor="let l of layers; trackBy: trackLayer"
             [attr.d]="l.d"
             [attr.fill]="l.fill"
             fill-opacity="0.85"
@@ -88,7 +91,7 @@ interface Tick {
 
           <g class="cbd__axis cbd__axis--x">
             <text
-              *ngFor="let t of xTicks"
+              *ngFor="let t of xTicks; trackBy: trackIndex"
               [attr.x]="t.x"
               [attr.y]="height - 4"
               text-anchor="middle">
@@ -97,7 +100,7 @@ interface Tick {
           </g>
           <g class="cbd__axis cbd__axis--y">
             <text
-              *ngFor="let t of yTicks"
+              *ngFor="let t of yTicks; trackBy: trackIndex"
               [attr.x]="paddingX - 6"
               [attr.y]="(t.y ?? 0) + 4"
               text-anchor="end">
@@ -134,12 +137,13 @@ interface Tick {
         }
         &__title {
           font-weight: 600;
-          color: #333;
-          font-size: 16px;
+          color: var(--df-text);
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
         }
         &__subtitle {
-          font-size: 12px;
-          color: #999;
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
         }
 
         &__legend {
@@ -147,8 +151,8 @@ interface Tick {
           flex-wrap: wrap;
           align-items: center;
           gap: 8px 16px;
-          font-size: 12px;
-          color: #555;
+          font-size: 1.2rem;
+          color: var(--df-text-2);
         }
         &__legend-item {
           display: inline-flex;
@@ -159,64 +163,38 @@ interface Tick {
           width: 10px;
           height: 10px;
           border-radius: 2px;
+          border: 1px solid var(--df-border-2);
         }
         &__legend-other {
           font-style: italic;
-          color: #999;
+          color: var(--df-text-muted);
         }
         &__legend-cost {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 11px;
-          color: #999;
+          color: var(--df-text-muted);
         }
 
         &__svg {
           width: 100%;
           height: var(--cbd-h, 240px);
-          background: rgba(0, 0, 0, 0.02);
-          border-radius: 4px;
+          background: var(--df-surface-2);
+          border-radius: var(--df-radius-sm);
         }
 
         &__grid line {
-          stroke: rgba(0, 0, 0, 0.08);
+          stroke: var(--df-border-2);
           stroke-dasharray: 2 4;
         }
         &__axis text {
-          fill: #999;
+          fill: var(--df-text-muted);
           font-size: 11px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
         &__empty text {
-          fill: #999;
+          fill: var(--df-text-muted);
           font-style: italic;
           font-size: 13px;
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .cbd {
-          &__title {
-            color: #fff;
-          }
-          &__subtitle {
-            color: #888;
-          }
-          &__legend {
-            color: #ccc;
-          }
-          &__legend-other,
-          &__legend-cost,
-          &__axis text,
-          &__empty text {
-            color: #999;
-            fill: #999;
-          }
-          &__svg {
-            background: rgba(255, 255, 255, 0.04);
-          }
-          &__grid line {
-            stroke: rgba(255, 255, 255, 0.08);
-          }
         }
       }
     `,
@@ -370,6 +348,14 @@ export class DfCostByDimensionComponent implements OnChanges {
     return formatUsd(v);
   }
 
+  trackLayer(_: number, l: Layer): string {
+    return l.label;
+  }
+
+  trackIndex(i: number): number {
+    return i;
+  }
+
   private innerH(): number {
     return this.height - this.paddingY * 2 - 12;
   }
@@ -432,9 +418,6 @@ function formatUsd(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '$0';
   if (v < 0.01) return '<$0.01';
   if (v < 1) return `$${v.toFixed(4)}`;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  }).format(v);
+  // Shared, hoisted formatter — template-reachable via the class method.
+  return USD_2DP.format(v);
 }

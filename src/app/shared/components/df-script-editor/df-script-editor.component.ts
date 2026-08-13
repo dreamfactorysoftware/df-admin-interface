@@ -56,7 +56,6 @@ export class DfScriptEditorComponent implements OnInit {
   @Input() isScript: boolean;
   @Input() cache: string;
   @Input() hideScmActions = false;
-  @Input() snapshotTimestamp?: string | Date | null;
   @Input() scmRepository?: FormControl;
   @Input() scmReference?: FormControl;
   @Input({ required: true }) type: FormControl;
@@ -97,6 +96,11 @@ export class DfScriptEditorComponent implements OnInit {
     if (this.storageServiceId.getRawValue() || this.storagePath.getRawValue()) {
       this.checked = true;
       this.storagePath.addValidators([Validators.required]);
+      // The editor is showing the snapshot as loaded right now. The running
+      // script always uses whatever is currently in linked storage, so the
+      // banner date means "when you last pulled it" — not the service row's
+      // last_modified_date, which never bumps for a storage-linked script.
+      this.lastRefreshedAt = new Date();
     }
     // Track previous value so we only reset storagePath on a real user-driven
     // service change, not when the parent patches the form on load/prefill.
@@ -214,17 +218,11 @@ export class DfScriptEditorComponent implements OnInit {
   }
 
   get showSnapshotBanner(): boolean {
-    return (
-      !!this.storageServiceId?.getRawValue() &&
-      (!!this.snapshotTimestamp || !!this.lastRefreshedAt)
-    );
+    return !!this.storageServiceId?.getRawValue() && !!this.lastRefreshedAt;
   }
 
   get snapshotDisplayDate(): Date | null {
-    if (this.lastRefreshedAt) return this.lastRefreshedAt;
-    if (!this.snapshotTimestamp) return null;
-    const d = new Date(this.snapshotTimestamp);
-    return isNaN(d.getTime()) ? null : d;
+    return this.lastRefreshedAt;
   }
 
   get snapshotLocked(): boolean {

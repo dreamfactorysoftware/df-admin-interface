@@ -21,6 +21,9 @@ const navIcons = [
   'api-connections',
   'api-security',
   'system-settings',
+  'api-builder',
+  'agents',
+  'alerts',
 ];
 
 export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
@@ -40,6 +43,10 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
           ? { labelPath: route.data['navLabelPath'] }
           : {}),
       };
+      // FB4: only top-level pillars carry an icon. A route named like a pillar
+      // (e.g. api-builder under api-types) must render icon-less when it sits
+      // nested, matching every other nested sibling. root === '' == top level.
+      const icon = root === '' ? findIconForRoute(route as string) : '';
       if (route.children) {
         const subRoutes = transformRoutes(
           route.children,
@@ -50,14 +57,14 @@ export function transformRoutes(routes: Routes, root = ''): Array<Nav> {
           ...navMetadata,
           subRoutes: subRoutes.length ? subRoutes : undefined,
           route: route.path as ROUTES,
-          icon: findIconForRoute(route as string),
+          icon,
         };
       }
       return {
         path: `${root}/${route.path}`,
         ...navMetadata,
         route: route.path as ROUTES,
-        icon: findIconForRoute(route as string),
+        icon,
       };
     });
 }
@@ -145,11 +152,60 @@ export function accessibleRoutes(
   });
 }
 
-type Breadcrumb = {
+export type Breadcrumb = {
   label: string;
   path?: string;
   translationKey?: string;
 };
+
+/** Fields a resolved record may carry its human-readable label under. */
+const RECORD_LABEL_FIELDS = ['name', 'label', 'email', 'username'];
+
+/**
+ * Keys the detail resolvers register their record under, checked before the
+ * rest of the route data so a co-resolved list (roles, services) can never win.
+ */
+const RECORD_DATA_KEYS = ['data', 'appData'];
+
+/**
+ * Pulls the display label out of a detail route's resolved data.
+ *
+ * Every `:id` route resolves the record it is editing (roleResolver,
+ * editAppResolver, limitsResolver, schedulerResolver, adminsResolver,
+ * userResolver ...), so the name is already in memory by the time the route
+ * activates - no extra request. List payloads (`{ resource: [...] }`) and
+ * paywall sentinels carry none of the label fields and are skipped, leaving
+ * the caller to fall back to the raw URL segment.
+ */
+export function recordLabelFromRouteData(
+  data: Record<string, any> | null | undefined
+): string | undefined {
+  if (!data) {
+    return undefined;
+  }
+  const candidates = [
+    ...RECORD_DATA_KEYS.map(key => data[key]),
+    ...Object.entries(data)
+      .filter(([key]) => !RECORD_DATA_KEYS.includes(key))
+      .map(([, value]) => value),
+  ];
+  for (const candidate of candidates) {
+    if (
+      !candidate ||
+      typeof candidate !== 'object' ||
+      Array.isArray(candidate)
+    ) {
+      continue;
+    }
+    for (const field of RECORD_LABEL_FIELDS) {
+      const label = candidate[field];
+      if (typeof label === 'string' && label.trim()) {
+        return label;
+      }
+    }
+  }
+  return undefined;
+}
 
 export function generateBreadcrumb(
   routeTable: Routes,
@@ -198,9 +254,11 @@ export function generateBreadcrumb(
           const translationKey = [...translationKeySoFar, translationKeySegment]
             .join('.')
             .replace(/\//g, '.');
-          const parts = currentSegment.split('-');
-          const requiredText = parts[parts.length - 1];
-          const breadcrumb: Breadcrumb = { label: requiredText };
+          // A dynamic segment is the record's own identifier (`:name`, `:id`)
+          // and has to render whole - splitting on '-' and keeping the tail
+          // turned a service named "my-mysql-db" into "db". Static segments
+          // render from translationKey below, so their label is a fallback.
+          const breadcrumb: Breadcrumb = { label: currentSegment };
 
           if (index !== urlSegments.length - 1) {
             breadcrumb.path = newPath.join('/');

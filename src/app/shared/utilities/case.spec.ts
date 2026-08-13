@@ -53,4 +53,53 @@ describe('String Conversion Utilities', () => {
       },
     });
   });
+
+  // The API Builder execution_plan / response_mapping hold user-authored blobs
+  // whose inner keys are real data field names + output aliases. Those keys must
+  // round-trip verbatim; only the envelope key is transformed. Adjacent keys
+  // must still transform normally (so the exception is tightly scoped).
+  it('keeps execution_plan/response_mapping values verbatim (snake->camel)', () => {
+    const input = {
+      api_id: 7,
+      execution_plan: {
+        steps: [
+          {
+            aliases: {
+              orders_by_customer_id: 'customer_orders',
+              cust_name: 'x',
+            },
+            params: { fields: 'id,cust_name' },
+          },
+        ],
+      },
+      response_mapping: { data: '{steps.s.resource}' },
+    };
+    const result = mapSnakeToCamel(input) as any;
+    expect(result.apiId).toBe(7); // adjacent key still transformed
+    // inner keys untouched (NOT camelCased)
+    expect(result.executionPlan.steps[0].aliases).toEqual({
+      orders_by_customer_id: 'customer_orders',
+      cust_name: 'x',
+    });
+    expect(result.executionPlan.steps[0].params).toEqual({
+      fields: 'id,cust_name',
+    });
+    expect(result.responseMapping).toEqual({ data: '{steps.s.resource}' });
+  });
+
+  it('keeps executionPlan/responseMapping values verbatim (camel->snake)', () => {
+    const input = {
+      apiId: 7,
+      executionPlan: {
+        steps: [{ aliases: { orders_by_customer_id: 'customer_orders' } }],
+      },
+      responseMapping: { data: '{steps.s.resource}' },
+    };
+    const result = mapCamelToSnake(input) as any;
+    expect(result.api_id).toBe(7); // adjacent key still transformed
+    expect(result.execution_plan.steps[0].aliases).toEqual({
+      orders_by_customer_id: 'customer_orders',
+    });
+    expect(result.response_mapping).toEqual({ data: '{steps.s.resource}' });
+  });
 });

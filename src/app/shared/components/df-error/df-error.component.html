@@ -1,5 +1,22 @@
 <div class="error-container">
   <div class="error">
-    <h1>{{ error$ | async }}</h1>
+    <h1>{{ 'errors.pageTitle' | transloco }}</h1>
+    <ng-container *ngIf="error">
+      <p class="error-message">
+        <span class="error-status" *ngIf="error.status">{{
+          error.status
+        }}</span>
+        {{ error.message | transloco }}
+      </p>
+      <df-error-detail [error]="error"></df-error-detail>
+    </ng-container>
+    <div class="error-actions">
+      <button mat-flat-button color="primary" type="button" (click)="goHome()">
+        {{ 'errors.goHome' | transloco }}
+      </button>
+      <button mat-stroked-button type="button" (click)="tryAgain()">
+        {{ 'errors.tryAgain' | transloco }}
+      </button>
+    </div>
   </div>
 </div>

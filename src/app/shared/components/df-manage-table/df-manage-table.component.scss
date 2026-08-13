@@ -1,16 +1,32 @@
-@use '@angular/material' as mat;
-@use 'src/theme' as theme;
+// Departure language: tokens only, hairline borders, flat surfaces.
+// Status colors ride --df-success / --df-danger so light, dark, and
+// phosphor all stay legible without per-theme overrides.
 
-$df-purple-palette: mat.define-palette(theme.$df-purple-palette);
-$green-palette: mat.define-palette(mat.$green-palette);
-$red-palette: mat.define-palette(mat.$red-palette);
+// Health chip trigger: strip the native button chrome so only the df-badge
+// pill shows, keep it a real focusable button for the "why" mat-menu. No color
+// here (the badge owns its tokens); structural reset only.
+.df-health-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
 
 .active {
-  color: mat.get-color-from-palette($green-palette, 500);
+  color: var(--df-success);
 }
 
 .inactive {
-  color: mat.get-color-from-palette($red-palette, 500);
+  color: var(--df-danger);
+}
+
+.log-warning {
+  color: var(--df-danger);
 }
 
 .top-action-bar {
@@ -18,8 +34,8 @@ $red-palette: mat.define-palette(mat.$red-palette);
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 12px;
+  gap: var(--df-space-3);
+  padding-bottom: var(--df-space-3);
 
   .search-input {
     height: 80% !important;
@@ -28,7 +44,7 @@ $red-palette: mat.define-palette(mat.$red-palette);
 }
 
 .bottom-action-bar {
-  margin-top: 16px;
+  margin-top: var(--df-space-4);
   display: flex;
   flex-direction: row;
   justify-content: center;
@@ -37,6 +53,105 @@ $red-palette: mat.define-palette(mat.$red-palette);
 .table-container {
   width: 100%;
   overflow-y: auto;
+
+  // Refetch in flight: keep stale rows visible but dimmed under the
+  // progress bar so the table doesn't flash empty.
+  &.table-stale {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+}
+
+.table-loading-bar {
+  margin-bottom: 2px;
+}
+
+// Error state: same flat bordered treatment as the chat error panel
+// (df-ai-chat __error): danger-soft wash inside a danger hairline.
+.table-error-panel {
+  margin-bottom: var(--df-space-3);
+  padding: var(--df-space-3) var(--df-space-4);
+  border: 1px solid var(--df-danger-border);
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-danger-soft);
+  color: var(--df-text);
+
+  .table-error-headline {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-3);
+    margin-bottom: var(--df-space-2);
+
+    fa-icon {
+      color: var(--df-danger);
+    }
+
+    span {
+      flex: 1;
+      font-size: 1.4rem;
+    }
+  }
+}
+
+// Empty state (matNoDataRow): quiet, centered, muted. The 32px cell
+// padding comes from the global .no-data-row rule.
+.no-data-row td {
+  color: var(--df-text-muted);
+  font-size: 1.35rem;
+}
+
+// Teaching empty state (punch 15a): one line of what-this-is plus the
+// primary CTA. Centered, muted copy, tokens only so all three themes
+// stay legible without overrides.
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--df-space-4);
+  padding: var(--df-space-4);
+  text-align: center;
+
+  .empty-state-message {
+    margin: 0;
+    max-width: 46rem;
+    color: var(--df-text-muted);
+    font-size: 1.4rem;
+    line-height: 1.5;
+  }
+}
+
+// Meridian table spec (section 1.7): --df-row-height rows, alpha-hairline
+// separators, no zebra. Row height overrides Material's default density so
+// the whole catalog lands on the 38px rhythm.
+.mat-mdc-row {
+  height: var(--df-row-height) !important;
+}
+.mat-mdc-cell,
+.mat-mdc-header-cell {
+  border-bottom: 1px solid var(--df-border-2);
+}
+
+// Numeric / id / hash columns: tabular figures (global .df-numeric utility)
+// plus right alignment, including the sort-header content flex.
+.mat-mdc-cell.df-numeric,
+.mat-mdc-header-cell.df-numeric {
+  text-align: right;
+}
+.mat-mdc-header-cell.df-numeric .mat-sort-header-container {
+  justify-content: flex-end;
+}
+
+// Hover-revealed row actions (spec 1.7): the trailing actions cell stays at
+// opacity 0 until the row is hovered or anything inside it takes focus. Never
+// display:none, so the buttons keep their place in tab order.
+.df-row-actions button {
+  opacity: 0;
+  transition: opacity var(--df-duration-fast) var(--df-ease-standard);
+}
+.mat-mdc-row:hover .df-row-actions button,
+.mat-mdc-row:focus-within .df-row-actions button,
+.df-row-actions button:focus-visible {
+  opacity: 1;
 }
 
 .clickable {
@@ -46,28 +161,20 @@ $red-palette: mat.define-palette(mat.$red-palette);
       cursor: pointer;
     }
   }
-  &.mat-mdc-row:focus,
-  &.mat-mdc-row:focus-within {
-    .mat-mdc-cell:first-child {
-      border-left: 2px solid mat.get-color-from-palette($df-purple-palette, 500);
-    }
-  }
-
-  &.mat-mdc-row:focus,
-  &.mat-mdc-row:focus-within,
+  // Quiet whole-row hover tint.
   &.mat-mdc-row:hover {
     .mat-mdc-cell {
-      background-color: mat.get-color-from-palette($df-purple-palette, 100);
+      background-color: var(--df-hover);
     }
   }
-}
-
-.dark-theme {
-  .search {
-    background-color: mat.get-color-from-palette(
-      $df-purple-palette,
-      1004
-    ) !important;
+  // Quiet selection / active state: a keyboard-focused or focus-within row
+  // rides --df-accent-soft instead of the previous loud accent border. Doubles
+  // as the visible-focus indicator for keyboard navigation.
+  &.mat-mdc-row:focus,
+  &.mat-mdc-row:focus-within {
+    .mat-mdc-cell {
+      background-color: var(--df-accent-soft);
+    }
   }
 }
 

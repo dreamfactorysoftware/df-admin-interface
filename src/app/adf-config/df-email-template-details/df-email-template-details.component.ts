@@ -26,6 +26,10 @@ import {
   DfAlertComponent,
 } from 'src/app/shared/components/df-alert/df-alert.component';
 import { catchError, throwError } from 'rxjs';
+import {
+  applyServerErrorsToForm,
+  normalizeError,
+} from 'src/app/shared/utilities/app-error';
 import { DfThemeService } from '../../shared/services/df-theme.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 
@@ -144,8 +148,9 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
         })
         .pipe(
           catchError(err => {
-            this.triggerAlert('error', err.error.error.message);
-            return throwError(() => new Error(err));
+            const e = normalizeError(err);
+            this.triggerAlert('error', e.message);
+            return throwError(() => e);
           })
         )
         .subscribe(() => {
@@ -161,11 +166,16 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
         )
         .pipe(
           catchError(err => {
+            const e = normalizeError(err);
+            const leftovers = applyServerErrorsToForm(
+              this.emailTemplateForm,
+              e
+            );
             this.triggerAlert(
               'error',
-              err.error.error.context.resource[0].message
+              leftovers.length ? leftovers.join(' ') : e.message
             );
-            return throwError(() => new Error(err));
+            return throwError(() => e);
           })
         )
         .subscribe(() => {

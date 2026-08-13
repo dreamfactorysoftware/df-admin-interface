@@ -1,146 +1,573 @@
-.api-doc-button-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+/* ============================================================
+   API docs, Meridian Phase 1: three-column spec-synced docs.
+   Tokens only: every color/space/type rides var(--df-*) so light,
+   dark and phosphor all resolve free. Swagger-scoped embed styling
+   lives in the bounded block at the END of src/styles.scss.
+
+   SCROLL CONTRACT (punch item 9 - keep this or the recurring
+   "cannot scroll with docs open" bug returns):
+   - Page scrolling is owned by .mat-drawer-content (the shell).
+     This screen reaches that scroller only by overflowing with
+     overflow VISIBLE all the way up.
+   - Therefore: NEVER put height, max-height, overflow, overflow-x
+     or contain on :host or the full-page .docs-two-col wrapper.
+   - Independent scroll for the left nav / right console is achieved
+     with position: sticky + a self-scoped max-height + overflow on
+     the INNER rail only. Sticky does not clip the ancestor height
+     chain, so page scroll survives. The center column flows with
+     the page.
+   ============================================================ */
+
+:host {
+  display: block;
 }
 
-.api-key-option {
+.docs-header-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  width: 100%;
+  gap: var(--df-space-3);
+}
 
-  .key-info {
+.health-detail {
+  margin: var(--df-space-2) 0 0;
+
+  .view-details-button {
+    color: var(--df-danger);
+    font-size: var(--df-font-size-xs);
+    padding: 2px var(--df-space-2);
+    min-width: auto;
+  }
+
+  .unhealthy-error-details {
+    margin-top: var(--df-space-2);
+    padding: var(--df-space-2) var(--df-space-3);
+    background-color: var(--df-code-bg);
+    border: 1px solid var(--df-border-2);
+    border-radius: var(--df-radius-sm);
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-code-text);
+  }
+}
+
+/* ---- two-column grid (NO height/overflow here) ---- */
+/* LEFT = wide endpoint list (full names). RIGHT = split metadata / test. */
+.docs-two-col {
+  display: grid;
+  grid-template-columns:
+    minmax(280px, 360px)
+    minmax(0, 1fr);
+  gap: var(--df-space-5);
+  align-items: start;
+  margin-top: var(--df-space-5);
+}
+
+/* ---- left: operation nav ---- */
+.docs-nav {
+  position: sticky;
+  top: var(--df-space-4);
+  align-self: start;
+  max-height: calc(100vh - var(--df-space-8));
+  overflow-y: auto;
+
+  &__group {
+    margin: var(--df-space-3) 0 var(--df-space-1);
+    padding: 0 var(--df-space-2);
+  }
+
+  mat-nav-list {
+    padding-top: 0;
+  }
+}
+
+.docs-op {
+  /* Full endpoint names: the row grows to fit and wraps rather than truncating,
+     so long `/_schema/{table_name}/_field/{field_name}` paths read in full. */
+  display: flex;
+  align-items: flex-start;
+  gap: var(--df-space-2);
+  min-height: var(--df-row-height);
+  height: auto;
+  padding-top: var(--df-space-1);
+  padding-bottom: var(--df-space-1);
+  border-left: 3px solid transparent;
+  border-radius: 0 var(--df-radius-sm) var(--df-radius-sm) 0;
+
+  &__method {
+    flex: 0 0 auto;
+    width: 3.6em;
+    padding-top: 0.2em;
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    text-transform: uppercase;
+  }
+
+  &__path {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+    line-height: var(--df-lh-tight);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-2);
+  }
+
+  &.is-active {
+    background-color: var(--df-hover);
+    font-weight: var(--df-font-weight-medium);
+  }
+}
+
+/* mat-list-item forces a fixed row height + single-line ellipsis on its text
+   wrapper; override so the full path can wrap. */
+.docs-op.mat-mdc-list-item {
+  height: auto;
+
+  ::ng-deep .mdc-list-item__content {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: flex-start;
+    gap: var(--df-space-2);
+    white-space: normal;
+  }
 
-    .key-name {
-      font-weight: 500;
-    }
-
-    .key-preview {
-      font-size: 0.85em;
-      color: rgba(0, 0, 0, 0.6);
-      font-family: monospace;
-    }
+  ::ng-deep .mat-mdc-list-item-unscoped-content {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
 }
 
-.api-keys-container {
-  margin: 16px 0;
-  max-width: 400px;
+/* ---- right column: the request builder rail ----
+   Sticky + self-scoped max-height keeps page scroll intact (see SCROLL
+   CONTRACT above): overflow lives on THIS sticky rail only, exactly like
+   .docs-nav, so the ancestor height chain is never clipped. The single .rb
+   child flows at its natural height, so the whole builder is visible on load
+   (no zero-height collapse) and the rail scrolls as one unit when tall. */
+.docs-right {
+  position: sticky;
+  top: var(--df-space-4);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-4);
+  min-width: 0;
+  max-height: calc(100vh - var(--df-space-8));
+  overflow-y: auto;
+}
 
-  .api-keys-select {
-    width: 100%;
+/* The request builder: one vertical stack — request line, parameters, the
+   send+response console, then the export, then a tamed reference. */
+.rb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+  min-width: 0;
+  padding-right: var(--df-space-2);
+
+  &__label {
+    margin: 0;
   }
 }
 
-.swagger-ui {
-  margin-top: 16px;
-}
-
-.api-health-banner {
+/* 1. REQUEST LINE: method chip + path with inline token pickers. */
+.rb-line {
   display: flex;
   align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  border-left-width: 4px;
-  border-left-style: solid;
+  flex-wrap: wrap;
+  gap: var(--df-space-2);
+  padding: var(--df-space-2) var(--df-space-3);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-surface-2);
 
-  p {
-    margin: 0;
-    font-size: 0.9em;
-  }
+  &__method {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    height: var(--df-field-height);
+    padding: 0 var(--df-space-3);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    background: var(--df-surface);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+    font-weight: var(--df-font-weight-heading);
+    text-transform: uppercase;
+    color: var(--df-text);
 
-  &.status-healthy {
-    border-left-color: #28a745;
-    background-color: #e9f5ec;
-    color: #155724;
-  }
-
-  &.status-unhealthy,
-  &.status-error {
-    border-left-color: #dc3545;
-    background-color: #f8d7da;
-    color: #721c24;
-  }
-
-  &.status-unhealthy {
-    & > div {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      width: 100%;
-
-      & > p {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-
-        .view-details-button {
-          margin-left: 12px;
-          flex-shrink: 0;
-          padding: 2px 8px;
-          line-height: normal;
-          font-size: 0.9em;
-          min-width: auto;
-        }
-      }
-
-      .unhealthy-error-details {
-        margin-top: 0;
-        padding: 8px 12px;
-        background-color: rgba(0, 0, 0, 0.03);
-        border: 1px solid rgba(0, 0, 0, 0.06);
-        border-radius: 4px;
-        width: 100%;
-        box-sizing: border-box;
-        max-height: 150px;
-        overflow-y: auto;
-
-        pre {
-          margin: 0;
-          white-space: pre-wrap;
-          word-break: break-word;
-          font-size: 0.85em;
-          color: inherit;
-        }
-      }
+    &.m-get {
+      color: var(--df-tint-data-fg);
+      border-color: var(--df-tint-data-fg);
+    }
+    &.m-post {
+      color: var(--df-tint-security-fg);
+      border-color: var(--df-tint-security-fg);
+    }
+    &.m-put {
+      color: var(--df-tint-system-fg);
+      border-color: var(--df-tint-system-fg);
+    }
+    &.m-patch {
+      color: var(--df-tint-docs-fg);
+      border-color: var(--df-tint-docs-fg);
+    }
+    &.m-delete {
+      color: var(--df-danger);
+      border-color: var(--df-danger);
     }
   }
 
-  &.status-loading {
-    border-left-color: #007bff;
-    background-color: #e7f3ff;
-    color: #004085;
-  }
-
-  &.status-warning {
-    border-left-color: #ffc107;
-    background-color: #fff3cd;
-    color: #856404;
+  &__path {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-width: 0;
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text-2);
   }
 }
 
-// Styles for elements within Swagger UI, piercing encapsulation
-:host ::ng-deep {
-  .swagger-ui {
-    // This targets the wrapper div for Swagger UI in your component's template
-    .information-container {
-      .main {
-        display: flex;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
+.rb-seg {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--df-text-2);
+}
+
+/* Inline token pickers: fill-in-the-blank chips that build the URL in place. */
+.rb-token {
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-sm);
+  color: var(--df-accent);
+  background: var(--df-accent-soft, var(--df-hover));
+  border: 1px solid var(--df-accent);
+  border-radius: var(--df-radius-sm);
+  padding: 2px var(--df-space-2);
+  max-width: 100%;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--df-focus-ring);
+  }
+
+  &--empty {
+    border-style: dashed;
+  }
+
+  &--text {
+    width: 12rem;
+    max-width: 100%;
+  }
+}
+
+/* Resolved effective path: what the request actually hits. */
+.rb-resolved {
+  margin: 0;
+  padding: var(--df-space-2) var(--df-space-3);
+  background: var(--df-code-bg);
+  border-radius: var(--df-radius-sm);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  overflow-x: auto;
+  white-space: nowrap;
+
+  &__base {
+    color: var(--df-text-muted);
+  }
+  &__path {
+    color: var(--df-code-text);
+  }
+}
+
+.rb-hint {
+  margin: 0;
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  line-height: var(--df-lh-base);
+}
+
+.rb-summary {
+  margin: 0;
+  font-size: var(--df-font-size-sm);
+  color: var(--df-text-2);
+  line-height: var(--df-lh-base);
+}
+
+/* 2. PARAMETERS: compact rows, each with an always-visible add/remove. */
+.rb-params {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  overflow: hidden;
+}
+
+.rb-param {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-2);
+  padding: var(--df-space-1) var(--df-space-2);
+  border-bottom: 1px solid var(--df-border-2);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.is-added {
+    background: var(--df-tint-data-bg, var(--df-hover));
+  }
+
+  &__add {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-1);
+    padding: 2px var(--df-space-2);
+    border: 1px solid var(--df-accent);
+    border-radius: var(--df-radius-sm);
+    background: none;
+    color: var(--df-accent);
+    cursor: pointer;
+    font-size: var(--df-font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: var(--df-tracking-eyebrow);
+
+    mat-icon {
+      font-size: 1.4rem;
+      width: 1.4rem;
+      height: 1.4rem;
+    }
+
+    &:hover,
+    &:focus-visible {
+      background: var(--df-accent-soft, var(--df-hover));
+      outline: none;
+    }
+
+    &.is-added {
+      background: var(--df-accent);
+      border-color: var(--df-accent);
+      color: var(--df-on-accent, var(--df-surface));
+    }
+  }
+
+  &__name {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text);
+  }
+
+  &__type {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    color: var(--df-accent);
+  }
+
+  &__loc {
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--df-tracking-eyebrow);
+  }
+
+  &__info {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--df-text-muted);
+    cursor: help;
+
+    mat-icon {
+      font-size: 1.5rem;
+      width: 1.5rem;
+      height: 1.5rem;
     }
   }
 }
 
-.custom-swagger-content-wrapper {
+/* Tamed reference disclosure: long-form metadata folded away. */
+.rb-ref {
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  padding: var(--df-space-2) var(--df-space-3);
+
+  &__summary {
+    cursor: pointer;
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text-muted);
+  }
+
+  &__body {
+    margin-top: var(--df-space-3);
+  }
+
+  &__prose {
+    margin: 0 0 var(--df-space-3);
+    font-size: var(--df-font-size-sm);
+    line-height: var(--df-lh-base);
+    color: var(--df-text-2);
+  }
+}
+
+.docs-section-label {
+  margin: var(--df-space-5) 0 var(--df-space-2);
+}
+
+.docs-table {
   width: 100%;
+  border-collapse: collapse;
+  font-size: var(--df-font-size-sm);
+
+  thead th {
+    text-align: left;
+    padding: var(--df-space-2) var(--df-space-3);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--df-tracking-eyebrow);
+    color: var(--df-text-muted);
+    border-bottom: 1px solid var(--df-border);
+  }
+
+  tbody td {
+    padding: var(--df-space-2) var(--df-space-3);
+    border-bottom: 1px solid var(--df-border-2);
+    vertical-align: top;
+    color: var(--df-text-2);
+  }
+
+  &__name {
+    font-family: var(--df-font-mono);
+    color: var(--df-text) !important;
+  }
+
+  &__type {
+    font-family: var(--df-font-mono);
+    color: var(--df-accent) !important;
+  }
+}
+
+.docs-schema {
+  margin: 0;
+  padding: var(--df-space-3) var(--df-space-4);
+  background-color: var(--df-code-bg);
+  color: var(--df-code-text);
+  border-radius: var(--df-radius-sm);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  overflow-x: auto;
+}
+
+/* ---- filter builder card ---- */
+.console-card {
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  background-color: var(--df-surface);
+  padding: var(--df-space-3);
+}
+
+/* ---- method color wash + left spine (punch item 22) ----
+   GET=data/blue, POST=security/green, PUT=system/amber,
+   PATCH=docs/teal, DELETE=danger. Category tints, all three themes.
+   Applied to the left endpoint nav rows (the request-line method chip carries
+   its own tint via .rb-line__method). */
+.m-get {
+  border-left-color: var(--df-tint-data-fg);
+  &.docs-op:hover {
+    background-color: var(--df-tint-data-bg);
+  }
+  .docs-op__method {
+    color: var(--df-tint-data-fg);
+  }
+}
+.m-post {
+  border-left-color: var(--df-tint-security-fg);
+  &.docs-op:hover {
+    background-color: var(--df-tint-security-bg);
+  }
+  .docs-op__method {
+    color: var(--df-tint-security-fg);
+  }
+}
+.m-put {
+  border-left-color: var(--df-tint-system-fg);
+  &.docs-op:hover {
+    background-color: var(--df-tint-system-bg);
+  }
+  .docs-op__method {
+    color: var(--df-tint-system-fg);
+  }
+}
+.m-patch {
+  border-left-color: var(--df-tint-docs-fg);
+  &.docs-op:hover {
+    background-color: var(--df-tint-docs-bg);
+  }
+  .docs-op__method {
+    color: var(--df-tint-docs-fg);
+  }
+}
+.m-delete {
+  border-left-color: var(--df-danger);
+  &.docs-op:hover {
+    background-color: var(--df-danger-soft);
+  }
+  .docs-op__method {
+    color: var(--df-danger);
+  }
+}
+
+/* ---- raw spec (demoted swagger) ---- */
+.raw-spec {
+  margin-top: var(--df-space-6);
+  border-top: 1px solid var(--df-border-2);
+  padding-top: var(--df-space-4);
+
+  &__toggle {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-sm);
+  }
+
+  &__body {
+    margin-top: var(--df-space-3);
+  }
+}
+
+.expand-schema-row {
+  margin: var(--df-space-4) 0 var(--df-space-2);
+}
+.expand-schema-hint {
+  font-size: var(--df-font-size-xs);
+  color: var(--df-text-muted);
+  margin-left: var(--df-space-8);
+}
+
+/* NEVER add overflow/height to .swagger-ui itself: page scroll owns it. */
+.swagger-ui {
+  margin-top: var(--df-space-4);
+}
+
+/* ---- responsive: stack below the two-column breakpoint ---- */
+@media (max-width: 1100px) {
+  .docs-two-col {
+    grid-template-columns: 1fr;
+  }
+  .docs-nav,
+  .docs-right {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
 }

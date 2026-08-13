@@ -12,7 +12,7 @@ import {
   AlertType,
   DfAlertComponent,
 } from '../../shared/components/df-alert/df-alert.component';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ROUTES } from '../../shared/types/routes';
 import { getIcon, iconExist } from '../../shared/utilities/icons';
 import { LoginCredentials } from '../../shared/types/user-management';
@@ -34,7 +34,7 @@ import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { CommonModule } from '@angular/common';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { PopupOverlayService } from 'src/app/shared/components/df-popup/popup-overlay.service';
-import { ErrorSharingService } from 'src/app/shared/services/error-sharing.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -72,20 +72,25 @@ export class DfLoginComponent implements OnInit {
   oauthServices: AuthService[] = [];
   samlServices: AuthService[] = [];
 
+  trackByName = (_: number, service: { name: string }): string => service.name;
+
   fpRoute = `/${ROUTES.AUTH}/${ROUTES.FORGOT_PASSWORD}`;
 
   isDarkMode = this.themeService.darkMode$;
 
   loginForm: FormGroup;
+  /** OAuth/SSO error handed over by AppComponent in the navigation itself
+   * (router state), so no shared error bus can race a NavigationStart clear. */
+  private navLoginError: string | null = null;
   constructor(
     private fb: FormBuilder,
     private systemConfigDataService: DfSystemConfigDataService,
     private authService: DfAuthService,
     private router: Router,
+    private activatedRoute: ActivatedRoute,
     private themeService: DfThemeService,
     private snackbarService: DfSnackbarService,
-    private popupOverlay: PopupOverlayService,
-    private errorSharingService: ErrorSharingService
+    private popupOverlay: PopupOverlayService
   ) {
     this.loginForm = this.fb.group({
       services: [''],
@@ -93,29 +98,26 @@ export class DfLoginComponent implements OnInit {
       email: [''],
       password: ['', [Validators.required]],
     });
+    const stateError =
+      this.router.getCurrentNavigation()?.extras?.state?.['loginError'] ??
+      history.state?.['loginError'];
+    if (typeof stateError === 'string' && stateError) {
+      this.navLoginError = stateError;
+    }
   }
 
   iconExist = iconExist;
   getIcon = getIcon;
 
   ngOnInit() {
-    // Check for shared error first
-    this.errorSharingService.error$.subscribe(sharedError => {
-      if (sharedError) {
-        // Decode the error message properly (remove URL encoding)
-        const decodedError = decodeURIComponent(
-          sharedError.replace(/\+/g, ' ')
-        );
-
-        // Set the alert message for the built-in alert display
-        this.alertMsg = decodedError;
-        this.showAlert = true;
-        this.alertType = 'error';
-
-        // Clear the error after displaying it
-        this.errorSharingService.clearError();
-      }
-    });
+    if (this.navLoginError) {
+      // Decode the error message properly (remove URL encoding)
+      this.alertMsg = decodeURIComponent(
+        this.navLoginError.replace(/\+/g, ' ')
+      );
+      this.showAlert = true;
+      this.alertType = 'error';
+    }
 
     this.systemConfigDataService.environment$.subscribe(env => {
       this.envloginAttribute = env.authentication.loginAttribute;
@@ -193,16 +195,17 @@ export class DfLoginComponent implements OnInit {
       .login(credentials)
       .pipe(
         catchError(err => {
-          if (err.status === 401 && isPasswordTooShort) {
+          const appError = normalizeError(err);
+          if (appError.status === 401 && isPasswordTooShort) {
             this.popupOverlay.open({
               message: `It looks like your password is too short. Our new system requires at least ${this.MINIMUM_PASSWORD_LENGTH} characters. Please reset your password to continue.`,
               showRemindMeLater: false,
             });
           } else {
-            this.alertMsg = err.error?.error?.message || 'Login failed';
+            this.alertMsg = appError.message;
             this.showAlert = true;
           }
-          return throwError(() => new Error(err));
+          return throwError(() => appError);
         })
       )
       .subscribe(() => {
@@ -213,7 +216,18 @@ export class DfLoginComponent implements OnInit {
             showRemindMeLater: true,
           });
         }
-        this.router.navigate([ROUTES.HOME]);
+        // Honor a validated internal returnUrl (set by the 401 interceptor
+        // redirect or loggedInGuard); anything else goes home.
+        const returnUrl = this.activatedRoute.snapshot.queryParams['returnUrl'];
+        if (
+          typeof returnUrl === 'string' &&
+          returnUrl.startsWith('/') &&
+          !returnUrl.startsWith('//')
+        ) {
+          this.router.navigateByUrl(returnUrl);
+        } else {
+          this.router.navigate([ROUTES.HOME]);
+        }
       });
   }
 }

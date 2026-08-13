@@ -6,6 +6,7 @@ import {
   ReactiveFormsModule,
 } from '@angular/forms';
 import { catchError, throwError } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { AlertType } from 'src/app/shared/components/df-alert/df-alert.component';
 import { DfAuthService } from '../services/df-auth.service';
@@ -85,9 +86,10 @@ export class DfRegisterComponent implements OnInit {
       .register(this.registerForm.controls['profileDetailsGroup'].value)
       .pipe(
         catchError(err => {
-          this.alertMsg = err.error.error.message;
+          const appError = normalizeError(err);
+          this.alertMsg = appError.message;
           this.showAlert = true;
-          return throwError(() => new Error(err));
+          return throwError(() => appError);
         })
       )
       .subscribe(() => {

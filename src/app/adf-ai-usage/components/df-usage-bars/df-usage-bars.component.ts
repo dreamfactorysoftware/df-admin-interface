@@ -1,5 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+} from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
@@ -32,7 +38,7 @@ import { GroupRow } from '../../types/usage';
 
         <ul class="bars__list">
           <li
-            *ngFor="let row of visibleRows"
+            *ngFor="let row of visibleRows; trackBy: trackRow"
             class="bars__row"
             [class.bars__row--clickable]="clickable"
             (click)="onClick(row)">
@@ -80,31 +86,32 @@ import { GroupRow } from '../../types/usage';
         }
         &__title {
           margin: 0;
-          font-size: 16px;
+          font-size: 1.5rem;
           font-weight: 600;
-          color: #333;
+          letter-spacing: -0.01em;
+          color: var(--df-text);
           display: inline-flex;
           align-items: center;
           gap: 8px;
         }
         &__hint {
-          font-size: 13px;
-          color: #999;
+          font-size: 1.3rem;
+          color: var(--df-text-muted);
           cursor: help;
 
           &:hover {
-            color: #7f11e0;
+            color: var(--df-accent);
           }
         }
         &__subtitle {
-          font-size: 12px;
-          color: #999;
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
         }
         &__empty {
           padding: 8px 0;
-          color: #999;
+          color: var(--df-text-muted);
           font-style: italic;
-          font-size: 14px;
+          font-size: 1.35rem;
         }
         &__list {
           list-style: none;
@@ -122,19 +129,19 @@ import { GroupRow } from '../../types/usage';
 
           &--clickable {
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: var(--df-radius-sm);
             padding: 4px 6px;
             margin: 0 -6px;
 
             &:hover {
-              background: rgba(127, 17, 224, 0.06);
+              background: var(--df-hover);
             }
           }
         }
         &__label {
-          font-size: 14px;
+          font-size: 1.35rem;
           font-weight: 500;
-          color: #333;
+          color: var(--df-text);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -142,11 +149,14 @@ import { GroupRow } from '../../types/usage';
         &__track {
           display: flex;
           height: 12px;
-          background: rgba(0, 0, 0, 0.06);
+          background: var(--df-surface-2);
           border-radius: 999px;
           overflow: hidden;
           min-width: 80px;
         }
+        // Bar fills are chart DATA colors (input vs output series), kept
+        // literal on purpose; the dark override below keeps the output
+        // series legible on the dark canvas.
         &__fill {
           display: block;
           height: 100%;
@@ -166,53 +176,26 @@ import { GroupRow } from '../../types/usage';
         }
         &__total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 14px;
+          font-size: 1.35rem;
           font-weight: 600;
-          color: #333;
+          color: var(--df-text);
         }
         &__count {
-          font-size: 12px;
-          color: #999;
+          font-size: 1.2rem;
+          color: var(--df-text-muted);
         }
         &__rate {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           font-size: 11px;
-          color: #7f11e0;
-          background: rgba(127, 17, 224, 0.08);
+          color: var(--df-accent-strong);
+          background: var(--df-accent-soft);
           padding: 1px 6px;
-          border-radius: 3px;
+          border-radius: var(--df-radius-sm);
         }
       }
 
       :host-context(.dark-theme) {
         .bars {
-          &__title,
-          &__label,
-          &__total {
-            color: #fff;
-          }
-          &__subtitle,
-          &__count,
-          &__empty {
-            color: #bbb;
-          }
-          &__rate {
-            color: #b388ff;
-            background: rgba(127, 17, 224, 0.18);
-          }
-          &__hint {
-            color: #888;
-
-            &:hover {
-              color: #bb86fc;
-            }
-          }
-          &__track {
-            background: rgba(255, 255, 255, 0.08);
-          }
-          &__row--clickable:hover {
-            background: rgba(187, 134, 252, 0.1);
-          }
           &__fill--output {
             background: #bb86fc;
           }
@@ -221,7 +204,7 @@ import { GroupRow } from '../../types/usage';
     `,
   ],
 })
-export class DfUsageBarsComponent {
+export class DfUsageBarsComponent implements OnChanges {
   @Input({ required: true }) title!: string;
   /** Optional one-line description rendered as a tooltip on an info icon
    *  next to the title — for explaining what this panel actually shows. */
@@ -232,12 +215,19 @@ export class DfUsageBarsComponent {
   @Output() rowClick = new EventEmitter<GroupRow>();
   faCircleInfo = faCircleInfo;
 
-  get visibleRows(): GroupRow[] {
-    return (this.rows ?? []).slice(0, this.limit);
+  // Computed once per input change, NOT per change-detection cycle. As
+  // getters these allocated a fresh slice (and, for max, a mapped array)
+  // on every CD evaluation — and max was evaluated twice per row.
+  visibleRows: GroupRow[] = [];
+  max = 1;
+
+  ngOnChanges(): void {
+    this.visibleRows = (this.rows ?? []).slice(0, this.limit);
+    this.max = Math.max(1, ...this.visibleRows.map(r => r.totalTokens));
   }
 
-  get max(): number {
-    return Math.max(1, ...this.visibleRows.map(r => r.totalTokens));
+  trackRow(_: number, row: GroupRow): string {
+    return row.key;
   }
 
   onClick(row: GroupRow): void {

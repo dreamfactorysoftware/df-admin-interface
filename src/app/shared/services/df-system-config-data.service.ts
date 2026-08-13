@@ -10,7 +10,8 @@ import {
 } from 'rxjs';
 import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
-import { DfUserDataService } from './df-user-data.service';
+import { normalizeError } from '../utilities/app-error';
+import { silent } from '../utilities/http-contexts';
 import { Environment, System } from 'src/app/shared/types/system';
 
 @Injectable({
@@ -41,10 +42,7 @@ export class DfSystemConfigDataService {
   private systemSubject = new BehaviorSubject<System>({ resource: [] });
   system$: Observable<System> = this.systemSubject.asObservable();
 
-  constructor(
-    private http: HttpClient,
-    private userDataService: DfUserDataService
-  ) {}
+  constructor(private http: HttpClient) {}
 
   get environment(): Environment {
     return this.environmentSubject.value;
@@ -69,21 +67,18 @@ export class DfSystemConfigDataService {
       })
       .pipe(
         tap(environment => (this.environment = environment)),
-        catchError(err => {
-          this.userDataService.clearToken();
-          return throwError(() => new Error(err));
-        }),
-        retry(1)
+        retry(1),
+        catchError(err => throwError(() => normalizeError(err)))
       );
   }
 
   fetchSystemData() {
     return this.http
       .get<System>(URLS.SYSTEM, {
-        headers: {
-          ...SHOW_LOADING_HEADER,
-          'skip-error': 'true',
-        },
+        headers: SHOW_LOADING_HEADER,
+        // Deliberate graceful degradation: consumers handle missing system
+        // data; same silence semantics the legacy header used to carry.
+        context: silent(),
       })
       .pipe(
         tap(system => {

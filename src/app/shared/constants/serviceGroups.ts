@@ -1,6 +1,7 @@
 import { ROUTES } from '../types/routes';
 
 export const SERVICE_GROUPS = {
+  [ROUTES.API_BUILDER]: ['API Builder'],
   [ROUTES.DATABASE]: ['Database', 'Big Data'],
   [ROUTES.SCRIPTING]: ['Script'],
   [ROUTES.NETWORK]: ['Remote Service'],

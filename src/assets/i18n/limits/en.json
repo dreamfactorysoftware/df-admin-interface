@@ -12,9 +12,9 @@
   "active": "Active",
   "refresh": "Refresh",
   "invalidForm": "Invalid Form Input",
-  "createSuccessMessage": "Limit successfully created",
-  "updateSuccessMessage": "Limit successfully updated",
-  "deleteSuccessMessage": "Limit successfully deleted",
+  "createSuccessMessage": "Limit created",
+  "updateSuccessMessage": "Limit updated",
+  "deleteSuccessMessage": "Limit deleted",
   "verbTooltip": "By default, all verbs will be limited unless a specific verb is selected for the limit type.",
   "limitTypes": {
     "instance": "Instance",

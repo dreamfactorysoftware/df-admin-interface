@@ -91,6 +91,8 @@ export class DfFieldDetailsComponent implements OnInit {
   referenceFieldDropdownMenuOptions: DatabaseSchemaFieldType[] = [];
   type = '';
 
+  trackByName = (_: number, item: { name: string }): string => item.name;
+
   constructor(
     @Inject(BASE_SERVICE_TOKEN)
     private service: DfBaseCrudService,
@@ -329,7 +331,6 @@ export class DfFieldDetailsComponent implements OnInit {
             { resource: [this.fieldDetailsForm.value] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
-              snackbarError: 'server',
             }
           )
           .subscribe(() => {
@@ -343,7 +344,6 @@ export class DfFieldDetailsComponent implements OnInit {
             { resource: [this.fieldDetailsForm.value] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
-              snackbarError: 'server',
             },
             `${this.dbName}/_schema/${this.tableName}/_field`
           )

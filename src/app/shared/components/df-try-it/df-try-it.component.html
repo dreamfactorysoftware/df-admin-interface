@@ -1,0 +1,257 @@
+<ng-container *transloco="let t; read: 'tryIt'">
+  <section class="try-it" data-testid="df-try-it">
+    <!-- Request line: method + path. The host (API docs builder) can hide this
+         and own the URL itself; standalone use keeps it. -->
+    <div class="try-it__request-line" *ngIf="!hideRequestLine">
+      <!-- Locked: the host sets the verb by the chosen operation. -->
+      <span
+        *ngIf="lockMethod"
+        class="try-it__method-chip"
+        [ngClass]="'m-' + method.toLowerCase()"
+        [attr.aria-label]="t('methodLabel')"
+        >{{ method }}</span
+      >
+      <mat-form-field
+        *ngIf="!lockMethod"
+        appearance="outline"
+        class="try-it__method">
+        <mat-select
+          [(ngModel)]="method"
+          [attr.aria-label]="t('methodLabel')"
+          panelClass="try-it__method-panel">
+          <mat-option
+            *ngFor="let m of methods; trackBy: trackByIndex"
+            [value]="m">
+            {{ m }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="try-it__path">
+        <input
+          matInput
+          [(ngModel)]="path"
+          [placeholder]="t('pathPlaceholder')"
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off" />
+      </mat-form-field>
+    </div>
+
+    <!-- Params / Headers / Body: fill in the values for the built call -->
+    <mat-tab-group
+      class="try-it__tabs"
+      [disableRipple]="true"
+      animationDuration="0ms">
+      <mat-tab [label]="t('tabs.params')">
+        <div class="try-it__kv">
+          <div
+            class="try-it__kv-row"
+            *ngFor="let p of params; let idx = index; trackBy: trackByIndex">
+            <input
+              class="try-it__kv-input"
+              [(ngModel)]="p.key"
+              [placeholder]="t('key')"
+              spellcheck="false" />
+            <input
+              class="try-it__kv-input"
+              [(ngModel)]="p.value"
+              [placeholder]="t('value')"
+              spellcheck="false" />
+            <button
+              mat-icon-button
+              type="button"
+              class="try-it__kv-remove"
+              [attr.aria-label]="t('removeRow')"
+              (click)="removeParam(idx)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <button
+            mat-button
+            type="button"
+            class="try-it__kv-add"
+            (click)="addParam()">
+            <mat-icon>add</mat-icon>{{ t('addParam') }}
+          </button>
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="t('tabs.headers')">
+        <div class="try-it__kv">
+          <div
+            class="try-it__kv-row"
+            *ngFor="let h of headers; let idx = index; trackBy: trackByIndex">
+            <input
+              class="try-it__kv-input"
+              [(ngModel)]="h.key"
+              [placeholder]="t('key')"
+              spellcheck="false" />
+            <input
+              class="try-it__kv-input"
+              [(ngModel)]="h.value"
+              [placeholder]="t('value')"
+              spellcheck="false" />
+            <button
+              mat-icon-button
+              type="button"
+              class="try-it__kv-remove"
+              [attr.aria-label]="t('removeRow')"
+              (click)="removeHeader(idx)">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+          <button
+            mat-button
+            type="button"
+            class="try-it__kv-add"
+            (click)="addHeader()">
+            <mat-icon>add</mat-icon>{{ t('addHeader') }}
+          </button>
+          <p class="try-it__kv-note">{{ t('authNote') }}</p>
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="t('tabs.body')" [disabled]="!methodHasBody">
+        <textarea
+          class="try-it__body"
+          [(ngModel)]="bodyText"
+          [placeholder]="t('bodyPlaceholder')"
+          spellcheck="false"
+          rows="8"></textarea>
+      </mat-tab>
+    </mat-tab-group>
+
+    <!-- Send + identity, co-located directly above the response. -->
+    <div class="try-it__send-area">
+      <mat-form-field appearance="outline" class="try-it__identity-select">
+        <mat-label>{{ t('identityLabel') }}</mat-label>
+        <mat-select
+          [(ngModel)]="selectedIdentityId"
+          (selectionChange)="onIdentityChange()"
+          data-testid="try-it-identity">
+          <mat-option
+            *ngFor="let i of identities; trackBy: trackByIdentity"
+            [value]="i.id"
+            [class.try-it__identity-option--session]="i.type === 'session'">
+            <span class="try-it__identity-name">{{ i.label }}</span>
+            <span
+              class="try-it__identity-default"
+              *ngIf="i.type === 'session'"
+              >{{ t('sessionDefault') }}</span
+            >
+            <span class="try-it__identity-meta" *ngIf="i.roleName">
+              {{ i.roleName }}</span
+            >
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <df-badge
+        *ngIf="selectedIdentity?.readOnly"
+        variant="neutral"
+        [label]="t('readOnly')"></df-badge>
+      <span class="try-it__send-spacer"></span>
+      <button
+        mat-flat-button
+        color="primary"
+        class="try-it__send"
+        type="button"
+        [disabled]="loading"
+        (click)="send()"
+        data-testid="try-it-send">
+        <mat-spinner *ngIf="loading" diameter="16"></mat-spinner>
+        <span *ngIf="!loading">{{ t('send') }}</span>
+      </button>
+    </div>
+    <p class="try-it__url df-numeric" [title]="requestUrl">{{ requestUrl }}</p>
+    <span class="try-it__identity-hint">{{ t('identityHint') }}</span>
+
+    <!-- Response: directly below Send. -->
+    <div class="try-it__response" *ngIf="response">
+      <div class="try-it__response-meta">
+        <df-badge
+          [variant]="statusVariant"
+          [label]="response.status + ' ' + response.statusText"></df-badge>
+        <span class="try-it__meta-item df-numeric"
+          >{{ response.durationMs }} {{ t('ms') }}</span
+        >
+        <span class="try-it__meta-item df-numeric">{{
+          formatSize(response.sizeBytes)
+        }}</span>
+        <span class="try-it__response-spacer"></span>
+        <mat-button-toggle-group
+          [(ngModel)]="viewMode"
+          class="try-it__view-toggle">
+          <mat-button-toggle value="pretty" [disabled]="!response.isJson">{{
+            t('pretty')
+          }}</mat-button-toggle>
+          <mat-button-toggle value="raw">{{ t('raw') }}</mat-button-toggle>
+        </mat-button-toggle-group>
+        <button
+          mat-icon-button
+          type="button"
+          [attr.aria-label]="t('copyResponse')"
+          (click)="copyResponse()">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+      </div>
+
+      <!-- Denial: the boundary held. Scoped key hit a 401/403 -->
+      <div
+        class="try-it__denied-banner"
+        *ngIf="isDenied"
+        data-testid="try-it-denied">
+        <mat-icon class="try-it__denied-icon">block</mat-icon>
+        <div class="try-it__denied-body">
+          <df-badge variant="danger" [label]="t('deniedTitle')"></df-badge>
+          <span class="try-it__denied-copy">{{
+            t('deniedBoundary', {
+              role: deniedIdentityLabel,
+              method: method,
+            })
+          }}</span>
+        </div>
+      </div>
+
+      <!-- Denied fields: what the active identity cannot see vs. the session -->
+      <div class="try-it__denied" *ngIf="deniedFields.length">
+        <span class="try-it__denied-label">{{ t('deniedLabel') }}</span>
+        <span
+          class="try-it__denied-field"
+          *ngFor="let f of deniedFields; trackBy: trackByField"
+          >{{ f }}</span
+        >
+      </div>
+
+      <pre class="try-it__code try-it__response-body"><code>{{
+        responseBody
+      }}</code></pre>
+    </div>
+
+    <p class="try-it__error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+    <!-- Export: copy the built request as curl / Python / JS / MCP config. -->
+    <div class="try-it__snippet">
+      <div class="try-it__snippet-bar">
+        <mat-button-toggle-group
+          [(ngModel)]="snippetLang"
+          class="try-it__snippet-lang">
+          <mat-button-toggle value="curl">curl</mat-button-toggle>
+          <mat-button-toggle value="python">Python</mat-button-toggle>
+          <mat-button-toggle value="js">JS</mat-button-toggle>
+          <mat-button-toggle value="mcp" class="try-it__snippet-lang-mcp"
+            >MCP</mat-button-toggle
+          >
+        </mat-button-toggle-group>
+        <button
+          mat-button
+          type="button"
+          class="try-it__copy"
+          (click)="copySnippet()">
+          <mat-icon>content_copy</mat-icon>{{ t('copy') }}
+        </button>
+      </div>
+      <pre class="try-it__code"><code>{{ snippet }}</code></pre>
+    </div>
+  </section>
+</ng-container>

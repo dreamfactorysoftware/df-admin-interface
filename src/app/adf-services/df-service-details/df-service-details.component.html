@@ -1,8 +1,7 @@
 <form
   [formGroup]="serviceForm"
   class="details-section"
-  (ngSubmit)="save(false, false)"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  (ngSubmit)="save(false, false)">
   <ng-container *ngIf="this.isDatabase && !this.edit; else notDatabaseEdit">
     <mat-stepper linear #stepper>
       <mat-step errorMessage="Service Type is required." [editable]="true">
@@ -46,7 +45,11 @@
             <div class="grid-wrapper grid-col-auto">
               <label
                 class="radio-card"
-                *ngFor="let type of filteredServiceTypes; let i = index">
+                *ngFor="
+                  let type of filteredServiceTypes;
+                  let i = index;
+                  trackBy: trackByName
+                ">
                 <input
                   formControlName="type"
                   type="radio"
@@ -67,7 +70,11 @@
               </label>
               <label
                 class="radio-card"
-                *ngFor="let type of notIncludedServices; let i = index">
+                *ngFor="
+                  let type of notIncludedServices;
+                  let i = index;
+                  trackBy: trackByName
+                ">
                 <input
                   formControlName="type"
                   type="radio"
@@ -81,7 +88,7 @@
                       class="card-icon"
                       [src]="getBackgroundImage(type.name)"
                       [alt]="type.label" />
-                    <h4 class="text-center" style="color: black !important">
+                    <h4 class="text-center">
                       {{ type.label }}
                     </h4>
                   </div>
@@ -129,6 +136,9 @@
               [matTooltip]="
                 'services.controls.namespace.tooltip' | transloco
               " />
+            <mat-hint>{{
+              'services.controls.namespace.hint' | transloco
+            }}</mat-hint>
           </mat-form-field>
           <mat-form-field
             appearance="outline"
@@ -205,7 +215,8 @@
             <ng-container *ngIf="!isDatabase || !hasStandardFields">
               <mat-accordion class="full-width">
                 <div class="details-section">
-                  <ng-container *ngFor="let item of viewSchema">
+                  <ng-container
+                    *ngFor="let item of viewSchema; trackBy: trackByName">
                     <ng-container
                       *ngIf="
                         item.type === 'text' && item.name === 'content';
@@ -266,7 +277,8 @@
 
             <ng-container *ngIf="isDatabase && hasStandardFields">
               <div class="details-section basic-fields-section">
-                <ng-container *ngFor="let item of basicFields">
+                <ng-container
+                  *ngFor="let item of basicFields; trackBy: trackByName">
                   <df-dynamic-field
                     *ngIf="
                       [
@@ -302,7 +314,11 @@
                       {{ 'services.options' | transloco }}
                     </mat-expansion-panel-header>
                     <div class="details-section">
-                      <ng-container *ngFor="let item of advancedFields">
+                      <ng-container
+                        *ngFor="
+                          let item of advancedFields;
+                          trackBy: trackByName
+                        ">
                         <ng-container
                           *ngIf="
                             item.type === 'text' && item.name === 'content';
@@ -466,6 +482,79 @@
     </mat-stepper>
   </ng-container>
   <ng-template #notDatabaseEdit>
+    <!-- Health: the Services table chip, opened up where you would act on it.
+         Top of the page for every service type, since the pages diverge
+         sharply below this point. Edit only (nothing to score during create)
+         and never for the read-only DreamFactory Platform APIs. -->
+    <df-service-health-panel
+      *ngIf="edit && serviceData?.id && !isPlatformService"
+      class="service-health-panel"
+      [serviceId]="serviceData.id"
+      [serviceName]="serviceData.name"
+      [serviceGroup]="serviceGroup"
+      [deprecated]="serviceData.deprecated">
+    </df-service-health-panel>
+
+    <!-- Meridian Phase 1: service Overview. Viewing an existing database
+         service opens on the Live API Card — a real base URL, a scoped key,
+         and a runnable curl — before the config form. -->
+    <ng-container *ngIf="edit && isDatabase && serviceData">
+      <df-page-header
+        [eyebrow]="'services.overview.eyebrow' | transloco"
+        [title]="serviceData.label || serviceData.name"
+        [description]="'services.overview.description' | transloco">
+      </df-page-header>
+      <df-artifact-card
+        class="service-overview-card"
+        [serviceName]="serviceData.name"
+        [baseUrl]="artifactBaseUrl"
+        [sampleTable]="artifactSampleTable"
+        [keys]="artifactKeys"
+        (createKey)="onCreateApiKey()">
+      </df-artifact-card>
+
+      <!-- Meridian Phase 5: Pipeline. The effective request chain for this
+           service as hairline cards (key -> role gate -> rate limit -> field
+           filter -> generated handler), each node deep-linked to the config
+           that governs it. Sits above Access so the chain reads before the
+           roles x verbs detail.
+      -->
+      <section class="service-pipeline" *ngIf="serviceData.id">
+        <df-page-header
+          [eyebrow]="'services.pipeline.eyebrow' | transloco"
+          [title]="'services.pipeline.title' | transloco"
+          [description]="'services.pipeline.description' | transloco">
+        </df-page-header>
+        <p class="service-pipeline__hint">
+          {{ 'services.pipeline.hint' | transloco }}
+        </p>
+        <df-pipeline-strip
+          [serviceId]="serviceData.id"
+          [serviceName]="serviceData.name"
+          [serviceType]="serviceData.type">
+        </df-pipeline-strip>
+      </section>
+
+      <!-- Meridian Phase 3: Access. Governance made legible where you build
+           the API. The roles x verbs matrix is derived client-side from the
+           role graph; clicking a granted cell opens the role's resolved scope.
+      -->
+      <section class="service-access" *ngIf="serviceData.id">
+        <df-page-header
+          [eyebrow]="'services.access.eyebrow' | transloco"
+          [title]="'services.access.title' | transloco"
+          [description]="'services.access.description' | transloco">
+        </df-page-header>
+        <p class="service-access__hint">
+          {{ 'services.access.hint' | transloco }}
+        </p>
+        <df-scope-matrix
+          [serviceId]="serviceData.id"
+          (cellClick)="onScopeCellClick($event)">
+        </df-scope-matrix>
+      </section>
+    </ng-container>
+
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
@@ -478,7 +567,9 @@
         (selectionChange)="
           onServiceTypeSelect(getServiceTypeLabel($event.value))
         ">
-        <mat-option *ngFor="let type of serviceTypes" [value]="type.name">
+        <mat-option
+          *ngFor="let type of serviceTypes; trackBy: trackByName"
+          [value]="type.name">
           {{ type.label }}
         </mat-option>
       </mat-select>
@@ -511,7 +602,7 @@
         <mat-label>Storage Service *</mat-label>
         <mat-select formControlName="storageServiceId" required>
           <mat-option
-            *ngFor="let service of availableFileServices"
+            *ngFor="let service of availableFileServices; trackBy: trackById"
             [value]="service.id">
             {{ service.label || service.name }}
           </mat-option>
@@ -578,8 +669,25 @@
       <ng-container formGroupName="config">
         <!-- Network Service Configuration -->
         <ng-container *ngIf="this.isNetworkService">
+          <!-- Prefill Base URL, parameters and headers from a cURL command -->
+          <div *ngIf="showCurlImport" class="curl-import-action full-width">
+            <button
+              mat-stroked-button
+              type="button"
+              color="primary"
+              data-testid="open-curl-import"
+              (click)="openCurlImport()">
+              <fa-icon [icon]="faFileImport"></fa-icon>
+              <span>{{ 'services.curlImport.button' | transloco }}</span>
+            </button>
+            <span class="curl-import-action__hint">
+              {{ 'services.curlImport.buttonHint' | transloco }}
+            </span>
+          </div>
+
           <!-- Required Fields (Base URL) - Always visible at the top -->
-          <ng-container *ngFor="let item of networkRequiredFields">
+          <ng-container
+            *ngFor="let item of networkRequiredFields; trackBy: trackByName">
             <df-dynamic-field
               *ngIf="
                 [
@@ -662,7 +770,11 @@
                 </ng-container>
 
                 <!-- Other Advanced Fields -->
-                <ng-container *ngFor="let item of networkAdvancedFields">
+                <ng-container
+                  *ngFor="
+                    let item of networkAdvancedFields;
+                    trackBy: trackByName
+                  ">
                   <df-dynamic-field
                     *ngIf="
                       [
@@ -705,31 +817,14 @@
         <ng-container *ngIf="this.isScriptService">
           <!-- Script Content - Always visible -->
           <ng-container *ngIf="getConfigControl('storageServiceId')">
-            <df-link-service
-              [cache]="
-                serviceForm.get('name')?.value ||
-                (serviceData ? serviceData.name : '')
-              "
-              [cacheScope]="'service'"
-              [storageServiceId]="serviceData ? serviceData.name : 'new'"
-              [storagePath]="getConfigControl('storagePath')"
-              [content]="getConfigControl('content')"
-              [storageServiceIdControl]="getConfigControl('storageServiceId')"
-              [scmRepositoryControl]="getConfigControl('scmRepository')"
-              [scmReferenceControl]="
-                getConfigControl('scmReference')
-              "></df-link-service>
             <df-script-editor
               [isScript]="this.isScriptService"
               [type]="getControl('type')"
               [storageServiceId]="getConfigControl('storageServiceId')"
               [storagePath]="getConfigControl('storagePath')"
               [content]="getConfigControl('content')"
-              [scmRepository]="getConfigControl('scmRepository')"
-              [scmReference]="getConfigControl('scmReference')"
               [cache]="serviceData ? serviceData.name : ''"
               [hideScmActions]="true"
-              [snapshotTimestamp]="serviceData?.lastModifiedDate"
               class="full-width"></df-script-editor>
           </ng-container>
 
@@ -762,7 +857,8 @@
                 </df-ace-editor>
 
                 <!-- Other configuration fields if any -->
-                <ng-container *ngFor="let item of viewSchema">
+                <ng-container
+                  *ngFor="let item of viewSchema; trackBy: trackByName">
                   <ng-container *ngIf="item.name !== 'content'">
                     <df-dynamic-field
                       *ngIf="
@@ -820,6 +916,20 @@
                   (selectConnection)="setAiServiceId($event)"
                   (selectRole)="setAiRoleId($event)"></df-ai-chat-prereqs>
 
+                <!-- AI Chat: data services multi-select. Replaces the
+                     auto-rendered default_data_services JSON text field. -->
+                <df-ai-data-services
+                  *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-data-services>
+
+                <!-- AI Chat: MCP servers multi-select. Replaces the
+                     auto-rendered mcp_servers JSON text field. -->
+                <df-ai-mcp-servers
+                  *ngIf="serviceForm.getRawValue().type === 'ai_chat'"
+                  class="full-width"
+                  [form]="serviceForm"></df-ai-mcp-servers>
+
                 <!-- AI Connection: validate provider + key without saving first.
                      `serviceId` lets the backend fall back to the saved api_key
                      when the form's field is blank — so admins can click Test
@@ -828,7 +938,9 @@
                   *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
                   class="full-width"
                   [form]="serviceForm"
-                  [serviceId]="edit && serviceData ? serviceData.id : null"></df-ai-test-connection>
+                  [serviceId]="
+                    edit && serviceData ? serviceData.id : null
+                  "></df-ai-test-connection>
 
                 <!-- AI Connection: model picker — fetches available models
                      from the provider and writes selection to default_model.
@@ -837,7 +949,9 @@
                   *ngIf="serviceForm.getRawValue().type === 'ai_connection'"
                   class="full-width"
                   [form]="serviceForm"
-                  [serviceId]="edit && serviceData ? serviceData.id : null"></df-ai-model-picker>
+                  [serviceId]="
+                    edit && serviceData ? serviceData.id : null
+                  "></df-ai-model-picker>
 
                 <!-- AI Connection: allowed-roles multi-select. Replaces
                      the auto-rendered allowed_roles JSON text field.
@@ -872,7 +986,8 @@
                     [formControl]="getConfigControl('excelContent')"
                     [mode]="excelMode"></df-ace-editor>
                 </ng-container>
-                <ng-container *ngFor="let item of viewSchema">
+                <ng-container
+                  *ngFor="let item of viewSchema; trackBy: trackByName">
                   <!-- ai_chat: aiServiceId and aiRoleId picked via prereqs panel above
                        ai_connection: defaultModel picked via model-picker above
                        ai_connection: allowedRoles picked via allowed-roles chips above
@@ -882,7 +997,9 @@
                       !(
                         serviceForm.getRawValue().type === 'ai_chat' &&
                         (item.name === 'aiServiceId' ||
-                          item.name === 'aiRoleId')
+                          item.name === 'aiRoleId' ||
+                          item.name === 'mcpServers' ||
+                          item.name === 'defaultDataServices')
                       ) &&
                       !(
                         serviceForm.getRawValue().type === 'ai_connection' &&
@@ -1026,7 +1143,7 @@
 
               <!-- Per-service tools -->
               <mat-expansion-panel
-                *ngFor="let svc of mcpServices"
+                *ngFor="let svc of mcpServices; trackBy: trackByName"
                 [expanded]="svc.expanded">
                 <mat-expansion-panel-header>
                   <mat-panel-title class="mcp-service-header">
@@ -1052,7 +1169,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      *ngFor="let tool of svc.tools"
+                      *ngFor="let tool of svc.tools; trackBy: trackByName"
                       [class.disabled-row]="!isToolEnabled(tool.name)">
                       <td class="toggle-col">
                         <mat-slide-toggle
@@ -1163,7 +1280,10 @@
                 <mat-menu #urlLookupMenu="matMenu">
                   <button
                     mat-menu-item
-                    *ngFor="let lookup of availableLookups"
+                    *ngFor="
+                      let lookup of availableLookups;
+                      trackBy: trackByName
+                    "
                     (click)="insertLookup(lookup.name, 'url')">
                     {{ lookup.name }}
                   </button>
@@ -1305,7 +1425,10 @@
                       <mat-select formControlName="storageServiceId">
                         <mat-option [value]="null">None</mat-option>
                         <mat-option
-                          *ngFor="let svc of availableScmServices"
+                          *ngFor="
+                            let svc of availableScmServices;
+                            trackBy: trackById
+                          "
                           [value]="svc.id">
                           {{ svc.label || svc.name }}
                         </mat-option>
@@ -1383,7 +1506,10 @@
                   <mat-menu #fnLookupMenu="matMenu">
                     <button
                       mat-menu-item
-                      *ngFor="let lookup of availableLookups"
+                      *ngFor="
+                        let lookup of availableLookups;
+                        trackBy: trackByName
+                      "
                       (click)="insertLookup(lookup.name, 'function')">
                       {{ lookup.name }}
                     </button>
@@ -1421,7 +1547,10 @@
                   <mat-menu #hdrLookupMenu="matMenu">
                     <button
                       mat-menu-item
-                      *ngFor="let lookup of availableLookups"
+                      *ngFor="
+                        let lookup of availableLookups;
+                        trackBy: trackByName
+                      "
                       (click)="insertLookup(lookup.name, 'headers')">
                       {{ lookup.name }}
                     </button>

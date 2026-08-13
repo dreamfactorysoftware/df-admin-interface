@@ -1,4 +1,4 @@
-<div [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<div>
   <mat-form-field
     subscriptSizing="dynamic"
     appearance="outline"
@@ -33,7 +33,9 @@
       *ngIf="['picklist', 'multi_picklist'].includes(schema.type)"
       [multiple]="schema.type === 'multi_picklist'"
       [formControl]="control">
-      <mat-option *ngFor="let option of schema.values" [value]="option.name">
+      <mat-option
+        *ngFor="let option of schema.values; trackBy: trackByOptionName"
+        [value]="option.name">
         {{ option.label }}
       </mat-option>
     </mat-select>
@@ -95,7 +97,7 @@
       [attr.aria-label]="schema.label" />
     <mat-autocomplete #auto="matAutocomplete">
       <mat-option
-        *ngFor="let option of filteredEventList | async"
+        *ngFor="let option of filteredEventList | async; trackBy: trackByValue"
         [value]="option">
         {{ option }}
       </mat-option>

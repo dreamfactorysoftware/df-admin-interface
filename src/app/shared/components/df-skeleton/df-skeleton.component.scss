@@ -1,0 +1,118 @@
+// df-skeleton: layout-matched loading placeholder with a subtle shimmer.
+// Tokens only. New Phase 0 tokens (skeleton bg/shine, duration, ease) carry
+// benign token-based fallbacks so the placeholder degrades gracefully if the
+// tokens-theme wave has not landed yet; no color/size literals reach phosphor.
+
+:host {
+  display: block;
+  width: 100%;
+}
+
+.df-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+  width: 100%;
+}
+
+// --- shimmer bar primitive -------------------------------------------------
+.df-skeleton__bar {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--df-radius-sm);
+  background-color: var(--df-skeleton-bg, var(--df-hover));
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--df-skeleton-shine, var(--df-border)) 50%,
+      transparent 100%
+    );
+    // Sweep is derived from a motion token (calc, not a literal) so it stays
+    // slow and calm relative to the 200ms UI standard.
+    animation: df-skeleton-shimmer calc(var(--df-duration-standard, 200ms) * 8)
+      var(--df-ease-standard, ease) infinite;
+    will-change: transform;
+  }
+}
+
+@keyframes df-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+// --- bar shapes ------------------------------------------------------------
+.df-skeleton__bar--line {
+  height: var(--df-font-size-sm, 1.3rem);
+  width: 100%;
+}
+
+.df-skeleton__bar--short {
+  width: 60%;
+}
+
+.df-skeleton__bar--title {
+  height: var(--df-font-size-lg, 1.6rem);
+  width: 40%;
+}
+
+.df-skeleton__bar--block {
+  height: 12rem;
+  width: 100%;
+}
+
+.df-skeleton__bar--action {
+  height: var(--df-field-height, 4rem);
+  width: 33%;
+  border-radius: var(--df-radius);
+}
+
+// --- units -----------------------------------------------------------------
+.df-skeleton__unit--line,
+.df-skeleton__unit--block {
+  display: block;
+}
+
+.df-skeleton__unit--row {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-4);
+  min-height: var(--df-row-height, 3.8rem);
+  padding: 0 var(--df-space-2);
+  border-bottom: 1px solid var(--df-border-2, var(--df-border));
+
+  .df-skeleton__bar--cell {
+    height: var(--df-font-size-sm, 1.3rem);
+    flex: 1;
+  }
+  .df-skeleton__bar--wide {
+    flex: 2;
+  }
+  .df-skeleton__bar--narrow {
+    flex: 0 0 15%;
+  }
+}
+
+.df-skeleton__unit--card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-3);
+  padding: var(--df-space-4);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
+  background-color: var(--df-surface);
+}
+
+// --- reduced motion: drop the sweep, keep the static placeholder -----------
+@media (prefers-reduced-motion: reduce) {
+  .df-skeleton__bar::after {
+    animation: none;
+  }
+}

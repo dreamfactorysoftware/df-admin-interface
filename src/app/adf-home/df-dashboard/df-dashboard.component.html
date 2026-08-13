@@ -1,77 +1,118 @@
-<div
-  class="dashboard-container"
-  [class.dark-theme]="themeService.darkMode$ | async">
-  <h2 class="dashboard-title">{{ 'home.dashboard.title' | transloco }}</h2>
+<df-page-header
+  [title]="'homeCockpit.title' | transloco"
+  [description]="'homeCockpit.description' | transloco">
+</df-page-header>
 
-  <div *ngIf="loading" class="loading-container">
-    <mat-card class="loading-card">
-      <mat-card-content>
-        <p>{{ 'home.dashboard.loading' | transloco }}</p>
-      </mat-card-content>
-    </mat-card>
-  </div>
-
-  <div *ngIf="!loading && !error" class="dashboard-content">
-    <!-- Quick Stats Cards -->
-    <div class="stats-grid">
-      <!-- Total Services Card -->
-      <df-dashboard-card
-        [icon]="faPlug"
-        [title]="'home.dashboard.services.title' | transloco"
-        [value]="stats.services.total"
-        [subtitle]="'home.dashboard.services.total' | transloco"
-        [showPrompt]="stats.services.total === 0"
-        [isZero]="stats.services.total === 0"
-        [zeroStateText]="'Create your first API'"
-        [clickable]="stats.services.total === 0"
-        (cardClick)="onServicesCardClick()"
-        color="primary">
-        <div prompt class="service-prompt" *ngIf="stats.services.total === 0">
-          <span>{{ 'home.dashboard.services.createPrompt' | transloco }}</span>
-        </div>
-      </df-dashboard-card>
-
-      <!-- API Keys Card -->
-      <df-dashboard-card
-        [icon]="faKey"
-        [title]="'home.dashboard.apiKeys.title' | transloco"
-        [value]="stats.apiKeys.total"
-        [subtitle]="'home.dashboard.apiKeys.total' | transloco"
-        [showPrompt]="stats.apiKeys.total === 0"
-        [isZero]="stats.apiKeys.total === 0"
-        [zeroStateText]="'Generate your API key'"
-        [clickable]="stats.apiKeys.total === 0"
-        (cardClick)="onApiKeysCardClick()"
-        color="success">
-        <div prompt class="key-prompt" *ngIf="stats.apiKeys.total === 0">
-          <span>{{ 'home.dashboard.apiKeys.createPrompt' | transloco }}</span>
-        </div>
-      </df-dashboard-card>
-
-      <!-- Roles Card -->
-      <df-dashboard-card
-        [icon]="faLock"
-        [title]="'home.dashboard.roles.title' | transloco"
-        [value]="stats.roles.total"
-        [subtitle]="'home.dashboard.roles.total' | transloco"
-        [showPrompt]="stats.roles.total === 0"
-        [isZero]="stats.roles.total === 0"
-        [zeroStateText]="'Set up your first role'"
-        [clickable]="stats.roles.total === 0"
-        (cardClick)="onRolesCardClick()"
-        color="info">
-        <div prompt class="role-prompt" *ngIf="stats.roles.total === 0">
-          <span>{{ 'home.dashboard.roles.createPrompt' | transloco }}</span>
-        </div>
-      </df-dashboard-card>
+<div class="home-body">
+  <!-- Loading: skeleton tiles + checklist rows, never a spinner or text -->
+  <ng-container *ngIf="state === 'loading'">
+    <div class="tile-grid">
+      <df-skeleton variant="card" [count]="4"></df-skeleton>
     </div>
-  </div>
+    <df-skeleton variant="card" [count]="1"></df-skeleton>
+  </ng-container>
 
-  <div *ngIf="!loading && error" class="error-container">
-    <mat-card class="error-card">
-      <mat-card-content>
-        <p>{{ 'home.dashboard.error' | transloco }}</p>
-      </mat-card-content>
-    </mat-card>
-  </div>
+  <!-- Error: honest empty state with retry -->
+  <df-empty-state
+    *ngIf="state === 'error'"
+    icon="cloud_off"
+    [title]="'homeCockpit.error.title' | transloco"
+    [description]="'homeCockpit.error.description' | transloco"
+    [actionLabel]="'homeCockpit.error.retry' | transloco"
+    actionIcon="refresh"
+    (action)="retry()">
+  </df-empty-state>
+
+  <!-- State A: activation checklist + provision-sample secondary action -->
+  <ng-container *ngIf="state === 'onboarding'">
+    <df-onboarding-checklist
+      [serviceCount]="serviceCount"
+      [apiKeyCount]="apiKeyCount"
+      [roleCount]="roleCount"
+      [firstCallMade]="firstCallMade">
+    </df-onboarding-checklist>
+
+    <div class="provision-row">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="provisioning"
+        (click)="provisionSample()">
+        {{ 'homeCockpit.provisionSample' | transloco }}
+      </button>
+    </div>
+  </ng-container>
+
+  <!-- State B: KPI cockpit -->
+  <ng-container *ngIf="state === 'cockpit'">
+    <div class="cockpit-controls">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-select
+          [(value)]="range"
+          (selectionChange)="onRangeChange()"
+          [disabled]="tilesLoading">
+          <mat-option *ngFor="let r of ranges" [value]="r.value">
+            {{ r.labelKey | transloco }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="tile-grid" *ngIf="!tilesLoading; else tileSkeleton">
+      <df-stat-tile
+        *ngFor="let tile of tiles"
+        [label]="tile.label | transloco"
+        [value]="tile.value"
+        [invertDelta]="tile.invertDelta || false"
+        [route]="tile.route"
+        [attr.title]="tile.tooltip ? (tile.tooltip | transloco) : null">
+      </df-stat-tile>
+    </div>
+    <ng-template #tileSkeleton>
+      <div class="tile-grid">
+        <df-skeleton variant="card" [count]="tiles.length || 4"></df-skeleton>
+      </div>
+    </ng-template>
+
+    <!-- Exposure alert strip (only when a user service is broadly OPEN) -->
+    <a
+      *ngIf="openCount > 0"
+      class="unprotected-strip"
+      [routerLink]="openReviewRoute"
+      [attr.title]="openReasons || null">
+      <fa-icon [icon]="faShieldHalved"></fa-icon>
+      <df-badge
+        variant="warning"
+        [label]="
+          'homeCockpit.exposure.label' | transloco: { count: openCount }
+        ">
+      </df-badge>
+      <span class="unprotected-cta">
+        {{ 'homeCockpit.exposure.cta' | transloco }}
+        <fa-icon [icon]="faArrowRight"></fa-icon>
+      </span>
+    </a>
+
+    <!-- Quick actions: task-oriented CTAs that route straight into the create
+         flow. Not nav mirrors, not counters - the verb an admin runs next. The
+         Live API Card is gone from Home by design; it lives on the service page.
+         Future: an "errors in last 24h" widget belongs on this row once a real
+         error-count endpoint exists - do NOT build it from client guesses. -->
+    <div class="quick-actions">
+      <a
+        *ngFor="let action of actions"
+        class="action-tile"
+        [routerLink]="action.route"
+        [attr.data-category]="action.category">
+        <span class="action-icon">
+          <fa-icon [icon]="action.icon"></fa-icon>
+        </span>
+        <span class="action-body">
+          <span class="action-title">{{ action.titleKey | transloco }}</span>
+          <span class="action-desc">{{ action.descKey | transloco }}</span>
+        </span>
+        <fa-icon class="action-arrow" [icon]="faArrowRight"></fa-icon>
+      </a>
+    </div>
+  </ng-container>
 </div>

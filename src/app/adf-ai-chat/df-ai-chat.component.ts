@@ -13,15 +13,30 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faDatabase } from '@fortawesome/free-solid-svg-icons';
+import { faDatabase, faUserShield } from '@fortawesome/free-solid-svg-icons';
+import { HttpClient } from '@angular/common/http';
 import { Subscription, finalize } from 'rxjs';
 import { AiChatService } from './services/ai-chat.service';
+import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { DfScopeService } from 'src/app/shared/services/df-scope.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { BASE_URL } from 'src/app/shared/constants/urls';
 import { ChatMessage, ChatService, ChatSession } from './types/chat';
+import { ProviderRates } from 'src/app/adf-ai-usage/types/usage';
+import { DEFAULT_RATES } from 'src/app/adf-ai-usage/utils/cost';
 import { DfChatInputComponent } from './components/df-chat-input/df-chat-input.component';
 import { DfChatMessageComponent } from './components/df-chat-message/df-chat-message.component';
 import { DfChatSessionListComponent } from './components/df-chat-session-list/df-chat-session-list.component';
+import { DfEmptyStateComponent } from 'src/app/shared/components/df-empty-state/df-empty-state.component';
+import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
+
+/** One resolved reach chip for the "act as role" header. */
+interface ActAsScopeChip {
+  label: string;
+  inherited: boolean;
+}
 
 @Component({
   selector: 'df-ai-chat',
@@ -29,7 +44,6 @@ import { DfChatSessionListComponent } from './components/df-chat-session-list/df
   imports: [
     CommonModule,
     FormsModule,
-    RouterLink,
     MatButtonModule,
     MatFormFieldModule,
     MatSelectModule,
@@ -38,6 +52,8 @@ import { DfChatSessionListComponent } from './components/df-chat-session-list/df
     DfChatInputComponent,
     DfChatMessageComponent,
     DfChatSessionListComponent,
+    DfEmptyStateComponent,
+    DfBadgeComponent,
   ],
   templateUrl: './df-ai-chat.component.html',
   styleUrls: ['./df-ai-chat.component.scss'],
@@ -47,6 +63,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
+  private http = inject(HttpClient);
+  private userDataService = inject(DfUserDataService);
+  private scope = inject(DfScopeService);
 
   @ViewChild('messageScroll') messageScroll?: ElementRef<HTMLDivElement>;
 
@@ -63,7 +82,24 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
 
   errorMessage: string | null = null;
 
+  // "Act as role": admins only. Lets an admin start a conversation scoped to a
+  // specific role and see exactly what that role sees. End users always run
+  // under their own login role — they never see this control. Blank = the
+  // admin's own (unrestricted) access.
+  isSysAdmin = false;
+  actAsRoles: { id: number; name: string }[] = [];
+  selectedActAsRoleId: number | null = null;
+  // Resolved reach for the currently picked "act as" role, shown as header
+  // chips so the boundary is visible before a single message is sent.
+  actAsScopeChips: ActAsScopeChip[] = [];
+
+  // Provider rate + model for the selected chat service's connection. Drives
+  // the per-message cost chip. Null rate => no cost chip (honest omission).
+  chatRate: ProviderRates | null = null;
+  chatModel?: string;
+
   faDatabase = faDatabase;
+  faUserShield = faUserShield;
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private inFlightSends = 0;
@@ -72,6 +108,29 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   private autoScrollPinned = true;
 
   ngOnInit(): void {
+    // Only sys admins get the "Act as role" control; for them, load the roles
+    // they can impersonate. End users are always scoped to their own login
+    // role by the backend and never see this.
+    this.subs.push(
+      this.userDataService.userData$.subscribe(userData => {
+        this.isSysAdmin = userData?.isSysAdmin === true;
+        if (this.isSysAdmin && this.actAsRoles.length === 0) {
+          this.http
+            .get<{
+              resource: { id: number; name: string }[];
+            }>(`${BASE_URL}/system/role`, {
+              params: { fields: 'id,name', sort: 'name' },
+            })
+            .subscribe({
+              next: res => (this.actAsRoles = res.resource ?? []),
+              error: () => {
+                /* non-fatal: no act-as options */
+              },
+            });
+        }
+      })
+    );
+
     this.api.listChatServices().subscribe({
       next: res => {
         this.chatServices = (res.resource ?? []).filter(
@@ -117,7 +176,122 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
     this.stopPolling();
     this.inFlightSends = 0;
     this.awaitingAssistant = false;
+    this.chatRate = null;
+    this.chatModel = undefined;
+    this.resolveRate(name);
     this.loadSessions();
+  }
+
+  /**
+   * Resolve the provider rate for a chat service's connection so the chat can
+   * price each assistant turn the SAME way the usage dashboard does: the
+   * connection's own cost_per_1k when configured, else the provider's default
+   * rate. Never fabricates — if neither resolves, chatRate stays null and the
+   * cost chip is omitted per message.
+   */
+  private resolveRate(serviceName: string): void {
+    const svc = this.chatServices.find(s => s.name === serviceName);
+    if (!svc) {
+      return;
+    }
+    this.http
+      .get<{
+        config?: { ai_service_id?: number };
+      }>(`${BASE_URL}/system/service/${svc.id}`)
+      .subscribe({
+        next: chatSvc => {
+          const aiId = chatSvc.config?.ai_service_id;
+          if (aiId == null) {
+            return;
+          }
+          this.http
+            .get<{
+              config?: {
+                provider?: string;
+                default_model?: string;
+                cost_per_1k_input?: number | null;
+                cost_per_1k_output?: number | null;
+              };
+            }>(`${BASE_URL}/system/service/${aiId}`)
+            .subscribe({
+              next: conn => {
+                const c = conn.config ?? {};
+                this.chatModel = c.default_model;
+                if (
+                  c.cost_per_1k_input != null &&
+                  c.cost_per_1k_output != null
+                ) {
+                  this.chatRate = {
+                    provider: c.provider ?? 'custom',
+                    inputPer1k: c.cost_per_1k_input,
+                    outputPer1k: c.cost_per_1k_output,
+                  };
+                } else if (c.provider && DEFAULT_RATES[c.provider]) {
+                  this.chatRate = DEFAULT_RATES[c.provider];
+                }
+                this.cdr.markForCheck();
+              },
+              error: () => {
+                /* non-fatal: no cost chip, tokens/latency still show */
+              },
+            });
+        },
+        error: () => {
+          /* non-fatal: no cost chip */
+        },
+      });
+  }
+
+  /** Admin picked a different "act as" role: refresh the header scope chips
+   *  so the resolved reach is visible before starting the chat. */
+  onActAsRoleChange(): void {
+    const roleId = this.selectedActAsRoleId;
+    if (roleId == null) {
+      this.actAsScopeChips = [];
+      return;
+    }
+    this.scope.reachForRole(roleId).subscribe({
+      next: entries => {
+        // Collapse (service, component) grants to one chip per service, and
+        // mark the chip inherited only when EVERY grant on it was inherited.
+        const byService = new Map<string, ActAsScopeChip>();
+        for (const e of entries) {
+          if (!e.allow) {
+            continue;
+          }
+          const existing = byService.get(e.serviceName);
+          if (existing) {
+            existing.inherited = existing.inherited && e.source === 'inherited';
+          } else {
+            byService.set(e.serviceName, {
+              label: e.serviceLabel || e.serviceName,
+              inherited: e.source === 'inherited',
+            });
+          }
+        }
+        this.actAsScopeChips = Array.from(byService.values()).sort((a, b) =>
+          a.label.localeCompare(b.label)
+        );
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.actAsScopeChips = [];
+      },
+    });
+  }
+
+  /** Regenerate an assistant turn: re-send the user message that produced it.
+   *  The backend always appends a fresh turn, so this asks the same question
+   *  again rather than editing history in place. */
+  regenerateFrom(assistant: ChatMessage): void {
+    const msgs = this.messages;
+    const idx = msgs.indexOf(assistant);
+    for (let i = idx - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user' && msgs[i].content) {
+        this.send(msgs[i].content as string);
+        return;
+      }
+    }
   }
 
   private loadSessions(): void {
@@ -140,12 +314,22 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
       });
   }
 
+  goToCreateService(): void {
+    this.router.navigate(['/ai/chat-services/create']);
+  }
+
   newChat(): void {
     if (!this.selectedServiceName) {
       return;
     }
     this.errorMessage = null;
-    this.api.createSession(this.selectedServiceName, {}).subscribe({
+    // Admins may start the conversation "as" a role (down-scoping only). End
+    // users send nothing here — the backend binds them to their own role.
+    const payload =
+      this.isSysAdmin && this.selectedActAsRoleId != null
+        ? { ai_role_id: this.selectedActAsRoleId }
+        : {};
+    this.api.createSession(this.selectedServiceName, payload).subscribe({
       next: session => {
         // Empty session has no messages; show it immediately.
         this.activeSession = { ...session, messages: [] };
@@ -273,7 +457,20 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
         if (this.activeSession?.id !== sessionId) {
           return;
         }
+        // Skip the reassignment when the payload hasn't changed since the
+        // last tick — otherwise every 1s poll replaces activeSession and
+        // rebuilds this.sessions, forcing the whole transcript through
+        // change detection for nothing.
+        if (this.sessionUnchanged(this.activeSession, session)) {
+          return;
+        }
         this.activeSession = session;
+        // Keep the sidebar entry in sync so its stats (tool-call count,
+        // token totals, title) reflect the just-completed turn — otherwise
+        // it keeps its creation-time zeros.
+        this.sessions = this.sessions.map(s =>
+          s.id === sessionId ? { ...s, ...session } : s
+        );
         this.scrollToBottom();
       },
       error: () => {
@@ -307,15 +504,9 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
   }
 
   private extractError(err: unknown): string {
-    if (typeof err === 'object' && err !== null) {
-      // Angular HttpErrorResponse: err.error.error.message
-      const e = err as {
-        error?: { error?: { message?: string } };
-        message?: string;
-      };
-      return e.error?.error?.message ?? e.message ?? 'Something went wrong.';
-    }
-    return 'Something went wrong.';
+    // AppError rethrown by the error interceptor, a raw Error, or a string;
+    // normalizeError handles all of them and never yields '[object Object]'.
+    return normalizeError(err).message;
   }
 
   get messages(): ChatMessage[] {
@@ -328,5 +519,33 @@ export class DfAiChatComponent implements OnInit, OnDestroy {
 
   trackMsg(_: number, m: ChatMessage): number | string {
     return m.id ?? m.created_at ?? _;
+  }
+
+  trackServiceName(_: number, s: ChatService): string {
+    return s.name;
+  }
+
+  trackRoleId(_: number, r: { id: number }): number {
+    return r.id;
+  }
+
+  /** Cheap same-payload check for the poll loop: message count, session
+   *  timestamp, and the tail message's content/tool-call count. Anything
+   *  the assistant streams in changes at least one of these. */
+  private sessionUnchanged(prev: ChatSession, next: ChatSession): boolean {
+    const prevMsgs = prev.messages ?? [];
+    const nextMsgs = next.messages ?? [];
+    if (prevMsgs.length !== nextMsgs.length) {
+      return false;
+    }
+    if (prev.updated_at !== next.updated_at || prev.title !== next.title) {
+      return false;
+    }
+    const a = prevMsgs[prevMsgs.length - 1];
+    const b = nextMsgs[nextMsgs.length - 1];
+    return (
+      (a?.content ?? '') === (b?.content ?? '') &&
+      (a?.tool_calls?.length ?? 0) === (b?.tool_calls?.length ?? 0)
+    );
   }
 }

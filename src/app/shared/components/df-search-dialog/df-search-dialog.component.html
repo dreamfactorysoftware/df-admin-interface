@@ -23,11 +23,13 @@
       </ng-component>
     </ng-template>
     <ng-template #results let-resultArray="resultArray">
-      <ul *ngFor="let result of resultArray" class="result-groups">
+      <ul
+        *ngFor="let result of resultArray; trackBy: trackByResultPath"
+        class="result-groups">
         <li>
           {{ getTranslationKey(result.path) | transloco }}
           <ul>
-            <li *ngFor="let item of result.items">
+            <li *ngFor="let item of result.items; trackBy: trackByItemSegment">
               <button
                 color="primary"
                 class="result-item"

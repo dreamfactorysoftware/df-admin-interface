@@ -67,6 +67,17 @@ export class DfSearchDialogComponent implements OnInit {
       .subscribe();
   }
 
+  trackByResultPath(_index: number, result: { path: string }): string {
+    return result.path;
+  }
+
+  trackByItemSegment(
+    _index: number,
+    item: { segment?: string; label?: string }
+  ): string {
+    return item.segment ?? item.label ?? '';
+  }
+
   navigate(path: string) {
     this.router.navigate([path]);
     this.dialogRef.close();

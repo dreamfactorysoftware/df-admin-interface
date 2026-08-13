@@ -1,8 +1,40 @@
 {
+  "health": {
+    "header": "Health",
+    "whyAria": "Why this service needs attention",
+    "level": {
+      "success": "Healthy",
+      "warning": "Needs attention",
+      "danger": "Action required"
+    },
+    "panelAria": "Health issues for this service",
+    "probe": {
+      "checking": "Checking the connection…",
+      "ok": "Connected. No issues found.",
+      "failed": "Cannot reach this service.",
+      "unsupported": "No issues found. This API type has no automatic connection check."
+    },
+    "rules": {
+      "noAccess": "No role grants access. This service is unreachable by any key.",
+      "deprecated": "Marked deprecated. Migrate consumers off this service.",
+      "cannotConnect": "Cannot reach this service. Check its host and credentials."
+    },
+    "fix": {
+      "noAccess": "Create a role"
+    },
+    "chip": {
+      "checking": "Checking…",
+      "notChecked": "Not checked"
+    }
+  },
   "details": "Details",
   "definition": "Service Definition",
   "config": "Configuration",
   "options": "Advanced Options",
+  "overview": {
+    "eyebrow": "Live API",
+    "description": "Your API is live. Copy a request and run it."
+  },
   "controls": {
     "serviceType": {
       "label": "Service Type",
@@ -10,7 +42,8 @@
     },
     "namespace": {
       "label": "Namespace",
-      "tooltip": "Select a namespace used for the API’s URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric."
+      "tooltip": "Select a namespace used for the API’s URI structure, such as /api/v2/{type}/{namespace}. It should be lowercase and alphanumeric.",
+      "hint": "This becomes the URL segment for the generated API, like /api/v2/your-namespace. Use lowercase letters, numbers, and underscores."
     },
     "label": {
       "label": "Label",
@@ -24,12 +57,12 @@
     "securityConfig": "Security Config",
     "nextSecurityConfig": "Next: Security Configuration"
   },
-  "firstTimeGuidance": "Welcome! Since this is your first API, we'll guide you through setting up security configuration to ensure your API is properly protected.",
-  "deleteSuccessMsg": "Service successfully deleted",
-  "createSuccessMsg": "Service successfully created",
-  "updateSuccessMsg": "Service successfully updated",
+  "firstTimeGuidance": "This is your first API. We'll walk you through the security configuration that protects it.",
+  "deleteSuccessMsg": "Service deleted",
+  "createSuccessMsg": "Service created. Generate its API docs to try it out, or lock it down with a role.",
+  "updateSuccessMsg": "Service updated",
   "celebration": {
-    "title": "🎉 Your First API is Live!",
+    "title": "Your first API is live",
     "subtitle": "{{name}} is ready to use",
     "whatHappened": "Here's what just happened in under 1 second:",
     "steps": {
@@ -54,10 +87,43 @@
     "endpointHint": "(lists all tables)",
     "yourApiKey": "Authentication Key:",
     "copyKey": "Copy API Key",
-    "keyCopied": "Copied!",
+    "keyCopied": "Copied",
     "usageHint": "Add the API key to the 'X-DreamFactory-Api-Key' header in your requests",
     "testYourApi": "Test Your API Now",
     "exploreLater": "I'll explore later",
-    "autoRedirectTest": "Redirecting to API testing playground..."
+    "autoRedirectTest": "Opening the API testing playground"
+  },
+  "access": {
+    "eyebrow": "Access",
+    "title": "Who can reach this service",
+    "description": "Every role is a row, every HTTP verb a column. Green is full access, amber is filtered, muted is none. Derived live from the role graph.",
+    "hint": "Agents and API keys inherit these grants through their role. Click any granted cell to see exactly what that role can reach across the platform.",
+    "dialog": {
+      "eyebrow": "Resolved scope",
+      "title": "{{verb}} on {{service}}",
+      "hint": "This is everything the role reaches, not just this service. Grants marked inherited come from a wildcard rule; explicit grants target one service. Edit the role to change what agents and keys under it can touch.",
+      "close": "Close"
+    }
+  },
+  "pipeline": {
+    "eyebrow": "Pipeline",
+    "title": "The request pipeline",
+    "description": "The ordered chain every request runs before it reaches your data. Each step deep-links to the config that governs it.",
+    "hint": "Derived live from keys, roles, and limits. Open steps are policies you have not set yet."
+  },
+  "curlImport": {
+    "button": "Import from cURL",
+    "buttonHint": "Prefill the base URL, parameters and headers from a cURL command.",
+    "title": "Import from cURL",
+    "hint": "Paste a cURL command. The URL, query parameters, headers and supported CURL options are mapped onto this service's configuration. Nothing is saved until you save the service.",
+    "commandLabel": "cURL command",
+    "placeholder": "curl -X GET 'https://api.example.com/v1/users?limit=10' -H 'Authorization: Bearer TOKEN'",
+    "preview": "Preview",
+    "baseUrl": "Base URL",
+    "method": "Method",
+    "parameters": "Parameters",
+    "headers": "Headers",
+    "curlOptions": "CURL Options",
+    "import": "Import"
   }
 }

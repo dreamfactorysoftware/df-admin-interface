@@ -6,7 +6,10 @@
   (click)="onClick()">
   <mat-card-content>
     <div class="card-header">
-      <div class="icon-container" [class]="'icon-' + color">
+      <div
+        class="icon-container"
+        [class]="'icon-' + color"
+        [attr.data-category]="category">
         <fa-icon [icon]="icon"></fa-icon>
       </div>
       <div class="header-stats" *ngIf="trend !== undefined">

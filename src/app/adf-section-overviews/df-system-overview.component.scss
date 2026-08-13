@@ -1,0 +1,76 @@
+// ============================================================
+// System landing density override (FB6b).
+// System is the tallest landing (5 stats + 12 cards across two
+// groups + 3 notes); at 1920x1080 / 100% zoom it overflowed the
+// content pane by ~52px and forced an inner scroll the other
+// landings don't have. This trims spacing/size ONLY for this
+// screen -- scoped through :host so df-section-landing (shared by
+// every other landing) keeps its own density. Tokens/tints/copy
+// are untouched, so light, dark, and phosphor all fit identically.
+// ============================================================
+:host ::ng-deep {
+  .section-landing {
+    gap: 12px;
+    padding: 12px 24px;
+  }
+
+  .section-landing__header {
+    padding-bottom: 10px;
+
+    h2 {
+      margin: 2px 0 4px;
+    }
+  }
+
+  .section-landing__stats {
+    gap: 8px;
+  }
+
+  .section-stat {
+    padding: 8px 12px;
+  }
+
+  .section-landing__groups {
+    gap: 12px;
+  }
+
+  .section-landing__group h3 {
+    margin: 0 0 6px;
+  }
+
+  .section-landing__cards {
+    gap: 10px;
+  }
+
+  .section-card {
+    min-height: 108px;
+    padding: 11px 14px;
+  }
+
+  .section-card__icon {
+    height: 30px;
+    margin-bottom: 6px;
+    width: 30px;
+  }
+
+  .section-card[data-category] .section-card__icon,
+  .section-card[data-tint]:not(.section-card--disabled) .section-card__icon {
+    height: 34px;
+    width: 34px;
+  }
+
+  .section-card__body {
+    h4 {
+      margin: 0 0 3px;
+    }
+
+    p {
+      margin: 0 0 4px;
+      min-height: 24px;
+    }
+  }
+
+  .section-landing__notes div {
+    padding: 10px 14px;
+  }
+}

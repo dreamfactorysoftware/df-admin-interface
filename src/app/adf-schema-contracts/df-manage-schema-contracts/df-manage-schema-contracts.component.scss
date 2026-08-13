@@ -1,0 +1,212 @@
+.schema-contracts-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+
+  .page-header {
+    margin-bottom: 16px;
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 24px;
+      font-weight: 500;
+    }
+
+    .subhead {
+      margin: 0;
+      color: var(--df-text-muted);
+      font-size: 14px;
+    }
+  }
+
+  .picker-card,
+  .summary-card,
+  .table-card,
+  .config-card {
+    margin-bottom: 16px;
+  }
+
+  .config-card {
+    .config-row {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+
+      .mode-picker {
+        min-width: 280px;
+        flex: 1;
+      }
+      .enforcement-picker {
+        min-width: 300px;
+        flex: 1;
+      }
+      .retention-input {
+        min-width: 220px;
+        flex: 1;
+      }
+
+      button {
+        margin-top: 8px;
+      }
+    }
+
+    mat-divider {
+      margin: 8px 0 16px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+  }
+
+  .picker-card mat-card-content {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+
+    .service-picker {
+      min-width: 320px;
+      flex: 1;
+    }
+  }
+
+  .summary-grid {
+    display: flex;
+    gap: 24px 32px;
+    flex-wrap: wrap;
+    row-gap: 16px;
+
+    .summary-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      min-width: 80px;
+
+      .value {
+        font-size: 28px;
+        font-weight: 500;
+        line-height: 1.1;
+
+        // Dates are wider than numbers — shrink so they fit on one line.
+        &.date {
+          font-size: 18px;
+          font-weight: 400;
+          white-space: nowrap;
+        }
+
+        // Enforcement is a word, not a number — shrink + emphasize.
+        &.enforcement {
+          font-size: 16px;
+          font-weight: 500;
+          white-space: nowrap;
+          color: var(--df-accent);
+        }
+      }
+      .label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--df-text-muted);
+      }
+      &.breaking .value {
+        color: var(--df-danger);
+      }
+    }
+  }
+
+  .describe-error {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    color: var(--df-danger);
+    font-size: 13px;
+  }
+
+  .contract-table {
+    width: 100%;
+
+    .table-name {
+      display: flex;
+      flex-direction: column;
+      strong {
+        font-weight: 500;
+      }
+      small {
+        color: var(--df-text-muted);
+      }
+    }
+
+    .lock-icon {
+      vertical-align: middle;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      margin-right: 4px;
+      &.muted {
+        color: var(--df-text-muted);
+      }
+    }
+    .muted {
+      color: var(--df-text-muted);
+    }
+
+    .actions-col {
+      width: 240px;
+      text-align: right;
+      white-space: nowrap;
+
+      button + button {
+        margin-left: 4px;
+      }
+    }
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+
+    &-red {
+      background: var(--df-danger-soft);
+      color: var(--df-danger);
+    }
+    &-orange {
+      background: var(--df-warning-soft);
+      color: var(--df-warning);
+    }
+    &-yellow {
+      background: var(--df-accent-soft);
+      color: var(--df-accent);
+    }
+    &-green {
+      background: var(--df-success-soft);
+      color: var(--df-success);
+    }
+    &-grey {
+      background: var(--df-surface-2);
+      color: var(--df-text-muted);
+    }
+  }
+
+  .loading-overlay {
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--df-text-muted);
+    padding: 48px 16px;
+    font-size: 14px;
+  }
+}

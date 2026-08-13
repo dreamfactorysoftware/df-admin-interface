@@ -32,7 +32,9 @@ interface YTick {
       <mat-card-content>
         <div class="chart__legend">
           <span class="chart__title">Tokens over time</span>
-          <span *ngFor="let l of layers" class="chart__legend-item">
+          <span
+            *ngFor="let l of layers; trackBy: trackLayer"
+            class="chart__legend-item">
             <span
               class="chart__legend-swatch"
               [style.background]="l.fill"></span>
@@ -48,7 +50,7 @@ interface YTick {
           aria-label="Tokens over time">
           <g class="chart__grid">
             <line
-              *ngFor="let t of yTicks"
+              *ngFor="let t of yTicks; trackBy: trackIndex"
               [attr.x1]="paddingX"
               [attr.x2]="width - paddingX"
               [attr.y1]="t.y"
@@ -56,7 +58,7 @@ interface YTick {
           </g>
 
           <path
-            *ngFor="let layer of layers"
+            *ngFor="let layer of layers; trackBy: trackLayer"
             [attr.d]="layer.d"
             [attr.fill]="layer.fill"
             fill-opacity="0.85"
@@ -64,7 +66,7 @@ interface YTick {
 
           <g class="chart__axis chart__axis--x">
             <text
-              *ngFor="let t of xTicks"
+              *ngFor="let t of xTicks; trackBy: trackIndex"
               [attr.x]="t.x"
               [attr.y]="height - 4"
               text-anchor="middle">
@@ -73,7 +75,7 @@ interface YTick {
           </g>
           <g class="chart__axis chart__axis--y">
             <text
-              *ngFor="let t of yTicks"
+              *ngFor="let t of yTicks; trackBy: trackIndex"
               [attr.x]="paddingX - 6"
               [attr.y]="t.y + 4"
               text-anchor="end">
@@ -108,13 +110,14 @@ interface YTick {
           flex-wrap: wrap;
           align-items: center;
           gap: 12px 24px;
-          font-size: 13px;
-          color: #666;
+          font-size: 1.3rem;
+          color: var(--df-text-2);
         }
         &__title {
           font-weight: 600;
-          color: #333;
-          font-size: 16px;
+          color: var(--df-text);
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
           margin-right: 8px;
         }
         &__legend-item {
@@ -126,56 +129,34 @@ interface YTick {
           width: 12px;
           height: 12px;
           border-radius: 2px;
+          border: 1px solid var(--df-border-2);
         }
         &__legend-total {
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
-          font-size: 12px;
-          color: #999;
+          font-size: 1.2rem;
+          color: var(--df-text-2);
         }
 
         &__svg {
           width: 100%;
           height: var(--chart-h, 280px);
-          background: rgba(0, 0, 0, 0.02);
-          border-radius: 4px;
+          background: var(--df-surface-2);
+          border-radius: var(--df-radius-sm);
         }
 
         &__grid line {
-          stroke: rgba(0, 0, 0, 0.08);
+          stroke: var(--df-border-2);
           stroke-dasharray: 2 4;
         }
         &__axis text {
-          fill: #999;
-          font-size: 12px;
+          fill: var(--df-text-muted);
+          font-size: 11px;
           font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
         }
         &__empty text {
-          fill: #999;
+          fill: var(--df-text-muted);
           font-style: italic;
-          font-size: 14px;
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .chart {
-          &__legend {
-            color: #bbb;
-          }
-          &__title {
-            color: #fff;
-          }
-          &__legend-total,
-          &__axis text,
-          &__empty text {
-            color: #bbb;
-            fill: #bbb;
-          }
-          &__svg {
-            background: rgba(255, 255, 255, 0.04);
-          }
-          &__grid line {
-            stroke: rgba(255, 255, 255, 0.08);
-          }
+          font-size: 1.3rem;
         }
       }
     `,
@@ -275,6 +256,14 @@ export class DfUsageStackedAreaComponent implements OnChanges {
 
   formatK(n: number): string {
     return formatK(n);
+  }
+
+  trackLayer(_: number, l: Layer): string {
+    return l.label;
+  }
+
+  trackIndex(i: number): number {
+    return i;
   }
 }
 

@@ -12,7 +12,9 @@ import {
   faShieldHalved,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
+import { TranslocoModule } from '@ngneat/transloco';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import { DfScopeMapComponent } from '../df-scope-map/df-scope-map.component';
 
 interface RoleRow {
   id: number;
@@ -23,44 +25,51 @@ interface RoleRow {
 @Component({
   selector: 'df-ai-allowed-roles',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, FontAwesomeModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    FontAwesomeModule,
+    TranslocoModule,
+    DfScopeMapComponent,
+  ],
   template: `
-    <div class="allowed-roles">
+    <div class="allowed-roles" *transloco="let t; read: 'aiAllowedRoles'">
       <div class="allowed-roles__header">
         <fa-icon [icon]="faShieldHalved" class="allowed-roles__icon"></fa-icon>
-        <span class="allowed-roles__title">Allowed Roles</span>
+        <span class="allowed-roles__title">{{ t('title') }}</span>
         <span class="allowed-roles__count">
-          {{ selected.length }} selected · {{ roles.length }} available
+          {{
+            t('count', {
+              selected: selected.length,
+              available: roles.length,
+            })
+          }}
         </span>
         <a
           mat-stroked-button
           [routerLink]="['/api-connections/role-based-access/create']"
           class="allowed-roles__action">
           <fa-icon [icon]="faPlus"></fa-icon>
-          <span>Create new role</span>
+          <span>{{ t('createRole') }}</span>
         </a>
       </div>
 
-      <p class="allowed-roles__hint">
-        Pick the DreamFactory roles that may use this AI Connection. Each role's
-        data scope determines what the AI can read while operating under that
-        role. At least one role is required before chat sessions can run.
-      </p>
+      <p class="allowed-roles__hint">{{ t('hint') }}</p>
 
       <div
         *ngIf="selected.length === 0 && !loading"
         class="allowed-roles__warn">
         <fa-icon [icon]="faTriangleExclamation"></fa-icon>
-        <span>
-          No roles selected. Chat sessions will refuse to start until at least
-          one role is allowed.
-        </span>
+        <span>{{ t('noneWarning') }}</span>
       </div>
 
-      <div *ngIf="loading" class="allowed-roles__loading">Loading roles…</div>
+      <div *ngIf="loading" class="allowed-roles__loading">
+        {{ t('loading') }}
+      </div>
 
       <ul *ngIf="!loading && roles.length > 0" class="allowed-roles__list">
-        <li *ngFor="let r of roles">
+        <li *ngFor="let r of roles; trackBy: trackById">
           <button
             type="button"
             class="allowed-roles__chip"
@@ -72,42 +81,51 @@ interface RoleRow {
               class="allowed-roles__chip-check"></fa-icon>
             <span class="allowed-roles__name">{{ r.name }}</span>
           </button>
-          <a
-            [routerLink]="['/api-connections/role-based-access', r.id, 'scope']"
-            class="allowed-roles__link"
-            >what can this role see?</a
-          >
         </li>
       </ul>
 
       <p *ngIf="!loading && roles.length === 0" class="allowed-roles__empty">
-        No DreamFactory roles exist yet. Create one and come back.
+        {{ t('empty') }}
       </p>
+
+      <section
+        *ngIf="!loading && selectedRoles.length > 0"
+        class="allowed-roles__reach">
+        <div class="allowed-roles__reach-head">
+          <fa-icon [icon]="faShieldHalved"></fa-icon>
+          <span>{{ t('reachTitle') }}</span>
+        </div>
+        <p class="allowed-roles__hint">{{ t('reachHint') }}</p>
+        <div
+          *ngFor="let r of selectedRoles; trackBy: trackById"
+          class="allowed-roles__reach-role">
+          <div class="allowed-roles__reach-role-name">
+            {{ t('reachRole', { role: r.name }) }}
+          </div>
+          <df-scope-map [roleId]="r.id"></df-scope-map>
+        </div>
+      </section>
     </div>
   `,
   styles: [
     `
-      /* Theme-flip tokens: dark text/surfaces by default (light mode);
-         the dark-theme class restores the original light-on-dark look. */
-      :host-context(.dark-theme) {
-        --df-ai-fg: rgba(255, 255, 255, 0.9);
-        --df-ai-fg-muted: rgba(255, 255, 255, 0.7);
-        --df-ai-fg-faint: rgba(255, 255, 255, 0.5);
-        --df-ai-surface: rgba(255, 255, 255, 0.02);
-        --df-ai-surface-strong: rgba(255, 255, 255, 0.04);
-        --df-ai-border: rgba(255, 255, 255, 0.08);
-      }
-
+      /* Departure treatment: token-only chrome (light/dark/phosphor come
+         free); selection chips ride the shared accent + corner scale so
+         all the df-ai-* pickers read as one product. Warning amber is
+         aliased locally per theme (no global --df-warning in light/dark);
+         phosphor's token wins by construction. */
       .allowed-roles {
+        --roles-warning: #9a5b00;
         display: flex;
         flex-direction: column;
         gap: 1rem;
         padding: 1.5rem 1.75rem;
         margin: 1rem 0;
-        background: var(--df-ai-surface, rgba(0, 0, 0, 0.03));
-        border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
-        border-radius: 8px;
-        font-size: 16px;
+        background: var(--df-surface-2);
+        border: 1px solid var(--df-border-2);
+        border-radius: var(--df-radius);
+        font-size: 1.4rem;
+        color: var(--df-text);
 
         &__header {
           display: flex;
@@ -117,18 +135,19 @@ interface RoleRow {
         }
 
         &__icon {
-          color: #a78bfa;
-          font-size: 20px;
+          color: var(--df-accent);
+          font-size: 1.8rem;
         }
 
         &__title {
           font-weight: 600;
-          font-size: 18px;
+          font-size: 1.5rem;
+          letter-spacing: -0.01em;
         }
 
         &__count {
-          font-size: 15px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
+          font-size: 1.3rem;
+          color: var(--df-text-muted);
         }
 
         &__action {
@@ -136,15 +155,15 @@ interface RoleRow {
           display: inline-flex !important;
           align-items: center;
           gap: 0.4rem;
-          font-size: 0.95rem !important;
+          font-size: 1.3rem !important;
           padding: 0 0.875rem !important;
           min-height: 38px !important;
         }
 
         &__hint {
           margin: 0;
-          font-size: 15px;
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.7));
+          font-size: 1.3rem;
+          color: var(--df-text-2);
           line-height: 1.55;
         }
 
@@ -153,18 +172,27 @@ interface RoleRow {
           align-items: flex-start;
           gap: 0.625rem;
           padding: 0.875rem 1.125rem;
-          background: rgba(245, 158, 11, 0.1);
-          border: 1px solid rgba(245, 158, 11, 0.4);
-          border-radius: 4px;
-          color: #fbbf24;
-          font-size: 15px;
+          background: color-mix(
+            in srgb,
+            var(--df-warning, var(--roles-warning)) 10%,
+            transparent
+          );
+          border: 1px solid
+            color-mix(
+              in srgb,
+              var(--df-warning, var(--roles-warning)) 40%,
+              transparent
+            );
+          border-radius: var(--df-radius-sm);
+          color: var(--df-warning, var(--roles-warning));
+          font-size: 1.3rem;
         }
 
         &__loading,
         &__empty {
-          color: var(--df-ai-fg-muted, rgba(0, 0, 0, 0.6));
+          color: var(--df-text-muted);
           font-style: italic;
-          font-size: 15px;
+          font-size: 1.3rem;
         }
 
         &__list {
@@ -186,12 +214,12 @@ interface RoleRow {
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          padding: 0.55rem 1.05rem;
-          background: var(--df-ai-surface-strong, rgba(0, 0, 0, 0.05));
-          border: 1px solid var(--df-ai-border, rgba(0, 0, 0, 0.12));
-          border-radius: 999px;
+          padding: 0.5rem 1rem;
+          background: var(--df-surface);
+          border: 1px solid var(--df-border);
+          border-radius: var(--df-radius-sm);
           font: inherit;
-          font-size: 16px;
+          font-size: 1.4rem;
           color: inherit;
           cursor: pointer;
           transition:
@@ -199,35 +227,63 @@ interface RoleRow {
             background 120ms ease;
 
           &:hover {
-            border-color: rgba(167, 139, 250, 0.6);
-            background: rgba(167, 139, 250, 0.08);
+            border-color: var(--df-accent);
+            background: var(--df-hover);
           }
 
           &--selected {
-            border-color: #a78bfa;
-            background: rgba(167, 139, 250, 0.18);
-            color: var(--df-ai-fg, rgba(0, 0, 0, 0.87));
+            border-color: var(--df-accent);
+            background: var(--df-accent-soft);
+            color: var(--df-text);
           }
         }
 
         &__chip-check {
-          color: #c4b5fd;
+          color: var(--df-accent);
         }
 
         &__name {
           font-weight: 500;
         }
 
-        &__link {
-          font-size: 14px;
-          color: var(--df-ai-fg-faint, rgba(0, 0, 0, 0.5));
-          text-decoration: none;
+        &__reach {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          margin-top: 0.5rem;
+          padding-top: 1.25rem;
+          border-top: 1px solid var(--df-border-2);
+        }
 
-          &:hover {
-            color: #a78bfa;
-            text-decoration: underline;
+        &__reach-head {
+          display: flex;
+          align-items: center;
+          gap: 0.625rem;
+          font-weight: 600;
+          font-size: 1.4rem;
+          letter-spacing: -0.01em;
+
+          fa-icon {
+            color: var(--df-accent);
+            font-size: 1.6rem;
           }
         }
+
+        &__reach-role {
+          display: flex;
+          flex-direction: column;
+          gap: 0.625rem;
+        }
+
+        &__reach-role-name {
+          font-weight: 600;
+          font-size: 1.3rem;
+          color: var(--df-text-2);
+        }
+      }
+
+      :host-context(.dark-theme) .allowed-roles {
+        --roles-warning: #ffb74d;
       }
     `,
   ],
@@ -273,6 +329,14 @@ export class DfAiAllowedRolesComponent implements OnInit {
     return this.selected.includes(id);
   }
 
+  /** The role records currently attached to this AI connection, in list order.
+   *  Each renders an inline df-scope-map so the resolved reach is visible in
+   *  place instead of behind a link. */
+  get selectedRoles(): RoleRow[] {
+    const ids = this.selected;
+    return this.roles.filter(r => ids.includes(r.id));
+  }
+
   toggle(id: number): void {
     const cur = this.selected;
     const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
@@ -297,5 +361,9 @@ export class DfAiAllowedRolesComponent implements OnInit {
       }
     }
     return [];
+  }
+
+  trackById(_: number, r: RoleRow): number {
+    return r.id;
   }
 }

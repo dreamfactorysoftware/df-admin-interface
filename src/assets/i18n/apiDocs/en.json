@@ -1,4 +1,38 @@
 {
+  "downloadApiDoc": "Download Api Documentation",
+  "subtitle": "Reference generated from the live OpenAPI spec. Pick an operation, then run it.",
+  "apiKeys": {
+    "label": "Available API Keys",
+    "copied": "API Key copied to clipboard",
+    "session": "Session token"
+  },
+  "empty": {
+    "title": "No documented operations",
+    "description": "This service returned no operations. Open the raw spec to inspect what it emitted."
+  },
+  "section": {
+    "parameters": "Parameters",
+    "requestBody": "Request body",
+    "responses": "Responses"
+  },
+  "param": {
+    "name": "Name",
+    "in": "In",
+    "type": "Type",
+    "required": "Required",
+    "description": "Description",
+    "requiredLabel": "Required",
+    "addToCall": "Add to the test call",
+    "removeFromCall": "Remove from the test call",
+    "add": "Add",
+    "added": "Added",
+    "headerTag": "header"
+  },
+  "builder": {
+    "request": "Request",
+    "reference": "Reference",
+    "pathParams": "Path parameters"
+  },
   "table": {
     "header": {
       "name": "Service Name",
@@ -6,11 +40,39 @@
       "description": "Description",
       "group": "Group",
       "type": "Type"
-    }
+    },
+    "pick": "Table",
+    "hint": "Pick a table to call a real endpoint."
   },
-  "downloadApiDoc": "Download Api Documentation",
-  "apiKeys": {
-    "label": "Available API Keys",
-    "copied": "API Key copied to clipboard"
+  "token": {
+    "table": "Table",
+    "field": "Field",
+    "procedure": "Procedure",
+    "function": "Function",
+    "hint": "Choose a value for each placeholder to call a real endpoint."
+  },
+  "response": {
+    "code": "Code",
+    "description": "Description"
+  },
+  "example": {
+    "title": "Runnable example",
+    "copy": "Copy snippet"
+  },
+  "lang": {
+    "js": "JavaScript",
+    "python": "Python",
+    "curl": "curl",
+    "mcp": "MCP config"
+  },
+  "console": {
+    "title": "Try it"
+  },
+  "rawSpec": {
+    "open": "Open raw spec",
+    "show": "Advanced: raw spec",
+    "hide": "Hide raw spec",
+    "expandSchema": "Populate table and field names in the spec",
+    "expandSchemaHint": "Includes live table and field names from your database. May be slow for large databases."
   }
 }

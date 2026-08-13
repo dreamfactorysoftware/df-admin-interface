@@ -14,6 +14,7 @@ import { DfPasswordService } from '../services/df-password.service';
 import { DfSystemConfigDataService } from '../../shared/services/df-system-config-data.service';
 import { matchValidator } from '../../shared/validators/match.validator';
 import { catchError, switchMap, throwError } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 import {
   AlertType,
   DfAlertComponent,
@@ -128,9 +129,10 @@ export class DfPasswordResetComponent implements OnInit {
           return this.authService.login(credentials);
         }),
         catchError(err => {
-          this.alertMsg = err.error.error.message;
+          const appError = normalizeError(err);
+          this.alertMsg = appError.message;
           this.showAlert = true;
-          return throwError(() => new Error(err));
+          return throwError(() => appError);
         })
       )
       .subscribe(() => {

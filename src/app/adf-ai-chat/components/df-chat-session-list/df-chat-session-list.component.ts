@@ -1,13 +1,29 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faPlus, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { ChatSession } from '../../types/chat';
 
+/** A date-bucketed run of sessions for one sidebar group heading. */
+interface SessionGroup {
+  key: string;
+  label: string;
+  sessions: ChatSession[];
+}
+
 @Component({
   selector: 'df-chat-session-list',
   standalone: true,
+  // OnPush is safe: the parent always reassigns `sessions` (never mutates
+  // the array or its rows in place) and the other inputs are primitives.
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, MatButtonModule, FontAwesomeModule],
   template: `
     <aside class="session-list">
@@ -29,32 +45,40 @@ import { ChatSession } from '../../types/chat';
         No sessions yet.
       </div>
 
-      <ul *ngIf="!loading && sessions.length > 0" class="session-list__items">
-        <li
-          *ngFor="let s of sessions; trackBy: trackById"
-          class="session-list__item"
-          [class.session-list__item--active]="s.id === activeId">
-          <button
-            type="button"
-            class="session-list__item-button"
-            (click)="select.emit(s)">
-            <span class="session-list__title">
-              {{ s.title || 'Session ' + s.id }}
-            </span>
-            <span class="session-list__meta">
-              {{ s.tool_call_count || 0 }} tool calls ·
-              {{ formatTime(s.updated_at) }}
-            </span>
-          </button>
-          <button
-            type="button"
-            class="session-list__delete"
-            (click)="delete.emit(s)"
-            title="Delete session">
-            <fa-icon [icon]="faTrashCan"></fa-icon>
-          </button>
-        </li>
-      </ul>
+      <div *ngIf="!loading && sessions.length > 0" class="session-list__scroll">
+        <section
+          *ngFor="let g of groups; trackBy: trackGroup"
+          class="session-list__group">
+          <h3 class="session-list__group-label df-eyebrow">{{ g.label }}</h3>
+          <ul class="session-list__items">
+            <li
+              *ngFor="let s of g.sessions; trackBy: trackById"
+              class="session-list__item"
+              [class.session-list__item--active]="s.id === activeId">
+              <button
+                type="button"
+                class="session-list__item-button"
+                (click)="select.emit(s)">
+                <span class="session-list__title">{{ titleFor(s) }}</span>
+                <span class="session-list__meta df-numeric">
+                  <span>{{ relativeTime(s.updated_at) }}</span>
+                  <ng-container *ngIf="tokenCount(s) as tok">
+                    <span class="session-list__dot">·</span>
+                    <span>{{ tok }} tokens</span>
+                  </ng-container>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="session-list__delete"
+                (click)="delete.emit(s)"
+                title="Delete session">
+                <fa-icon [icon]="faTrashCan"></fa-icon>
+              </button>
+            </li>
+          </ul>
+        </section>
+      </div>
     </aside>
   `,
   styles: [
@@ -63,8 +87,8 @@ import { ChatSession } from '../../types/chat';
         display: flex;
         flex-direction: column;
         height: 100%;
-        background: rgba(255, 255, 255, 0.02);
-        border-right: 1px solid rgba(255, 255, 255, 0.08);
+        background: var(--chat-surface);
+        border-right: 1px solid var(--chat-border-2);
         overflow: hidden;
 
         &__new {
@@ -73,76 +97,116 @@ import { ChatSession } from '../../types/chat';
           display: inline-flex !important;
           align-items: center;
           gap: 0.5rem;
+          border-radius: var(--df-radius-sm) !important;
         }
 
         &__empty {
           padding: 1rem 1rem 0;
-          color: rgba(255, 255, 255, 0.5);
+          color: var(--chat-text-muted);
           font-style: italic;
-          font-size: 14px;
+          font-size: 1.3rem;
+        }
+
+        &__scroll {
+          flex: 1;
+          overflow-y: auto;
+        }
+
+        &__group {
+          &:not(:first-child) {
+            margin-top: 0.5rem;
+          }
+        }
+
+        &__group-label {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          margin: 0;
+          padding: 0.5rem 0.875rem 0.375rem;
+          background: var(--chat-surface);
+          color: var(--chat-text-muted);
         }
 
         &__items {
-          flex: 1;
-          overflow-y: auto;
           list-style: none;
           padding: 0;
           margin: 0;
         }
 
+        // Sidebar density language: 44px rows, hairline separators,
+        // active state on the accent wash + inset accent bar.
         &__item {
           display: flex;
           align-items: stretch;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          min-height: 44px;
+          border-bottom: 1px solid var(--chat-border-2);
 
           &--active {
-            background: rgba(96, 165, 250, 0.08);
-            box-shadow: inset 3px 0 0 #60a5fa;
+            background: var(--df-accent-soft);
+            box-shadow: inset 2px 0 0 var(--df-accent);
           }
 
           &:hover:not(.session-list__item--active) {
-            background: rgba(255, 255, 255, 0.04);
+            background: var(--chat-hover);
           }
         }
 
         &__item-button {
           flex: 1;
+          // min-width: 0 lets the button shrink below its content so long
+          // titles ellipsize instead of clipping at the panel edge (flex
+          // children default to min-width: auto, which blocks text-overflow).
+          min-width: 0;
           background: none;
           border: none;
           color: inherit;
           text-align: left;
-          padding: 0.625rem 1rem;
+          padding: 6px 12px;
           cursor: pointer;
           display: flex;
           flex-direction: column;
-          gap: 0.25rem;
+          justify-content: center;
+          gap: 2px;
           font-family: inherit;
           font-size: inherit;
         }
 
+        // Punch item 4: long titles clip to a single ellipsized line.
         &__title {
           font-weight: 500;
-          font-size: 0.9375rem;
+          font-size: 1.3rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+        }
+
+        &__meta {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          font-size: 1.1rem;
+          color: var(--chat-text-muted);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
-        &__meta {
-          font-size: 12px;
-          color: rgba(255, 255, 255, 0.5);
+        &__dot {
+          color: var(--chat-text-faint);
         }
 
         &__delete {
           background: none;
           border: none;
-          color: rgba(255, 255, 255, 0.3);
+          color: var(--chat-text-faint);
           cursor: pointer;
           padding: 0.5rem 0.875rem;
-          font-size: 14px;
+          font-size: 1.3rem;
 
           &:hover {
-            color: #ff6b6b;
+            color: var(--df-danger);
           }
         }
       }
@@ -165,25 +229,136 @@ export class DfChatSessionListComponent {
     return s.id;
   }
 
-  formatTime(iso?: string): string {
+  trackGroup(_: number, g: SessionGroup): string {
+    return g.key;
+  }
+
+  /** Session title. The backend auto-titles from the first user message, so
+   *  the title itself is the content preview; fall back to a stable label for
+   *  never-used sessions. We never invent a snippet the list endpoint does
+   *  not return. */
+  titleFor(s: ChatSession): string {
+    const t = (s.title ?? '').trim();
+    return t || `Session ${s.id}`;
+  }
+
+  /** Combined token count for the row meta; empty string when there is none
+   *  (so the chip is omitted rather than reading a fake "0"). */
+  tokenCount(s: ChatSession): string {
+    const total = (s.total_input_tokens ?? 0) + (s.total_output_tokens ?? 0);
+    return total > 0 ? total.toLocaleString('en-US') : '';
+  }
+
+  /** Memo for group derivation: rebuilding the buckets per CD cycle (the
+   *  chat poll ticks every second) is wasted work. Keyed on the sessions
+   *  array reference — the parent always reassigns it on change — plus the
+   *  calendar day so the Today/Yesterday split stays fresh past midnight. */
+  private groupCache: {
+    ref: ChatSession[];
+    day: string;
+    groups: SessionGroup[];
+  } | null = null;
+
+  get groups(): SessionGroup[] {
+    const day = new Date().toDateString();
+    if (this.groupCache?.ref === this.sessions && this.groupCache.day === day) {
+      return this.groupCache.groups;
+    }
+    const groups = this.buildGroups(this.sessions);
+    this.groupCache = { ref: this.sessions, day, groups };
+    return groups;
+  }
+
+  private buildGroups(sessions: ChatSession[]): SessionGroup[] {
+    const today: ChatSession[] = [];
+    const yesterday: ChatSession[] = [];
+    const earlier: ChatSession[] = [];
+
+    const now = new Date();
+    const startToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ).getTime();
+    const startYesterday = startToday - 86400000;
+
+    for (const s of sessions) {
+      const ts = this.timestamp(s.updated_at ?? s.created_at);
+      if (ts >= startToday) {
+        today.push(s);
+      } else if (ts >= startYesterday) {
+        yesterday.push(s);
+      } else {
+        earlier.push(s);
+      }
+    }
+
+    const out: SessionGroup[] = [];
+    if (today.length) {
+      out.push({ key: 'today', label: 'Today', sessions: today });
+    }
+    if (yesterday.length) {
+      out.push({ key: 'yesterday', label: 'Yesterday', sessions: yesterday });
+    }
+    if (earlier.length) {
+      out.push({ key: 'earlier', label: 'Earlier', sessions: earlier });
+    }
+    return out;
+  }
+
+  private timestamp(iso?: string): number {
+    if (!iso) {
+      return 0;
+    }
+    const t = new Date(iso).getTime();
+    return Number.isNaN(t) ? 0 : t;
+  }
+
+  /** Memo for relativeTime: runs per row per CD cycle; the wording only
+   *  changes as time passes, so cache per ISO string and drop the whole
+   *  cache when the minute rolls over. */
+  private relCache = new Map<string, string>();
+  private relCacheMinute = -1;
+
+  relativeTime(iso?: string): string {
     if (!iso) {
       return '';
     }
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
+    const minute = Math.floor(Date.now() / 60000);
+    if (minute !== this.relCacheMinute) {
+      this.relCacheMinute = minute;
+      this.relCache.clear();
+    }
+    const hit = this.relCache.get(iso);
+    if (hit !== undefined) {
+      return hit;
+    }
+    const text = this.computeRelative(iso);
+    this.relCache.set(iso, text);
+    return text;
+  }
+
+  private computeRelative(iso: string): string {
+    const then = new Date(iso).getTime();
+    if (Number.isNaN(then)) {
       return '';
     }
-    const now = new Date();
-    const sameDay =
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate();
-    if (sameDay) {
-      return d.toLocaleTimeString([], {
-        hour: 'numeric',
-        minute: '2-digit',
-      });
+    const diff = Date.now() - then;
+    if (diff < 60000) {
+      return 'just now';
     }
-    return d.toLocaleDateString();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) {
+      return `${mins}m ago`;
+    }
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) {
+      return `${hours}h ago`;
+    }
+    const days = Math.floor(hours / 24);
+    if (days < 7) {
+      return `${days}d ago`;
+    }
+    return new Date(then).toLocaleDateString();
   }
 }

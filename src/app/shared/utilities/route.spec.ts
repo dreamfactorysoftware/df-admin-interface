@@ -1,6 +1,11 @@
 import { Routes } from '@angular/router';
 import { ROUTES } from '../types/routes';
-import { accessibleRoutes, generateBreadcrumb, transformRoutes } from './route';
+import {
+  accessibleRoutes,
+  generateBreadcrumb,
+  recordLabelFromRouteData,
+  transformRoutes,
+} from './route';
 
 describe('Route Utilities', () => {
   it('should transform and filter Angular routes', () => {
@@ -46,5 +51,48 @@ describe('Route Utilities', () => {
         translationKey: 'nav.test.child.header',
       },
     ]);
+  });
+
+  it('should keep a hyphenated dynamic segment whole', () => {
+    const routes: Routes = [{ path: 'test', children: [{ path: ':name' }] }];
+
+    const result = generateBreadcrumb(routes, '/test/my-mysql-db');
+
+    expect(result[1]).toEqual({ label: 'my-mysql-db' });
+  });
+
+  describe('recordLabelFromRouteData', () => {
+    it('should read the record name resolved under `data`', () => {
+      expect(
+        recordLabelFromRouteData({
+          type: 'edit',
+          data: { id: 7, name: 'my-limit' },
+          services: { resource: [{ id: 1, name: 'db' }] },
+        })
+      ).toBe('my-limit');
+    });
+
+    it('should prefer the record keys over a co-resolved list', () => {
+      expect(
+        recordLabelFromRouteData({
+          roles: { resource: [{ id: 1, name: 'role' }] },
+          appData: { id: 3, name: 'my-api-key' },
+        })
+      ).toBe('my-api-key');
+    });
+
+    it('should fall back to email when the record has no name', () => {
+      expect(
+        recordLabelFromRouteData({ data: { id: 3, email: 'a@b.com' } })
+      ).toBe('a@b.com');
+    });
+
+    it('should return undefined for list payloads and sentinels', () => {
+      expect(
+        recordLabelFromRouteData({ data: { resource: [{ name: 'db' }] } })
+      ).toBeUndefined();
+      expect(recordLabelFromRouteData({ data: 'paywall' })).toBeUndefined();
+      expect(recordLabelFromRouteData(undefined)).toBeUndefined();
+    });
   });
 });

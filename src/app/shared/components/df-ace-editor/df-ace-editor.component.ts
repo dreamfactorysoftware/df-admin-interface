@@ -82,7 +82,7 @@ export class DfAceEditorComponent
       showGutter: true,
       highlightActiveLine: true,
       tabSize: 2,
-      readOnly: false,
+      readOnly: this.readonly,
       maxLines: 50,
     });
     this.suppressChange = false;
@@ -129,7 +129,18 @@ export class DfAceEditorComponent
   }
 
   setValue(value: string): void {
-    this.editor.setValue(value);
+    // -1 keeps the cursor at the start instead of select-all on programmatic
+    // updates (live-updating views re-set value on a timer).
+    this.suppressChange = true;
+    this.editor.setValue(value, -1);
+    this.suppressChange = false;
+  }
+
+  /** Scroll the view to the last line (tail -f behavior for log views). */
+  scrollToBottom(): void {
+    if (!this.editor) return;
+    const lastLine = this.editor.session.getLength();
+    this.editor.scrollToLine(lastLine, false, false, () => undefined);
   }
 
   /** Insert text at the current cursor position */

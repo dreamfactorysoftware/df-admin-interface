@@ -20,7 +20,7 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: white;
+  background-color: var(--df-surface);
 }
 
 .icon-img {
@@ -30,21 +30,20 @@ $df-purple-palette: mat.define-palette(theme.$df-purple-palette);
 a {
   margin-top: 25px;
   text-decoration: none;
-  color: black;
+  color: var(--df-text);
 }
 
 .label {
   margin-top: 15px;
 }
 
-.dark-theme {
+// ponytail: palette 1002 (#0f0e13) is darker than --df-surface (#1c1b21);
+// kept so dark mode looks unchanged. Retire once surfaces are unified.
+:host-context(.dark-theme) {
   .icon-link-card {
     background-color: mat.get-color-from-palette(
       $df-purple-palette,
       1002
     ) !important;
-  }
-  .label {
-    color: white !important;
   }
 }

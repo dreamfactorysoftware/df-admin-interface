@@ -22,6 +22,7 @@ import {
   FieldInfo,
   RelatedInfo,
 } from './services/data-explorer.service';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
 
 @Component({
   selector: 'df-schema-info',
@@ -51,7 +52,7 @@ import {
 
       <div class="schema-error" *ngIf="error && !loading">
         <mat-icon color="warn">error_outline</mat-icon>
-        <span>{{ error }}</span>
+        <span>{{ error | transloco }}</span>
       </div>
 
       <div class="schema-body" *ngIf="schema && !loading && !error">
@@ -60,7 +61,9 @@ import {
           {{ t('dataExplorer.columns') }} ({{ schema.field.length }})
         </div>
         <div class="field-list">
-          <div class="field-row" *ngFor="let field of schema.field">
+          <div
+            class="field-row"
+            *ngFor="let field of schema.field; trackBy: trackByFieldName">
             <div class="field-name">
               <span>{{ field.name }}</span>
               <mat-chip-set class="field-badges">
@@ -104,7 +107,9 @@ import {
             {{ t('dataExplorer.relationships') }} ({{ schema.related!.length }})
           </div>
           <div class="rel-list">
-            <div class="rel-row" *ngFor="let rel of schema.related">
+            <div
+              class="rel-row"
+              *ngFor="let rel of schema.related; trackBy: trackByRelName">
               <mat-icon class="rel-icon">{{
                 rel.type === 'belongs_to' ? 'arrow_back' : 'arrow_forward'
               }}</mat-icon>
@@ -131,8 +136,8 @@ import {
         display: flex;
         flex-direction: column;
         height: 100%;
-        border-left: 1px solid #e0e0e0;
-        background: #fafafa;
+        border-left: 1px solid var(--df-border);
+        background: var(--df-bg);
         width: 320px;
         overflow: hidden;
       }
@@ -142,15 +147,15 @@ import {
         align-items: center;
         justify-content: space-between;
         padding: 8px 12px;
-        border-bottom: 1px solid #e0e0e0;
-        background: #f5f5f5;
+        border-bottom: 1px solid var(--df-border);
+        background: var(--df-surface-2);
 
         .schema-title {
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: #616161;
+          letter-spacing: 0.06em;
+          color: var(--df-text-muted);
         }
 
         .close-btn {
@@ -171,8 +176,8 @@ import {
         align-items: center;
         gap: 8px;
         padding: 12px;
-        font-size: 13px;
-        color: #d32f2f;
+        font-size: 1.3rem;
+        color: var(--df-danger);
       }
 
       .schema-body {
@@ -185,16 +190,16 @@ import {
         font-size: 11px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #9e9e9e;
+        letter-spacing: 0.06em;
+        color: var(--df-text-muted);
         padding: 12px 12px 6px;
-        border-bottom: 1px solid #eeeeee;
+        border-bottom: 1px solid var(--df-border-2);
       }
 
       .field-list {
         .field-row {
           padding: 6px 12px;
-          border-bottom: 1px solid #f5f5f5;
+          border-bottom: 1px solid var(--df-border-2);
           font-size: 12px;
 
           .field-name {
@@ -202,8 +207,8 @@ import {
             align-items: center;
             gap: 6px;
             font-weight: 500;
-            color: #212121;
-            font-family: 'Roboto Mono', monospace;
+            color: var(--df-text);
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-badges {
@@ -217,26 +222,26 @@ import {
             }
 
             .badge-pk {
-              --mdc-chip-elevated-container-color: #7b1fa2;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent);
+              --mdc-chip-label-text-color: var(--df-accent-contrast);
             }
 
             .badge-fk {
-              --mdc-chip-elevated-container-color: #1565c0;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-accent-soft);
+              --mdc-chip-label-text-color: var(--df-accent-strong);
             }
 
             .badge-uq {
-              --mdc-chip-elevated-container-color: #ef6c00;
-              --mdc-chip-label-text-color: white;
+              --mdc-chip-elevated-container-color: var(--df-surface-2);
+              --mdc-chip-label-text-color: var(--df-text-2);
             }
           }
 
           .field-type {
             font-size: 11px;
-            color: #757575;
+            color: var(--df-text-muted);
             margin-top: 2px;
-            font-family: 'Roboto Mono', monospace;
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
           }
 
           .field-meta {
@@ -247,7 +252,7 @@ import {
             .not-null,
             .auto-inc {
               font-size: 10px;
-              color: #9e9e9e;
+              color: var(--df-text-faint);
               text-transform: uppercase;
             }
           }
@@ -262,18 +267,19 @@ import {
               font-size: 14px;
               width: 14px;
               height: 14px;
-              color: #9e9e9e;
+              color: var(--df-text-faint);
             }
           }
         }
       }
 
       .ref-link {
-        color: #1565c0;
+        color: var(--df-accent);
         cursor: pointer;
         font-size: 11px;
         text-decoration: none;
         &:hover {
+          color: var(--df-accent-strong);
           text-decoration: underline;
         }
       }
@@ -284,13 +290,13 @@ import {
           align-items: flex-start;
           gap: 8px;
           padding: 6px 12px;
-          border-bottom: 1px solid #f5f5f5;
+          border-bottom: 1px solid var(--df-border-2);
 
           .rel-icon {
             font-size: 16px;
             width: 16px;
             height: 16px;
-            color: #7b1fa2;
+            color: var(--df-accent);
             margin-top: 2px;
           }
 
@@ -302,51 +308,15 @@ import {
             .rel-type {
               font-size: 10px;
               text-transform: uppercase;
-              color: #9e9e9e;
-              letter-spacing: 0.5px;
+              color: var(--df-text-faint);
+              letter-spacing: 0.06em;
             }
 
             .rel-field {
               font-size: 11px;
-              color: #757575;
-              font-family: 'Roboto Mono', monospace;
+              color: var(--df-text-muted);
+              font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             }
-          }
-        }
-      }
-
-      :host-context(.dark-theme) {
-        .schema-info-panel {
-          background: #1e1e1e;
-          border-left-color: #424242;
-        }
-        .schema-header {
-          background: #2c2c2c;
-          border-bottom-color: #424242;
-          .schema-title {
-            color: #bdbdbd;
-          }
-        }
-        .section-header {
-          color: #757575;
-          border-bottom-color: #333;
-        }
-        .field-list .field-row {
-          border-bottom-color: #2c2c2c;
-          .field-name {
-            color: #e0e0e0;
-          }
-          .field-type {
-            color: #9e9e9e;
-          }
-        }
-        .ref-link {
-          color: #64b5f6;
-        }
-        .rel-list .rel-row {
-          border-bottom-color: #2c2c2c;
-          .rel-icon {
-            color: #ce93d8;
           }
         }
       }
@@ -379,6 +349,14 @@ export class DfSchemaInfoComponent implements OnChanges, OnDestroy {
     this.destroy$.complete();
   }
 
+  trackByFieldName(_index: number, field: { name: string }): string {
+    return field.name;
+  }
+
+  trackByRelName(_index: number, rel: { name: string }): string {
+    return rel.name;
+  }
+
   loadSchema(): void {
     if (!this.serviceName || !this.tableName) return;
 
@@ -401,7 +379,7 @@ export class DfSchemaInfoComponent implements OnChanges, OnDestroy {
           this.loading = false;
         },
         error: err => {
-          this.error = err?.error?.error?.message || 'Failed to load schema';
+          this.error = normalizeError(err).message;
           this.loading = false;
         },
       });

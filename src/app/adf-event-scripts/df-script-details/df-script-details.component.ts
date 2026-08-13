@@ -69,6 +69,8 @@ export class DfScriptDetailsComponent implements OnInit {
   ungroupedRouteOptions: string[];
   tableOptions: string[];
   storeServiceArray: string[];
+
+  trackByValue = (_: number, item: string): string => item;
   selectedStorageItem: string;
   selectedServiceItem: string;
   selectedEventItem: string;
@@ -147,8 +149,8 @@ export class DfScriptDetailsComponent implements OnInit {
         : (script.storageServiceId ?? null);
     const scriptItem = {
       ...script,
-      storageServiceId,                     
-      storagePath: script.storagePath || null,  
+      storageServiceId,
+      storagePath: script.storagePath || null,
       name: this.completeScriptName || this.selectedRouteItem,
     };
 

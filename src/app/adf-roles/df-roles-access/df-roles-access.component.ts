@@ -85,6 +85,8 @@ export class DfRolesAccessComponent implements OnInit {
   faTrashCan = faTrashCan;
   faPlus = faPlus;
   serviceOptions = [{ id: 0, name: '' }];
+
+  trackById = (_: number, item: { id: number }): number => item.id;
   expandOperator: FormControl = new FormControl('');
   expandValue: FormControl = new FormControl('');
 

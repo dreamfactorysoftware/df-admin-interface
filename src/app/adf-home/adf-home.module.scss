@@ -6,8 +6,24 @@
 }
 
 section {
-  padding-top: 30px;
-  padding-bottom: 50px;
+  padding-top: 20px;
+  padding-bottom: 36px;
+
+  // Departure type hierarchy for home-section headings; tokens keep all
+  // three themes legible.
+  h2 {
+    font-size: 1.8rem;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+    color: var(--df-text);
+  }
+
+  h3 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--df-text);
+  }
 }
 
 ul {

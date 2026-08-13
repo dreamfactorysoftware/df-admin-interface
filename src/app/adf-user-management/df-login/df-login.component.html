@@ -1,6 +1,4 @@
-<div
-  class="user-management-card-container"
-  [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+<div class="user-management-card-container">
   <div class="left-panel">
     <img src="assets/img/logo.png" alt="DreamFactory Logo" class="logo" />
   </div>
@@ -30,7 +28,7 @@
             <mat-select formControlName="services">
               <mat-option></mat-option>
               <mat-option
-                *ngFor="let service of ldapServices"
+                *ngFor="let service of ldapServices; trackBy: trackByName"
                 [value]="service.name">
                 {{ service.label }}
               </mat-option>
@@ -118,7 +116,7 @@
     <h3>{{ title }}</h3>
     <mat-divider></mat-divider>
     <div class="services-container">
-      <ng-container *ngFor="let service of services">
+      <ng-container *ngFor="let service of services; trackBy: trackByName">
         <a
           mat-flat-button
           color="primary"

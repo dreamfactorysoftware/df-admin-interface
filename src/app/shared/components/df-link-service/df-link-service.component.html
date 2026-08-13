@@ -1,8 +1,5 @@
 <ng-container *ngIf="selectType">
-  <form
-    [formGroup]="roleForm"
-    class="details-section"
-    [class]="(isDarkMode | async) ? 'dark-theme' : ''">
+  <form [formGroup]="roleForm" class="details-section">
     <mat-accordion>
       <mat-expansion-panel [expanded]="false">
         <mat-expansion-panel-header>
@@ -16,7 +13,10 @@
           <mat-label>Select Service</mat-label>
           <mat-select formControlName="serviceList">
             <mat-option
-              *ngFor="let service of storageServices"
+              *ngFor="
+                let service of storageServices;
+                trackBy: trackByServiceName
+              "
               [value]="service.label">
               {{ service.label }}
             </mat-option>
@@ -117,7 +117,7 @@
             </div>
             <div class="link-service-list" *ngIf="!loadingItems">
               <div class="link-service-error" *ngIf="explorerError as err">
-                {{ err }}
+                {{ err | transloco }}
               </div>
               <div
                 class="link-service-empty"
@@ -127,7 +127,7 @@
                 Empty folder.
               </div>
               <button
-                *ngFor="let item of pathItems"
+                *ngFor="let item of pathItems; trackBy: trackByItemPath"
                 mat-button
                 type="button"
                 class="link-service-item"
@@ -202,7 +202,7 @@
                 scoped key (reused across all webhook-enabled scripts).
               </mat-hint>
               <mat-hint *ngIf="generateKeyError" class="webhook-key-error">
-                {{ generateKeyError }}
+                {{ generateKeyError | transloco }}
               </mat-hint>
             </mat-form-field>
             <button

@@ -40,7 +40,7 @@ import { DatabaseService } from './services/data-explorer.service';
       <!-- Error -->
       <div class="error-state" *ngIf="error && !loading">
         <mat-icon color="warn">error_outline</mat-icon>
-        <span>{{ error }}</span>
+        <span>{{ error | transloco }}</span>
         <button mat-stroked-button color="primary" (click)="retry.emit()">
           {{ t('dataExplorer.retry') }}
         </button>
@@ -61,7 +61,7 @@ import { DatabaseService } from './services/data-explorer.service';
         class="db-list">
         <a
           mat-list-item
-          *ngFor="let db of databases"
+          *ngFor="let db of databases; trackBy: trackByDbName"
           (click)="databaseSelected.emit(db)"
           [matTooltip]="db.description || db.name"
           matTooltipPosition="right"
@@ -91,22 +91,18 @@ import { DatabaseService } from './services/data-explorer.service';
         padding: 0 16px;
         height: 49px;
         box-sizing: border-box;
-        border-bottom: 1px solid #e0e0e0;
-        font-weight: 500;
-        font-size: 14px;
-        color: #424242;
+        border-bottom: 1px solid var(--df-border);
+        font-weight: 600;
+        font-size: 1.4rem;
+        letter-spacing: -0.01em;
+        color: var(--df-text);
 
         .header-icon {
           font-size: 20px;
           width: 20px;
           height: 20px;
-          color: #7b1fa2;
+          color: var(--df-accent);
         }
-      }
-
-      :host-context(.dark-theme) .panel-header {
-        border-bottom-color: #424242;
-        color: #e0e0e0;
       }
 
       .loading-state,
@@ -118,14 +114,8 @@ import { DatabaseService } from './services/data-explorer.service';
         gap: 12px;
         padding: 32px 16px;
         text-align: center;
-        color: #757575;
-        font-size: 13px;
-      }
-
-      :host-context(.dark-theme) .loading-state,
-      :host-context(.dark-theme) .error-state,
-      :host-context(.dark-theme) .empty-state {
-        color: #bdbdbd;
+        color: var(--df-text-muted);
+        font-size: 1.3rem;
       }
 
       .db-list {
@@ -147,7 +137,7 @@ import { DatabaseService } from './services/data-explorer.service';
         }
 
         .db-icon {
-          color: #7b1fa2;
+          color: var(--df-accent);
           font-size: 16px;
           flex-shrink: 0;
           pointer-events: none;
@@ -161,8 +151,9 @@ import { DatabaseService } from './services/data-explorer.service';
           pointer-events: none;
 
           .db-name {
-            font-size: 14px;
+            font-size: 1.4rem;
             font-weight: 500;
+            color: var(--df-text);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -170,7 +161,7 @@ import { DatabaseService } from './services/data-explorer.service';
 
           .db-type {
             font-size: 11px;
-            color: #9e9e9e;
+            color: var(--df-text-muted);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -178,21 +169,13 @@ import { DatabaseService } from './services/data-explorer.service';
         }
 
         .chevron {
-          color: #bdbdbd;
+          color: var(--df-text-faint);
           flex-shrink: 0;
           pointer-events: none;
         }
-      }
 
-      :host-context(.dark-theme) .db-item {
-        .db-icon {
-          color: #ce93d8;
-        }
-        .db-info .db-type {
-          color: #757575;
-        }
-        .chevron {
-          color: #616161;
+        &:hover {
+          background: var(--df-hover);
         }
       }
     `,
@@ -206,4 +189,8 @@ export class DfDbSelectorComponent {
   @Output() retry = new EventEmitter<void>();
 
   faDatabase = faDatabase;
+
+  trackByDbName(_index: number, db: DatabaseService): string {
+    return db.name;
+  }
 }

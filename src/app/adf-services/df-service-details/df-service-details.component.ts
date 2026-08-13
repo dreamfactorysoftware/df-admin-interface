@@ -33,6 +33,8 @@ import { DfAiChatPrereqsComponent } from 'src/app/adf-ai-chat/components/df-ai-c
 import { DfAiTestConnectionComponent } from 'src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component';
 import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-picker/df-ai-model-picker.component';
 import { DfAiAllowedRolesComponent } from 'src/app/shared/components/df-ai-allowed-roles/df-ai-allowed-roles.component';
+import { DfAiMcpServersComponent } from 'src/app/shared/components/df-ai-mcp-servers/df-ai-mcp-servers.component';
+import { DfAiDataServicesComponent } from 'src/app/shared/components/df-ai-data-services/df-ai-data-services.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
 
@@ -46,6 +48,7 @@ import {
   faPenToSquare,
   faTrashCan,
   faPlus,
+  faFileImport,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -59,7 +62,6 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
-import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
@@ -71,6 +73,8 @@ import {
   throwError,
   tap,
 } from 'rxjs';
+import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { silent, toastOff } from 'src/app/shared/utilities/http-contexts';
 import {
   GOLD_SERVICES,
   SILVER_SERVICES,
@@ -104,6 +108,19 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
+import { DfArtifactResolverService } from 'src/app/shared/services/df-artifact-resolver.service';
+import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
+import {
+  DfArtifactCardComponent,
+  ArtifactKeyOption,
+} from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
+import { DfScopeMatrixComponent } from 'src/app/shared/components/df-scope-matrix/df-scope-matrix.component';
+import { DfServiceHealthPanelComponent } from '../df-service-health-panel/df-service-health-panel.component';
+import { DfPipelineStripComponent } from 'src/app/shared/components/df-pipeline-strip/df-pipeline-strip.component';
+import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
+import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
+import { DfCurlImportDialogComponent } from 'src/app/shared/components/df-curl-import-dialog/df-curl-import-dialog.component';
+import { ParsedCurl } from 'src/app/shared/utilities/curl-parser';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -159,13 +176,14 @@ interface ServiceResponse {
     DfAiTestConnectionComponent,
     DfAiModelPickerComponent,
     DfAiAllowedRolesComponent,
+    DfAiMcpServersComponent,
+    DfAiDataServicesComponent,
     DfArrayFieldComponent,
     DfAceEditorComponent,
     FontAwesomeModule,
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
-    DfLinkServiceComponent,
     DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
@@ -179,11 +197,22 @@ interface ServiceResponse {
     DfSecurityConfigComponent,
     MatMenuModule,
     MatDialogModule,
+    DfPageHeaderComponent,
+    DfArtifactCardComponent,
+    DfScopeMatrixComponent,
+    DfPipelineStripComponent,
+    DfServiceHealthPanelComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
+  /** DreamFactory Platform APIs route (data.system). Those services are not
+   * role-governed the way a user service is, so they are not health-scored. */
+  isPlatformService = false;
+  /** Route group ('Database', 'File', 'Script', ...). Selects the health
+   * panel's connection-probe endpoint. */
+  serviceGroup: string | null = null;
   isNetworkService = false;
   isScriptService = false;
   isFile = false;
@@ -196,6 +225,7 @@ export class DfServiceDetailsComponent implements OnInit {
   faPenToSquare = faPenToSquare;
   faTrashCan = faTrashCan;
   faPlus = faPlus;
+  faFileImport = faFileImport;
   serviceData: Service;
   selectedServiceTypeLable: string;
   configSchema: Array<ConfigSchema>;
@@ -209,6 +239,12 @@ export class DfServiceDetailsComponent implements OnInit {
   showSecurityConfig = false;
   currentServiceId: number | null = null;
   isFirstTimeUser = false;
+
+  // Meridian Phase 1: the Live API Card (df-artifact-card) on the service
+  // Overview. Populated only when viewing an existing database service, whose
+  // API exposes /_table/ endpoints the sample curl can hit.
+  artifactKeys: ArtifactKeyOption[] = [];
+  artifactSampleTable = 'your_table';
   availableFileServices: any[] = [];
   mcpServices: {
     name: string;
@@ -304,7 +340,8 @@ export class DfServiceDetailsComponent implements OnInit {
     private currentServiceService: DfCurrentServiceService,
     private snackBar: MatSnackBar,
     private systemService: DfSystemService,
-    private analyticsService: DfAnalyticsService
+    private analyticsService: DfAnalyticsService,
+    private artifactResolver: DfArtifactResolverService
   ) {
     this.serviceForm = this.fb.group({
       type: ['', Validators.required],
@@ -313,6 +350,7 @@ export class DfServiceDetailsComponent implements OnInit {
       description: [''],
       isActive: [true],
       storageServiceId: [null], // Add storage service ID field for Excel services
+      config: this.fb.group({}),
       service_doc_by_service_id: this.fb.group({
         format: [0],
         content: [''],
@@ -412,6 +450,12 @@ export class DfServiceDetailsComponent implements OnInit {
         if (route['groups'] && route['groups'][0] === 'MCP') {
           this.isMcp = true;
         }
+        this.serviceGroup = route['groups']?.[0] ?? null;
+        // Set on the DF_PLATFORM_APIS route (and inherited by its children).
+        this.isPlatformService =
+          route['system'] ||
+          this.activatedRoute.snapshot.parent?.data?.['system'] ||
+          false;
         const { data, serviceTypes, groups } = route;
         const licenseType = env.platform?.license;
         this.serviceTypes = serviceTypes.filter(
@@ -425,6 +469,15 @@ export class DfServiceDetailsComponent implements OnInit {
           );
         } else {
           this.snackbarService.setSnackbarLastEle('Unknown label', false);
+        }
+        // Punch 5: the shell H1 falls back to the raw :id URL segment on
+        // edit pages; publish the service label (name as fallback, id if
+        // neither) keyed to this URL so the title reads "MyDB" not "48".
+        if (this.edit && data) {
+          this.snackbarService.setPageLabel(
+            this.router.url,
+            data.label || data.name || String(data.id ?? '')
+          );
         }
         if (this.isDatabase) {
           if (licenseType === 'SILVER') {
@@ -641,6 +694,13 @@ export class DfServiceDetailsComponent implements OnInit {
           );
           this.loadMcpServices();
           this.loadAvailableScmServices();
+        }
+
+        // Meridian Phase 1: on the service Overview (viewing an existing
+        // database service), fetch the pieces the Live API Card needs — a real
+        // sample table and any API key whose role can read this service.
+        if (this.edit && this.isDatabase && this.serviceData) {
+          this.loadArtifactCardData();
         }
       });
     if (this.isDatabase) {
@@ -1240,6 +1300,7 @@ export class DfServiceDetailsComponent implements OnInit {
           group: 'source control',
           fields: 'id,name,label,type',
         },
+        context: silent(),
       })
       .subscribe({
         next: (res: any) => {
@@ -1249,6 +1310,8 @@ export class DfServiceDetailsComponent implements OnInit {
             []
           ).filter((s: any) => s.id && s.name);
         },
+        // Silent by design: SCM dropdown enrichment; the form works without
+        // it, so no toast (see context: silent() above).
         error: () => {
           this.availableScmServices = [];
         },
@@ -1283,6 +1346,8 @@ export class DfServiceDetailsComponent implements OnInit {
       .get(url, {
         params: { branch, content: '1', path },
         responseType: 'text',
+        // The error callback below shows its own contextual toast.
+        context: toastOff(),
       })
       .subscribe({
         next: (content: string) => {
@@ -1295,7 +1360,7 @@ export class DfServiceDetailsComponent implements OnInit {
         },
         error: (err: any) => {
           this.snackbarService.openSnackBar(
-            `Failed to fetch from SCM: ${err?.error?.error?.message || err.message}`,
+            `Failed to fetch from SCM: ${normalizeError(err).message}`,
             'error'
           );
         },
@@ -1336,8 +1401,9 @@ export class DfServiceDetailsComponent implements OnInit {
   }
 
   initializeConfig(value: string) {
+    const config = this.fb.group({});
+
     if (this.configSchema && this.configSchema.length > 0) {
-      const config = this.fb.group({});
       this.configSchema.forEach(control => {
         const validator = [];
         if (control.required) {
@@ -1378,16 +1444,23 @@ export class DfServiceDetailsComponent implements OnInit {
         // Initialize serviceDefinitionType for JSON/YAML toggle
         this.serviceDefinitionType = '0'; // Default to JSON
       }
-      this.serviceForm.addControl('config', config);
     }
+
+    this.serviceForm.setControl('config', config);
   }
 
   get subscriptionRequired() {
     const serviceType = this.serviceForm.controls['type'].value;
     // Local email service is open source and should not require subscription
-    if (serviceType === 'local_email') {
+    if (serviceType === 'local_email' || serviceType === 'api_builder') {
       return false;
     }
+
+    const selectedType = this.serviceTypes.find(st => st.name === serviceType);
+    if (selectedType?.group === 'API Builder') {
+      return false;
+    }
+
     return serviceType && this.configSchema?.length === 0;
   }
 
@@ -1463,18 +1536,41 @@ export class DfServiceDetailsComponent implements OnInit {
     );
   }
 
-  get viewSchema() {
-    const result = this.configSchema?.filter(
-      control => !['storageServiceId', 'storagePath'].includes(control.name)
-    );
+  // These schema-view getters are bound all over the template (*ngFor +
+  // *ngIf) and several call each other, so a single change-detection pass
+  // used to allocate 10+ fresh copies of the config schema array — every
+  // keystroke in the form re-filtered everything and tore down the *ngFor
+  // children (same hang pattern fixed in df-api-builder). configSchema is
+  // only ever reassigned (never mutated in place), so recompute the derived
+  // views only when configSchema or the service-type flags change and hand
+  // back stable array refs otherwise.
+  private schemaMemoSrc: Array<ConfigSchema> | null = null;
+  private schemaMemoIsDatabase: boolean | null = null;
+  private schemaMemoIsNetwork: boolean | null = null;
+  private memoViewSchema: Array<ConfigSchema> = [];
+  private memoHasStandardFields = false;
+  private memoBasicFields: Array<ConfigSchema> = [];
+  private memoAdvancedFields: Array<ConfigSchema> = [];
+  private memoNetworkRequiredFields: Array<ConfigSchema> = [];
+  private memoNetworkAdvancedFields: Array<ConfigSchema> = [];
 
-    return result || [];
-  }
-
-  get hasStandardFields(): boolean {
-    if (!this.isDatabase || !this.viewSchema) {
-      return false;
+  private syncSchemaViews(): void {
+    if (
+      this.schemaMemoSrc === (this.configSchema ?? null) &&
+      this.schemaMemoIsDatabase === this.isDatabase &&
+      this.schemaMemoIsNetwork === this.isNetworkService
+    ) {
+      return;
     }
+    this.schemaMemoSrc = this.configSchema ?? null;
+    this.schemaMemoIsDatabase = this.isDatabase;
+    this.schemaMemoIsNetwork = this.isNetworkService;
+
+    const viewSchema =
+      this.configSchema?.filter(
+        control => !['storageServiceId', 'storagePath'].includes(control.name)
+      ) || [];
+    this.memoViewSchema = viewSchema;
 
     const standardFieldNames = [
       'host',
@@ -1483,56 +1579,63 @@ export class DfServiceDetailsComponent implements OnInit {
       'username',
       'password',
     ];
-    const fieldNames = this.viewSchema.map(field => field.name.toLowerCase());
+    const fieldNames = viewSchema.map(field => field.name.toLowerCase());
+    // Standard connection form only when at least 3 of the standard fields exist
+    this.memoHasStandardFields =
+      this.isDatabase &&
+      standardFieldNames.filter(name => fieldNames.includes(name)).length >= 3;
 
-    // Check if at least 3 of the standard fields exist
-    const matchingFields = standardFieldNames.filter(name =>
-      fieldNames.includes(name)
-    );
-    return matchingFields.length >= 3;
+    if (!this.isDatabase) {
+      this.memoBasicFields = [];
+      this.memoAdvancedFields = [];
+    } else if (!this.memoHasStandardFields) {
+      // If not standard fields, return all fields as basic
+      this.memoBasicFields = viewSchema;
+      this.memoAdvancedFields = [];
+    } else {
+      this.memoBasicFields = viewSchema.filter(field =>
+        standardFieldNames.includes(field.name.toLowerCase())
+      );
+      this.memoAdvancedFields = viewSchema.filter(
+        field => !standardFieldNames.includes(field.name.toLowerCase())
+      );
+    }
+
+    // Base URL is the primary required field for network services; all other
+    // fields are considered advanced
+    const requiredFieldNames = ['baseUrl'];
+    if (!this.isNetworkService) {
+      this.memoNetworkRequiredFields = [];
+      this.memoNetworkAdvancedFields = [];
+    } else {
+      this.memoNetworkRequiredFields = viewSchema.filter(field =>
+        requiredFieldNames.includes(field.name)
+      );
+      this.memoNetworkAdvancedFields = viewSchema.filter(
+        field =>
+          !requiredFieldNames.includes(field.name) && field.name !== 'content'
+      );
+    }
+  }
+
+  get viewSchema() {
+    this.syncSchemaViews();
+    return this.memoViewSchema;
+  }
+
+  get hasStandardFields(): boolean {
+    this.syncSchemaViews();
+    return this.memoHasStandardFields;
   }
 
   get basicFields() {
-    if (!this.isDatabase || !this.viewSchema) {
-      return [];
-    }
-
-    if (!this.hasStandardFields) {
-      // If not standard fields, return all fields as basic
-      return this.viewSchema;
-    }
-
-    const basicFieldNames = [
-      'host',
-      'port',
-      'database',
-      'username',
-      'password',
-    ];
-    return this.viewSchema.filter(field =>
-      basicFieldNames.includes(field.name.toLowerCase())
-    );
+    this.syncSchemaViews();
+    return this.memoBasicFields;
   }
 
   get advancedFields() {
-    if (!this.isDatabase || !this.viewSchema) {
-      return [];
-    }
-
-    if (!this.hasStandardFields) {
-      return [];
-    }
-
-    const basicFieldNames = [
-      'host',
-      'port',
-      'database',
-      'username',
-      'password',
-    ];
-    return this.viewSchema.filter(
-      field => !basicFieldNames.includes(field.name.toLowerCase())
-    );
+    this.syncSchemaViews();
+    return this.memoAdvancedFields;
   }
 
   get showAdvancedOptions(): boolean {
@@ -1545,32 +1648,101 @@ export class DfServiceDetailsComponent implements OnInit {
 
   // Network service field categorization
   get networkRequiredFields() {
-    if (!this.isNetworkService || !this.viewSchema) {
-      return [];
-    }
-
-    // Base URL is the primary required field for network services
-    const requiredFieldNames = ['baseUrl'];
-    return this.viewSchema.filter(field =>
-      requiredFieldNames.includes(field.name)
-    );
+    this.syncSchemaViews();
+    return this.memoNetworkRequiredFields;
   }
 
   get networkAdvancedFields() {
-    if (!this.isNetworkService || !this.viewSchema) {
-      return [];
-    }
-
-    // All other fields are considered advanced
-    const requiredFieldNames = ['baseUrl'];
-    return this.viewSchema.filter(
-      field =>
-        !requiredFieldNames.includes(field.name) && field.name !== 'content'
-    );
+    this.syncSchemaViews();
+    return this.memoNetworkAdvancedFields;
   }
+
+  trackByName = (_: number, item: { name: string }): string => item.name;
+  trackById = (_: number, item: { id: number }): number => item.id;
 
   get showNetworkAdvancedOptions(): boolean {
     return this.isNetworkService;
+  }
+
+  // cURL import only makes sense where the schema exposes a base URL to point
+  // at, which is what the HTTP (rws) style services provide.
+  get showCurlImport(): boolean {
+    return (
+      this.isNetworkService &&
+      this.viewSchema.some(field => field.name === 'baseUrl')
+    );
+  }
+
+  openCurlImport(): void {
+    this.dialog
+      .open(DfCurlImportDialogComponent, { width: '46rem' })
+      .afterClosed()
+      .subscribe((parsed?: ParsedCurl) => {
+        if (parsed) {
+          this.applyCurlImport(parsed);
+        }
+      });
+  }
+
+  // Verb bitmask used by rws_parameters_config.action / rws_headers_config.action.
+  private static readonly VERB_MASK: Record<string, number> = {
+    GET: 1,
+    POST: 2,
+    PUT: 4,
+    PATCH: 8,
+    DELETE: 16,
+  };
+
+  private applyCurlImport(parsed: ParsedCurl): void {
+    const config = this.serviceForm.get('config');
+    if (!config) {
+      return;
+    }
+
+    const setIfPresent = (name: string, value: any) => {
+      const control = config.get(name);
+      if (control) {
+        control.setValue(value);
+        control.markAsDirty();
+      }
+    };
+
+    // A verb we cannot represent (HEAD, OPTIONS) leaves action at 0, which the
+    // backend treats as "applies to every verb".
+    const action = DfServiceDetailsComponent.VERB_MASK[parsed.method] ?? 0;
+
+    setIfPresent('baseUrl', parsed.baseUrl);
+
+    setIfPresent(
+      'parameters',
+      parsed.parameters.map(param => ({
+        name: param.name,
+        value: param.value,
+        exclude: false,
+        outbound: true,
+        cacheKey: false,
+        action,
+      }))
+    );
+
+    setIfPresent(
+      'headers',
+      parsed.headers.map(header => ({
+        name: header.name,
+        value: header.value,
+        passFromClient: false,
+        action,
+      }))
+    );
+
+    if (Object.keys(parsed.options).length) {
+      // CURL options are an object field, so merge rather than clobber whatever
+      // the user already configured.
+      const existing = config.get('options')?.value ?? {};
+      setIfPresent('options', { ...existing, ...parsed.options });
+    }
+
+    this.serviceForm.markAsDirty();
   }
 
   getConfigControl(name: string) {
@@ -1649,6 +1821,8 @@ export class DfServiceDetailsComponent implements OnInit {
 
     const data = this.serviceForm.getRawValue();
     if (data.type === '' || data.name === '') {
+      // Show validation errors instead of silently doing nothing.
+      this.serviceForm.markAllAsTouched();
       return;
     }
     if (!this.validateServiceName(data.name)) {
@@ -1658,14 +1832,12 @@ export class DfServiceDetailsComponent implements OnInit {
     const formattedName = this.formatServiceName(data.name);
     this.serviceForm.patchValue({ name: formattedName });
     type Params = {
-      snackbarError?: string;
       snackbarSuccess?: string;
       fields?: string;
       related?: string;
     };
 
     let params: Params = {
-      snackbarError: 'server',
       snackbarSuccess: 'services.createSuccessMsg',
     };
 
@@ -1839,7 +2011,6 @@ export class DfServiceDetailsComponent implements OnInit {
       }
       this.servicesService
         .update(this.serviceData.id, editPayload, {
-          snackbarError: 'server',
           snackbarSuccess: 'services.updateSuccessMsg',
         })
         .subscribe(() => {
@@ -1901,11 +2072,25 @@ export class DfServiceDetailsComponent implements OnInit {
           })
         )
         .subscribe({
-          next: () => {
+          next: (response: ServiceResponse) => {
             if (data.type.toLowerCase().includes('saml')) {
               this.router.navigate(['../'], {
                 relativeTo: this.activatedRoute,
               });
+            } else if (this.isDatabase) {
+              // Meridian Phase 1 proof-of-life: a new database API lands on its
+              // Overview (the Live API Card with a runnable curl), not the
+              // api-docs scavenger hunt. `../{id}` is the sibling :id route.
+              const newId = response?.resource?.[0]?.id;
+              if (newId != null) {
+                this.router.navigate(['../', newId], {
+                  relativeTo: this.activatedRoute,
+                });
+              } else {
+                this.router.navigate([
+                  `/api-connections/api-docs/${formattedName}`,
+                ]);
+              }
             } else {
               this.router.navigate([
                 `/api-connections/api-docs/${formattedName}`,
@@ -1913,9 +2098,11 @@ export class DfServiceDetailsComponent implements OnInit {
             }
           },
           error: error => {
-            // Use openSnackBar instead of error
+            // Kept deliberately: the interceptor toast covers the raw HTTP
+            // failure, but this path also surfaces the local rollback error
+            // thrown after a failed database connection test above.
             this.snackbarService.openSnackBar(
-              error.message || 'Failed to create service',
+              normalizeError(error).message,
               'error'
             );
           },
@@ -1957,6 +2144,54 @@ export class DfServiceDetailsComponent implements OnInit {
     this.router.navigate(['../'], { relativeTo: this.activatedRoute });
   }
 
+  // Fully-qualified service base for the Live API Card, e.g.
+  // https://host/api/v2/mydb — a real origin so the copied curl runs as-is.
+  get artifactBaseUrl(): string {
+    const name = this.serviceData?.name ?? '';
+    return `${window.location.origin}${BASE_URL}/${name}`;
+  }
+
+  // The card fires this when no key is present; send the user to create one.
+  onCreateApiKey(): void {
+    this.router.navigate(['/api-connections/api-keys/create']);
+  }
+
+  // Meridian Phase 3: a granted scope-matrix cell opens the role's resolved
+  // scope in a dialog. df-scope-matrix only emits for non-'none' cells, so
+  // there is always a real grant to inspect here.
+  onScopeCellClick(event: { roleId: number; verb: ScopeVerb }): void {
+    this.dialog.open(DfServiceRoleScopeDialogComponent, {
+      width: '640px',
+      maxWidth: '92vw',
+      autoFocus: false,
+      data: {
+        roleId: event.roleId,
+        verb: event.verb,
+        serviceLabel: this.serviceData?.label || this.serviceData?.name || '',
+      },
+    });
+  }
+
+  // Resolve a key + sample table for the Live API Card whose curl PROVABLY
+  // returns 200. The probe (candidate resolution + per-key 200 check) lives in
+  // the shared DfArtifactResolverService so Home, Overview, Docs, and
+  // post-create mount the card off one implementation.
+  private async loadArtifactCardData(): Promise<void> {
+    const name = this.serviceData?.name;
+    const id = this.serviceData?.id;
+    if (!name || typeof id !== 'number') {
+      this.artifactKeys = [];
+      return;
+    }
+    const res = await this.artifactResolver.resolveWorkingKeyAndTable(
+      id,
+      name,
+      this.artifactSampleTable
+    );
+    this.artifactSampleTable = res.sampleTable;
+    this.artifactKeys = res.keys;
+  }
+
   getBackgroundImage(typeLabel: string) {
     const image = this.images?.find(img => img.label == typeLabel);
     if (!image) {
@@ -1965,12 +2200,29 @@ export class DfServiceDetailsComponent implements OnInit {
     return image ? image.src : '';
   }
 
+  // Bound to the service-type picker grid *ngFor; without memoization every
+  // change-detection pass re-filtered the whole list and returned a new array
+  // (the api-builder hang pattern). Recompute only when the list ref or the
+  // search term changes.
+  private memoServiceTypesSrc: Array<ServiceType> | null = null;
+  private memoServiceTypesSearch: string | null = null;
+  private memoFilteredServiceTypes: Array<ServiceType> = [];
+
   get filteredServiceTypes() {
-    return this.serviceTypes.filter(
-      type =>
-        type.label.toLowerCase().includes(this.search.toLowerCase()) ||
-        type.name.toLowerCase().includes(this.search.toLowerCase())
-    );
+    if (
+      this.memoServiceTypesSrc !== this.serviceTypes ||
+      this.memoServiceTypesSearch !== this.search
+    ) {
+      this.memoServiceTypesSrc = this.serviceTypes;
+      this.memoServiceTypesSearch = this.search;
+      const term = this.search.toLowerCase();
+      this.memoFilteredServiceTypes = this.serviceTypes.filter(
+        type =>
+          type.label.toLowerCase().includes(term) ||
+          type.name.toLowerCase().includes(term)
+      );
+    }
+    return this.memoFilteredServiceTypes;
   }
 
   nextStep(stepper: MatStepper) {
@@ -2044,7 +2296,6 @@ export class DfServiceDetailsComponent implements OnInit {
             resource: [payload],
           },
           {
-            snackbarError: 'server',
             snackbarSuccess: 'services.createSuccessMsg',
           }
         )
@@ -2061,10 +2312,7 @@ export class DfServiceDetailsComponent implements OnInit {
       this.currentServiceId = createdService.id;
 
       // Show success message using DfSnackbarService
-      this.snackbarService.openSnackBar(
-        'Service successfully created',
-        'success'
-      );
+      this.snackbarService.openSnackBar('Service created', 'success');
 
       // Show security config section
       this.showSecurityConfig = true;

@@ -1,7 +1,10 @@
+// Departure language: tokens only (both themes and phosphor repaint via
+// the --df-* set), 6/8px corner scale, flat bordered surfaces.
+
 .file-selector-container {
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius);
   padding: 16px;
   margin-bottom: 16px;
 }
@@ -11,17 +14,19 @@
 }
 
 .file-selector-label {
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   margin-right: 8px;
+  color: var(--df-text);
 }
 
 .file-selector-description {
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.6);
+  font-size: 1.3rem;
+  color: var(--df-text-muted);
 
   a {
-    color: #3f51b5;
+    color: var(--df-accent);
     text-decoration: none;
 
     &:hover {
@@ -49,7 +54,7 @@
 
 .select-file-button {
   padding: 8px 24px;
-  font-size: 14px;
+  font-size: 1.4rem;
 
   fa-icon {
     margin-right: 8px;
@@ -61,8 +66,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px;
-  background-color: rgba(0, 0, 0, 0.04);
-  border-radius: 4px;
+  background-color: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
 }
 
 .selected-file-info {
@@ -72,8 +78,8 @@
 }
 
 .file-icon {
-  font-size: 24px;
-  color: #3f51b5;
+  font-size: 2.4rem;
+  color: var(--df-accent);
 }
 
 .file-details {
@@ -82,6 +88,7 @@
 }
 
 .file-name {
+  color: var(--df-text);
   font-weight: 500;
   margin-bottom: 4px;
 }
@@ -89,14 +96,16 @@
 .file-path-container {
   margin-top: 12px;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: var(--df-radius-sm);
 }
 
 .file-path-header {
+  font-size: 11px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   margin-bottom: 6px;
-  font-size: 15px;
-  color: rgba(0, 0, 0, 0.87);
+  color: var(--df-text-muted);
 }
 
 .file-path-section {
@@ -104,34 +113,33 @@
   margin-bottom: 8px;
   flex-wrap: wrap;
   padding: 12px;
-  background-color: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  background-color: var(--df-surface-2);
+  border-radius: var(--df-radius-sm);
+  border: 1px solid var(--df-border);
 }
 
 .file-path-label {
   font-weight: 600;
   margin-right: 8px;
-  color: rgba(0, 0, 0, 0.87);
-  font-size: 14px;
+  color: var(--df-text);
+  font-size: 1.3rem;
 }
 
 .file-path-value {
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.87);
+  font-size: 1.3rem;
   word-break: break-all;
   flex: 1;
-  font-family: monospace;
-  background-color: rgba(255, 255, 255, 0.5);
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  background-color: var(--df-code-bg);
+  color: var(--df-code-text);
   padding: 4px 8px;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--df-radius-sm);
+  border: 1px solid var(--df-border-2);
 }
 
 .file-service {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.87);
+  font-size: 1.2rem;
+  color: var(--df-text-2);
 }
 
 .file-actions {
@@ -143,9 +151,9 @@
 .clear-button {
   background: none;
   border: none;
-  color: #f44336;
+  color: var(--df-danger);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 1.3rem;
   padding: 0;
   font-weight: 500;
 
@@ -155,15 +163,15 @@
 }
 
 .no-apis-message {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--df-text-muted);
   font-style: italic;
 }
 
 .relative-path-section {
   display: flex;
   margin-top: 6px;
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  font-size: 1.2rem;
+  color: var(--df-text-muted);
 }
 
 .relative-path-label {
@@ -172,58 +180,5 @@
 }
 
 .relative-path-value {
-  font-family: monospace;
-}
-
-/* Dark theme adjustments */
-:host-context(.dark-theme) {
-  .file-selector-container {
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  .file-selector-description,
-  .no-apis-message {
-    color: rgba(255, 255, 255, 0.6);
-
-    a {
-      color: #9fa8da;
-    }
-  }
-
-  .file-name,
-  .file-service {
-    color: rgba(255, 255, 255, 0.87);
-  }
-
-  .file-path-header {
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  .file-selector-selected {
-    background-color: rgba(255, 255, 255, 0.04);
-  }
-
-  .clear-button {
-    color: #ef9a9a;
-  }
-
-  .file-path-section {
-    background-color: rgba(255, 255, 255, 0.07);
-    border-color: rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
-  }
-
-  .file-path-label {
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  .file-path-value {
-    color: rgba(255, 255, 255, 0.9);
-    background-color: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .relative-path-section {
-    color: rgba(255, 255, 255, 0.6);
-  }
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
 }

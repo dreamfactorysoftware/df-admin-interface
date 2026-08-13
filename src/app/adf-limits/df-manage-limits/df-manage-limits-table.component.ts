@@ -11,13 +11,15 @@ import {
   LIMIT_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
-import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { TranslocoService } from '@ngneat/transloco';
 import { MatDialog } from '@angular/material/dialog';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { LimitTableRowData } from '../types';
 import { Actions } from 'src/app/shared/types/table';
+
+/** Shown when a limit is not scoped to a user, service, or role. */
+const PLACEHOLDER = '-';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -31,6 +33,8 @@ import { Actions } from 'src/app/shared/types/table';
   imports: DfManageTableModules,
 })
 export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTableRowData> {
+  override emptyStateMessage = 'emptyState.limits.message';
+  override emptyStateActionLabel = 'emptyState.limits.action';
   constructor(
     @Inject(LIMIT_SERVICE_TOKEN)
     private limitService: DfBaseCrudService,
@@ -115,9 +119,14 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
         limitType: limit.type,
         limitRate: `${limit.rate} / ${limit.period}`,
         limitCounter: `${limit.limitCacheByLimitId[0].attempts} / ${limit.limitCacheByLimitId[0].max}`,
-        user: limit.userId,
-        service: limit.serviceId,
-        role: limit.roleId,
+        // The user/service/role columns show the related record's name. The
+        // relations come back on every fetch (see refreshTable's `related`);
+        // a limit that is not scoped to one has a null relation, not a
+        // missing name, so fall back to '-' rather than printing the raw id.
+        user:
+          limit.userByUserId?.name ?? limit.userByUserId?.email ?? PLACEHOLDER,
+        service: limit.serviceByServiceId?.name ?? PLACEHOLDER,
+        role: limit.roleByRoleId?.name ?? PLACEHOLDER,
         active: limit.isActive,
       };
     });
@@ -134,17 +143,12 @@ export class DfManageLimitsTableComponent extends DfManageTableComponent<LimitTa
   }
 
   refreshTable(limit?: number, offset?: number, filter?: string): void {
-    this.limitService
-      .getAll<GenericListResponse<LimitType>>({
-        limit,
-        offset,
-        filter,
-        related:
-          'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
-      })
-      .subscribe(data => {
-        this.dataSource.data = this.mapDataToTable(data.resource);
-        this.tableLength = data.meta.count;
-      });
+    this.fetchTable(this.limitService, {
+      limit,
+      offset,
+      filter,
+      related:
+        'service_by_service_id,role_by_role_id,user_by_user_id,limit_cache_by_limit_id',
+    });
   }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { DfLoadingSpinnerService } from './shared/services/df-loading-spinner.service';
 import { NgIf, AsyncPipe } from '@angular/common';
 import {
@@ -16,11 +16,11 @@ import { DfLicenseCheckService } from './shared/services/df-license-check.servic
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
-import { ErrorSharingService } from './shared/services/error-sharing.service';
 import { LoginResponse } from './shared/types/auth.types';
 import { ROUTES } from './shared/types/routes';
 import { IntercomService } from './shared/services/intercom.service';
 import { DfUserDataService } from './shared/services/df-user-data.service';
+import { DfCommandPaletteService } from './shared/components/df-command-palette/df-command-palette.service';
 import { filter } from 'rxjs';
 
 @UntilDestroy({ checkProperties: true })
@@ -49,10 +49,27 @@ export class AppComponent implements OnInit {
     private router: Router,
     private route: ActivatedRoute,
     private loggingService: LoggingService,
-    private errorSharingService: ErrorSharingService,
     private intercomService: IntercomService,
-    private dfUserDataService: DfUserDataService
+    private dfUserDataService: DfUserDataService,
+    private commandPalette: DfCommandPaletteService
   ) {}
+
+  /**
+   * Global Cmd/Ctrl-K opens the command palette from any surface. Bound on
+   * the shell root so it works regardless of focus, except inside the palette
+   * itself (its own input handles Escape). Only when authenticated - there is
+   * nothing to jump to on the login screen.
+   */
+  @HostListener('document:keydown', ['$event'])
+  onGlobalKeydown(event: KeyboardEvent): void {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (!this.authService.isAuthenticated()) {
+        return;
+      }
+      event.preventDefault();
+      this.commandPalette.toggle();
+    }
+  }
 
   ngOnInit() {
     this.loggingService.log('AppComponent initialized');
@@ -124,9 +141,12 @@ export class AppComponent implements OnInit {
     if (error) {
       this.loggingService.log(`OAuth error found: ${error}`);
 
-      // Set error in sharing service and navigate to auth/login
-      this.errorSharingService.setError(error);
-      this.router.navigate(['/auth/login']);
+      // Carry the error in the navigation itself. A shared error bus would
+      // race the NavigationStart clearing in DfErrorService: this navigation
+      // starts before DfLoginComponent subscribes, wiping the error.
+      this.router.navigate(['/auth/login'], {
+        state: { loginError: error },
+      });
       return;
     } else if (jwt) {
       this.loggingService.log(`JWT found in URL: ${jwt.substring(0, 20)}...`);

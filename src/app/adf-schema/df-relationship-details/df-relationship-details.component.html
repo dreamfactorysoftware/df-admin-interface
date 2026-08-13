@@ -2,7 +2,7 @@
   [showAlert]="showAlert"
   [alertType]="alertType"
   (alertClosed)="showAlert = false">
-  {{ alertMsg }}
+  {{ alertMsg | transloco }}
 </df-alert>
 <form
   [formGroup]="relationshipForm"
@@ -18,6 +18,9 @@
       matInput
       formControlName="name"
       placeholder="{{ 'name' | transloco }}" />
+    <mat-error *ngIf="relationshipForm.controls['name'].hasError('server')">
+      {{ relationshipForm.controls['name'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -25,6 +28,9 @@
       {{ 'schema.alias' | transloco }}
     </mat-label>
     <input matInput formControlName="alias" />
+    <mat-error *ngIf="relationshipForm.controls['alias'].hasError('server')">
+      {{ relationshipForm.controls['alias'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -32,6 +38,9 @@
       {{ 'label' | transloco }}
     </mat-label>
     <input matInput formControlName="label" />
+    <mat-error *ngIf="relationshipForm.controls['label'].hasError('server')">
+      {{ relationshipForm.controls['label'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -39,6 +48,10 @@
       {{ 'description' | transloco }}
     </mat-label>
     <input matInput formControlName="description" />
+    <mat-error
+      *ngIf="relationshipForm.controls['description'].hasError('server')">
+      {{ relationshipForm.controls['description'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-slide-toggle formControlName="alwaysFetch" class="dynamic-width">{{
@@ -57,6 +70,9 @@
     <mat-error *ngIf="relationshipForm.controls['type'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['type'].hasError('server')">
+      {{ relationshipForm.controls['type'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-slide-toggle formControlName="isVirtual" class="dynamic-width">{{
@@ -68,12 +84,17 @@
       {{ 'schema.relationships.field.label' | transloco }}
     </mat-label>
     <mat-select formControlName="field">
-      <mat-option *ngFor="let option of fieldOptions" [value]="option.value">
+      <mat-option
+        *ngFor="let option of fieldOptions; trackBy: trackByValue"
+        [value]="option.value">
         {{ option.label }}
       </mat-option>
     </mat-select>
     <mat-error *ngIf="relationshipForm.controls['field'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['field'].hasError('server')">
+      {{ relationshipForm.controls['field'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -82,13 +103,19 @@
       {{ 'schema.relationships.referenceService.label' | transloco }}
     </mat-label>
     <mat-select formControlName="refServiceId">
-      <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
+      <mat-option
+        *ngFor="let option of serviceOptions; trackBy: trackByValue"
+        [value]="option.value">
         {{ option.name }}
       </mat-option>
     </mat-select>
     <mat-error
       *ngIf="relationshipForm.controls['refServiceId'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['refServiceId'].hasError('server')">
+      {{ relationshipForm.controls['refServiceId'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -101,7 +128,7 @@
         - {{ 'schema.relationships.referenceTable.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of referenceTableOptions"
+        *ngFor="let option of referenceTableOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -109,6 +136,9 @@
     <mat-error
       *ngIf="relationshipForm.controls['refTable'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['refTable'].hasError('server')">
+      {{ relationshipForm.controls['refTable'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -121,7 +151,7 @@
         - {{ 'schema.relationships.referenceField.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of referenceFieldOptions"
+        *ngFor="let option of referenceFieldOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -130,6 +160,9 @@
       *ngIf="relationshipForm.controls['refField'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error *ngIf="relationshipForm.controls['refField'].hasError('server')">
+      {{ relationshipForm.controls['refField'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <mat-form-field subscriptSizing="dynamic" class="dynamic-width">
@@ -137,7 +170,9 @@
       {{ 'schema.relationships.junctionService.label' | transloco }}
     </mat-label>
     <mat-select formControlName="junctionServiceId">
-      <mat-option *ngFor="let option of serviceOptions" [value]="option.value">
+      <mat-option
+        *ngFor="let option of serviceOptions; trackBy: trackByValue"
+        [value]="option.value">
         {{ option.label }}
       </mat-option>
     </mat-select>
@@ -146,6 +181,10 @@
         relationshipForm.controls['junctionServiceId'].hasError('required')
       ">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionServiceId'].hasError('server')">
+      {{ relationshipForm.controls['junctionServiceId'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -158,7 +197,7 @@
         - {{ 'schema.relationships.junctionTable.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of junctionTableOptions"
+        *ngFor="let option of junctionTableOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -166,6 +205,10 @@
     <mat-error
       *ngIf="relationshipForm.controls['junctionTable'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionTable'].hasError('server')">
+      {{ relationshipForm.controls['junctionTable'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -178,7 +221,7 @@
         - {{ 'schema.relationships.junctionField.default' | transloco }} -
       </mat-option>
       <mat-option
-        *ngFor="let option of junctionFieldOptions"
+        *ngFor="let option of junctionFieldOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -186,6 +229,10 @@
     <mat-error
       *ngIf="relationshipForm.controls['junctionField'].hasError('required')">
       {{ 'schema.alerts.tableNameError' | transloco }}
+    </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionField'].hasError('server')">
+      {{ relationshipForm.controls['junctionField'].getError('server') }}
     </mat-error>
   </mat-form-field>
 
@@ -200,7 +247,7 @@
         -
       </mat-option>
       <mat-option
-        *ngFor="let option of junctionFieldOptions"
+        *ngFor="let option of junctionFieldOptions; trackBy: trackByValue"
         [value]="option.value">
         {{ option.label }}
       </mat-option>
@@ -211,13 +258,17 @@
       ">
       {{ 'schema.alerts.tableNameError' | transloco }}
     </mat-error>
+    <mat-error
+      *ngIf="relationshipForm.controls['junctionRefField'].hasError('server')">
+      {{ relationshipForm.controls['junctionRefField'].getError('server') }}
+    </mat-error>
   </mat-form-field>
 
   <div class="full-width action-bar">
-    <button mat-flat-button type="button" (click)="goBack()">
+    <button class="cancel-btn" mat-flat-button type="button" (click)="goBack()">
       {{ 'cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary">
+    <button class="save-btn" mat-flat-button color="primary">
       <span *ngIf="type === 'edit'">{{ 'update' | transloco }}</span>
       <span *ngIf="type === 'create'">{{ 'save' | transloco }}</span>
     </button>
