@@ -2,6 +2,28 @@ import { ServiceType } from '../types/service';
 
 export const SILVER_SERVICES: Array<ServiceType> = [
   {
+    name: 'ai_connection',
+    label: 'AI Connection',
+    description:
+      'Connect to AI/LLM providers (Anthropic, OpenAI, xAI, Ollama, custom OpenAI-compatible endpoints).',
+    group: 'AI',
+    configSchema: [],
+  },
+  {
+    name: 'ai_chat',
+    label: 'AI Chat',
+    description: 'Chat with your DreamFactory data using AI and MCP tools.',
+    group: 'AI Chat',
+    configSchema: [],
+  },
+  {
+    name: 'agents',
+    label: 'Agents',
+    description: 'AI agent identity and governed access.',
+    group: 'Agents',
+    configSchema: [],
+  },
+  {
     name: 'adldap',
     label: 'Active Directory',
     description: 'A service for supporting Active Directory integration',
