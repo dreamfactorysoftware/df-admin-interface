@@ -488,6 +488,29 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     return t.kind !== 'text';
   }
 
+  /**
+   * Whether this token renders as a picker rather than a text box.
+   *
+   * A `{table_name}` / `{procedure_name}` / `{function_name}` token is only
+   * enumerable if something came back to enumerate. The lookup can legitimately
+   * return nothing - a service with no stored procedures - and it can fail
+   * outright (RBAC on the listing endpoint, a backend the service cannot
+   * reach); loadTableOptions/loadResourceOptions swallow that into an empty
+   * list. A <select> with no options and a disabled placeholder leaves the
+   * operation unrunnable with nothing to type into, so an empty list falls back
+   * to free text.
+   *
+   * `undefined` means the request is still in flight: keep the picker so the
+   * control does not flip from input to select underneath the user.
+   */
+  usePicker(t: PathToken): boolean {
+    if (!this.isEnumerableToken(t)) {
+      return false;
+    }
+    const options = this.tokenOptions[t.token];
+    return options === undefined || options.length > 0;
+  }
+
   /** A human label for a free-text token: its name with spaces for underscores.
    *  Bound as data, not a hardcoded UI string. */
   humanizeToken(token: string): string {

@@ -137,11 +137,19 @@
                   </a>
                 </mat-menu>
               </ng-container>
+              <!-- Nothing failing. The chip still has to say which of those
+                   two it means: a service whose type has no connection check
+                   is "not checked", never "Healthy". -->
               <ng-template #healthyChip>
                 <df-badge
-                  variant="success"
+                  [variant]="row.probe === 'ok' ? 'success' : 'neutral'"
                   [label]="
-                    'services.health.level.success' | transloco
+                    (row.probe === 'ok'
+                      ? 'services.health.level.success'
+                      : row.probe === 'unsupported'
+                        ? 'services.health.chip.notChecked'
+                        : 'services.health.chip.checking'
+                    ) | transloco
                   "></df-badge>
               </ng-template>
             </ng-container>

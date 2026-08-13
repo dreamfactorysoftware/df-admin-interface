@@ -12,6 +12,14 @@
   gap: 16px;
 }
 
+// Health panel sits at the top of every service edit page, above whatever
+// that type's page opens with (Overview card, stepper-less form, ...). The
+// form is not a gap-based column, so it owns its own bottom margin.
+.service-health-panel {
+  display: block;
+  margin-bottom: 2.4rem;
+}
+
 // ---- Meridian Phase 5: Pipeline section (request chain under the overview) ---
 // ---- Meridian Phase 3: Access section (scope matrix under the overview) ----
 .service-pipeline,

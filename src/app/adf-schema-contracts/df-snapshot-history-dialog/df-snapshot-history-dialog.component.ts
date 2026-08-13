@@ -147,15 +147,15 @@ interface DialogData {
       .loading.inline {
         padding: 12px;
         font-size: 13px;
-        color: rgba(0, 0, 0, 0.55);
+        color: var(--df-text-muted);
       }
       .error {
-        color: #b00020;
+        color: var(--df-danger);
       }
       .empty {
         padding: 24px;
         text-align: center;
-        color: rgba(0, 0, 0, 0.5);
+        color: var(--df-text-muted);
       }
 
       .history-table {
@@ -166,19 +166,19 @@ interface DialogData {
           padding: 2px 8px;
           border-radius: 4px;
           font-size: 12px;
-          background: #f5f5f5;
-          color: rgba(0, 0, 0, 0.6);
+          background: var(--df-surface-2);
+          color: var(--df-text-muted);
           text-transform: capitalize;
 
           &.active {
-            background: #e8f5e9;
-            color: #1b5e20;
+            background: var(--df-success-soft);
+            color: var(--df-success);
             font-weight: 500;
           }
         }
 
         code {
-          background: #f5f5f5;
+          background: var(--df-surface-2);
           padding: 1px 6px;
           border-radius: 3px;
           font-size: 12px;
@@ -191,7 +191,7 @@ interface DialogData {
 
       .json-pane {
         margin-top: 16px;
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        border: 1px solid var(--df-border-2);
         border-radius: 4px;
         overflow: hidden;
 
@@ -200,13 +200,13 @@ interface DialogData {
           justify-content: space-between;
           align-items: center;
           padding: 8px 12px;
-          background: #fafafa;
+          background: var(--df-surface-2);
           font-size: 13px;
 
           .hash {
             font-family: monospace;
             font-size: 11px;
-            color: rgba(0, 0, 0, 0.55);
+            color: var(--df-text-muted);
           }
         }
 
@@ -216,7 +216,7 @@ interface DialogData {
           font-size: 11px;
           max-height: 40vh;
           overflow: auto;
-          background: #fff;
+          background: var(--df-surface);
         }
       }
     `,

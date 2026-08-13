@@ -104,7 +104,7 @@
             <span *ngIf="!seg.token" class="rb-seg">{{ seg.text }}</span>
             <ng-container *ngIf="seg.token as tk">
               <select
-                *ngIf="isEnumerableToken(tk); else segText"
+                *ngIf="usePicker(tk); else segText"
                 class="rb-token"
                 [class.rb-token--empty]="!tokenValues[tk.token]"
                 [ngModel]="tokenValues[tk.token] || ''"

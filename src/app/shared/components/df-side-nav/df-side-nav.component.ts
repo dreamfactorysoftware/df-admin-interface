@@ -24,7 +24,9 @@ import {
 import { routes } from 'src/app/routes';
 import {
   accessibleRoutes,
+  Breadcrumb,
   generateBreadcrumb,
+  recordLabelFromRouteData,
   transformRoutes,
 } from '../../utilities/route';
 import { Nav } from '../../types/nav';
@@ -317,8 +319,39 @@ export class DfSideNavComponent implements OnInit {
     if (this._breadCrumbsUrl !== this.router.url) {
       this._breadCrumbsUrl = this.router.url;
       this._breadCrumbs = generateBreadcrumb(routes, this.router.url);
+      this.nameLastCrumb(this._breadCrumbs);
     }
     return this._breadCrumbs;
+  }
+
+  /**
+   * A detail route ends in the record's id (/rate-limiting/7, /users/12), so
+   * the crumb generated from the URL reads "7". Replace it with the record's
+   * own name, taken from the data the route's resolver has already fetched.
+   * The raw segment stays when nothing names the record (a paywalled route, a
+   * failed resolve), which is the current behaviour, not a regression.
+   */
+  private nameLastCrumb(crumbs: Breadcrumb[]): void {
+    const last = crumbs[crumbs.length - 1];
+    // translationKey marks a static segment (its label comes from i18n); only
+    // dynamic segments print the raw URL text.
+    if (!last || last.translationKey) {
+      return;
+    }
+    let route = this.router.routerState.snapshot.root;
+    while (route.firstChild) {
+      route = route.firstChild;
+    }
+    // Rename only the crumb that *is* the record identifier. Routes with a
+    // trailing static segment (:id/scope) end on a crumb that names a page,
+    // not a record, and must be left alone.
+    if (!Object.values(route.params ?? {}).includes(last.label)) {
+      return;
+    }
+    const label = recordLabelFromRouteData(route.data);
+    if (label) {
+      last.label = label;
+    }
   }
 
   handleNavClick(nav: Nav) {

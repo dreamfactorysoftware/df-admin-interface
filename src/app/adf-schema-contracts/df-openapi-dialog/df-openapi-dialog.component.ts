@@ -98,7 +98,7 @@ interface DialogData {
         align-items: center;
       }
       .error {
-        color: #b00020;
+        color: var(--df-danger);
       }
 
       .header-row {
@@ -106,10 +106,10 @@ interface DialogData {
         justify-content: space-between;
         align-items: center;
         padding-bottom: 8px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        border-bottom: 1px solid var(--df-border-2);
 
         .meta code {
-          background: #f5f5f5;
+          background: var(--df-surface-2);
           padding: 1px 6px;
           border-radius: 3px;
         }
@@ -122,23 +122,23 @@ interface DialogData {
         font-weight: 600;
         font-size: 12px;
         letter-spacing: 0.5px;
-        background: #e3f2fd;
-        color: #0d47a1;
+        background: var(--df-tint-data-bg);
+        color: var(--df-tint-data-fg);
 
         &.locked {
-          background: #e8f5e9;
-          color: #1b5e20;
+          background: var(--df-success-soft);
+          color: var(--df-success);
         }
       }
 
       .hint {
         font-size: 13px;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--df-text-muted);
         margin: 12px 0;
       }
 
       .schema-json {
-        background: #fafafa;
+        background: var(--df-surface-2);
         padding: 12px;
         border-radius: 4px;
         font-size: 11px;

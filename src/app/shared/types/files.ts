@@ -20,6 +20,9 @@ export interface Service {
   serviceDocByServiceId?: any;
   createdDate?: string;
   lastModifiedDate?: string;
+  /** Opt-in flag, present only when the service explicitly carries it; scored
+   * by DfServiceHealthService the same way as on ServiceRow. */
+  deprecated?: boolean;
 }
 
 export interface FileTableRow {
