@@ -1076,6 +1076,37 @@
       </ng-container>
     </ng-container>
 
+    <!-- MCP Registered Redirect URIs (read-only) -->
+    <ng-container *ngIf="isMcp && edit">
+      <mat-accordion class="full-width">
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            Registered Redirect URIs
+          </mat-expansion-panel-header>
+          <div class="details-section">
+            <p>
+              Callback URLs that MCP clients registered for themselves through
+              dynamic client registration. These are enforced at
+              <code>/authorize</code> alongside the Allowed Redirect URIs above,
+              but are managed by the clients rather than here.
+            </p>
+            <p *ngIf="registeredRedirectUris.length === 0">
+              No client has registered a redirect URI yet.
+            </p>
+            <table
+              *ngIf="registeredRedirectUris.length > 0"
+              class="mcp-services-table full-width">
+              <tbody>
+                <tr *ngFor="let uri of registeredRedirectUris">
+                  <td>{{ uri }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </mat-expansion-panel>
+      </mat-accordion>
+    </ng-container>
+
     <!-- MCP Available Services & Tools -->
     <ng-container *ngIf="isMcp && edit">
       <mat-accordion class="full-width">

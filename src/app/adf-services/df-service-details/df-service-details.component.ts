@@ -256,6 +256,9 @@ export class DfServiceDetailsComponent implements OnInit {
   }[] = [];
   mcpServicesLoaded = false;
   disabledTools = new Set<string>();
+  // Read-only: redirect URIs clients registered for themselves via dynamic
+  // client registration. Enforced at /authorize but not editable here.
+  registeredRedirectUris: string[] = [];
   mcpGlobalTools: { name: string; title: string; description: string }[] = [
     {
       name: 'list_apis',
@@ -674,6 +677,8 @@ export class DfServiceDetailsComponent implements OnInit {
         if (this.edit && this.isMcp) {
           const disabled: string[] = data?.config?.disabledTools ?? [];
           this.disabledTools = new Set(disabled);
+          this.registeredRedirectUris =
+            data?.config?.registeredRedirectUris ?? [];
           this.customTools = (data?.config?.customTools ?? []).map(
             (t: any) => ({
               id: t.id,
