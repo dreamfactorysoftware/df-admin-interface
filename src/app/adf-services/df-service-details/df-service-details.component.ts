@@ -34,6 +34,11 @@ import { DfAiTestConnectionComponent } from 'src/app/shared/components/df-ai-tes
 import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-picker/df-ai-model-picker.component';
 import { DfAiAllowedRolesComponent } from 'src/app/shared/components/df-ai-allowed-roles/df-ai-allowed-roles.component';
 import { DfAiMcpServersComponent } from 'src/app/shared/components/df-ai-mcp-servers/df-ai-mcp-servers.component';
+import {
+  SYSTEM_MCP_TOOLS,
+  SystemMcpTool,
+  isSystemMcpType,
+} from './system-mcp-tools';
 import { DfAiDataServicesComponent } from 'src/app/shared/components/df-ai-data-services/df-ai-data-services.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
@@ -218,6 +223,11 @@ export class DfServiceDetailsComponent implements OnInit {
   isFile = false;
   isAuth = false;
   isMcp = false;
+  // True when the selected/loaded service type is `system_mcp` (System API
+  // MCP Server). Such services expose a fixed tool catalogue and run no
+  // custom tools, so the data-plane MCP panels are replaced by one panel.
+  isSystemMcp = false;
+  systemMcpTools: ReadonlyArray<SystemMcpTool> = SYSTEM_MCP_TOOLS;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -672,28 +682,36 @@ export class DfServiceDetailsComponent implements OnInit {
 
         // If editing an MCP service, load available services and custom tools
         if (this.edit && this.isMcp) {
+          this.isSystemMcp = isSystemMcpType(data?.type);
           const disabled: string[] = data?.config?.disabledTools ?? [];
           this.disabledTools = new Set(disabled);
-          this.customTools = (data?.config?.customTools ?? []).map(
-            (t: any) => ({
-              id: t.id,
-              toolType: t.toolType || 'api',
-              name: t.name,
-              description: t.description,
-              httpMethod: t.httpMethod,
-              url: t.url,
-              parameters: t.parameters || [],
-              headers: t.headers || {},
-              function: t.function || '',
-              enabled: t.enabled !== false && t.enabled !== 0,
-              storageServiceId: t.storageServiceId || null,
-              scmRepository: t.scmRepository || '',
-              scmReference: t.scmReference || '',
-              storagePath: t.storagePath || '',
-            })
-          );
-          this.loadMcpServices();
-          this.loadAvailableScmServices();
+          if (this.isSystemMcp) {
+            // System API MCP server: fixed tool catalogue, no custom tools,
+            // no per-service (database/file) tool discovery.
+            this.customTools = [];
+            this.mcpServicesLoaded = true;
+          } else {
+            this.customTools = (data?.config?.customTools ?? []).map(
+              (t: any) => ({
+                id: t.id,
+                toolType: t.toolType || 'api',
+                name: t.name,
+                description: t.description,
+                httpMethod: t.httpMethod,
+                url: t.url,
+                parameters: t.parameters || [],
+                headers: t.headers || {},
+                function: t.function || '',
+                enabled: t.enabled !== false && t.enabled !== 0,
+                storageServiceId: t.storageServiceId || null,
+                scmRepository: t.scmRepository || '',
+                scmReference: t.scmReference || '',
+                storagePath: t.storagePath || '',
+              })
+            );
+            this.loadMcpServices();
+            this.loadAvailableScmServices();
+          }
         }
 
         // Meridian Phase 1: on the service Overview (viewing an existing
@@ -1101,6 +1119,20 @@ export class DfServiceDetailsComponent implements OnInit {
     }
   }
 
+  isAllSystemToolsEnabled(): boolean {
+    return this.systemMcpTools.some(t => !this.disabledTools.has(t.name));
+  }
+
+  toggleAllSystemTools(enabled: boolean) {
+    for (const tool of this.systemMcpTools) {
+      if (enabled) {
+        this.disabledTools.delete(tool.name);
+      } else {
+        this.disabledTools.add(tool.name);
+      }
+    }
+  }
+
   isAllGlobalToolsEnabled(): boolean {
     return this.mcpGlobalTools.some(t => !this.disabledTools.has(t.name));
   }
@@ -1385,6 +1417,7 @@ export class DfServiceDetailsComponent implements OnInit {
     this.isNetworkService = false;
     this.isScriptService = false;
     this.isFile = false;
+    this.isSystemMcp = isSystemMcpType(type);
 
     // Find the service type to get its group
     const serviceType = this.serviceTypes.find(st => st.name === type);
@@ -2008,6 +2041,11 @@ export class DfServiceDetailsComponent implements OnInit {
           scmReference: tool.scmReference || '',
           storagePath: tool.storagePath || '',
         }));
+        if (this.isSystemMcp) {
+          // The System API MCP server runs no custom tools; the backend
+          // config model drops them, so do not send them at all.
+          delete editPayload.config.customTools;
+        }
       }
       this.servicesService
         .update(this.serviceData.id, editPayload, {
