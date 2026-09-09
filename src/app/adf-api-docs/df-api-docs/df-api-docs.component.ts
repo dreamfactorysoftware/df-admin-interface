@@ -852,8 +852,11 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   // identity) rather than a re-derived one. This component only supplies the
   // service base URL the console builds on.
 
+  // Absolute on purpose: df-try-it uses this verbatim in its curl / Python /
+  // JS snippets and the resolved-URL line, and a host-less '/api/v2/...' is
+  // not copy-pasteable (#519).
   get serviceBaseUrl(): string {
-    return `${BASE_URL}/${this.serviceName ?? ''}`;
+    return `${window.location.origin}${BASE_URL}/${this.serviceName ?? ''}`;
   }
 
   // ---- df-try-it host log --------------------------------------------------

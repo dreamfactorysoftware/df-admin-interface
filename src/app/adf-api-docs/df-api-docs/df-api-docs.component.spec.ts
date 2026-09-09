@@ -98,6 +98,12 @@ describe('DfApiDocsComponent', () => {
     expect(navigateSpy).toHaveBeenCalled();
   });
 
+  it('exposes an absolute service base url for the try-it console', () => {
+    expect(component.serviceBaseUrl).toBe(
+      `${window.location.origin}/api/v2/db`
+    );
+  });
+
   it('should download the api doc when the download button is clicked', () => {
     global.URL.createObjectURL = jest.fn(blob => 'urltest');
     global.URL.revokeObjectURL = jest.fn(url => 'urltest');
