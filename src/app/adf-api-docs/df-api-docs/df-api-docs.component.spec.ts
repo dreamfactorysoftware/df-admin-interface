@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { DfApiDocsComponent } from './df-api-docs.component';
+import { DfApiDocsComponent, absolutizeServers } from './df-api-docs.component';
 import { createTestBedConfig } from 'src/app/shared/utilities/testbed-config';
 import { mockApiDocsData } from './test-utilities/df-api-docs.mock';
 import { Router } from '@angular/router';
@@ -117,5 +117,25 @@ describe('DfApiDocsComponent', () => {
 
     expect(createAnchorElementSpy).toHaveBeenCalledWith('a');
     expect(spyObj.click).toHaveBeenCalled();
+  });
+});
+
+describe('absolutizeServers', () => {
+  it('prefixes relative server urls with the page origin and leaves the rest', () => {
+    const spec: any = {
+      info: { title: 't', group: 'g' },
+      paths: {},
+      servers: [{ url: '/api/v2/db' }, { url: 'https://other.example/api' }],
+    };
+    const out = absolutizeServers(spec);
+    expect(out['servers']).toEqual([
+      { url: `${window.location.origin}/api/v2/db` },
+      { url: 'https://other.example/api' },
+    ]);
+    // input spec (what gets downloaded) is untouched
+    expect(spec.servers[0].url).toBe('/api/v2/db');
+    expect(
+      absolutizeServers({ info: {}, paths: {} } as any)['servers']
+    ).toBeUndefined();
   });
 });
