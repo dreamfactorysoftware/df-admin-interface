@@ -41,6 +41,11 @@
     height: 80% !important;
     max-width: 300px !important;
   }
+
+  // "Not used in" access-usage filter (hidden when the endpoint is absent).
+  .df-usage-filter {
+    width: 160px;
+  }
 }
 
 .bottom-action-bar {

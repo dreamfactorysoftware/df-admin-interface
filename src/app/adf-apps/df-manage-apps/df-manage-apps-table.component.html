@@ -17,6 +17,23 @@
   </button>
   <ng-content select="[topActions]"></ng-content>
   <div class="spacer"></div>
+  <ng-container *ngIf="accessUsage as usage">
+    <mat-form-field
+      *ngIf="usage.available"
+      class="df-usage-filter"
+      data-testid="access-usage-filter"
+      appearance="outline"
+      subscriptSizing="dynamic">
+      <mat-label>{{ 'accessUsage.filter.label' | transloco }}</mat-label>
+      <mat-select [formControl]="usage.filter">
+        <mat-option
+          *ngFor="let option of usage.filterOptions"
+          [value]="option.value">
+          {{ option.label | transloco }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+  </ng-container>
   <mat-form-field
     *ngIf="allowFilter"
     class="search-input"
@@ -117,10 +134,18 @@
                 column.columnDef !== 'active' &&
                 column.columnDef !== 'tokens' &&
                 column.columnDef !== 'spend' &&
-                column.columnDef !== 'role'
+                column.columnDef !== 'role' &&
+                column.columnDef !== 'lastUsed'
               ">
               {{ column?.cell(row) }}
             </ng-container>
+            <df-access-usage-cell
+              *ngIf="column.columnDef === 'lastUsed'"
+              [usage]="accessUsage?.get(row.id)"
+              [staleDays]="accessUsage?.staleDays ?? null"
+              [trackingStartedAt]="
+                accessUsage?.trackingStartedAt ?? null
+              "></df-access-usage-cell>
           </td>
         </ng-container>
         <ng-container
@@ -246,7 +271,11 @@
         <td class="mat-cell" [attr.colspan]="columns.length">
           <ng-container
             *ngIf="tableState !== 'loading' && tableState !== 'error'">
-            <ng-container *ngIf="currentFilter.value; else noFilterActive">
+            <ng-container
+              *ngIf="
+                currentFilter.value || accessUsage?.filterActive;
+                else noFilterActive
+              ">
               {{ 'noFilterResults' | transloco }}
               <button
                 mat-button
