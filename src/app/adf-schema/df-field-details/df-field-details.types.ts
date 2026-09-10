@@ -26,7 +26,8 @@ export type DatabaseSchemaFieldType = {
   scale: number;
   supportsMultibyte: boolean;
   type: string;
-  validation: string | null;
+  // A rules object; older UI builds saved the raw text wrapped as ["{...}"].
+  validation: Record<string, unknown> | string[] | null;
   value: [];
 };
 

@@ -110,6 +110,27 @@ describe('DfFieldDetailsComponent - create field details', () => {
     expect(crudServiceSpy).toHaveBeenCalled();
   });
 
+  it('should send validation rules as an object when creating a field', () => {
+    const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'create');
+
+    component.fieldDetailsForm.patchValue({
+      name: 'test-field',
+      type: 'string',
+      length: 255,
+      validation: '{"not_null": true}',
+    });
+
+    component.onSubmit();
+
+    const [payload] =
+      crudServiceSpy.mock.calls[crudServiceSpy.mock.calls.length - 1];
+    expect(
+      (payload as { resource: Record<string, unknown>[] }).resource[0][
+        'validation'
+      ]
+    ).toEqual({ not_null: true });
+  });
+
   it('should set isAggregate validation if isVirtual is true', () => {
     expect(component.fieldDetailsForm.controls['isAggregate'].enabled).toBe(
       false
@@ -403,5 +424,65 @@ describe('DfFieldDetailsComponent - edit field details', () => {
     component.onSubmit();
 
     expect(crudServiceSpy).toHaveBeenCalled();
+  });
+
+  describe('validation rules', () => {
+    const loadField = (validation: unknown) => {
+      jest
+        .spyOn(DfBaseCrudService.prototype, 'get')
+        .mockReturnValue(of({ ...MOCK_FORM_DATA, dbFunction: [], validation }));
+      component.ngOnInit();
+    };
+
+    const submittedField = () => {
+      const updateSpy = jest.spyOn(DfBaseCrudService.prototype, 'update');
+      component.onSubmit();
+      const [, payload] = updateSpy.mock.calls[updateSpy.mock.calls.length - 1];
+      return (payload as { resource: Record<string, unknown>[] }).resource[0];
+    };
+
+    it('shows stored rules as formatted JSON', () => {
+      loadField({ api_read_only: true });
+
+      expect(component.fieldDetailsForm.controls['validation'].value).toBe(
+        JSON.stringify({ api_read_only: true }, null, 2)
+      );
+    });
+
+    it('recovers rules that older builds saved as wrapped text', () => {
+      loadField(['{"api_read_only": true}']);
+      expect(component.fieldDetailsForm.controls['validation'].value).toBe(
+        JSON.stringify({ api_read_only: true }, null, 2)
+      );
+
+      loadField(['']);
+      expect(component.fieldDetailsForm.controls['validation'].value).toBe('');
+    });
+
+    it('sends rules as an object, not as text', () => {
+      loadField(null);
+      component.fieldDetailsForm.patchValue({
+        validation: '{"api_read_only": true}',
+      });
+
+      expect(submittedField()['validation']).toEqual({ api_read_only: true });
+    });
+
+    it('sends null to clear rules when the box is empty', () => {
+      loadField({ api_read_only: true });
+      component.fieldDetailsForm.patchValue({ validation: '  ' });
+
+      expect(submittedField()['validation']).toBeNull();
+    });
+
+    it('rejects JSON that is not an object', () => {
+      const control = component.fieldDetailsForm.controls['validation'];
+
+      control.setValue('"api_read_only"');
+      expect(control.hasError('jsonInvalid')).toBe(true);
+
+      control.setValue('{"api_read_only": true}');
+      expect(control.hasError('jsonInvalid')).toBe(false);
+    });
   });
 });

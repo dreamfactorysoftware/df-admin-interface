@@ -7,11 +7,15 @@ export const snakeToCamelString = (str: string) =>
 // (e.g. {"cust_name": "custName"}); camelCasing those keys silently breaks the
 // rename mapping on reload. The key itself is still transformed so the
 // camelCase<->snake_case envelope (executionPlan <-> execution_plan) still works.
+// Schema field `validation` rules are the same kind of blob: the backend matches
+// rule names verbatim (api_read_only, not_null, ...) and the field editor shows
+// them as raw JSON, so camelCasing them would round-trip names that don't exist.
 const OPAQUE_VALUE_KEYS = new Set([
   'execution_plan',
   'executionPlan',
   'response_mapping',
   'responseMapping',
+  'validation',
 ]);
 
 export function mapSnakeToCamel<T>(obj: T): T {
