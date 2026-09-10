@@ -101,6 +101,13 @@ export const SYSTEM_MCP_TOOLS: ReadonlyArray<SystemMcpTool> = [
     title: 'List Admins',
     description: 'List the administrator accounts on this instance.',
   },
+  // Access audit (read-only)
+  {
+    name: 'get_access_audit',
+    title: 'Get Access Audit',
+    description:
+      'Report last-used / never-used / stale API keys, roles and users from system/access_usage.',
+  },
   // Generic
   {
     name: 'call_system_api',

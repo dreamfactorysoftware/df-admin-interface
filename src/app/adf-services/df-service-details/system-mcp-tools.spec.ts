@@ -22,12 +22,13 @@ const EXPECTED_TOOL_NAMES = [
   'create_app',
   'get_app',
   'list_admins',
+  'get_access_audit',
   'call_system_api',
 ];
 
 describe('SYSTEM_MCP_TOOLS catalogue', () => {
-  it('contains exactly the 17 tools exposed by df-system-mcp-server', () => {
-    expect(SYSTEM_MCP_TOOLS.length).toBe(17);
+  it('contains exactly the 18 tools exposed by df-system-mcp-server', () => {
+    expect(SYSTEM_MCP_TOOLS.length).toBe(18);
     expect(SYSTEM_MCP_TOOLS.map(t => t.name)).toEqual(EXPECTED_TOOL_NAMES);
   });
 
