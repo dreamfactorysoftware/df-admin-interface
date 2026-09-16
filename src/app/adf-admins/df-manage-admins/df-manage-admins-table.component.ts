@@ -39,6 +39,7 @@ export class DfManageAdminsTableComponent extends DfManageTableComponent<UserRow
     dialog: MatDialog
   ) {
     super(router, activatedRoute, liveAnnouncer, translateService, dialog);
+    this.enableAccessUsage('user', { header: 'accessUsage.lastActive' });
   }
   override columns = USER_COLUMNS;
 

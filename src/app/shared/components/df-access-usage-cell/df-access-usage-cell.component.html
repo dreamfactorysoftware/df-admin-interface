@@ -1,0 +1,26 @@
+<span
+  class="df-usage"
+  data-testid="access-usage-cell"
+  [class.df-usage--muted]="view.muted"
+  [matTooltip]="tooltip"
+  matTooltipClass="df-usage-tooltip">
+  <ng-container *ngIf="view.warning">
+    <fa-icon
+      class="df-usage__warning"
+      data-testid="access-usage-warning"
+      aria-hidden="true"
+      [icon]="faTriangleExclamation"></fa-icon>
+    <span class="cdk-visually-hidden">{{
+      'accessUsage.disabledButAttempted' | transloco
+    }}</span>
+  </ng-container>
+  <span class="df-usage__label">{{
+    view.relative ?? ('accessUsage.never' | transloco)
+  }}</span>
+</span>
+<df-badge
+  *ngIf="view.unreferenced"
+  data-testid="access-usage-unreferenced"
+  variant="warning"
+  [dot]="false"
+  [label]="'accessUsage.unreferenced' | transloco"></df-badge>

@@ -1,0 +1,23 @@
+// Token-driven so light, dark, and phosphor all stay legible.
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--df-space-2);
+  white-space: nowrap;
+}
+
+.df-usage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--df-space-2);
+}
+
+// Never used or stale: quiet, not alarming.
+.df-usage--muted {
+  color: var(--df-text-faint);
+}
+
+// Inactive credential still being sent.
+.df-usage__warning {
+  color: var(--df-warning);
+}
