@@ -1200,9 +1200,68 @@
                 </table>
               </mat-expansion-panel>
 
-              <!-- Per-service tools -->
+              <!-- Merged database tools (tool_style = merged) -->
               <mat-expansion-panel
-                *ngFor="let svc of mcpServices; trackBy: trackByName"
+                *ngIf="isMergedStyle && dbServices.length > 0"
+                data-testid="merged-db-tools">
+                <mat-expansion-panel-header>
+                  <mat-panel-title class="mcp-service-header">
+                    <span>Database Tools (merged)</span>
+                  </mat-panel-title>
+                  <mat-panel-description>
+                    {{ mergedDbVerbs.length }} tools &middot;
+                    {{ dbServices.length }} databases
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
+                <p class="details-section">
+                  Each verb is registered once and takes a
+                  <code>service</code> argument. Turning a verb off for one
+                  database removes that database from the tool's allowed
+                  services; turning it off everywhere removes the tool.
+                </p>
+                <table class="mcp-services-table full-width">
+                  <thead>
+                    <tr>
+                      <th class="toggle-col"></th>
+                      <th>Tool Name</th>
+                      <th *ngFor="let svc of dbServices; trackBy: trackByName">
+                        <code>{{ svc.name }}</code>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let verb of mergedDbVerbs; trackBy: trackByName"
+                      [class.disabled-row]="!isVerbEnabledAnywhere(verb.name)">
+                      <td class="toggle-col">
+                        <mat-slide-toggle
+                          color="primary"
+                          [checked]="isVerbEnabledAnywhere(verb.name)"
+                          (change)="
+                            toggleVerbEverywhere(verb.name, $event.checked)
+                          ">
+                        </mat-slide-toggle>
+                      </td>
+                      <td>
+                        <code>{{ verb.name }}</code>
+                      </td>
+                      <td *ngFor="let svc of dbServices; trackBy: trackByName">
+                        <mat-slide-toggle
+                          color="primary"
+                          [checked]="isVerbEnabledFor(verb.name, svc.name)"
+                          (change)="
+                            toggleVerbFor(verb.name, svc.name, $event.checked)
+                          ">
+                        </mat-slide-toggle>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </mat-expansion-panel>
+
+              <!-- Per-service tools (files always; databases only when prefixed) -->
+              <mat-expansion-panel
+                *ngFor="let svc of visibleServices; trackBy: trackByName"
                 [expanded]="svc.expanded">
                 <mat-expansion-panel-header>
                   <mat-panel-title class="mcp-service-header">

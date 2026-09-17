@@ -685,6 +685,8 @@ export class DfServiceDetailsComponent implements OnInit {
           this.isSystemMcp = isSystemMcpType(data?.type);
           const disabled: string[] = data?.config?.disabledTools ?? [];
           this.disabledTools = new Set(disabled);
+          this.toolStyle =
+            data?.config?.toolStyle === 'merged' ? 'merged' : 'prefixed';
           if (this.isSystemMcp) {
             // System API MCP server: fixed tool catalogue, no custom tools,
             // no per-service (database/file) tool discovery.
@@ -710,6 +712,14 @@ export class DfServiceDetailsComponent implements OnInit {
               })
             );
             this.loadMcpServices();
+            // Flipping Database Tool Style must re-render the tool panel
+            // straight away; until the service is saved the config control
+            // is the only source of truth for the style.
+            this.getConfigControl('toolStyle')?.valueChanges.subscribe(
+              (value: string) => {
+                this.toolStyle = value === 'merged' ? 'merged' : 'prefixed';
+              }
+            );
             this.loadAvailableScmServices();
           }
         }
@@ -1144,6 +1154,75 @@ export class DfServiceDetailsComponent implements OnInit {
       } else {
         this.disabledTools.add(tool.name);
       }
+    }
+  }
+
+  /** tool_style from the service config: 'prefixed' (default) or 'merged'. */
+  toolStyle: 'prefixed' | 'merged' = 'prefixed';
+
+  get isMergedStyle(): boolean {
+    return this.toolStyle === 'merged';
+  }
+
+  /** Merged mode merges database tools only; file tools stay per-service. */
+  get dbServices() {
+    return this.mcpServices.filter(s => s.category === 'Database');
+  }
+
+  /** Services that still get their own panel: all, or files only when merged. */
+  get visibleServices() {
+    return this.isMergedStyle
+      ? this.mcpServices.filter(s => s.category !== 'Database')
+      : this.mcpServices;
+  }
+
+  /**
+   * The bare verbs a merged catalog exposes (get_tables, delete_records, ...).
+   * Derived by stripping the prefix off the same list the prefixed panels
+   * render, so the two views can never drift apart.
+   */
+  get mergedDbVerbs(): { name: string; title: string; description: string }[] {
+    const sample = this.dbServices[0];
+    if (!sample) return [];
+    const prefix = this.sanitizeApiName(sample.name) + '_';
+    return sample.tools.map(tool => ({
+      ...tool,
+      name: tool.name.startsWith(prefix)
+        ? tool.name.slice(prefix.length)
+        : tool.name,
+    }));
+  }
+
+  /**
+   * Disable keys stay PREFIXED even in merged mode. The daemon reads
+   * `<service>_<verb>` entries and enforces them per service: it drops that
+   * service from the merged tool's `service` enum and refuses it at call
+   * time. Writing bare verbs here would disable the tool for every database.
+   */
+  private verbKey(verb: string, serviceName: string): string {
+    return `${this.sanitizeApiName(serviceName)}_${verb}`;
+  }
+
+  isVerbEnabledFor(verb: string, serviceName: string): boolean {
+    return !this.disabledTools.has(this.verbKey(verb, serviceName));
+  }
+
+  toggleVerbFor(verb: string, serviceName: string, enabled: boolean) {
+    const key = this.verbKey(verb, serviceName);
+    if (enabled) {
+      this.disabledTools.delete(key);
+    } else {
+      this.disabledTools.add(key);
+    }
+  }
+
+  isVerbEnabledAnywhere(verb: string): boolean {
+    return this.dbServices.some(svc => this.isVerbEnabledFor(verb, svc.name));
+  }
+
+  toggleVerbEverywhere(verb: string, enabled: boolean) {
+    for (const svc of this.dbServices) {
+      this.toggleVerbFor(verb, svc.name, enabled);
     }
   }
 
