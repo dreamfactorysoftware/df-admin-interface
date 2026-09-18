@@ -1394,6 +1394,40 @@
         "createSave": "Create role",
         "done": "Done",
         "createHint": "The new role is granted this server only. Tick an API to also grant it there."
+      },
+      "editor": {
+        "createTitle": "Create a role for {{server}}",
+        "addTitle": "Add a role to {{server}}",
+        "editTitle": "Edit access to {{server}}",
+        "createHint": "Pick what the new role may reach. No access is the default for every API.",
+        "addHint": "The role is granted this server. Pick an API to also grant it there.",
+        "editHint": "Per exposed API. No access removes the role's blanket row for that API.",
+        "alsoKey": "Also create an API key",
+        "filter": "Filter APIs",
+        "group": {
+          "database": "Databases",
+          "file": "File stores"
+        },
+        "readOnAll": "Read on all",
+        "pickRoleFirst": "pick a role first",
+        "level": {
+          "none": "No access",
+          "read": "Read",
+          "rw": "Read and write"
+        },
+        "sumCreates": "Creates role {{name}}",
+        "sumServer": "grants this server",
+        "sumRead": "read on {{n}} APIs",
+        "sumRw": "read and write on {{n}} APIs",
+        "sumKey": "creates an API key",
+        "sumNothing": "No changes yet.",
+        "sumDelta": {
+          "+read": "+ read on {{label}}",
+          "+rw": "+ read and write on {{label}}",
+          "+write": "+ write on {{label}}",
+          "-write": "− write on {{label}}",
+          "-access": "− access on {{label}}"
+        }
       }
     },
     "create": {
