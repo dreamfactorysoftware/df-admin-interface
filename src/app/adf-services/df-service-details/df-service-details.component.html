@@ -487,7 +487,7 @@
          sharply below this point. Edit only (nothing to score during create)
          and never for the read-only DreamFactory Platform APIs. -->
     <df-service-health-panel
-      *ngIf="edit && serviceData?.id && !isPlatformService"
+      *ngIf="edit && serviceData?.id && !isPlatformService && !isMcp"
       class="service-health-panel"
       [serviceId]="serviceData.id"
       [serviceName]="serviceData.name"
@@ -564,6 +564,7 @@
       }}</mat-label>
       <mat-select
         formControlName="type"
+        data-testid="service-type-select"
         (selectionChange)="
           onServiceTypeSelect(getServiceTypeLabel($event.value))
         ">
@@ -580,11 +581,18 @@
         [matTooltip]="'services.controls.serviceType.tooltip' | transloco" />
     </mat-form-field>
 
+    <!-- New MCP server: short stepper (name -> APIs -> who -> client ->
+         review -> connect). Owns its own form and POST. -->
+    <df-mcp-create
+      *ngIf="mcpCreateMode"
+      class="full-width"
+      [configSchema]="configSchema"></df-mcp-create>
+
     <mat-form-field
       subscriptSizing="dynamic"
       class="dynamic-width"
       appearance="outline"
-      *ngIf="!subscriptionRequired">
+      *ngIf="!subscriptionRequired && !mcpCreateMode">
       <mat-label>{{
         'services.controls.namespace.label' | transloco
       }}</mat-label>
@@ -613,7 +621,7 @@
       subscriptSizing="dynamic"
       appearance="outline"
       class="full-width"
-      *ngIf="!subscriptionRequired">
+      *ngIf="!subscriptionRequired && !mcpCreateMode">
       <mat-label>{{ 'services.controls.label.label' | transloco }}</mat-label>
       <input matInput formControlName="label" />
       <fa-icon
@@ -626,7 +634,7 @@
       subscriptSizing="dynamic"
       class="full-width"
       appearance="outline"
-      *ngIf="!subscriptionRequired">
+      *ngIf="!subscriptionRequired && !mcpCreateMode">
       <mat-label>{{
         'services.controls.description.label' | transloco
       }}</mat-label>
@@ -640,7 +648,7 @@
     <mat-slide-toggle
       formControlName="isActive"
       color="primary"
-      *ngIf="!subscriptionRequired"
+      *ngIf="!subscriptionRequired && !mcpCreateMode"
       ><span>{{ 'active' | transloco }}</span></mat-slide-toggle
     >
     <div class="full-width">
@@ -665,7 +673,7 @@
         </ng-template>
       </ng-container>
     </div>
-    <ng-container *ngIf="viewSchema && !subscriptionRequired">
+    <ng-container *ngIf="viewSchema && !subscriptionRequired && !mcpCreateMode">
       <ng-container formGroupName="config">
         <!-- Network Service Configuration -->
         <ng-container *ngIf="this.isNetworkService">
@@ -994,6 +1002,7 @@
                        (df-service-details camelCases the schema names) -->
                   <ng-container
                     *ngIf="
+                      !isMcpOwnedField(item.name) &&
                       !(
                         serviceForm.getRawValue().type === 'ai_chat' &&
                         (item.name === 'aiServiceId' ||
@@ -1076,8 +1085,26 @@
       </ng-container>
     </ng-container>
 
-    <!-- System API MCP Server: fixed tool catalogue (no per-service panels,
-         no custom tools). Toggles share disabledTools with the mcp type so
+    <!-- MCP server page (#523): what the server exposes, previewed as a
+         role or key, who can connect, modes, connect snippets. Binds the
+         config controls it owns and the shared disabledTools set; save()
+         persists both through the existing payload path. -->
+    <ng-container *ngIf="isMcp && edit && serviceData">
+      <df-mcp-exposure
+        class="full-width"
+        [serviceId]="serviceData.id"
+        [serviceName]="serviceData.name"
+        [serviceLabel]="serviceData.label || serviceData.name"
+        [systemMcp]="isSystemMcp"
+        [config]="mcpConfigGroup"
+        [disabledTools]="disabledTools"
+        [customTools]="mcpCustomToolNames"
+        [fixedTools]="mcpFixedToolNames"
+        [attachableNames]="mcpAttachableNames"></df-mcp-exposure>
+    </ng-container>
+
+    <!-- System API MCP Server: fixed tool catalogue toggles (no exposure
+         grid). Toggles share disabledTools with the mcp type so
          disabled_tools round-trips through the service config. -->
     <ng-container *ngIf="isMcp && isSystemMcp && edit">
       <mat-accordion class="full-width">
@@ -1113,181 +1140,6 @@
                   <tbody>
                     <tr
                       *ngFor="let tool of systemMcpTools; trackBy: trackByName"
-                      [class.disabled-row]="!isToolEnabled(tool.name)">
-                      <td class="toggle-col">
-                        <mat-slide-toggle
-                          color="primary"
-                          [checked]="isToolEnabled(tool.name)"
-                          (change)="toggleTool(tool.name, $event.checked)">
-                        </mat-slide-toggle>
-                      </td>
-                      <td>
-                        <code>{{ tool.name }}</code>
-                      </td>
-                      <td>{{ tool.description }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </mat-expansion-panel>
-            </mat-accordion>
-          </div>
-        </mat-expansion-panel>
-      </mat-accordion>
-    </ng-container>
-
-    <!-- MCP Available Services & Tools -->
-    <ng-container *ngIf="isMcp && !isSystemMcp && edit">
-      <mat-accordion class="full-width">
-        <mat-expansion-panel [expanded]="true">
-          <mat-expansion-panel-header>
-            Built-in Tools
-          </mat-expansion-panel-header>
-          <div class="details-section" *ngIf="!mcpServicesLoaded">
-            <p>Loading services...</p>
-          </div>
-          <div
-            class="details-section"
-            *ngIf="
-              mcpServicesLoaded &&
-              mcpServices.length === 0 &&
-              mcpGlobalTools.length === 0
-            ">
-            <p>No database or file services found.</p>
-          </div>
-          <div *ngIf="mcpServicesLoaded" class="mcp-tools-container">
-            <mat-accordion multi>
-              <!-- Global (cross-service) tools -->
-              <mat-expansion-panel>
-                <mat-expansion-panel-header>
-                  <mat-panel-title class="mcp-service-header">
-                    <mat-slide-toggle
-                      color="primary"
-                      [checked]="isAllGlobalToolsEnabled()"
-                      (change)="toggleAllGlobalTools($event.checked)"
-                      (click)="$event.stopPropagation()">
-                    </mat-slide-toggle>
-                    <span>Global Tools</span>
-                  </mat-panel-title>
-                  <mat-panel-description>
-                    Cross-service &middot; {{ mcpGlobalTools.length }} tools
-                  </mat-panel-description>
-                </mat-expansion-panel-header>
-                <table class="mcp-services-table full-width">
-                  <thead>
-                    <tr>
-                      <th class="toggle-col"></th>
-                      <th>Tool Name</th>
-                      <th>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      *ngFor="let tool of mcpGlobalTools"
-                      [class.disabled-row]="!isToolEnabled(tool.name)">
-                      <td class="toggle-col">
-                        <mat-slide-toggle
-                          color="primary"
-                          [checked]="isToolEnabled(tool.name)"
-                          (change)="toggleTool(tool.name, $event.checked)">
-                        </mat-slide-toggle>
-                      </td>
-                      <td>
-                        <code>{{ tool.name }}</code>
-                      </td>
-                      <td>{{ tool.description }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </mat-expansion-panel>
-
-              <!-- Merged database tools (tool_style = merged) -->
-              <mat-expansion-panel
-                *ngIf="isMergedStyle && dbServices.length > 0"
-                data-testid="merged-db-tools">
-                <mat-expansion-panel-header>
-                  <mat-panel-title class="mcp-service-header">
-                    <span>Database Tools (merged)</span>
-                  </mat-panel-title>
-                  <mat-panel-description>
-                    {{ mergedDbVerbs.length }} tools &middot;
-                    {{ dbServices.length }} databases
-                  </mat-panel-description>
-                </mat-expansion-panel-header>
-                <p class="details-section">
-                  Each verb is registered once and takes a
-                  <code>service</code> argument. Turning a verb off for one
-                  database removes that database from the tool's allowed
-                  services; turning it off everywhere removes the tool.
-                </p>
-                <table class="mcp-services-table full-width">
-                  <thead>
-                    <tr>
-                      <th class="toggle-col"></th>
-                      <th>Tool Name</th>
-                      <th *ngFor="let svc of dbServices; trackBy: trackByName">
-                        <code>{{ svc.name }}</code>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      *ngFor="let verb of mergedDbVerbs; trackBy: trackByName"
-                      [class.disabled-row]="!isVerbEnabledAnywhere(verb.name)">
-                      <td class="toggle-col">
-                        <mat-slide-toggle
-                          color="primary"
-                          [checked]="isVerbEnabledAnywhere(verb.name)"
-                          (change)="
-                            toggleVerbEverywhere(verb.name, $event.checked)
-                          ">
-                        </mat-slide-toggle>
-                      </td>
-                      <td>
-                        <code>{{ verb.name }}</code>
-                      </td>
-                      <td *ngFor="let svc of dbServices; trackBy: trackByName">
-                        <mat-slide-toggle
-                          color="primary"
-                          [checked]="isVerbEnabledFor(verb.name, svc.name)"
-                          (change)="
-                            toggleVerbFor(verb.name, svc.name, $event.checked)
-                          ">
-                        </mat-slide-toggle>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </mat-expansion-panel>
-
-              <!-- Per-service tools (files always; databases only when prefixed) -->
-              <mat-expansion-panel
-                *ngFor="let svc of visibleServices; trackBy: trackByName"
-                [expanded]="svc.expanded">
-                <mat-expansion-panel-header>
-                  <mat-panel-title class="mcp-service-header">
-                    <mat-slide-toggle
-                      color="primary"
-                      [checked]="isServiceEnabled(svc)"
-                      (change)="toggleService(svc, $event.checked)"
-                      (click)="$event.stopPropagation()">
-                    </mat-slide-toggle>
-                    <span>{{ svc.label }}</span>
-                  </mat-panel-title>
-                  <mat-panel-description>
-                    {{ svc.category }} &middot; {{ svc.tools.length }} tools
-                  </mat-panel-description>
-                </mat-expansion-panel-header>
-                <table class="mcp-services-table full-width">
-                  <thead>
-                    <tr>
-                      <th class="toggle-col"></th>
-                      <th>Tool Name</th>
-                      <th>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      *ngFor="let tool of svc.tools; trackBy: trackByName"
                       [class.disabled-row]="!isToolEnabled(tool.name)">
                       <td class="toggle-col">
                         <mat-slide-toggle
@@ -1780,7 +1632,9 @@
       </mat-accordion>
     </ng-container>
 
-    <div class="full-width action-bar" *ngIf="!subscriptionRequired">
+    <div
+      class="full-width action-bar"
+      *ngIf="!subscriptionRequired && !mcpCreateMode">
       <button
         mat-flat-button
         class="cancel-btn"

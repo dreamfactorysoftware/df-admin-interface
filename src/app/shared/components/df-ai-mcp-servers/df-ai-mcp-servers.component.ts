@@ -32,7 +32,7 @@ interface McpServerRow {
         </span>
         <a
           mat-stroked-button
-          [routerLink]="['/api-connections/api-types/database']"
+          [routerLink]="['/ai/mcp/create']"
           class="mcp-servers__action">
           <fa-icon [icon]="faPlus"></fa-icon>
           <span>Create MCP service</span>
