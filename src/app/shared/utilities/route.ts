@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import { Routes, UrlSegment, UrlSegmentGroup } from '@angular/router';
 import { Nav } from '../types/nav';
 import { ROUTES } from '../types/routes';
 
@@ -228,6 +228,42 @@ export function generateBreadcrumb(
 
     let matched = false;
     for (const route of routes) {
+      // A matcher route (e.g. the service detail `:id` plus an optional tab
+      // segment) has no `path`; ask the matcher what it consumes. The first
+      // consumed segment is the record identifier and becomes the crumb;
+      // any further consumed segment (a tab) is part of the same page.
+      if (route.path === undefined && route.matcher) {
+        const remaining = urlSegments
+          .slice(index)
+          .map(segment => new UrlSegment(segment, {}));
+        const result = route.matcher(
+          remaining,
+          new UrlSegmentGroup(remaining, {}),
+          route
+        );
+        if (!result || result.consumed.length === 0) {
+          continue;
+        }
+        matched = true;
+        const consumed = result.consumed.map(segment => segment.path);
+        const newPath = [...pathSoFar, ...consumed];
+        const breadcrumb: Breadcrumb = { label: consumed[0] };
+        if (index + consumed.length < urlSegments.length) {
+          breadcrumb.path = newPath.join('/');
+        }
+        breadcrumbs.push(breadcrumb);
+        if (
+          traverseRoutes(
+            route.children || [],
+            newPath,
+            [...translationKeySoFar, 'id'],
+            index + consumed.length
+          )
+        ) {
+          return true;
+        }
+        continue;
+      }
       const path = route.path as string;
       const isDynamic = path.startsWith(':');
       const currentSegment = isDynamic ? urlSegments[index] : path;

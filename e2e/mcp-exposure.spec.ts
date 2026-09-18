@@ -34,7 +34,9 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   const detail = await request.get(`${baseURL}/api/v2/system/service/${id}`, {
     headers,
   });
-  const config = (await detail.json()).config;
+  const record = await detail.json();
+  const config = record.config;
+  const title: string = record.label || record.name;
   const exposed: string[] = config.exposed_services ?? [];
   expect(exposed.length).toBeGreaterThan(0);
 
@@ -76,10 +78,18 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   expect(advertised).toBeGreaterThan(0);
   expect(advertised).toBeLessThanOrEqual(5 + 5 + exposed.length * 16 + 6 * 2);
 
+  // Breadcrumb and title come from the route data, tab segment or not.
+  const crumbs = page.locator('nav.topbar-breadcrumbs');
+  await expect(crumbs).toContainText('MCP Servers');
+  await expect(crumbs).toContainText('demo_mcp');
+  await expect(page.locator('h1.page-header')).toContainText(title);
+
   // Tabs are route segments; switching keeps the page state (no reload).
   await page.locator('[role="tab"]', { hasText: 'Access' }).click();
   await expect(page).toHaveURL(new RegExp(`/ai/mcp/${id}/access$`));
   await expect(page.getByTestId('mcp-access')).toBeVisible();
+  await expect(crumbs).toContainText('demo_mcp');
+  await expect(page.locator('h1.page-header')).toContainText(title);
   await page.locator('[role="tab"]', { hasText: 'Connect' }).click();
   await expect(page).toHaveURL(new RegExp(`/ai/mcp/${id}/connect$`));
   await expect(page.getByTestId('mcp-connect')).toContainText('/mcp/demo_mcp');

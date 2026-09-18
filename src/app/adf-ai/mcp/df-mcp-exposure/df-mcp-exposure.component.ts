@@ -16,10 +16,16 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  ActivatedRoute,
+  NavigationEnd,
+  Router,
+  RouterLink,
+} from '@angular/router';
 import { TranslocoModule } from '@ngneat/transloco';
-import { Subject, forkJoin, of, switchMap, takeUntil } from 'rxjs';
+import { Subject, filter, forkJoin, of, switchMap, takeUntil } from 'rxjs';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfMcpAccessComponent } from '../df-mcp-access/df-mcp-access.component';
 import { DfMcpExposureGridComponent } from '../df-mcp-exposure-grid/df-mcp-exposure-grid.component';
 import {
@@ -178,7 +184,8 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     private api: DfMcpApiService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private snackbar: DfSnackbarService
   ) {}
 
   ngOnInit(): void {
@@ -194,6 +201,26 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
         const tab = tabFromParam(params.get('tab'), this.systemMcp);
         this.selectedIndex = Math.max(0, this.tabs.indexOf(tab));
       });
+      // The shell H1 override is keyed by exact URL (the host publishes it
+      // once on load). A tab switch changes the URL, so republish the label
+      // for every navigation that stays on this service.
+      this.router.events
+        .pipe(
+          filter(e => e instanceof NavigationEnd),
+          takeUntil(this.destroy$)
+        )
+        .subscribe(() => {
+          const url = this.router.url;
+          if (
+            this.serviceId != null &&
+            new RegExp(`/${this.serviceId}(/|$|\\?)`).test(url)
+          ) {
+            this.snackbar.setPageLabel(
+              url,
+              this.serviceLabel || this.serviceName
+            );
+          }
+        });
     }
   }
 
