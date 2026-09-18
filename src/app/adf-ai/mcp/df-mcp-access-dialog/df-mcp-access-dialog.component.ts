@@ -25,6 +25,7 @@ import {
   ServiceGrant,
   accessDiff,
   accessRowsForChanges,
+  buildAccessChanges,
   grantsByService,
 } from '../mcp-model';
 
@@ -94,13 +95,27 @@ export class DfMcpAccessDialogComponent {
         .replace(/[^a-z0-9]+/g, '_')
         .replace(/^_|_$/g, '');
       this.name = this.name ? `${this.name}_access` : 'mcp_access';
-      for (const b of data.backends) this.levels[b.id as number] = 'read';
-    } else {
+    }
+    if (data.mode !== 'edit') {
+      // Opt-in: a new or added role never proposes data access the admin
+      // did not tick. The level only applies once the backend is included.
       for (const b of data.backends) {
         this.levels[b.id as number] = 'read';
         this.include[b.id as number] = false;
       }
     }
+  }
+
+  /** Add and create are opt-in per backend; edit shows every exposed API. */
+  get optIn(): boolean {
+    return this.data.mode !== 'edit';
+  }
+
+  /** Whether the row's level picker is usable right now. */
+  levelDisabled(b: McpBackend): boolean {
+    if (!this.optIn) return false;
+    if (this.data.mode === 'add' && !this.roleId) return true;
+    return !this.include[b.id as number];
   }
 
   /** Roles an admin can add: active ones without a server grant yet. */
@@ -144,26 +159,17 @@ export class DfMcpAccessDialogComponent {
   }
 
   review(): void {
-    const grants = this.currentGrants();
-    const changes: AccessChange[] = [];
-    const serverBefore = grants[this.data.serviceId]?.level ?? 'none';
-    changes.push({
-      serviceId: this.data.serviceId,
-      label: this.data.serviceLabel,
-      before: serverBefore,
-      after: serverBefore === 'none' ? 'read' : serverBefore,
-    });
-    for (const b of this.data.backends) {
-      const id = b.id as number;
-      if (this.data.mode === 'add' && !this.include[id]) continue;
-      if (grants[id]?.tableLimited) continue;
-      changes.push({
-        serviceId: id,
+    const changes = buildAccessChanges({
+      serverId: this.data.serviceId,
+      serverLabel: this.data.serviceLabel,
+      backends: this.data.backends.map(b => ({
+        id: b.id as number,
         label: b.label,
-        before: grants[id]?.level ?? 'none',
-        after: this.levels[id] ?? 'none',
-      });
-    }
+      })),
+      grants: this.currentGrants(),
+      levels: this.levels,
+      include: this.optIn ? this.include : null,
+    });
     this.changes = changes;
     this.diff = accessDiff(changes, this.levelLabels());
     this.step = 'review';

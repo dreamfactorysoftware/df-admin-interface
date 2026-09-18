@@ -1249,7 +1249,8 @@
       "requireWhy": {
         "on": "Only roles granted this server can connect",
         "off": "Any logged-in user can connect; roles only limit data calls"
-      }
+      },
+      "writesNa": "Not applicable to the System API server"
     },
     "carry": {
       "title": "What the client carries each turn",
@@ -1391,7 +1392,8 @@
         "back": "Back",
         "save": "Save",
         "createSave": "Create role",
-        "done": "Done"
+        "done": "Done",
+        "createHint": "The new role is granted this server only. Tick an API to also grant it there."
       }
     },
     "create": {

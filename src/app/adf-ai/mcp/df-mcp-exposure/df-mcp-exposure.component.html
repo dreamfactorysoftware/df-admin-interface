@@ -150,7 +150,8 @@
       }}</span>
     </div>
 
-    <div class="mcp__mode">
+    <!-- system_mcp hides allow_writes from its schema by design -->
+    <div class="mcp__mode" *ngIf="!systemMcp">
       <span class="mcp__k">{{ t('modes.writes') }}</span>
       <mat-button-toggle-group
         class="mcp__writes"

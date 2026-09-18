@@ -34,6 +34,9 @@
       <p class="dlg__hint" *ngIf="data.mode === 'add'">
         {{ t('dialog.addHint') }}
       </p>
+      <p class="dlg__hint" *ngIf="data.mode === 'create'">
+        {{ t('dialog.createHint') }}
+      </p>
       <p class="dlg__hint" *ngIf="data.mode === 'edit'">
         {{ t('dialog.editHint') }}
       </p>
@@ -43,11 +46,12 @@
           class="dlg__api"
           *ngFor="let b of data.backends; trackBy: trackByBackend">
           <mat-checkbox
-            *ngIf="data.mode === 'add'"
+            *ngIf="optIn"
             color="primary"
             [(ngModel)]="include[b.id!]"
             [name]="'inc_' + b.name"
-            [disabled]="!roleId"></mat-checkbox>
+            [disabled]="data.mode === 'add' && !roleId"
+            [attr.aria-label]="b.label"></mat-checkbox>
           <div class="dlg__api-name">
             <span>{{ b.label }}</span>
             <code>{{ b.name }}</code>
@@ -66,7 +70,7 @@
             <mat-button-toggle-group
               [(ngModel)]="levels[b.id!]"
               [name]="'lvl_' + b.name"
-              [disabled]="data.mode === 'add' && (!roleId || !include[b.id!])"
+              [disabled]="levelDisabled(b)"
               [attr.aria-label]="b.label">
               <mat-button-toggle value="none">{{
                 t('level.none')
