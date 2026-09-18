@@ -7,7 +7,6 @@ import {
   Output,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslocoModule, TranslocoService } from '@ngneat/transloco';
@@ -22,9 +21,9 @@ import {
   McpRole,
 } from '../df-mcp-api.service';
 import {
-  DfMcpAccessDialogComponent,
-  McpAccessDialogData,
-} from '../df-mcp-access-dialog/df-mcp-access-dialog.component';
+  AccessEditorMode,
+  DfMcpAccessEditorComponent,
+} from '../df-mcp-access-editor/df-mcp-access-editor.component';
 import {
   AccessLevel,
   McpBackend,
@@ -69,7 +68,7 @@ export interface AccessRow {
     RouterLink,
     TranslocoModule,
     MatButtonModule,
-    MatDialogModule,
+    DfMcpAccessEditorComponent,
     MatTooltipModule,
     DfBadgeComponent,
     DfSkeletonComponent,
@@ -92,16 +91,21 @@ export class DfMcpAccessComponent implements OnChanges {
 
   rows: AccessRow[] = [];
   granting: number | null = null;
+  /** The inline editor open at the top of the panel, if any. */
+  editor: { mode: AccessEditorMode; role?: McpRole } | null = null;
 
   constructor(
     private api: DfMcpApiService,
-    private dialog: MatDialog,
     private snackbar: DfSnackbarService,
     private transloco: TranslocoService
   ) {}
 
   ngOnChanges(): void {
     this.rows = this.buildRows();
+    this.exposedBackends = this.backends.filter(
+      b => b.id != null && this.exposed.includes(b.name)
+    );
+    this.grantedIds = new Set(this.grantedRows.map(r => r.roleId));
   }
 
   get grantedRows(): AccessRow[] {
@@ -112,11 +116,9 @@ export class DfMcpAccessComponent implements OnChanges {
     return this.rows.filter(r => !r.granted);
   }
 
-  get exposedBackends(): McpBackend[] {
-    return this.backends.filter(
-      b => b.id != null && this.exposed.includes(b.name)
-    );
-  }
+  /** Memoized in ngOnChanges: the editor resets on input identity changes. */
+  exposedBackends: McpBackend[] = [];
+  grantedIds = new Set<number>();
 
   private buildRows(): AccessRow[] {
     const byId = new Map(this.roles.map(r => [r.id, r]));
@@ -203,23 +205,20 @@ export class DfMcpAccessComponent implements OnChanges {
     });
   }
 
-  open(mode: McpAccessDialogData['mode'], row?: AccessRow): void {
-    const data: McpAccessDialogData = {
+  open(mode: AccessEditorMode, row?: AccessRow): void {
+    this.editor = {
       mode,
-      serviceId: this.serviceId,
-      serviceLabel: this.serviceLabel,
-      backends: this.exposedBackends,
-      roles: this.roles,
       role: row ? this.roles.find(r => r.id === row.roleId) : undefined,
-      granted: new Set(this.grantedRows.map(r => r.roleId)),
-      allowWrites: this.allowWrites,
     };
-    this.dialog
-      .open(DfMcpAccessDialogComponent, { data, width: '560px' })
-      .afterClosed()
-      .subscribe(saved => {
-        if (saved) this.changed.emit();
-      });
+  }
+
+  close(): void {
+    this.editor = null;
+  }
+
+  onSaved(): void {
+    this.editor = null;
+    this.changed.emit();
   }
 
   hasExposedReach(row: AccessRow): boolean {

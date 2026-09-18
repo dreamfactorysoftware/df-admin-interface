@@ -492,6 +492,47 @@ export function buildAccessChanges(i: AccessChangeInput): AccessChange[] {
   return changes;
 }
 
+export type AccessDelta = '+read' | '+rw' | '+write' | '-write' | '-access';
+
+export interface AccessSummary {
+  /** The server row: newly granted, kept as is, or not touched. */
+  server: 'grant' | 'keep' | 'none';
+  /** Backends that go from no access straight to a level (add / create). */
+  read: string[];
+  rw: string[];
+  /** Every other transition (edit): label + what changes. */
+  deltas: Array<{ label: string; delta: AccessDelta }>;
+}
+
+/**
+ * The one-line summary an access editor shows live: what a save grants or
+ * removes, per backend, plus whether the server row is new.
+ */
+export function summarizeAccessChanges(
+  changes: AccessChange[],
+  serverId: number
+): AccessSummary {
+  const out: AccessSummary = { server: 'none', read: [], rw: [], deltas: [] };
+  for (const c of changes) {
+    if (c.serviceId === serverId) {
+      out.server = c.before === 'none' ? 'grant' : 'keep';
+      continue;
+    }
+    if (c.before === c.after) continue;
+    if (c.before === 'none') {
+      (c.after === 'rw' ? out.rw : out.read).push(c.label);
+    } else if (c.after === 'none') {
+      out.deltas.push({ label: c.label, delta: '-access' });
+    } else {
+      out.deltas.push({
+        label: c.label,
+        delta: c.after === 'rw' ? '+write' : '-write',
+      });
+    }
+  }
+  return out;
+}
+
 /** Plain-language lines for the diff shown before a role save. */
 export function accessDiff(
   changes: AccessChange[],

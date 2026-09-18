@@ -1,0 +1,175 @@
+<section
+  class="editor"
+  data-testid="mcp-access-editor"
+  [attr.data-mode]="mode"
+  *transloco="let t; read: 'mcpServer.access'">
+  <div class="editor__hd">
+    <h4>{{ t('editor.' + mode + 'Title', { server: serviceLabel }) }}</h4>
+    <span class="editor__hint">{{ t('editor.' + mode + 'Hint') }}</span>
+  </div>
+
+  <!-- Key shown once, after a create with key -->
+  <ng-container *ngIf="done">
+    <p class="editor__created">{{ t('dialog.created', { name: name }) }}</p>
+    <div class="editor__keybox" *ngIf="apiKey">
+      <span>{{ t('dialog.keyOnce') }}</span>
+      <code data-testid="mcp-access-key">{{ apiKey }}</code>
+      <button mat-stroked-button type="button" (click)="copyKey()">
+        {{ t('dialog.copyKey') }}
+      </button>
+    </div>
+    <p class="editor__hint" *ngIf="!apiKey">{{ t('dialog.keyFailed') }}</p>
+    <div class="editor__actions">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="saved.emit()">
+        {{ t('dialog.done') }}
+      </button>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="!done">
+    <!-- Top row: role picker / name + key -->
+    <div class="editor__top">
+      <mat-form-field
+        *ngIf="mode === 'add'"
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="editor__field">
+        <mat-label>{{ t('dialog.role') }}</mat-label>
+        <mat-select
+          [value]="roleId"
+          (selectionChange)="onRolePicked($event.value)"
+          data-testid="mcp-access-role">
+          <mat-option *ngFor="let r of addableRoles" [value]="r.id">{{
+            r.name
+          }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field
+        *ngIf="mode === 'create'"
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="editor__field">
+        <mat-label>{{ t('dialog.roleName') }}</mat-label>
+        <input
+          matInput
+          [(ngModel)]="name"
+          name="name"
+          data-testid="mcp-access-name" />
+      </mat-form-field>
+
+      <mat-checkbox
+        *ngIf="mode === 'create'"
+        color="primary"
+        [(ngModel)]="createKey"
+        name="createKey">
+        {{ t('editor.alsoKey') }}
+      </mat-checkbox>
+
+      <span class="editor__role" *ngIf="mode === 'edit' && role">
+        <code>{{ role.name }}</code>
+        <a [routerLink]="['/api-connections/role-based-access', role.id]">{{
+          t('rolePage')
+        }}</a>
+      </span>
+
+      <mat-form-field
+        *ngIf="showFilter"
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="editor__filter">
+        <mat-label>{{ t('editor.filter') }}</mat-label>
+        <input matInput [(ngModel)]="filter" name="filter" />
+      </mat-form-field>
+    </div>
+
+    <p class="editor__hint" *ngIf="backends.length === 0">
+      {{ t('dialog.noBackends') }}
+    </p>
+
+    <!-- Groups -->
+    <ng-container *ngFor="let group of groups; trackBy: trackByKind">
+      <div class="editor__group" *ngIf="group.rows.length > 0">
+        <div class="editor__group-hd">
+          <span class="editor__group-name">{{
+            t('editor.group.' + group.kind)
+          }}</span>
+          <button
+            mat-button
+            type="button"
+            class="editor__small"
+            [disabled]="mode === 'add' && !roleId"
+            (click)="readOnAll(group.kind)">
+            {{ t('editor.readOnAll') }}
+          </button>
+        </div>
+        <div
+          class="editor__row"
+          *ngFor="let row of group.rows; trackBy: trackByRow"
+          [attr.data-backend]="row.backend.name">
+          <div class="editor__name">
+            <span>{{ row.backend.label }}</span>
+            <code>{{ row.backend.name }}</code>
+          </div>
+          <span class="editor__why" *ngIf="row.grant?.tableLimited">
+            {{ t('tableLimited') }}
+          </span>
+          <span
+            class="editor__why"
+            *ngIf="!row.grant?.tableLimited && mode === 'add' && !roleId">
+            {{ t('editor.pickRoleFirst') }}
+          </span>
+          <div
+            class="editor__seg"
+            role="radiogroup"
+            [attr.aria-label]="row.backend.label"
+            *ngIf="!locked(row)">
+            <button
+              *ngFor="let level of levelsList"
+              type="button"
+              role="radio"
+              class="editor__opt"
+              [class.editor__opt--on]="levels[row.id] === level"
+              [attr.aria-checked]="levels[row.id] === level"
+              [attr.data-level]="level"
+              [disabled]="level === 'rw' && !allowWrites"
+              [matTooltip]="
+                level === 'rw' && !allowWrites ? t('dialog.writesBlocked') : ''
+              "
+              (click)="setLevel(row, level)">
+              {{ t('editor.level.' + level) }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Live summary = the diff -->
+    <p class="editor__summary" data-testid="mcp-access-summary">
+      {{ summaryText }}
+    </p>
+    <p class="editor__error" *ngIf="error">{{ error }}</p>
+
+    <div class="editor__actions">
+      <span class="editor__everywhere" *ngIf="touchesApis">{{
+        t('dialog.everywhere')
+      }}</span>
+      <button mat-button type="button" (click)="cancelled.emit()">
+        {{ t('dialog.cancel') }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        data-testid="mcp-access-save"
+        [disabled]="!canSave"
+        (click)="save()">
+        {{ mode === 'create' ? t('dialog.createSave') : t('dialog.save') }}
+      </button>
+    </div>
+  </ng-container>
+</section>
