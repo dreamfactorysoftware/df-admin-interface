@@ -1,0 +1,169 @@
+<ng-container *transloco="let t; read: 'mcpServer.access'">
+  <h2 mat-dialog-title>
+    {{ t('dialog.' + data.mode + 'Title', { server: data.serviceLabel }) }}
+  </h2>
+
+  <mat-dialog-content class="dlg">
+    <!-- Step 1: pick / name / levels -->
+    <ng-container *ngIf="step === 'edit'">
+      <mat-form-field
+        *ngIf="data.mode === 'add'"
+        appearance="outline"
+        class="dlg__full"
+        subscriptSizing="dynamic">
+        <mat-label>{{ t('dialog.role') }}</mat-label>
+        <mat-select
+          [value]="roleId"
+          (selectionChange)="onRolePicked($event.value)"
+          data-testid="mcp-access-role">
+          <mat-option *ngFor="let r of addableRoles" [value]="r.id">{{
+            r.name
+          }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field
+        *ngIf="data.mode === 'create'"
+        appearance="outline"
+        class="dlg__full"
+        subscriptSizing="dynamic">
+        <mat-label>{{ t('dialog.roleName') }}</mat-label>
+        <input matInput [(ngModel)]="name" name="name" />
+      </mat-form-field>
+
+      <p class="dlg__hint" *ngIf="data.mode === 'add'">
+        {{ t('dialog.addHint') }}
+      </p>
+      <p class="dlg__hint" *ngIf="data.mode === 'edit'">
+        {{ t('dialog.editHint') }}
+      </p>
+
+      <div class="dlg__apis" *ngIf="data.backends.length > 0">
+        <div
+          class="dlg__api"
+          *ngFor="let b of data.backends; trackBy: trackByBackend">
+          <mat-checkbox
+            *ngIf="data.mode === 'add'"
+            color="primary"
+            [(ngModel)]="include[b.id!]"
+            [name]="'inc_' + b.name"
+            [disabled]="!roleId"></mat-checkbox>
+          <div class="dlg__api-name">
+            <span>{{ b.label }}</span>
+            <code>{{ b.name }}</code>
+          </div>
+          <ng-container *ngIf="grant(b)?.tableLimited; else levelPicker">
+            <span class="dlg__limited">
+              {{ t('tableLimited') }}
+              <a
+                [routerLink]="['/api-connections/role-based-access', roleId]"
+                mat-dialog-close
+                >{{ t('rolePage') }}</a
+              >
+            </span>
+          </ng-container>
+          <ng-template #levelPicker>
+            <mat-button-toggle-group
+              [(ngModel)]="levels[b.id!]"
+              [name]="'lvl_' + b.name"
+              [disabled]="data.mode === 'add' && (!roleId || !include[b.id!])"
+              [attr.aria-label]="b.label">
+              <mat-button-toggle value="none">{{
+                t('level.none')
+              }}</mat-button-toggle>
+              <mat-button-toggle value="read">{{
+                t('level.read')
+              }}</mat-button-toggle>
+              <mat-button-toggle
+                value="rw"
+                [disabled]="!data.allowWrites"
+                [matTooltip]="data.allowWrites ? '' : t('dialog.writesBlocked')"
+                >{{ t('level.rw') }}</mat-button-toggle
+              >
+            </mat-button-toggle-group>
+          </ng-template>
+        </div>
+      </div>
+      <p class="dlg__hint" *ngIf="data.backends.length === 0">
+        {{ t('dialog.noBackends') }}
+      </p>
+
+      <mat-checkbox
+        *ngIf="data.mode === 'create'"
+        color="primary"
+        [(ngModel)]="createKey"
+        name="createKey"
+        class="dlg__key">
+        {{ t('dialog.alsoKey') }}
+      </mat-checkbox>
+    </ng-container>
+
+    <!-- Step 2: the diff -->
+    <ng-container *ngIf="step === 'review'">
+      <p class="dlg__hint">{{ t('dialog.reviewHint') }}</p>
+      <ul class="dlg__diff" data-testid="mcp-access-diff">
+        <li *ngFor="let line of diff">{{ line }}</li>
+        <li *ngIf="diff.length === 0" class="dlg__hint">
+          {{ t('dialog.noChanges') }}
+        </li>
+      </ul>
+      <p class="dlg__everywhere" *ngIf="touchesApis">
+        {{ t('dialog.everywhere') }}
+      </p>
+      <p class="dlg__error" *ngIf="error">{{ error }}</p>
+    </ng-container>
+
+    <!-- Step 3: key shown once -->
+    <ng-container *ngIf="step === 'done'">
+      <p>{{ t('dialog.created', { name: name }) }}</p>
+      <div class="dlg__keybox" *ngIf="apiKey">
+        <span>{{ t('dialog.keyOnce') }}</span>
+        <code data-testid="mcp-access-key">{{ apiKey }}</code>
+        <button mat-stroked-button type="button" (click)="copyKey()">
+          {{ t('dialog.copyKey') }}
+        </button>
+      </div>
+      <p class="dlg__hint" *ngIf="!apiKey">{{ t('dialog.keyFailed') }}</p>
+    </ng-container>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <ng-container *ngIf="step === 'edit'">
+      <button mat-button type="button" mat-dialog-close>
+        {{ t('dialog.cancel') }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="
+          (data.mode === 'add' && !roleId) || (data.mode === 'create' && !name)
+        "
+        (click)="review()">
+        {{ t('dialog.review') }}
+      </button>
+    </ng-container>
+    <ng-container *ngIf="step === 'review'">
+      <button mat-button type="button" (click)="step = 'edit'">
+        {{ t('dialog.back') }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="saving || (diff.length === 0 && data.mode !== 'create')"
+        (click)="save()">
+        {{ data.mode === 'create' ? t('dialog.createSave') : t('dialog.save') }}
+      </button>
+    </ng-container>
+    <ng-container *ngIf="step === 'done'">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="ref.close(true)">
+        {{ t('dialog.done') }}
+      </button>
+    </ng-container>
+  </mat-dialog-actions>
+</ng-container>

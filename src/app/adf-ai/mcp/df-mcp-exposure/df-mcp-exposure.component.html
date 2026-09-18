@@ -1,0 +1,421 @@
+<section
+  class="mcp"
+  data-testid="df-mcp-exposure"
+  *transloco="let t; read: 'mcpServer'">
+  <!-- Header: name, endpoint, health -->
+  <header class="mcp__head">
+    <code class="mcp__endpoint" data-testid="mcp-endpoint">{{
+      endpointUrl
+    }}</code>
+    <div class="mcp__health" *ngIf="!preview">
+      <df-badge
+        *ngIf="health"
+        [variant]="healthVariant"
+        [label]="healthMessage || t('health.' + healthVariant)"></df-badge>
+      <df-badge
+        *ngIf="!health && healthChecked"
+        variant="neutral"
+        [dot]="false"
+        [label]="t('health.unavailable')"></df-badge>
+      <df-badge
+        *ngIf="access && !cfg.requireRoleAccess"
+        variant="warning"
+        [label]="t('health.anyUser')"></df-badge>
+      <df-badge
+        *ngIf="access && cfg.requireRoleAccess"
+        [variant]="grantedRoleCount ? 'success' : 'warning'"
+        [label]="
+          grantedRoleCount
+            ? t('health.rolesGranted', { n: grantedRoleCount })
+            : t('health.noRoles')
+        "></df-badge>
+      <a class="mcp__link" [routerLink]="['/system-settings/system-info']">{{
+        t('health.systemPage')
+      }}</a>
+    </div>
+  </header>
+
+  <!-- Preview-as + summary tiles -->
+  <div class="mcp__top">
+    <div class="mcp__card mcp__who">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>{{ t('previewAs') }}</mat-label>
+        <mat-select
+          [value]="identityKey"
+          (selectionChange)="selectIdentity($event.value)"
+          data-testid="mcp-preview-as">
+          <mat-option
+            *ngFor="let o of identities; trackBy: trackByKey"
+            [value]="o.key">
+            <ng-container *ngIf="o.identity.kind === 'admin'">{{
+              t('identity.admin')
+            }}</ng-container>
+            <ng-container *ngIf="o.identity.kind === 'role'">{{
+              t('identity.role', { name: o.label })
+            }}</ng-container>
+            <ng-container *ngIf="o.identity.kind === 'app'">{{
+              t('identity.key', { name: o.label, role: o.identity.roleName })
+            }}</ng-container>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <p class="mcp__note">{{ t('identityNote.' + identityNoteKey) }}</p>
+    </div>
+    <div class="mcp__card mcp__tile" data-testid="mcp-tile-tools">
+      <span class="mcp__k">{{ t('tiles.tools') }}</span>
+      <span class="mcp__v">{{ shape.shown.length }}</span>
+      <span class="mcp__d">
+        <ng-container *ngIf="shape.lazy">{{
+          t('tiles.facadeOver', { n: shape.tools.length })
+        }}</ng-container>
+        <ng-container *ngIf="!shape.lazy && serverToolCount !== null">{{
+          t('tiles.serverReports', { n: serverToolCount })
+        }}</ng-container>
+        <ng-container *ngIf="!shape.lazy && serverToolCount === null">{{
+          t('tiles.estimated')
+        }}</ng-container>
+      </span>
+    </div>
+    <div class="mcp__card mcp__tile">
+      <span class="mcp__k">{{ t('tiles.tokens') }}</span>
+      <span class="mcp__v">{{ tokens }}</span>
+      <span class="mcp__d">{{ t('tiles.tokensHint') }}</span>
+    </div>
+    <div class="mcp__card mcp__tile">
+      <span class="mcp__k">{{ t('tiles.mode') }}</span>
+      <span class="mcp__v mcp__v--small">{{
+        shape.lazy ? t('mode.lazy') : t('mode.direct')
+      }}</span>
+      <span class="mcp__d">{{
+        t('modeReason.' + modeReasonKey, { kb: fullKb, threshold: thresholdKb })
+      }}</span>
+    </div>
+    <div class="mcp__card mcp__tile">
+      <span class="mcp__k">{{ t('tiles.who') }}</span>
+      <span class="mcp__v mcp__v--small">{{
+        cfg.allowApiKeyAuth ? t('auth.oauthKey') : t('auth.oauthOnly')
+      }}</span>
+      <span class="mcp__d">
+        <ng-container *ngIf="!cfg.requireRoleAccess">{{
+          t('auth.anyLogin')
+        }}</ng-container>
+        <ng-container *ngIf="cfg.requireRoleAccess && cfg.allowApiKeyAuth">{{
+          t('auth.rolesAndKeys', { roles: grantedRoleCount, keys: keyCount })
+        }}</ng-container>
+        <ng-container *ngIf="cfg.requireRoleAccess && !cfg.allowApiKeyAuth">{{
+          t('auth.rolesOnly', { roles: grantedRoleCount })
+        }}</ng-container>
+      </span>
+    </div>
+  </div>
+
+  <!-- Modes strip -->
+  <div class="mcp__card mcp__modes" data-testid="mcp-modes">
+    <div class="mcp__mode">
+      <span class="mcp__k">{{ t('modes.lazy') }}</span>
+      <mat-button-toggle-group
+        [value]="cfg.lazyMode"
+        [disabled]="!has('lazyMode')"
+        (change)="setMode('lazyMode', $event.value)"
+        [attr.aria-label]="t('modes.lazy')">
+        <mat-button-toggle value="auto">{{
+          t('modes.auto')
+        }}</mat-button-toggle>
+        <mat-button-toggle value="on">{{ t('modes.on') }}</mat-button-toggle>
+        <mat-button-toggle value="off">{{ t('modes.off') }}</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="mcp__c">{{
+        t('modes.lazyWhy.' + cfg.lazyMode, { threshold: thresholdKb })
+      }}</span>
+    </div>
+
+    <div class="mcp__mode" *ngIf="!systemMcp">
+      <span class="mcp__k">{{ t('modes.style') }}</span>
+      <mat-button-toggle-group
+        [value]="cfg.toolStyle"
+        [disabled]="!has('toolStyle')"
+        (change)="setMode('toolStyle', $event.value)"
+        [attr.aria-label]="t('modes.style')">
+        <mat-button-toggle value="merged">{{
+          t('modes.merged')
+        }}</mat-button-toggle>
+        <mat-button-toggle value="prefixed">{{
+          t('modes.prefixed')
+        }}</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="mcp__c">{{
+        cfg.toolStyle === 'merged'
+          ? t('modes.styleWhy.merged')
+          : t('modes.styleWhy.prefixed', { n: shape.dbs.length })
+      }}</span>
+    </div>
+
+    <div class="mcp__mode">
+      <span class="mcp__k">{{ t('modes.writes') }}</span>
+      <mat-button-toggle-group
+        class="mcp__writes"
+        [value]="cfg.allowWrites"
+        [disabled]="!has('allowWrites')"
+        (change)="setMode('allowWrites', $event.value)"
+        [attr.aria-label]="t('modes.writes')">
+        <mat-button-toggle [value]="true">{{
+          t('modes.allowed')
+        }}</mat-button-toggle>
+        <mat-button-toggle [value]="false">{{
+          t('modes.blocked')
+        }}</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="mcp__c">
+        <ng-container *ngIf="!has('allowWrites')">{{
+          t('modes.needsUpgrade')
+        }}</ng-container>
+        <ng-container *ngIf="has('allowWrites')">{{
+          cfg.allowWrites
+            ? t('modes.writesWhy.on', { n: shape.writable })
+            : t('modes.writesWhy.off')
+        }}</ng-container>
+      </span>
+    </div>
+
+    <div class="mcp__mode">
+      <span class="mcp__k">{{ t('modes.auth') }}</span>
+      <mat-button-toggle-group
+        [value]="cfg.allowApiKeyAuth"
+        [disabled]="!has('allowApiKeyAuth')"
+        (change)="setMode('allowApiKeyAuth', $event.value)"
+        [attr.aria-label]="t('modes.auth')">
+        <mat-button-toggle [value]="false">{{
+          t('auth.oauthOnly')
+        }}</mat-button-toggle>
+        <mat-button-toggle [value]="true">{{
+          t('auth.oauthKeyLong')
+        }}</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="mcp__c">{{
+        cfg.allowApiKeyAuth ? t('modes.authWhy.key') : t('modes.authWhy.oauth')
+      }}</span>
+    </div>
+
+    <div class="mcp__mode">
+      <span class="mcp__k">{{ t('modes.requireRole') }}</span>
+      <mat-button-toggle-group
+        [value]="cfg.requireRoleAccess"
+        [disabled]="!has('requireRoleAccess')"
+        (change)="setMode('requireRoleAccess', $event.value)"
+        [attr.aria-label]="t('modes.requireRole')">
+        <mat-button-toggle [value]="true">{{
+          t('modes.on')
+        }}</mat-button-toggle>
+        <mat-button-toggle [value]="false">{{
+          t('modes.off')
+        }}</mat-button-toggle>
+      </mat-button-toggle-group>
+      <span class="mcp__c">
+        <ng-container *ngIf="!has('requireRoleAccess')">{{
+          t('modes.needsUpgrade')
+        }}</ng-container>
+        <ng-container *ngIf="has('requireRoleAccess')">{{
+          cfg.requireRoleAccess
+            ? t('modes.requireWhy.on')
+            : t('modes.requireWhy.off')
+        }}</ng-container>
+      </span>
+    </div>
+  </div>
+
+  <!-- What the client carries each turn -->
+  <div class="mcp__card">
+    <div class="mcp__hd">
+      <h3>{{ t('carry.title') }}</h3>
+      <span class="mcp__hint">{{ t('carry.hint') }}</span>
+    </div>
+    <div class="mcp__carry">
+      <div class="mcp__bars">
+        <div class="mcp__bar-row">
+          <span class="mcp__bar-lbl">{{ t('carry.full') }}</span>
+          <div class="mcp__bar">
+            <i [style.width.%]="barWidth(shape.bytes)"></i>
+          </div>
+          <span class="mcp__bar-n">{{ fullKb }}</span>
+        </div>
+        <div class="mcp__bar-row">
+          <span class="mcp__bar-lbl">{{ t('carry.facade') }}</span>
+          <div class="mcp__bar mcp__bar--lite">
+            <i [style.width.%]="barWidth(shape.facadeBytes)"></i>
+          </div>
+          <span class="mcp__bar-n">{{ facadeKb }}</span>
+        </div>
+        <p class="mcp__hint">
+          {{ t('carry.barHint', { threshold: thresholdKb }) }}
+        </p>
+        <p class="mcp__hint">
+          {{
+            shape.lazy
+              ? t('carry.isLazy', {
+                  lite: facadeKb,
+                  full: fullKb,
+                  n: shape.tools.length,
+                })
+              : t('carry.isDirect', {
+                  full: fullKb,
+                  n: shape.tools.length,
+                  threshold: thresholdKb,
+                })
+          }}
+        </p>
+      </div>
+      <div class="mcp__steps" [class.mcp__steps--dim]="!shape.lazy">
+        <div class="mcp__step">
+          <code>search_tools("shipped orders by customer")</code>
+          <span>{{ t('carry.step1', { tool: exampleTool }) }}</span>
+        </div>
+        <div class="mcp__step">
+          <code>describe_tool("{{ exampleTool }}")</code>
+          <span>{{ t('carry.step2') }}</span>
+        </div>
+        <div class="mcp__step">
+          <code>call_tool("{{ exampleTool }}", {{ '{' }} … {{ '}' }})</code>
+          <span>{{ t('carry.step3') }}</span>
+        </div>
+        <div class="mcp__step">
+          <code>fetch_more(handle, 6000)</code>
+          <span>{{ t('carry.step4') }}</span>
+        </div>
+        <p class="mcp__hint">{{ t('carry.stepsNote') }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Who can connect -->
+  <df-mcp-access
+    *ngIf="!preview && serviceId !== null"
+    [serviceId]="serviceId"
+    [serviceLabel]="serviceLabel || serviceName"
+    [access]="access"
+    [roles]="roles"
+    [apps]="apps"
+    [backends]="backends"
+    [exposed]="cfg.exposedServices"
+    [requireRoleAccess]="cfg.requireRoleAccess"
+    [allowWrites]="cfg.allowWrites"
+    [loading]="loading"
+    (previewAs)="previewRole($event)"
+    (changed)="reloadAccess()"></df-mcp-access>
+
+  <div class="mcp__split" [class.mcp__split--rail-only]="systemMcp">
+    <!-- Exposure grid -->
+    <div class="mcp__card" *ngIf="!systemMcp">
+      <div class="mcp__hd">
+        <h3>{{ t('grid.title') }}</h3>
+        <span class="mcp__hint">{{ t('grid.hint') }}</span>
+      </div>
+      <df-mcp-exposure-grid
+        [backends]="backends"
+        [cfg]="cfg"
+        [identity]="identity"
+        [loading]="loading"
+        (toggleExposed)="toggleExposed($event)"
+        (toggleCell)="toggleCell($event)"></df-mcp-exposure-grid>
+    </div>
+
+    <div class="mcp__rail">
+      <!-- Catalog -->
+      <div class="mcp__card" data-testid="mcp-catalog">
+        <div class="mcp__hd">
+          <h3>{{ t('catalog.title') }}</h3>
+        </div>
+        <div class="mcp__cat-sum">
+          <span
+            ><b>{{ shape.shown.length }}</b> {{ t('catalog.advertised') }}</span
+          >
+          <span
+            ><b>{{ shape.writable }}</b> {{ t('catalog.canWrite') }}</span
+          >
+          <span *ngIf="!systemMcp"
+            ><b>{{ shape.dbs.length }}</b> {{ t('catalog.databases') }}</span
+          >
+          <span *ngIf="!systemMcp"
+            ><b>{{ shape.files.length }}</b> {{ t('catalog.files') }}</span
+          >
+        </div>
+        <div class="mcp__chips">
+          <span
+            *ngFor="let tool of shape.shown; trackBy: trackByName"
+            class="mcp__chip"
+            [class.mcp__chip--write]="tool.kind === 'write'"
+            [class.mcp__chip--facade]="tool.kind === 'facade'"
+            [class.mcp__chip--global]="
+              tool.kind === 'global' || tool.kind === 'aggregate'
+            "
+            [class.mcp__chip--custom]="tool.kind === 'custom'">
+            {{ tool.name }}<b *ngIf="tool.kind === 'write'" class="mcp__w">W</b>
+          </span>
+        </div>
+        <p class="mcp__hint" *ngIf="shape.lazy">
+          {{ t('catalog.lazyNote', { n: shape.tools.length }) }}
+        </p>
+        <p class="mcp__hint" *ngIf="!preview">
+          {{ t('catalog.source.' + catalogSource) }}
+        </p>
+      </div>
+
+      <!-- Connect -->
+      <div class="mcp__card" data-testid="mcp-connect">
+        <div class="mcp__hd">
+          <h3>{{ t('connect.title') }}</h3>
+        </div>
+        <mat-button-toggle-group
+          class="mcp__clients"
+          [value]="client"
+          (change)="client = $event.value"
+          [attr.aria-label]="t('connect.title')">
+          <mat-button-toggle *ngFor="let c of clients" [value]="c">{{
+            t('connect.client.' + c)
+          }}</mat-button-toggle>
+        </mat-button-toggle-group>
+        <p
+          class="mcp__hint"
+          *ngIf="identity.kind === 'app' && !cfg.allowApiKeyAuth">
+          {{ t('connect.keyOff') }}
+        </p>
+        <pre class="mcp__snip"><code>{{ snippet }}</code></pre>
+        <button
+          mat-stroked-button
+          type="button"
+          class="mcp__copy"
+          (click)="copySnippet()">
+          {{ copied ? t('connect.copied') : t('connect.copy') }}
+        </button>
+      </div>
+
+      <!-- Last 7 days -->
+      <div class="mcp__card" *ngIf="!preview" data-testid="mcp-usage">
+        <div class="mcp__hd">
+          <h3>{{ t('usage.title') }}</h3>
+          <span class="mcp__hint" *ngIf="!usage">{{
+            t('usage.unavailable')
+          }}</span>
+        </div>
+        <table class="mcp__ev" *ngIf="usage">
+          <thead>
+            <tr>
+              <th>{{ systemMcp ? t('usage.tool') : t('usage.backend') }}</th>
+              <th>{{ t('usage.calls') }}</th>
+              <th>{{ t('usage.lastUsed') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of usageRows">
+              <td>{{ row.label || t('usage.merged') }}</td>
+              <td [class.mcp__zero]="!row.calls">{{ row.calls }}</td>
+              <td>{{ row.lastUsed || t('usage.never') }}</td>
+            </tr>
+            <tr *ngIf="usageRows.length === 0">
+              <td colspan="3" class="mcp__hint">{{ t('usage.nothing') }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

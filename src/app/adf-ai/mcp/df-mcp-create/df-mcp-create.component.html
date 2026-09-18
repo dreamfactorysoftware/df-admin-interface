@@ -1,0 +1,262 @@
+<section
+  class="create"
+  data-testid="df-mcp-create"
+  *transloco="let t; read: 'mcpServer.create'">
+  <mat-stepper #stepper [linear]="false" class="create__stepper">
+    <!-- 1. Name -->
+    <mat-step [label]="t('steps.name')" [completed]="form.valid">
+      <div class="create__step" [formGroup]="form">
+        <mat-form-field
+          appearance="outline"
+          class="create__field"
+          subscriptSizing="dynamic">
+          <mat-label>{{
+            'services.controls.namespace.label' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            formControlName="name"
+            data-testid="mcp-create-name" />
+        </mat-form-field>
+        <p class="create__hint">{{ t('nameHint') }}</p>
+        <mat-form-field
+          appearance="outline"
+          class="create__field"
+          subscriptSizing="dynamic">
+          <mat-label>{{
+            'services.controls.label.label' | transloco
+          }}</mat-label>
+          <input matInput formControlName="label" />
+        </mat-form-field>
+        <mat-form-field
+          appearance="outline"
+          class="create__field"
+          subscriptSizing="dynamic">
+          <mat-label>{{
+            'services.controls.description.label' | transloco
+          }}</mat-label>
+          <textarea matInput rows="2" formControlName="description"></textarea>
+        </mat-form-field>
+        <div class="create__actions">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            matStepperNext
+            [disabled]="form.invalid">
+            {{ t('next') }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- 2. Attach APIs -->
+    <mat-step [label]="t('steps.apis')" [completed]="exposed.length > 0">
+      <div class="create__step">
+        <p class="create__hint">{{ t('apisHint') }}</p>
+        <p class="create__hint" *ngIf="!loading && backends.length === 0">
+          {{ t('noApis') }}
+        </p>
+        <div class="create__list">
+          <mat-checkbox
+            *ngFor="let b of backends; trackBy: trackByName"
+            color="primary"
+            [checked]="isExposed(b)"
+            (change)="toggleBackend(b)"
+            [attr.data-backend]="b.name">
+            <span class="create__lbl">{{ b.label }}</span>
+            <code class="create__code">{{ b.name }}</code>
+            <span class="create__kind">{{
+              'mcpServer.grid.kind.' + b.kind | transloco
+            }}</span>
+          </mat-checkbox>
+        </div>
+        <div class="create__actions">
+          <button mat-button type="button" matStepperPrevious>
+            {{ t('back') }}
+          </button>
+          <button mat-flat-button color="primary" type="button" matStepperNext>
+            {{ t('next') }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- 3. Who can connect -->
+    <mat-step [label]="t('steps.who')">
+      <div class="create__step">
+        <p class="create__hint">{{ t('whoHint') }}</p>
+        <mat-slide-toggle
+          *ngIf="has('requireRoleAccess')"
+          color="primary"
+          [formControl]="ctl('requireRoleAccess')">
+          {{ t('requireRole') }}
+        </mat-slide-toggle>
+        <p class="create__hint">{{ t('requireRoleHint') }}</p>
+        <mat-slide-toggle
+          *ngIf="has('allowApiKeyAuth')"
+          color="primary"
+          [formControl]="ctl('allowApiKeyAuth')">
+          {{ t('allowKey') }}
+        </mat-slide-toggle>
+        <p class="create__hint">{{ t('allowKeyHint') }}</p>
+
+        <h4 class="create__h4">{{ t('grantRoles') }}</h4>
+        <p class="create__hint">{{ t('grantRolesHint') }}</p>
+        <div class="create__list create__list--roles">
+          <mat-checkbox
+            *ngFor="let r of roles; trackBy: trackById"
+            color="primary"
+            [checked]="grantRoleIds.has(r.id)"
+            (change)="toggleRole(r.id)">
+            {{ r.name }}
+          </mat-checkbox>
+        </div>
+        <div class="create__actions">
+          <button mat-button type="button" matStepperPrevious>
+            {{ t('back') }}
+          </button>
+          <button mat-flat-button color="primary" type="button" matStepperNext>
+            {{ t('next') }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- 4. Client settings -->
+    <mat-step [label]="t('steps.client')">
+      <div class="create__step" *transloco="let m; read: 'mcpServer.modes'">
+        <p class="create__hint">{{ t('clientHint') }}</p>
+        <div class="create__mode" *ngIf="has('lazyMode')">
+          <span class="create__k">{{ m('lazy') }}</span>
+          <mat-button-toggle-group
+            [formControl]="ctl('lazyMode')"
+            [attr.aria-label]="m('lazy')">
+            <mat-button-toggle value="auto">{{ m('auto') }}</mat-button-toggle>
+            <mat-button-toggle value="on">{{ m('on') }}</mat-button-toggle>
+            <mat-button-toggle value="off">{{ m('off') }}</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        <div class="create__mode" *ngIf="has('toolStyle')">
+          <span class="create__k">{{ m('style') }}</span>
+          <mat-button-toggle-group
+            [formControl]="ctl('toolStyle')"
+            [attr.aria-label]="m('style')">
+            <mat-button-toggle value="merged">{{
+              m('merged')
+            }}</mat-button-toggle>
+            <mat-button-toggle value="prefixed">{{
+              m('prefixed')
+            }}</mat-button-toggle>
+          </mat-button-toggle-group>
+          <span class="create__hint">{{
+            ctl('toolStyle').value === 'merged'
+              ? m('styleWhy.merged')
+              : m('styleWhy.prefixed', { n: exposed.length })
+          }}</span>
+        </div>
+        <div class="create__mode" *ngIf="has('allowWrites')">
+          <span class="create__k">{{ m('writes') }}</span>
+          <mat-button-toggle-group
+            [formControl]="ctl('allowWrites')"
+            [attr.aria-label]="m('writes')">
+            <mat-button-toggle [value]="true">{{
+              m('allowed')
+            }}</mat-button-toggle>
+            <mat-button-toggle [value]="false">{{
+              m('blocked')
+            }}</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+        <div class="create__actions">
+          <button mat-button type="button" matStepperPrevious>
+            {{ t('back') }}
+          </button>
+          <button mat-flat-button color="primary" type="button" matStepperNext>
+            {{ t('next') }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- 5. Review: the server page in preview mode -->
+    <mat-step [label]="t('steps.review')">
+      <div class="create__step">
+        <p class="create__hint">{{ t('reviewHint') }}</p>
+        <df-mcp-exposure
+          *ngIf="stepper.selectedIndex === 4"
+          [preview]="true"
+          [serviceName]="name"
+          [serviceLabel]="form.get('label')?.value || name"
+          [config]="config"
+          [disabledTools]="disabledTools"
+          [backends]="backends"
+          [previewRoles]="previewRoles"></df-mcp-exposure>
+        <p class="create__error" *ngIf="error">
+          {{ t('createFailed', { error: error }) }}
+        </p>
+        <div class="create__actions">
+          <button
+            mat-button
+            type="button"
+            matStepperPrevious
+            [disabled]="creating">
+            {{ t('back') }}
+          </button>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            data-testid="mcp-create-submit"
+            [disabled]="form.invalid || creating"
+            (click)="create(); stepper.next()">
+            {{ creating ? t('creating') : t('createServer') }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- 6. Connect -->
+    <mat-step [label]="t('steps.connect')">
+      <div class="create__step" *transloco="let c; read: 'mcpServer.connect'">
+        <ng-container *ngIf="createdId !== null">
+          <code class="create__endpoint">{{ endpointUrl }}</code>
+          <mat-button-toggle-group
+            [value]="client"
+            (change)="client = $event.value"
+            [attr.aria-label]="c('title')">
+            <mat-button-toggle *ngFor="let cl of clients" [value]="cl">{{
+              c('client.' + cl)
+            }}</mat-button-toggle>
+          </mat-button-toggle-group>
+          <pre class="create__snip"><code>{{ snippet }}</code></pre>
+          <button mat-stroked-button type="button" (click)="copySnippet()">
+            {{ copied ? c('copied') : c('copy') }}
+          </button>
+          <div
+            class="create__wait"
+            [class.create__wait--live]="firstCall"
+            data-testid="mcp-create-wait">
+            <strong>{{ firstCall ? t('firstCall') : t('waiting') }}</strong>
+            <span *ngIf="!firstCall">{{ t('waitingHint') }}</span>
+          </div>
+          <div class="create__actions">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="openPage()">
+              {{ t('openPage') }}
+            </button>
+          </div>
+        </ng-container>
+        <p class="create__error" *ngIf="createdId === null && error">
+          {{ t('createFailed', { error: error }) }}
+        </p>
+        <p class="create__hint" *ngIf="createdId === null && !error">
+          {{ creating ? t('creating') : t('reviewHint') }}
+        </p>
+      </div>
+    </mat-step>
+  </mat-stepper>
+</section>

@@ -1,0 +1,158 @@
+<section
+  class="access"
+  data-testid="mcp-access"
+  *transloco="let t; read: 'mcpServer.access'">
+  <div class="access__hd">
+    <h3>{{ t('title') }}</h3>
+    <span class="access__hint">{{ t('hint') }}</span>
+    <div class="access__actions">
+      <button mat-stroked-button type="button" (click)="open('add')">
+        {{ t('addExisting') }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="open('create')">
+        {{ t('createRole') }}
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="loading" class="access__loading">
+    <df-skeleton variant="table-row" [count]="2"></df-skeleton>
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <p class="access__warn" *ngIf="!requireRoleAccess">
+      <df-badge variant="warning" [label]="t('anyUser')"></df-badge>
+      <span>{{ t('anyUserHint') }}</span>
+    </p>
+    <p class="access__hint" *ngIf="!access">{{ t('statsUnavailable') }}</p>
+
+    <div class="access__rows" *ngIf="grantedRows.length > 0">
+      <div
+        class="access__row"
+        *ngFor="let row of grantedRows; trackBy: trackByRole"
+        [attr.data-role]="row.name">
+        <div class="access__role">
+          <span class="access__name">{{ row.name }}</span>
+          <small>{{
+            row.level === 'rw'
+              ? t('level.rw')
+              : row.level === 'read'
+                ? t('level.read')
+                : t('level.serverOnly')
+          }}</small>
+        </div>
+        <div class="access__reach">
+          <ng-container *ngIf="row.reach.length === 0">
+            <span class="access__hint">{{ t('reachNone') }}</span>
+          </ng-container>
+          <code
+            *ngFor="let r of row.reach"
+            [class.access__reach--unexposed]="!r.exposed"
+            [matTooltip]="
+              r.tableLimited ? t('tableLimited') : t('level.' + r.level)
+            "
+            >{{ r.label
+            }}<span *ngIf="r.tableLimited" class="access__lim">*</span></code
+          >
+          <df-badge
+            *ngIf="row.reach.length && !hasExposedReach(row)"
+            variant="warning"
+            [dot]="false"
+            [label]="t('notExposed')"></df-badge>
+        </div>
+        <div class="access__key">
+          <code *ngIf="row.keyName">{{ row.keyName }}</code>
+          <span *ngIf="!row.keyName" class="access__hint">{{
+            t('loginOnly')
+          }}</span>
+        </div>
+        <div class="access__stats" *ngIf="access">
+          <span>{{ t('requests', { n: row.requests }) }}</span>
+          <span [class.access__denied]="row.denied > 0">{{
+            t('denied', { n: row.denied })
+          }}</span>
+        </div>
+        <div class="access__btns">
+          <button
+            mat-button
+            type="button"
+            class="access__small"
+            (click)="previewAs.emit(row.roleId)">
+            {{ t('previewAs') }}
+          </button>
+          <button
+            mat-button
+            type="button"
+            class="access__small"
+            (click)="open('edit', row)">
+            {{ t('editAccess') }}
+          </button>
+          <a
+            mat-button
+            class="access__small"
+            [routerLink]="['/api-connections/role-based-access', row.roleId]"
+            >{{ t('rolePage') }}</a
+          >
+        </div>
+      </div>
+    </div>
+
+    <p class="access__hint" *ngIf="grantedRows.length === 0">
+      {{ requireRoleAccess ? t('nobody') : t('nobodyOpen') }}
+    </p>
+
+    <!-- Roles seen in the last 30 days without a grant -->
+    <div class="access__seen" *ngIf="seenRows.length > 0">
+      <h4>{{ t('seenTitle') }}</h4>
+      <div
+        class="access__row access__row--seen"
+        *ngFor="let row of seenRows; trackBy: trackByRole"
+        [attr.data-role]="row.name">
+        <div class="access__role">
+          <span class="access__name">{{ row.name }}</span>
+          <small>{{
+            row.lastSeen ? t('lastSeen', { at: row.lastSeen }) : ''
+          }}</small>
+        </div>
+        <div class="access__reach">
+          <code
+            *ngFor="let r of row.reach"
+            [class.access__reach--unexposed]="!r.exposed"
+            >{{ r.label }}</code
+          >
+        </div>
+        <div class="access__key">
+          <code *ngIf="row.keyName">{{ row.keyName }}</code>
+        </div>
+        <div class="access__stats">
+          <span>{{ t('requests', { n: row.requests }) }}</span>
+          <span [class.access__denied]="row.denied > 0">{{
+            t('denied', { n: row.denied })
+          }}</span>
+        </div>
+        <div class="access__btns">
+          <button
+            mat-button
+            type="button"
+            class="access__small"
+            (click)="previewAs.emit(row.roleId)">
+            {{ t('previewAs') }}
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            color="primary"
+            class="access__small"
+            [disabled]="granting === row.roleId"
+            (click)="grant(row)">
+            {{ t('grant') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</section>

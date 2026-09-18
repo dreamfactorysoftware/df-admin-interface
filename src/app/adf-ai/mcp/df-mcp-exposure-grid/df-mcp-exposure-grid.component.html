@@ -1,0 +1,153 @@
+<ng-container *transloco="let t; read: 'mcpServer.grid'">
+  <div *ngIf="loading" class="grid__loading">
+    <df-skeleton variant="table-row" [count]="4"></df-skeleton>
+  </div>
+
+  <p *ngIf="!loading && backends.length === 0" class="grid__empty">
+    {{ t('empty') }}
+  </p>
+
+  <div *ngIf="!loading && backends.length > 0" class="grid__wrap">
+    <table class="grid" data-testid="mcp-exposure-grid">
+      <thead>
+        <tr>
+          <th class="grid__svc"></th>
+          <th
+            *ngFor="let g of groups"
+            class="grid__group"
+            [class.grid__group--write]="g === 'write'"
+            [attr.colspan]="groupSpan(g)">
+            {{ t('group.' + g) }}
+          </th>
+          <th></th>
+        </tr>
+        <tr>
+          <th class="grid__svc">{{ t('backend') }}</th>
+          <th
+            *ngFor="let verb of dbVerbs; trackBy: trackByName"
+            class="grid__verb">
+            <span>{{ verb.name }}</span>
+          </th>
+          <th class="grid__count">{{ t('tools') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Databases: 16 verbs -->
+        <tr
+          *ngFor="let b of databases; trackBy: trackByName"
+          class="grid__row"
+          [class.grid__row--off]="!isExposed(b)"
+          [class.grid__row--hidden]="isHidden(b)"
+          [attr.data-backend]="b.name"
+          [attr.data-exposed]="isExposed(b)">
+          <td class="grid__svc">
+            <div class="grid__name">
+              <mat-slide-toggle
+                color="primary"
+                [checked]="isExposed(b)"
+                (change)="toggleExposed.emit(b.name)"
+                [attr.aria-label]="t('expose', { name: b.label })">
+              </mat-slide-toggle>
+              <span class="grid__lbl">{{ b.label }}</span>
+              <code class="grid__n">{{ b.name }}</code>
+              <span class="grid__ty">{{ t('kind.database') }}</span>
+              <span
+                *ngIf="limitedTo(b) as comps"
+                class="grid__limited"
+                [matTooltip]="comps.join(', ')"
+                >{{ t('limitedTo', { n: comps.length }) }}</span
+              >
+            </div>
+          </td>
+          <td *ngFor="let verb of dbVerbs; trackBy: trackByName">
+            <button
+              type="button"
+              class="grid__cell"
+              [class.grid__cell--write]="verb.write"
+              [attr.data-state]="state(b, verb)"
+              [attr.data-key]="key(b, verb)"
+              [disabled]="!interactive(b, verb)"
+              [matTooltip]="key(b, verb) + ': ' + t('state.' + state(b, verb))"
+              [attr.aria-label]="
+                key(b, verb) + ': ' + t('state.' + state(b, verb))
+              "
+              (click)="onCell(b, verb)">
+              <i></i>
+            </button>
+          </td>
+          <td class="grid__count">
+            <span *ngIf="!isExposed(b)">—</span>
+            <span *ngIf="isHidden(b)">{{ t('hiddenShort') }}</span>
+            <span *ngIf="isExposed(b) && !isHidden(b)">{{ toolCount(b) }}</span>
+          </td>
+        </tr>
+
+        <!-- Files: 6 verbs, padded to the database column count -->
+        <tr
+          *ngFor="let b of files; trackBy: trackByName"
+          class="grid__row grid__row--file"
+          [class.grid__row--off]="!isExposed(b)"
+          [class.grid__row--hidden]="isHidden(b)"
+          [attr.data-backend]="b.name"
+          [attr.data-exposed]="isExposed(b)">
+          <td class="grid__svc">
+            <div class="grid__name">
+              <mat-slide-toggle
+                color="primary"
+                [checked]="isExposed(b)"
+                (change)="toggleExposed.emit(b.name)"
+                [attr.aria-label]="t('expose', { name: b.label })">
+              </mat-slide-toggle>
+              <span class="grid__lbl">{{ b.label }}</span>
+              <code class="grid__n">{{ b.name }}</code>
+              <span class="grid__ty">{{ t('kind.file') }}</span>
+              <span
+                *ngIf="limitedTo(b) as comps"
+                class="grid__limited"
+                [matTooltip]="comps.join(', ')"
+                >{{ t('limitedTo', { n: comps.length }) }}</span
+              >
+            </div>
+          </td>
+          <td *ngFor="let verb of fileVerbs; trackBy: trackByName">
+            <button
+              type="button"
+              class="grid__cell"
+              [class.grid__cell--write]="verb.write"
+              [attr.data-state]="state(b, verb)"
+              [attr.data-key]="key(b, verb)"
+              [disabled]="!interactive(b, verb)"
+              [matTooltip]="verb.name + ': ' + t('state.' + state(b, verb))"
+              [attr.aria-label]="
+                key(b, verb) + ': ' + t('state.' + state(b, verb))
+              "
+              (click)="onCell(b, verb)">
+              <i></i>
+            </button>
+          </td>
+          <td
+            [attr.colspan]="dbVerbs.length - fileVerbs.length"
+            class="grid__pad">
+            <span class="grid__fileverbs">{{ t('fileVerbs') }}</span>
+          </td>
+          <td class="grid__count">
+            <span *ngIf="!isExposed(b)">—</span>
+            <span *ngIf="isHidden(b)">{{ t('hiddenShort') }}</span>
+            <span *ngIf="isExposed(b) && !isHidden(b)">{{ toolCount(b) }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="grid__legend" *ngIf="!loading && backends.length > 0">
+    <span *ngFor="let s of states"
+      ><i class="grid__dot" [attr.data-state]="s"></i
+      >{{ t('legend.' + s) }}</span
+    >
+    <span
+      ><i class="grid__dot grid__dot--write" data-state="on"></i
+      >{{ t('legend.write') }}</span
+    >
+  </div>
+</ng-container>
