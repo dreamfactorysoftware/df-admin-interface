@@ -27,10 +27,11 @@ import {
   AccessSummary,
   BackendKind,
   McpBackend,
-  ServiceGrant,
+  ServiceGrantSpec,
+  accessChangeTouched,
   accessRowsForChanges,
   buildAccessChanges,
-  grantsByService,
+  classifyServiceGrant,
   summarizeAccessChanges,
 } from '../mcp-model';
 
@@ -39,7 +40,7 @@ export type AccessEditorMode = 'add' | 'edit' | 'create';
 interface EditorRow {
   backend: McpBackend;
   id: number;
-  grant?: ServiceGrant;
+  spec: ServiceGrantSpec;
 }
 
 /**
@@ -87,6 +88,13 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
   name = '';
   createKey = true;
   levels: Record<number, AccessLevel> = {};
+  /** Ticked tables per backend id; missing / empty = whole API. */
+  tables: Record<number, string[]> = {};
+  expanded = new Set<number>();
+  tableFilter: Record<number, string> = {};
+  /** Table names per backend name, fetched lazily on first expand. */
+  private tableCache: Record<string, string[]> = {};
+  loadingTables = new Set<string>();
   filter = '';
   saving = false;
   error = '';
@@ -118,6 +126,9 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
 
   private reset(): void {
     this.levels = {};
+    this.tables = {};
+    this.expanded = new Set();
+    this.tableFilter = {};
     this.error = '';
     this.apiKey = null;
     this.done = false;
@@ -139,10 +150,23 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
   }
 
   private seedLevels(role: McpRole): void {
-    const grants = grantsByService(role.rows);
+    const specs = this.specsOf(role);
     for (const b of this.backends) {
-      this.levels[b.id as number] = grants[b.id as number]?.level ?? 'none';
+      const id = b.id as number;
+      const spec = specs[id];
+      this.levels[id] = spec?.level ?? 'none';
+      if (spec?.tables?.length) this.tables[id] = [...spec.tables];
     }
+  }
+
+  private specsOf(role?: McpRole): Record<number, ServiceGrantSpec> {
+    const out: Record<number, ServiceGrantSpec> = {};
+    if (!role) return out;
+    const ids = [this.serviceId, ...this.backends.map(b => b.id as number)];
+    for (const id of ids) {
+      out[id] = classifyServiceGrant(role.rows.filter(r => r.serviceId === id));
+    }
+    return out;
   }
 
   /** Roles an admin can add: active ones without a server grant yet. */
@@ -156,8 +180,8 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
     return this.role ?? this.roles.find(r => r.id === this.roleId);
   }
 
-  private currentGrants(): Record<number, ServiceGrant> {
-    return this.currentRole ? grantsByService(this.currentRole.rows) : {};
+  private currentSpecs(): Record<number, ServiceGrantSpec> {
+    return this.specsOf(this.currentRole);
   }
 
   onRolePicked(id: number): void {
@@ -171,7 +195,7 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
   }
 
   private rowsOf(kind: BackendKind): EditorRow[] {
-    const grants = this.currentGrants();
+    const specs = this.currentSpecs();
     const q = this.filter.trim().toLowerCase();
     return this.backends
       .filter(b => b.kind === kind)
@@ -184,7 +208,12 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
       .map(b => ({
         backend: b,
         id: b.id as number,
-        grant: grants[b.id as number],
+        spec: specs[b.id as number] ?? {
+          level: 'none',
+          tables: null,
+          editable: true,
+          mask: 0,
+        },
       }));
   }
 
@@ -200,15 +229,85 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
     return g.kind;
   }
 
-  /** The row is locked: the role is not picked yet, or the grant is table-limited. */
+  /** The row is locked: no role picked yet, or rows the editor cannot manage. */
   locked(row: EditorRow): boolean {
-    return (this.mode === 'add' && !this.roleId) || !!row.grant?.tableLimited;
+    return (this.mode === 'add' && !this.roleId) || !row.spec.editable;
+  }
+
+  // ------------------------------------------------------- table limits
+
+  canLimit(row: EditorRow): boolean {
+    return (
+      row.backend.kind === 'database' &&
+      !this.locked(row) &&
+      (this.levels[row.id] ?? 'none') !== 'none'
+    );
+  }
+
+  isExpanded(row: EditorRow): boolean {
+    return this.expanded.has(row.id);
+  }
+
+  toggleExpanded(row: EditorRow): void {
+    if (this.expanded.has(row.id)) {
+      this.expanded.delete(row.id);
+      return;
+    }
+    this.expanded.add(row.id);
+    const name = row.backend.name;
+    if (this.tableCache[name] || this.loadingTables.has(name)) return;
+    this.loadingTables.add(name);
+    this.api.listTables(name).subscribe(names => {
+      this.tableCache[name] = names;
+      this.loadingTables.delete(name);
+    });
+  }
+
+  tablesOf(row: EditorRow): string[] | null {
+    return this.tableCache[row.backend.name] ?? null;
+  }
+
+  /** Tables shown under a row: filtered when the list is long. */
+  visibleTables(row: EditorRow): string[] {
+    const all = this.tablesOf(row) ?? [];
+    const q = (this.tableFilter[row.id] ?? '').trim().toLowerCase();
+    return q ? all.filter(t => t.toLowerCase().includes(q)) : all;
+  }
+
+  showTableFilter(row: EditorRow): boolean {
+    return (this.tablesOf(row)?.length ?? 0) > 12;
+  }
+
+  ticked(row: EditorRow, table: string): boolean {
+    return (this.tables[row.id] ?? []).includes(table);
+  }
+
+  toggleTable(row: EditorRow, table: string): void {
+    const cur = this.tables[row.id] ?? [];
+    this.tables[row.id] = cur.includes(table)
+      ? cur.filter(t => t !== table)
+      : [...cur, table];
+  }
+
+  tickedCount(row: EditorRow): number {
+    return (this.tables[row.id] ?? []).length;
+  }
+
+  /** The role's page, for per-table verbs or row filters. */
+  get rolePageLink(): unknown[] | null {
+    return this.roleId != null
+      ? ['/api-connections/role-based-access', this.roleId]
+      : null;
   }
 
   setLevel(row: EditorRow, level: AccessLevel): void {
     if (this.locked(row)) return;
     if (level === 'rw' && !this.allowWrites) return;
     this.levels[row.id] = level;
+    if (level === 'none') {
+      delete this.tables[row.id];
+      this.expanded.delete(row.id);
+    }
   }
 
   /** Per-group shortcut: read on every editable row still at no access. */
@@ -228,8 +327,15 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
         id: b.id as number,
         label: b.label,
       })),
-      grants: this.currentGrants(),
+      grants: {},
+      specs: this.currentSpecs(),
       levels: this.levels,
+      tables: this.tables,
+      tableTotals: Object.fromEntries(
+        this.backends
+          .filter(b => this.tableCache[b.name])
+          .map(b => [b.id as number, this.tableCache[b.name].length])
+      ),
     });
   }
 
@@ -262,6 +368,7 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
     }
     for (const d of s.deltas)
       parts.push(t('sumDelta.' + d.delta, { label: d.label }));
+    if (s.listing) parts.push(t('sumListing'));
     if (this.mode === 'create' && this.createKey) parts.push(t('sumKey'));
     if (parts.length === 0) return t('sumNothing');
     return parts.join(', ');
@@ -271,7 +378,7 @@ export class DfMcpAccessEditorComponent implements OnInit, OnChanges {
     if (this.saving) return false;
     if (this.mode === 'add' && !this.roleId) return false;
     if (this.mode === 'create') return !!this.name.trim();
-    return this.changes.some(c => c.before !== c.after);
+    return this.changes.some(accessChangeTouched);
   }
 
   save(): void {

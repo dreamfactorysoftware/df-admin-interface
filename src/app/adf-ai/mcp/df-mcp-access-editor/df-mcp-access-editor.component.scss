@@ -121,13 +121,82 @@
     }
   }
 
+  &__rolelink {
+    text-decoration: none;
+    color: var(--df-text-faint);
+    font-size: var(--df-font-size-xs);
+    &:hover {
+      color: var(--df-accent);
+    }
+  }
+
+  &__ctl {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-2);
+    justify-self: end;
+  }
+
+  &__limit {
+    appearance: none;
+    border: 1px dashed var(--df-border);
+    background: transparent;
+    color: var(--df-text-muted);
+    font: inherit;
+    font-size: var(--df-font-size-xs);
+    border-radius: var(--df-radius-sm);
+    padding: 3px 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+
+    &:hover {
+      background: var(--df-hover);
+    }
+    &--on {
+      border-style: solid;
+      border-color: var(--df-warning-border);
+      background: var(--df-warning-soft);
+      color: var(--df-warning);
+    }
+  }
+
+  &__chev {
+    display: inline-block;
+    transition: transform var(--df-duration-fast);
+    &--open {
+      transform: rotate(90deg);
+    }
+  }
+
+  &__tables {
+    padding: var(--df-space-2) 0 var(--df-space-2) var(--df-space-5);
+    border-bottom: 1px solid var(--df-border-2);
+    background: var(--df-surface-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+  }
+
+  &__tfilter {
+    width: 16rem;
+    max-width: 100%;
+  }
+
+  &__tlist {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0 var(--df-space-3);
+  }
+
   // ---- segmented control
   &__seg {
     display: inline-flex;
     border: 1px solid var(--df-border);
     border-radius: var(--df-radius-sm);
     overflow: hidden;
-    justify-self: end;
   }
 
   &__opt {

@@ -1434,8 +1434,19 @@
           "+rw": "+ read and write on {{label}}",
           "+write": "+ write on {{label}}",
           "-write": "− write on {{label}}",
-          "-access": "− access on {{label}}"
-        }
+          "-access": "− access on {{label}}",
+          "~tables": "tables on {{label}}"
+        },
+        "limitTables": "Limit to tables",
+        "limitTablesOn": "{{n}} of {{total}} tables",
+        "wholeApi": "whole API",
+        "tableFilter": "Filter tables",
+        "loadingTables": "Loading tables…",
+        "noTables": "No tables found (or the admin cannot list them).",
+        "rolePageTip": "Need per-table verbs or row filters? Edit on the role page",
+        "readOnlyRow": "limited on the role page",
+        "sumListing": "plus table listing (GET _table/) on the limited APIs",
+        "limitTablesN": "{{n}} tables"
       }
     },
     "create": {
