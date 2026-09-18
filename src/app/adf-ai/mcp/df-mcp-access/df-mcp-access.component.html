@@ -19,6 +19,19 @@
     </div>
   </div>
 
+  <df-mcp-access-editor
+    *ngIf="editor"
+    [mode]="editor.mode"
+    [serviceId]="serviceId"
+    [serviceLabel]="serviceLabel"
+    [backends]="exposedBackends"
+    [roles]="roles"
+    [role]="editor.role"
+    [granted]="grantedIds"
+    [allowWrites]="allowWrites"
+    (saved)="onSaved()"
+    (cancelled)="close()"></df-mcp-access-editor>
+
   <div *ngIf="loading" class="access__loading">
     <df-skeleton variant="table-row" [count]="2"></df-skeleton>
   </div>

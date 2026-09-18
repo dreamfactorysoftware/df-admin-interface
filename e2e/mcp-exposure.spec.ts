@@ -90,6 +90,25 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   await expect(page.getByTestId('mcp-access')).toBeVisible();
   await expect(crumbs).toContainText('demo_mcp');
   await expect(page.locator('h1.page-header')).toContainText(title);
+  // Create role opens an inline panel (no modal): every backend starts at
+  // "No access", the live summary is the diff, Cancel closes it.
+  await page.getByRole('button', { name: 'Create role' }).click();
+  const editor = page.getByTestId('mcp-access-editor');
+  await expect(editor).toBeVisible();
+  await expect(page.locator('mat-dialog-container')).toHaveCount(0);
+  const rowsInEditor = editor.locator('.editor__row');
+  expect(await rowsInEditor.count()).toBe(exposed.length);
+  expect(
+    await editor.locator('.editor__opt--on[data-level="none"]').count()
+  ).toBe(exposed.length);
+  const summary = page.getByTestId('mcp-access-summary');
+  await expect(summary).toContainText('grants this server');
+  await expect(summary).not.toContainText('read on');
+  await rowsInEditor.first().locator('[data-level="read"]').click();
+  await expect(summary).toContainText('read on 1 APIs');
+  await editor.getByRole('button', { name: 'Cancel' }).click();
+  await expect(editor).toHaveCount(0);
+
   await page.locator('[role="tab"]', { hasText: 'Connect' }).click();
   await expect(page).toHaveURL(new RegExp(`/ai/mcp/${id}/connect$`));
   await expect(page.getByTestId('mcp-connect')).toContainText('/mcp/demo_mcp');

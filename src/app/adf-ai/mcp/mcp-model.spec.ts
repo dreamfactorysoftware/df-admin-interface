@@ -15,6 +15,7 @@ import {
   maskForLevel,
   shapeCatalog,
   shapeFixedCatalog,
+  summarizeAccessChanges,
   tokensPerTurn,
   toolKey,
   verbsByServiceName,
@@ -274,6 +275,35 @@ describe('mcp-model: access', () => {
     expect(changes).toEqual([
       { serviceId: 54, label: 'Demo MCP', before: 'rw', after: 'rw' },
     ]);
+  });
+
+  it('summarises a save: server grant, new levels, and edit deltas', () => {
+    const s = summarizeAccessChanges(
+      [
+        { serviceId: 54, label: 'Demo MCP', before: 'none', after: 'read' },
+        { serviceId: 50, label: 'A', before: 'none', after: 'read' },
+        { serviceId: 51, label: 'B', before: 'none', after: 'rw' },
+        { serviceId: 52, label: 'C', before: 'read', after: 'rw' },
+        { serviceId: 53, label: 'D', before: 'rw', after: 'read' },
+        { serviceId: 55, label: 'E', before: 'read', after: 'none' },
+        { serviceId: 56, label: 'F', before: 'read', after: 'read' },
+      ],
+      54
+    );
+    expect(s.server).toBe('grant');
+    expect(s.read).toEqual(['A']);
+    expect(s.rw).toEqual(['B']);
+    expect(s.deltas).toEqual([
+      { label: 'C', delta: '+write' },
+      { label: 'D', delta: '-write' },
+      { label: 'E', delta: '-access' },
+    ]);
+    expect(
+      summarizeAccessChanges(
+        [{ serviceId: 54, label: 'Demo MCP', before: 'rw', after: 'rw' }],
+        54
+      ).server
+    ).toBe('keep');
   });
 
   it('writes a plain diff and only for changed lines', () => {
