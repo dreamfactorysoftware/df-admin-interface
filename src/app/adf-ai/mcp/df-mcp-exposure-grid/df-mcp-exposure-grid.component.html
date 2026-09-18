@@ -17,7 +17,39 @@
             class="grid__group"
             [class.grid__group--write]="g === 'write'"
             [attr.colspan]="groupSpan(g)">
-            {{ t('group.' + g) }}
+            <span class="grid__group-lbl">
+              <button
+                type="button"
+                class="grid__sw"
+                role="checkbox"
+                [attr.data-state]="setState(groupVerbs(g), 'database')"
+                [attr.aria-checked]="
+                  setState(groupVerbs(g), 'database') === 'mixed'
+                    ? 'mixed'
+                    : setState(groupVerbs(g), 'database') === 'on'
+                "
+                [disabled]="exposedCount('database') === 0"
+                [matTooltip]="
+                  t(
+                    setState(groupVerbs(g), 'database') === 'on'
+                      ? 'groupDisable'
+                      : 'groupEnable',
+                    { group: t('group.' + g), n: exposedCount('database') }
+                  )
+                "
+                [attr.aria-label]="
+                  t(
+                    setState(groupVerbs(g), 'database') === 'on'
+                      ? 'groupDisable'
+                      : 'groupEnable',
+                    { group: t('group.' + g), n: exposedCount('database') }
+                  )
+                "
+                (click)="onToggleVerbs(groupVerbs(g), 'database')">
+                <i></i>
+              </button>
+              {{ t('group.' + g) }}
+            </span>
           </th>
           <th></th>
         </tr>
@@ -27,6 +59,37 @@
             *ngFor="let verb of dbVerbs; trackBy: trackByName"
             class="grid__verb">
             <span>{{ verb.name }}</span>
+            <button
+              type="button"
+              class="grid__sw"
+              role="checkbox"
+              [attr.data-verb]="verb.name"
+              [attr.data-state]="setState([verb], 'database')"
+              [attr.aria-checked]="
+                setState([verb], 'database') === 'mixed'
+                  ? 'mixed'
+                  : setState([verb], 'database') === 'on'
+              "
+              [disabled]="exposedCount('database') === 0"
+              [matTooltip]="
+                t(
+                  setState([verb], 'database') === 'on'
+                    ? 'colDisable'
+                    : 'colEnable',
+                  { verb: verb.name, n: exposedCount('database') }
+                )
+              "
+              [attr.aria-label]="
+                t(
+                  setState([verb], 'database') === 'on'
+                    ? 'colDisable'
+                    : 'colEnable',
+                  { verb: verb.name, n: exposedCount('database') }
+                )
+              "
+              (click)="onToggleVerbs([verb], 'database')">
+              <i></i>
+            </button>
           </th>
           <th class="grid__count">{{ t('tools') }}</th>
         </tr>
@@ -80,6 +143,48 @@
             <span *ngIf="isHidden(b)">{{ t('hiddenShort') }}</span>
             <span *ngIf="isExposed(b) && !isHidden(b)">{{ toolCount(b) }}</span>
           </td>
+        </tr>
+
+        <!-- File stores: their own 6-verb header with column switches -->
+        <tr class="grid__filehead" *ngIf="files.length > 0">
+          <th class="grid__svc">{{ t('fileHeader') }}</th>
+          <th
+            *ngFor="let verb of fileVerbs; trackBy: trackByName"
+            class="grid__verb grid__verb--file">
+            <span>{{ verb.name }}</span>
+            <button
+              type="button"
+              class="grid__sw"
+              role="checkbox"
+              [attr.data-verb]="verb.name"
+              [attr.data-state]="setState([verb], 'file')"
+              [attr.aria-checked]="
+                setState([verb], 'file') === 'mixed'
+                  ? 'mixed'
+                  : setState([verb], 'file') === 'on'
+              "
+              [disabled]="exposedCount('file') === 0"
+              [matTooltip]="
+                t(
+                  setState([verb], 'file') === 'on'
+                    ? 'colDisableFiles'
+                    : 'colEnableFiles',
+                  { verb: verb.name, n: exposedCount('file') }
+                )
+              "
+              [attr.aria-label]="
+                t(
+                  setState([verb], 'file') === 'on'
+                    ? 'colDisableFiles'
+                    : 'colEnableFiles',
+                  { verb: verb.name, n: exposedCount('file') }
+                )
+              "
+              (click)="onToggleVerbs([verb], 'file')">
+              <i></i>
+            </button>
+          </th>
+          <th [attr.colspan]="dbVerbs.length - fileVerbs.length + 1"></th>
         </tr>
 
         <!-- Files: 6 verbs, padded to the database column count -->

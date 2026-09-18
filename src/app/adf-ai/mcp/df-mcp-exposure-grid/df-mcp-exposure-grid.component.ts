@@ -13,13 +13,22 @@ import {
   McpConfig,
   McpIdentity,
   McpVerb,
+  BackendKind,
   VERB_GROUPS,
   VerbGroup,
+  VerbSetState,
   advertisedVerbs,
   backendVisible,
   cellState,
+  exposedOfKind,
   toolKey,
+  verbSetState,
 } from '../mcp-model';
+
+export interface VerbSetToggle {
+  verbs: McpVerb[];
+  kind: BackendKind;
+}
 
 /**
  * df-mcp-exposure-grid — rows are attachable backends, columns the verbs
@@ -48,6 +57,8 @@ export class DfMcpExposureGridComponent {
 
   @Output() toggleExposed = new EventEmitter<string>();
   @Output() toggleCell = new EventEmitter<string>();
+  /** A column / group header switch: every verb in the set, exposed rows only. */
+  @Output() toggleVerbs = new EventEmitter<VerbSetToggle>();
 
   readonly dbVerbs = DB_VERBS;
   readonly fileVerbs = FILE_VERBS;
@@ -64,6 +75,24 @@ export class DfMcpExposureGridComponent {
 
   groupSpan(group: VerbGroup): number {
     return DB_VERBS.filter(v => v.group === group).length;
+  }
+
+  groupVerbs(group: VerbGroup): McpVerb[] {
+    return DB_VERBS.filter(v => v.group === group);
+  }
+
+  /** Tri-state of a verb (or group) across the exposed backends of a kind. */
+  setState(verbs: McpVerb[], kind: BackendKind): VerbSetState {
+    return verbSetState(this.cfg, this.backends, verbs, kind);
+  }
+
+  exposedCount(kind: BackendKind): number {
+    return exposedOfKind(this.cfg, this.backends, kind).length;
+  }
+
+  onToggleVerbs(verbs: McpVerb[], kind: BackendKind): void {
+    if (this.exposedCount(kind) === 0) return;
+    this.toggleVerbs.emit({ verbs, kind });
   }
 
   isExposed(b: McpBackend): boolean {

@@ -227,6 +227,71 @@ export function cellState(
   return 'on';
 }
 
+// ---------------------------------------------------------- columns
+
+/** State of a verb (or verb group) across the EXPOSED backends of a kind. */
+export type VerbSetState = 'on' | 'mixed' | 'off' | 'none';
+
+/** Exposed backends of the kind a verb set applies to. */
+export function exposedOfKind(
+  cfg: Pick<McpConfig, 'exposedServices'>,
+  backends: McpBackend[],
+  kind: BackendKind
+): McpBackend[] {
+  return backends.filter(
+    b => b.kind === kind && cfg.exposedServices.includes(b.name)
+  );
+}
+
+/** disabled_tools keys a verb set spans on the exposed backends of a kind. */
+export function verbSetKeys(
+  cfg: Pick<McpConfig, 'exposedServices'>,
+  backends: McpBackend[],
+  verbs: ReadonlyArray<McpVerb>,
+  kind: BackendKind
+): string[] {
+  const keys: string[] = [];
+  for (const b of exposedOfKind(cfg, backends, kind)) {
+    for (const v of verbs) keys.push(toolKey(b.name, v.name));
+  }
+  return keys;
+}
+
+/** on: every key enabled; off: none; mixed: some; none: nothing exposed. */
+export function verbSetState(
+  cfg: Pick<McpConfig, 'exposedServices' | 'disabledTools'>,
+  backends: McpBackend[],
+  verbs: ReadonlyArray<McpVerb>,
+  kind: BackendKind
+): VerbSetState {
+  const keys = verbSetKeys(cfg, backends, verbs, kind);
+  if (keys.length === 0) return 'none';
+  const disabled = new Set(cfg.disabledTools);
+  const off = keys.filter(k => disabled.has(k)).length;
+  if (off === 0) return 'on';
+  if (off === keys.length) return 'off';
+  return 'mixed';
+}
+
+/**
+ * One click on a column/group header: when every key is enabled, disable
+ * them all; otherwise (mixed or off) enable them all. Keys of hidden or
+ * unexposed backends, and every other key, are left untouched.
+ */
+export function toggleVerbSet(
+  cfg: Pick<McpConfig, 'exposedServices' | 'disabledTools'>,
+  backends: McpBackend[],
+  verbs: ReadonlyArray<McpVerb>,
+  kind: BackendKind
+): string[] {
+  const keys = verbSetKeys(cfg, backends, verbs, kind);
+  const state = verbSetState(cfg, backends, verbs, kind);
+  const next = new Set(cfg.disabledTools);
+  if (state === 'on') keys.forEach(k => next.add(k));
+  else keys.forEach(k => next.delete(k));
+  return Array.from(next);
+}
+
 /** Tools a backend advertises: exposed, not disabled, not blocked by writes. */
 export function advertisedVerbs(
   cfg: McpConfig,

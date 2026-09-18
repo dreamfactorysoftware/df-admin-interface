@@ -78,6 +78,35 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   expect(advertised).toBeGreaterThan(0);
   expect(advertised).toBeLessThanOrEqual(5 + 5 + exposed.length * 16 + 6 * 2);
 
+  // Column switch: one click disables the verb on every exposed backend,
+  // the tile drops by that many tools, the next click restores it.
+  const before = advertised;
+  const colSwitch = grid.locator('button.grid__sw[data-verb="get_tables"]');
+  await expect(colSwitch).toHaveAttribute('data-state', 'on');
+  await colSwitch.click();
+  await expect(colSwitch).toHaveAttribute('data-state', 'off');
+  for (const name of exposed) {
+    await expect(
+      grid.locator(`tr[data-backend="${name}"] button[data-key$="_get_tables"]`)
+    ).toHaveAttribute('data-state', 'off');
+  }
+  const offRows = grid.locator('tr[data-exposed="false"]');
+  if (await offRows.count()) {
+    await expect(
+      offRows.first().locator('button[data-key$="_get_tables"]')
+    ).toHaveAttribute('data-state', 'gone');
+  }
+  if (config.tool_style !== 'merged') {
+    await expect(tile.locator('.mcp__v')).toHaveText(
+      String(before - exposed.length)
+    );
+  } else {
+    await expect(tile.locator('.mcp__v')).toHaveText(String(before - 1));
+  }
+  await colSwitch.click();
+  await expect(colSwitch).toHaveAttribute('data-state', 'on');
+  await expect(tile.locator('.mcp__v')).toHaveText(String(before));
+
   // Breadcrumb and title come from the route data, tab segment or not.
   const crumbs = page.locator('nav.topbar-breadcrumbs');
   await expect(crumbs).toContainText('MCP Servers');
