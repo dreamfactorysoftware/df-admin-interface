@@ -451,6 +451,47 @@ export interface AccessChange {
   after: AccessLevel;
 }
 
+export interface AccessChangeInput {
+  serverId: number;
+  serverLabel: string;
+  backends: Array<{ id: number; label: string }>;
+  grants: Record<number, ServiceGrant>;
+  levels: Record<number, AccessLevel>;
+  /** Opt-in modes (add / create): only ticked backends are considered. */
+  include?: Record<number, boolean> | null;
+}
+
+/**
+ * The changes a role save proposes: the server row (granted read when the
+ * role has none) plus one row per considered backend. Table-limited grants,
+ * on a backend or on the server itself, are never widened here: they stay
+ * as they are and the dialog points at the role page instead.
+ */
+export function buildAccessChanges(i: AccessChangeInput): AccessChange[] {
+  const changes: AccessChange[] = [];
+  const server = i.grants[i.serverId];
+  if (!server?.tableLimited) {
+    const before = server?.level ?? 'none';
+    changes.push({
+      serviceId: i.serverId,
+      label: i.serverLabel,
+      before,
+      after: before === 'none' ? 'read' : before,
+    });
+  }
+  for (const b of i.backends) {
+    if (i.include && !i.include[b.id]) continue;
+    if (i.grants[b.id]?.tableLimited) continue;
+    changes.push({
+      serviceId: b.id,
+      label: b.label,
+      before: i.grants[b.id]?.level ?? 'none',
+      after: i.levels[b.id] ?? 'none',
+    });
+  }
+  return changes;
+}
+
 /** Plain-language lines for the diff shown before a role save. */
 export function accessDiff(
   changes: AccessChange[],

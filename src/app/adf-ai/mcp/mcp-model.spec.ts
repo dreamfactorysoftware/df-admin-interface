@@ -6,6 +6,7 @@ import {
   McpConfig,
   accessDiff,
   accessRowsForChanges,
+  buildAccessChanges,
   callsByBackend,
   cellState,
   connectSnippet,
@@ -225,6 +226,54 @@ describe('mcp-model: access', () => {
         50: 'demo_mysql',
       })
     ).toEqual({ demo_mysql: 3 });
+  });
+
+  it('proposes the server row plus only ticked backends in opt-in modes', () => {
+    const changes = buildAccessChanges({
+      serverId: 54,
+      serverLabel: 'Demo MCP',
+      backends: [
+        { id: 50, label: 'Demo MySQL' },
+        { id: 51, label: 'Demo PG' },
+      ],
+      grants: {},
+      levels: { 50: 'read', 51: 'rw' },
+      include: { 50: true, 51: false },
+    });
+    expect(changes).toEqual([
+      { serviceId: 54, label: 'Demo MCP', before: 'none', after: 'read' },
+      { serviceId: 50, label: 'Demo MySQL', before: 'none', after: 'read' },
+    ]);
+  });
+
+  it('never widens a table-limited grant, on a backend or on the server', () => {
+    const limited = { level: 'read' as const, tableLimited: true, mask: 1 };
+    const changes = buildAccessChanges({
+      serverId: 54,
+      serverLabel: 'Demo MCP',
+      backends: [
+        { id: 50, label: 'Demo MySQL' },
+        { id: 51, label: 'Demo PG' },
+      ],
+      grants: { 54: limited, 50: limited },
+      levels: { 50: 'rw', 51: 'read' },
+    });
+    expect(changes).toEqual([
+      { serviceId: 51, label: 'Demo PG', before: 'none', after: 'read' },
+    ]);
+  });
+
+  it('keeps an existing server grant level rather than downgrading it', () => {
+    const changes = buildAccessChanges({
+      serverId: 54,
+      serverLabel: 'Demo MCP',
+      backends: [],
+      grants: { 54: { level: 'rw', tableLimited: false, mask: 31 } },
+      levels: {},
+    });
+    expect(changes).toEqual([
+      { serviceId: 54, label: 'Demo MCP', before: 'rw', after: 'rw' },
+    ]);
   });
 
   it('writes a plain diff and only for changed lines', () => {

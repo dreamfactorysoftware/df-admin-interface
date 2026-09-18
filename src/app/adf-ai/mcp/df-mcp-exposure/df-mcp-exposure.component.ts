@@ -148,6 +148,8 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
 
   private destroy$ = new Subject<void>();
   private formSub$ = new Subject<void>();
+  /** Bumped on every (re)load so a late response for another server is dropped. */
+  private loadSeq = 0;
 
   constructor(private api: DfMcpApiService) {}
 
@@ -159,6 +161,16 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['config'] && !changes['config'].firstChange) this.bindForm();
+    const switched =
+      (changes['serviceId'] && !changes['serviceId'].firstChange) ||
+      (changes['serviceName'] && !changes['serviceName'].firstChange);
+    if (switched) {
+      // Route param change between two MCP servers: the component instance
+      // is reused, so drop the previous server's preview before loading.
+      this.resetPreview();
+      if (!this.preview) this.load();
+      return;
+    }
     if (changes['backends'] || changes['previewRoles']) {
       if (this.preview) {
         this.roles = this.previewRoles;
@@ -173,6 +185,29 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
     this.formSub$.complete();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  /** Back to "Any admin" with nothing loaded, as on first render. */
+  private resetPreview(): void {
+    this.loadSeq++;
+    this.identityKey = 'admin';
+    this.identity = ADMIN_IDENTITY;
+    this.identities = [];
+    this.roles = [];
+    this.apps = [];
+    this.access = null;
+    this.health = null;
+    this.healthChecked = false;
+    this.usage = null;
+    this.serviceNameById = {};
+    if (!this.preview) this.backends = [];
+    this.bytesPerTool = DEFAULT_BYTES_PER_TOOL;
+    this.catalogSource = 'estimate';
+    this.rpcCalibrated = false;
+    this.rpcToolCount = null;
+    this.serverToolCount = null;
+    this.identityChange.emit(this.identity);
+    this.recompute();
   }
 
   private bindForm(): void {
@@ -250,6 +285,7 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
   private load(): void {
     if (this.serviceId == null) return;
     this.loading = true;
+    const seq = ++this.loadSeq;
     forkJoin({
       backends: this.systemMcp
         ? of([] as McpBackend[])
@@ -264,6 +300,7 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
     })
       .pipe(takeUntil(this.destroy$))
       .subscribe(r => {
+        if (seq !== this.loadSeq) return;
         this.backends = r.backends;
         this.roles = r.roles;
         this.apps = r.apps;
@@ -289,6 +326,7 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
   /** Reload access + roles after the access panel writes a role. */
   reloadAccess(): void {
     if (this.serviceId == null) return;
+    const seq = this.loadSeq;
     forkJoin({
       roles: this.api.roles(),
       apps: this.api.apps(),
@@ -296,6 +334,7 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
     })
       .pipe(takeUntil(this.destroy$))
       .subscribe(r => {
+        if (seq !== this.loadSeq) return;
         this.roles = r.roles;
         this.apps = r.apps;
         this.access = r.access;
@@ -321,6 +360,7 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
       return;
     }
     const asked = this.identity;
+    const seq = this.loadSeq;
     of(asked)
       .pipe(
         switchMap(id =>
@@ -332,7 +372,7 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
         takeUntil(this.destroy$)
       )
       .subscribe(cat => {
-        if (this.identity !== asked) return;
+        if (this.identity !== asked || seq !== this.loadSeq) return;
         if (!cat || !cat.count) {
           this.catalogSource = this.rpcCalibrated ? 'rpc' : 'estimate';
           this.serverToolCount = null;
