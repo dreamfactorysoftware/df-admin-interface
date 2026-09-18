@@ -48,5 +48,7 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-usage/utils/task-estimate.spec.ts',
     '<rootDir>/src/app/shared/components/df-section-landing/df-section-landing.component.spec.ts',
     '<rootDir>/src/app/adf-home/df-welcome-page/df-generate-api-card/df-generate-api-card.component.spec.ts',
+    // 2026-09-18 MCP server page (#523): pure catalog / access / snippet model.
+    '<rootDir>/src/app/adf-ai/mcp/mcp-model.spec.ts',
   ],
 };
