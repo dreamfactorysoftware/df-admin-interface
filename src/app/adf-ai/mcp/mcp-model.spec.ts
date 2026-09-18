@@ -7,6 +7,7 @@ import {
   accessDiff,
   accessRowsForChanges,
   buildAccessChanges,
+  classifyServiceGrant,
   callsByBackend,
   cellState,
   connectSnippet,
@@ -385,6 +386,202 @@ describe('mcp-model: access', () => {
       'Demo MySQL: no access → read',
       'Demo SQL: read and write → no access',
     ]);
+  });
+
+  it('prefills from grants: * rows, _table/<name>/* rows, or read-only', () => {
+    expect(classifyServiceGrant([])).toEqual({
+      level: 'none',
+      tables: null,
+      editable: true,
+      mask: 0,
+    });
+    expect(
+      classifyServiceGrant([{ serviceId: 50, component: '*', verbMask: 31 }])
+    ).toEqual({ level: 'rw', tables: null, editable: true, mask: 31 });
+    expect(
+      classifyServiceGrant([
+        { serviceId: 50, component: '_table/orders/*', verbMask: 1 },
+        { serviceId: 50, component: '_table/customers/*', verbMask: 1 },
+        { serviceId: 50, component: '_table/', verbMask: 1 },
+      ])
+    ).toEqual({
+      level: 'read',
+      tables: ['orders', 'customers'],
+      editable: true,
+      mask: 1,
+    });
+    // anything the editor cannot represent is read-only
+    const readOnly = [
+      [
+        {
+          serviceId: 50,
+          component: '_table/orders/*',
+          verbMask: 1,
+          filters: [{ name: 'x' }],
+        },
+      ],
+      [
+        { serviceId: 50, component: '_table/orders/*', verbMask: 1 },
+        { serviceId: 50, component: '_table/customers/*', verbMask: 31 },
+      ],
+      [{ serviceId: 50, component: '_proc/*', verbMask: 1 }],
+      [
+        { serviceId: 50, component: '*', verbMask: 1 },
+        { serviceId: 50, component: '_table/orders/*', verbMask: 31 },
+      ],
+      [{ serviceId: 50, component: '_table/orders', verbMask: 1 }],
+    ];
+    for (const rows of readOnly) {
+      expect(classifyServiceGrant(rows as never).editable).toBe(false);
+    }
+  });
+
+  it('writes table-limited grants as per-table rows plus a listing row, no *', () => {
+    const rows = accessRowsForChanges(
+      [
+        {
+          serviceId: 50,
+          label: 'Demo MySQL',
+          before: 'none',
+          after: 'read',
+          tables: ['orders', 'customers'],
+        },
+      ],
+      []
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({ component: '_table/orders/*', verb_mask: 1 }),
+      expect.objectContaining({
+        component: '_table/customers/*',
+        verb_mask: 1,
+      }),
+      expect.objectContaining({ component: '_table/', verb_mask: 1 }),
+    ]);
+    expect(rows.some(r => r['component'] === '*')).toBe(false);
+    const rw = accessRowsForChanges(
+      [
+        {
+          serviceId: 50,
+          label: 'a',
+          before: 'none',
+          after: 'rw',
+          tables: ['orders'],
+        },
+      ],
+      []
+    );
+    expect(rw[0]).toEqual(
+      expect.objectContaining({ component: '_table/orders/*', verb_mask: 31 })
+    );
+    expect(rw[1]).toEqual(
+      expect.objectContaining({ component: '_table/', verb_mask: 1 })
+    );
+  });
+
+  it('moves between whole API and table-limited without leaving stray rows', () => {
+    const existing = [
+      { id: 1, serviceId: 50, component: '_table/orders/*', verbMask: 1 },
+      { id: 2, serviceId: 50, component: '_table/customers/*', verbMask: 1 },
+      { id: 3, serviceId: 50, component: '_table/', verbMask: 1 },
+    ];
+    expect(
+      accessRowsForChanges(
+        [
+          {
+            serviceId: 50,
+            label: 'a',
+            before: 'read',
+            after: 'read',
+            beforeTables: ['orders', 'customers'],
+            tables: null,
+          },
+        ],
+        existing
+      )
+    ).toEqual([
+      expect.objectContaining({ component: '*', verb_mask: 1 }),
+      { id: 1, role_id: null },
+      { id: 2, role_id: null },
+      { id: 3, role_id: null },
+    ]);
+    expect(
+      accessRowsForChanges(
+        [
+          {
+            serviceId: 50,
+            label: 'a',
+            before: 'read',
+            after: 'read',
+            beforeTables: ['orders', 'customers'],
+            tables: ['orders', 'products'],
+          },
+        ],
+        existing
+      )
+    ).toEqual([
+      { id: 2, role_id: null },
+      expect.objectContaining({ component: '_table/products/*', verb_mask: 1 }),
+    ]);
+    expect(
+      accessRowsForChanges(
+        [
+          {
+            serviceId: 50,
+            label: 'a',
+            before: 'read',
+            after: 'read',
+            beforeTables: ['orders', 'customers'],
+            tables: ['customers', 'orders'],
+          },
+        ],
+        existing
+      )
+    ).toEqual([]);
+    expect(
+      accessRowsForChanges(
+        [
+          {
+            serviceId: 50,
+            label: 'a',
+            before: 'read',
+            after: 'none',
+            beforeTables: ['orders', 'customers'],
+          },
+        ],
+        existing
+      )
+    ).toEqual([
+      { id: 1, role_id: null },
+      { id: 2, role_id: null },
+      { id: 3, role_id: null },
+    ]);
+  });
+
+  it('summary names table limits and flags the listing row', () => {
+    const s = summarizeAccessChanges(
+      [
+        {
+          serviceId: 50,
+          label: 'Demo MySQL',
+          before: 'none',
+          after: 'read',
+          tables: ['a', 'b'],
+          tableTotal: 5,
+        },
+        {
+          serviceId: 51,
+          label: 'PG',
+          before: 'read',
+          after: 'read',
+          beforeTables: ['a'],
+          tables: ['a', 'b'],
+        },
+      ],
+      54
+    );
+    expect(s.read).toEqual(['Demo MySQL (2 of 5 tables)']);
+    expect(s.deltas).toEqual([{ label: 'PG (2 tables)', delta: '~tables' }]);
+    expect(s.listing).toBe(true);
   });
 
   it('builds PATCH rows: update by id, unlink with role_id null, create new', () => {

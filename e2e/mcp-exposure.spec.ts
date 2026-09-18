@@ -138,6 +138,92 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   await editor.getByRole('button', { name: 'Cancel' }).click();
   await expect(editor).toHaveCount(0);
 
+  // Table-level grants: create a throwaway role through the panel with
+  // demo_mysql limited to two tables, check the rows the API holds, delete.
+  const roleName = `ui523_e2e_${Date.now()}`;
+  const dbBackend = exposed[0];
+  const tablesRes = await request.get(
+    `${baseURL}/api/v2/${dbBackend}/_table?as_list=true`,
+    { headers }
+  );
+  const tableNames: string[] = (await tablesRes.json()).resource ?? [];
+  expect(tableNames.length).toBeGreaterThanOrEqual(2);
+  const pick = tableNames.slice(0, 2);
+  await page.getByRole('button', { name: 'Create role' }).click();
+  await expect(editor).toBeVisible();
+  await page.getByTestId('mcp-access-name').fill(roleName);
+  await editor
+    .locator('mat-checkbox', { hasText: 'Also create an API key' })
+    .locator('input')
+    .uncheck();
+  const dbRow = editor.locator(`.editor__row[data-backend="${dbBackend}"]`);
+  await dbRow.locator('[data-level="read"]').click();
+  await dbRow.getByTestId('mcp-limit-tables').click();
+  const tablesBox = editor.locator(`[data-tables-for="${dbBackend}"]`);
+  for (const t of pick) {
+    await tablesBox.locator(`mat-checkbox[data-table="${t}"] input`).check();
+  }
+  await expect(summary).toContainText(`read on 1 APIs`);
+  await expect(summary).toContainText('table listing');
+  await page.getByTestId('mcp-access-save').click();
+  await expect(editor).toHaveCount(0, { timeout: 15_000 });
+  let roleId: number | undefined;
+  try {
+    const roleRes = await request.get(
+      `${baseURL}/api/v2/system/role?filter=name%3D${roleName}&related=role_service_access_by_role_id`,
+      { headers }
+    );
+    const role = (await roleRes.json()).resource?.[0];
+    expect(role, 'role created by the panel').toBeTruthy();
+    roleId = role.id;
+    const svcRes = await request.get(
+      `${baseURL}/api/v2/system/service?filter=name%3D${dbBackend}&fields=id`,
+      { headers }
+    );
+    const dbId = (await svcRes.json()).resource?.[0]?.id;
+    const rows = (role.role_service_access_by_role_id ?? []).map(
+      (r: { service_id: number; component: string; verb_mask: number }) => ({
+        service_id: r.service_id,
+        component: r.component,
+        verb_mask: r.verb_mask,
+      })
+    );
+    // the server row
+    expect(rows).toContainEqual({
+      service_id: id,
+      component: '*',
+      verb_mask: 1,
+    });
+    // per-table GET rows plus the listing row, and no * on the database
+    for (const t of pick) {
+      expect(rows).toContainEqual({
+        service_id: dbId,
+        component: `_table/${t}/*`,
+        verb_mask: 1,
+      });
+    }
+    expect(rows).toContainEqual({
+      service_id: dbId,
+      component: '_table/',
+      verb_mask: 1,
+    });
+    expect(
+      rows.some(
+        (r: { service_id: number; component: string }) =>
+          r.service_id === dbId && r.component === '*'
+      )
+    ).toBe(false);
+    expect(
+      rows.filter((r: { service_id: number }) => r.service_id === dbId)
+    ).toHaveLength(pick.length + 1);
+  } finally {
+    if (roleId) {
+      await request.delete(`${baseURL}/api/v2/system/role/${roleId}`, {
+        headers,
+      });
+    }
+  }
+
   await page.locator('[role="tab"]', { hasText: 'Connect' }).click();
   await expect(page).toHaveURL(new RegExp(`/ai/mcp/${id}/connect$`));
   await expect(page.getByTestId('mcp-connect')).toContainText('/mcp/demo_mcp');

@@ -257,6 +257,7 @@ export class DfMcpApiService {
                   component: row.component,
                   verbMask: row.verbMask ?? 0,
                   requestorMask: row.requestorMask,
+                  filters: row.filters ?? null,
                 })
               ),
             })
@@ -285,6 +286,19 @@ export class DfMcpApiService {
               })
             )
         ),
+        catchError(() => of([]))
+      );
+  }
+
+  /** Table names of a database service (for table-level grants). */
+  listTables(serviceName: string): Observable<string[]> {
+    return this.http
+      .get<any>(`${BASE_URL}/${serviceName}/_table`, {
+        params: { as_list: 'true' },
+        context: silent(),
+      })
+      .pipe(
+        map(res => (Array.isArray(res?.resource) ? res.resource : [])),
         catchError(() => of([]))
       );
   }

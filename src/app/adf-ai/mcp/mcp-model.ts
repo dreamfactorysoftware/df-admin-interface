@@ -448,6 +448,70 @@ export interface RoleAccessRow {
   component: string;
   verbMask: number;
   requestorMask?: number;
+  filters?: unknown[] | null;
+}
+
+/** GET on this component lets a table-limited role list tables. */
+export const TABLE_LIST_COMPONENT = '_table/';
+const TABLE_ROW = /^_table\/([^/*][^/]*)\/\*$/;
+
+/** `_table/<name>/*` -> name; anything else -> null. */
+export function tableOfComponent(component: string): string | null {
+  const m = TABLE_ROW.exec(component);
+  return m ? m[1] : null;
+}
+
+function isListingComponent(component: string): boolean {
+  return component === TABLE_LIST_COMPONENT || component === '_table';
+}
+
+/**
+ * What the access editor can show for one service: the level, the ticked
+ * tables (null = whole API) and whether the rows are ones it manages.
+ * Anything it cannot represent (row filters, other verbs per table, _proc /
+ * _schema components, `*` mixed with table rows, differing table masks)
+ * makes the row read-only, pointing at the role page.
+ */
+export interface ServiceGrantSpec {
+  level: AccessLevel;
+  tables: string[] | null;
+  editable: boolean;
+  mask: number;
+}
+
+export function classifyServiceGrant(rows: RoleAccessRow[]): ServiceGrantSpec {
+  const active = rows.filter(r => r.verbMask > 0);
+  const mask = active.reduce((m, r) => m | r.verbMask, 0);
+  if (active.length === 0) {
+    return { level: 'none', tables: null, editable: true, mask: 0 };
+  }
+  const filtered = active.some(
+    r => Array.isArray(r.filters) && r.filters.length > 0
+  );
+  const star = active.filter(r => r.component === '*');
+  const tableRows = active.filter(r => tableOfComponent(r.component));
+  const listing = active.filter(r => isListingComponent(r.component));
+  const others =
+    active.length - star.length - tableRows.length - listing.length;
+  const tables = tableRows.length
+    ? tableRows.map(r => tableOfComponent(r.component) as string)
+    : null;
+  if (filtered || others > 0 || (star.length && tableRows.length)) {
+    return { level: levelFromMask(mask), tables, editable: false, mask };
+  }
+  if (star.length) {
+    const m = star.reduce((x, r) => x | r.verbMask, 0);
+    return { level: levelFromMask(m), tables: null, editable: true, mask: m };
+  }
+  if (tableRows.length) {
+    const m = tableRows[0].verbMask;
+    if (tableRows.some(r => r.verbMask !== m)) {
+      return { level: levelFromMask(mask), tables, editable: false, mask };
+    }
+    return { level: levelFromMask(m), tables, editable: true, mask: m };
+  }
+  // listing rows only: nothing readable
+  return { level: 'none', tables: null, editable: true, mask };
 }
 
 export interface ServiceGrant {
@@ -514,6 +578,23 @@ export interface AccessChange {
   label: string;
   before: AccessLevel;
   after: AccessLevel;
+  /** Ticked tables before / after; null or missing = the whole API. */
+  beforeTables?: string[] | null;
+  tables?: string[] | null;
+  /** How many tables the API has, when known (for "2 of 5 tables"). */
+  tableTotal?: number;
+}
+
+function sameTables(a?: string[] | null, b?: string[] | null): boolean {
+  const x = [...(a ?? [])].sort().join('|');
+  const y = [...(b ?? [])].sort().join('|');
+  return x === y;
+}
+
+/** A change that a save has to write. */
+export function accessChangeTouched(c: AccessChange): boolean {
+  if (c.before !== c.after) return true;
+  return c.after !== 'none' && !sameTables(c.beforeTables, c.tables);
 }
 
 export interface AccessChangeInput {
@@ -524,6 +605,11 @@ export interface AccessChangeInput {
   levels: Record<number, AccessLevel>;
   /** Opt-in modes (add / create): only ticked backends are considered. */
   include?: Record<number, boolean> | null;
+  /** Per-service classification; a non-editable spec skips the backend. */
+  specs?: Record<number, ServiceGrantSpec>;
+  /** Ticked tables per backend (null / missing = whole API). */
+  tables?: Record<number, string[] | null>;
+  tableTotals?: Record<number, number>;
 }
 
 /**
@@ -534,9 +620,11 @@ export interface AccessChangeInput {
  */
 export function buildAccessChanges(i: AccessChangeInput): AccessChange[] {
   const changes: AccessChange[] = [];
+  const serverSpec = i.specs?.[i.serverId];
   const server = i.grants[i.serverId];
-  if (!server?.tableLimited) {
-    const before = server?.level ?? 'none';
+  const serverLocked = serverSpec ? !serverSpec.editable : server?.tableLimited;
+  if (!serverLocked) {
+    const before = serverSpec?.level ?? server?.level ?? 'none';
     changes.push({
       serviceId: i.serverId,
       label: i.serverLabel,
@@ -546,18 +634,30 @@ export function buildAccessChanges(i: AccessChangeInput): AccessChange[] {
   }
   for (const b of i.backends) {
     if (i.include && !i.include[b.id]) continue;
-    if (i.grants[b.id]?.tableLimited) continue;
+    const spec = i.specs?.[b.id];
+    if (spec ? !spec.editable : i.grants[b.id]?.tableLimited) continue;
+    const ticked = i.tables?.[b.id];
+    const total = i.tableTotals?.[b.id];
     changes.push({
       serviceId: b.id,
       label: b.label,
-      before: i.grants[b.id]?.level ?? 'none',
+      before: spec?.level ?? i.grants[b.id]?.level ?? 'none',
       after: i.levels[b.id] ?? 'none',
+      ...(spec?.tables?.length ? { beforeTables: spec.tables } : {}),
+      ...(ticked?.length ? { tables: ticked } : {}),
+      ...(total != null ? { tableTotal: total } : {}),
     });
   }
   return changes;
 }
 
-export type AccessDelta = '+read' | '+rw' | '+write' | '-write' | '-access';
+export type AccessDelta =
+  | '+read'
+  | '+rw'
+  | '+write'
+  | '-write'
+  | '-access'
+  | '~tables';
 
 export interface AccessSummary {
   /** The server row: newly granted, kept as is, or not touched. */
@@ -567,6 +667,16 @@ export interface AccessSummary {
   rw: string[];
   /** Every other transition (edit): label + what changes. */
   deltas: Array<{ label: string; delta: AccessDelta }>;
+  /** A table-limited grant is written: the listing row (_table/ GET) too. */
+  listing: boolean;
+}
+
+/** "Demo MySQL (2 of 5 tables)" when the grant is table-limited. */
+export function tableLabel(c: AccessChange): string {
+  if (!c.tables?.length) return c.label;
+  return c.tableTotal
+    ? `${c.label} (${c.tables.length} of ${c.tableTotal} tables)`
+    : `${c.label} (${c.tables.length} tables)`;
 }
 
 /**
@@ -577,20 +687,30 @@ export function summarizeAccessChanges(
   changes: AccessChange[],
   serverId: number
 ): AccessSummary {
-  const out: AccessSummary = { server: 'none', read: [], rw: [], deltas: [] };
+  const out: AccessSummary = {
+    server: 'none',
+    read: [],
+    rw: [],
+    deltas: [],
+    listing: false,
+  };
   for (const c of changes) {
     if (c.serviceId === serverId) {
       out.server = c.before === 'none' ? 'grant' : 'keep';
       continue;
     }
-    if (c.before === c.after) continue;
-    if (c.before === 'none') {
-      (c.after === 'rw' ? out.rw : out.read).push(c.label);
+    if (!accessChangeTouched(c)) continue;
+    if (c.after !== 'none' && c.tables?.length) out.listing = true;
+    const label = tableLabel(c);
+    if (c.before === c.after) {
+      out.deltas.push({ label, delta: '~tables' });
+    } else if (c.before === 'none') {
+      (c.after === 'rw' ? out.rw : out.read).push(label);
     } else if (c.after === 'none') {
       out.deltas.push({ label: c.label, delta: '-access' });
     } else {
       out.deltas.push({
-        label: c.label,
+        label,
         delta: c.after === 'rw' ? '+write' : '-write',
       });
     }
@@ -609,34 +729,71 @@ export function accessDiff(
 }
 
 /**
- * The role_service_access rows to PATCH for a set of level changes. A row
- * that exists is updated by id; `none` on an existing `*` row unlinks it
- * (`role_id: null`); a new level creates a `*` row. Table-limited rows are
- * never touched here.
+ * The role_service_access rows to PATCH for a set of changes.
+ *
+ * Whole API: one `*` row at the level (updated by id when it exists).
+ * Table-limited: one `_table/<name>/*` row per ticked table at the level
+ * plus a GET-only `_table/` row so the role can still list tables; no `*`
+ * row. No access: every managed row is unlinked (`role_id: null`). Rows
+ * the editor does not manage (filters, other components) are never sent;
+ * such services are read-only in the editor.
  */
 export function accessRowsForChanges(
   changes: AccessChange[],
   existing: RoleAccessRow[]
 ): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
-  for (const c of changes) {
-    if (c.before === c.after) continue;
-    const star = existing.find(
-      r => r.serviceId === c.serviceId && r.component === '*'
-    );
-    if (c.after === 'none') {
-      if (star?.id != null) out.push({ id: star.id, role_id: null });
-      continue;
-    }
+  const unlink = (r: RoleAccessRow) => {
+    if (r.id != null) out.push({ id: r.id, role_id: null });
+  };
+  const upsert = (
+    r: RoleAccessRow | undefined,
+    serviceId: number,
+    component: string,
+    mask: number
+  ) => {
+    if (r?.id != null && r.verbMask === mask) return;
     out.push({
-      ...(star?.id != null ? { id: star.id } : {}),
-      service_id: c.serviceId,
-      component: '*',
-      verb_mask: maskForLevel(c.after),
+      ...(r?.id != null ? { id: r.id } : {}),
+      service_id: serviceId,
+      component,
+      verb_mask: mask,
       requestor_mask: 3,
       filters: [],
       filter_op: 'AND',
     });
+  };
+  for (const c of changes) {
+    if (!accessChangeTouched(c)) continue;
+    const rows = existing.filter(r => r.serviceId === c.serviceId);
+    const star = rows.find(r => r.component === '*');
+    const tableRows = rows.filter(r => tableOfComponent(r.component));
+    const listing = rows.filter(r => isListingComponent(r.component));
+    if (c.after === 'none') {
+      if (star) unlink(star);
+      tableRows.forEach(unlink);
+      listing.forEach(unlink);
+      continue;
+    }
+    const mask = maskForLevel(c.after);
+    if (!c.tables?.length) {
+      upsert(star, c.serviceId, '*', mask);
+      tableRows.forEach(unlink);
+      listing.forEach(unlink);
+      continue;
+    }
+    if (star) unlink(star);
+    const ticked = new Set(c.tables);
+    for (const r of tableRows) {
+      if (!ticked.has(tableOfComponent(r.component) as string)) unlink(r);
+    }
+    for (const t of c.tables) {
+      const r = tableRows.find(x => tableOfComponent(x.component) === t);
+      upsert(r, c.serviceId, `_table/${t}/*`, mask);
+    }
+    const keep = listing.find(r => r.component === TABLE_LIST_COMPONENT);
+    listing.filter(r => r !== keep).forEach(unlink);
+    upsert(keep, c.serviceId, TABLE_LIST_COMPONENT, READ_MASK);
   }
   return out;
 }

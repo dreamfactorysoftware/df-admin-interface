@@ -107,44 +107,131 @@
             {{ t('editor.readOnAll') }}
           </button>
         </div>
-        <div
-          class="editor__row"
-          *ngFor="let row of group.rows; trackBy: trackByRow"
-          [attr.data-backend]="row.backend.name">
-          <div class="editor__name">
-            <span>{{ row.backend.label }}</span>
-            <code>{{ row.backend.name }}</code>
-          </div>
-          <span class="editor__why" *ngIf="row.grant?.tableLimited">
-            {{ t('tableLimited') }}
-          </span>
-          <span
-            class="editor__why"
-            *ngIf="!row.grant?.tableLimited && mode === 'add' && !roleId">
-            {{ t('editor.pickRoleFirst') }}
-          </span>
+        <ng-container *ngFor="let row of group.rows; trackBy: trackByRow">
           <div
-            class="editor__seg"
-            role="radiogroup"
-            [attr.aria-label]="row.backend.label"
-            *ngIf="!locked(row)">
-            <button
-              *ngFor="let level of levelsList"
-              type="button"
-              role="radio"
-              class="editor__opt"
-              [class.editor__opt--on]="levels[row.id] === level"
-              [attr.aria-checked]="levels[row.id] === level"
-              [attr.data-level]="level"
-              [disabled]="level === 'rw' && !allowWrites"
-              [matTooltip]="
-                level === 'rw' && !allowWrites ? t('dialog.writesBlocked') : ''
-              "
-              (click)="setLevel(row, level)">
-              {{ t('editor.level.' + level) }}
-            </button>
+            class="editor__row"
+            [class.editor__row--open]="isExpanded(row)"
+            [attr.data-backend]="row.backend.name">
+            <div class="editor__name">
+              <span>{{ row.backend.label }}</span>
+              <code>{{ row.backend.name }}</code>
+              <a
+                *ngIf="rolePageLink"
+                class="editor__rolelink"
+                [routerLink]="rolePageLink"
+                [matTooltip]="t('editor.rolePageTip')"
+                [attr.aria-label]="t('editor.rolePageTip')"
+                >⚙</a
+              >
+            </div>
+            <span class="editor__why" *ngIf="!row.spec.editable">
+              {{ t('editor.readOnlyRow') }}
+              <a *ngIf="rolePageLink" [routerLink]="rolePageLink">{{
+                t('rolePage')
+              }}</a>
+            </span>
+            <span
+              class="editor__why"
+              *ngIf="row.spec.editable && mode === 'add' && !roleId">
+              {{ t('editor.pickRoleFirst') }}
+            </span>
+            <div class="editor__ctl" *ngIf="!locked(row)">
+              <button
+                *ngIf="canLimit(row)"
+                type="button"
+                class="editor__limit"
+                [class.editor__limit--on]="tickedCount(row) > 0"
+                [attr.aria-expanded]="isExpanded(row)"
+                data-testid="mcp-limit-tables"
+                (click)="toggleExpanded(row)">
+                <span
+                  class="editor__chev"
+                  [class.editor__chev--open]="isExpanded(row)"
+                  >▸</span
+                >
+                <ng-container *ngIf="tickedCount(row) === 0">{{
+                  t('editor.limitTables')
+                }}</ng-container>
+                <ng-container *ngIf="tickedCount(row) > 0">{{
+                  tablesOf(row)
+                    ? t('editor.limitTablesOn', {
+                        n: tickedCount(row),
+                        total: tablesOf(row)!.length,
+                      })
+                    : t('editor.limitTablesN', { n: tickedCount(row) })
+                }}</ng-container>
+              </button>
+              <div
+                class="editor__seg"
+                role="radiogroup"
+                [attr.aria-label]="row.backend.label">
+                <button
+                  *ngFor="let level of levelsList"
+                  type="button"
+                  role="radio"
+                  class="editor__opt"
+                  [class.editor__opt--on]="levels[row.id] === level"
+                  [attr.aria-checked]="levels[row.id] === level"
+                  [attr.data-level]="level"
+                  [disabled]="level === 'rw' && !allowWrites"
+                  [matTooltip]="
+                    level === 'rw' && !allowWrites
+                      ? t('dialog.writesBlocked')
+                      : ''
+                  "
+                  (click)="setLevel(row, level)">
+                  {{ t('editor.level.' + level) }}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <!-- Limit to tables: lazy list with a checkbox each -->
+          <div
+            class="editor__tables"
+            *ngIf="canLimit(row) && isExpanded(row)"
+            [attr.data-tables-for]="row.backend.name">
+            <p class="editor__hint" *ngIf="loadingTables.has(row.backend.name)">
+              {{ t('editor.loadingTables') }}
+            </p>
+            <ng-container *ngIf="tablesOf(row) as all">
+              <p class="editor__hint" *ngIf="all.length === 0">
+                {{ t('editor.noTables') }}
+              </p>
+              <mat-form-field
+                *ngIf="showTableFilter(row)"
+                appearance="outline"
+                subscriptSizing="dynamic"
+                class="editor__tfilter">
+                <mat-label>{{ t('editor.tableFilter') }}</mat-label>
+                <input
+                  matInput
+                  [(ngModel)]="tableFilter[row.id]"
+                  [name]="'tf_' + row.backend.name" />
+              </mat-form-field>
+              <div class="editor__tlist">
+                <mat-checkbox
+                  *ngFor="let table of visibleTables(row)"
+                  color="primary"
+                  [checked]="ticked(row, table)"
+                  (change)="toggleTable(row, table)"
+                  [attr.data-table]="table">
+                  {{ table }}
+                </mat-checkbox>
+              </div>
+              <p class="editor__hint">
+                {{
+                  tickedCount(row) === 0
+                    ? t('editor.wholeApi')
+                    : t('editor.limitTablesOn', {
+                        n: tickedCount(row),
+                        total: all.length,
+                      })
+                }}
+              </p>
+            </ng-container>
+          </div>
+        </ng-container>
       </div>
     </ng-container>
 
