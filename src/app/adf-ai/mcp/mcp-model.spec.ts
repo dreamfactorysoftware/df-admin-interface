@@ -17,7 +17,9 @@ import {
   shapeFixedCatalog,
   summarizeAccessChanges,
   tokensPerTurn,
+  toggleVerbSet,
   toolKey,
+  verbSetState,
   verbsByServiceName,
 } from './mcp-model';
 
@@ -144,6 +146,68 @@ describe('mcp-model: catalog shaping', () => {
       'list_services',
       'get_service',
     ]);
+  });
+});
+
+describe('mcp-model: verb column switches', () => {
+  const getTables = [verb('get_tables')];
+  it('reads on / mixed / off across exposed backends only', () => {
+    expect(verbSetState(base, backends, getTables, 'database')).toBe('on');
+    const oneOff = {
+      ...base,
+      disabledTools: [toolKey('demo_mysql', 'get_tables')],
+    };
+    expect(verbSetState(oneOff, backends, getTables, 'database')).toBe('mixed');
+    const allOff = {
+      ...base,
+      disabledTools: base.exposedServices.map(s => toolKey(s, 'get_tables')),
+    };
+    expect(verbSetState(allOff, backends, getTables, 'database')).toBe('off');
+    // an unexposed backend's key never counts
+    const unexposedOff = {
+      ...base,
+      exposedServices: ['demo_mysql'],
+      disabledTools: [toolKey('demo_pgsql', 'get_tables')],
+    };
+    expect(verbSetState(unexposedOff, backends, getTables, 'database')).toBe(
+      'on'
+    );
+    expect(verbSetState(base, backends, getTables, 'file')).toBe('none');
+  });
+
+  it('one click disables the verb on every exposed backend, the next re-enables', () => {
+    const off = toggleVerbSet(base, backends, getTables, 'database');
+    expect(off.sort()).toEqual(
+      base.exposedServices.map(s => toolKey(s, 'get_tables')).sort()
+    );
+    expect(off).not.toContain(toolKey('files', 'get_tables'));
+    const on = toggleVerbSet(
+      { ...base, disabledTools: off },
+      backends,
+      getTables,
+      'database'
+    );
+    expect(on).toEqual([]);
+    // mixed -> enable all, other keys untouched
+    const mixed = {
+      ...base,
+      disabledTools: [toolKey('demo_mysql', 'get_tables'), 'discover_services'],
+    };
+    expect(toggleVerbSet(mixed, backends, getTables, 'database')).toEqual([
+      'discover_services',
+    ]);
+  });
+
+  it('a group toggles every verb of the group; merged style drops the tools', () => {
+    const writes = DB_VERBS.filter(v => v.group === 'write');
+    const off = toggleVerbSet(base, backends, writes, 'database');
+    expect(off.length).toBe(3 * 3);
+    const merged = shapeCatalog(
+      { ...base, toolStyle: 'merged', disabledTools: off },
+      backends
+    );
+    expect(merged.tools.some(t => t.name === 'delete_records')).toBe(false);
+    expect(merged.tools.some(t => t.name === 'get_tables')).toBe(true);
   });
 });
 

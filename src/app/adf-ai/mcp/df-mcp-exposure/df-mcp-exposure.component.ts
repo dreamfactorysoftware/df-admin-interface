@@ -27,7 +27,10 @@ import { Subject, filter, forkJoin, of, switchMap, takeUntil } from 'rxjs';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfMcpAccessComponent } from '../df-mcp-access/df-mcp-access.component';
-import { DfMcpExposureGridComponent } from '../df-mcp-exposure-grid/df-mcp-exposure-grid.component';
+import {
+  DfMcpExposureGridComponent,
+  VerbSetToggle,
+} from '../df-mcp-exposure-grid/df-mcp-exposure-grid.component';
 import {
   CatalogSource,
   DfMcpApiService,
@@ -57,6 +60,7 @@ import {
   maskFromVerbNames,
   shapeCatalog,
   shapeFixedCatalog,
+  toggleVerbSet,
   tokensPerTurn,
   verbsByServiceName,
 } from '../mcp-model';
@@ -380,6 +384,14 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
       cur.includes(name) ? cur.filter(n => n !== name) : [...cur, name]
     );
     c.markAsDirty();
+  }
+
+  /** Column / group header switch: rewrite the shared set in place. */
+  toggleVerbColumn(e: VerbSetToggle): void {
+    const next = toggleVerbSet(this.cfg, this.backends, e.verbs, e.kind);
+    this.disabledTools.clear();
+    next.forEach(k => this.disabledTools.add(k));
+    this.recompute();
   }
 
   toggleCell(key: string): void {

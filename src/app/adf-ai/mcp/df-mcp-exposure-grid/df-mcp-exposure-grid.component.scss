@@ -59,6 +59,10 @@
     vertical-align: bottom;
     padding-bottom: var(--df-space-1);
 
+    &--file {
+      height: 6.5rem;
+    }
+
     span {
       display: inline-block;
       writing-mode: vertical-rl;
@@ -67,6 +71,85 @@
       font-size: 11px;
       font-weight: var(--df-font-weight-body);
       color: var(--df-text-2);
+    }
+  }
+
+  &__group-lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--df-space-1);
+  }
+
+  &__filehead th {
+    border-top: 1px solid var(--df-border);
+    padding-top: var(--df-space-2);
+    text-align: left;
+  }
+
+  // ---- column / group switch: a mini version of the row switch.
+  // on = filled track with the knob right; off = empty track, knob left;
+  // mixed = half-filled track, knob centred.
+  &__sw {
+    display: block;
+    margin: 4px auto 0;
+    width: 1.8rem;
+    height: 1rem;
+    padding: 0;
+    border: 1px solid var(--df-border);
+    border-radius: 999px;
+    background: var(--df-surface-2);
+    cursor: pointer;
+    position: relative;
+
+    i {
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      width: calc(1rem - 4px);
+      height: calc(1rem - 4px);
+      border-radius: 50%;
+      background: var(--df-text-faint);
+      transition:
+        left var(--df-duration-fast) var(--df-ease-standard),
+        background-color var(--df-duration-fast);
+    }
+
+    &[data-state='on'] {
+      background: var(--df-accent);
+      border-color: var(--df-accent);
+      i {
+        left: calc(100% - 1rem + 3px);
+        background: var(--df-accent-contrast);
+      }
+    }
+    &[data-state='mixed'] {
+      background: linear-gradient(
+        90deg,
+        var(--df-accent) 50%,
+        var(--df-surface-2) 50%
+      );
+      border-color: var(--df-accent);
+      i {
+        left: calc(50% - (1rem - 4px) / 2);
+        background: var(--df-accent-contrast);
+      }
+    }
+    &:hover:not(:disabled) {
+      box-shadow: 0 0 0 3px var(--df-accent-soft);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--df-accent);
+      outline-offset: 1px;
+    }
+    &:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    &--legend {
+      display: inline-block;
+      margin: 0;
+      pointer-events: none;
     }
   }
 

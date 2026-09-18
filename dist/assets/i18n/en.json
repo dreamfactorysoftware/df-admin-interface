@@ -1298,9 +1298,17 @@
         "off": "disabled by you",
         "writes-off": "blocked by the server-wide writes switch",
         "denied": "advertised but the role denies it at call time",
-        "gone": "hidden from this identity entirely"
+        "gone": "hidden from this identity entirely",
+        "column": "column switch: on / some / off across exposed backends"
       },
-      "limitedTo": "limited to {{n}} tables"
+      "limitedTo": "limited to {{n}} tables",
+      "fileHeader": "File stores",
+      "colDisable": "Disable {{verb}} on all {{n}} exposed databases",
+      "colEnable": "Enable {{verb}} on all {{n}} exposed databases",
+      "colDisableFiles": "Disable {{verb}} on all {{n}} exposed file stores",
+      "colEnableFiles": "Enable {{verb}} on all {{n}} exposed file stores",
+      "groupDisable": "Disable every {{group}} verb on all {{n}} exposed databases",
+      "groupEnable": "Enable every {{group}} verb on all {{n}} exposed databases"
     },
     "catalog": {
       "title": "What this identity sees",
