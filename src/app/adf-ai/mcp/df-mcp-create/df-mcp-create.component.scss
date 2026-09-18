@@ -1,0 +1,127 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.create {
+  font-size: var(--df-font-size-sm);
+  color: var(--df-text);
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    padding: var(--df-space-3) 0;
+  }
+
+  &__field {
+    max-width: 32rem;
+    width: 100%;
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+  }
+
+  &__error {
+    margin: 0;
+    color: var(--df-danger);
+    font-size: var(--df-font-size-xs);
+  }
+
+  &__h4 {
+    margin: var(--df-space-3) 0 0;
+    font-size: var(--df-font-size-md);
+    font-weight: var(--df-font-weight-heading);
+  }
+
+  &__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    gap: var(--df-space-1) var(--df-space-3);
+
+    &--roles {
+      grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    }
+  }
+
+  &__lbl {
+    margin-right: var(--df-space-1);
+  }
+
+  &__code {
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    margin-right: var(--df-space-1);
+  }
+
+  &__kind {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--df-text-faint);
+  }
+
+  &__mode {
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-1);
+    margin-top: var(--df-space-2);
+  }
+
+  &__k {
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-heading);
+    color: var(--df-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__actions {
+    display: flex;
+    gap: var(--df-space-2);
+    margin-top: var(--df-space-3);
+  }
+
+  &__endpoint {
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
+    word-break: break-all;
+  }
+
+  &__snip {
+    margin: 0;
+    padding: var(--df-space-3);
+    background: var(--df-code-bg);
+    color: var(--df-code-text);
+    border-radius: var(--df-radius-sm);
+    font-size: var(--df-font-size-xs);
+    line-height: 1.5;
+    overflow-x: auto;
+    max-width: 48rem;
+  }
+
+  &__wait {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: var(--df-space-3);
+    padding: var(--df-space-3);
+    border: 1px dashed var(--df-border);
+    border-radius: var(--df-radius-sm);
+    max-width: 48rem;
+
+    span {
+      font-size: var(--df-font-size-xs);
+      color: var(--df-text-muted);
+    }
+
+    &--live {
+      border-style: solid;
+      border-color: var(--df-success-border);
+      background: var(--df-success-soft);
+    }
+  }
+}
