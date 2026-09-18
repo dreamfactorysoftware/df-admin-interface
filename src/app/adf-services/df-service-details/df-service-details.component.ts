@@ -653,6 +653,7 @@ export class DfServiceDetailsComponent implements OnInit {
                 storagePath: t.storagePath || '',
               })
             );
+            this.customToolsSnapshot = JSON.stringify(this.customTools);
             this.loadAvailableScmServices();
           }
         }
@@ -931,6 +932,16 @@ export class DfServiceDetailsComponent implements OnInit {
 
   get mcpFixedToolNames(): string[] {
     return this.systemMcpTools.map(t => t.name);
+  }
+
+  /** Custom tools as loaded; the Custom tools tab shows a dot when edited. */
+  private customToolsSnapshot = '[]';
+
+  get customToolsDirty(): boolean {
+    return (
+      this.editingToolIndex !== null ||
+      JSON.stringify(this.customTools) !== this.customToolsSnapshot
+    );
   }
 
   /** New `mcp` service: the stepper replaces the generic form. */

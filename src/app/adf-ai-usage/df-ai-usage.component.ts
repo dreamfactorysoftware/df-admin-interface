@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -147,6 +147,7 @@ export class DfAiUsageComponent implements OnInit {
   // Filter state. Mutated in place via toggleFilter / removeChip; refresh()
   // is called once after each mutation. Sent as-is to the backend.
   filters: UsageFilters = createEmptyFilters();
+  private route = inject(ActivatedRoute);
 
   // Derived views are cached here on each refresh. The template binds to these
   // as stable references, NOT recomputed on every change-detection tick —
@@ -224,6 +225,11 @@ export class DfAiUsageComponent implements OnInit {
   faXmark = faXmark;
 
   ngOnInit(): void {
+    // Deep link from a service page: /ai/usage?service_id=<id>
+    const id = Number(this.route.snapshot.queryParamMap.get('service_id'));
+    if (Number.isFinite(id) && id > 0) {
+      this.filters = { ...this.filters, service_id: [id] };
+    }
     this.refresh();
   }
 

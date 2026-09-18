@@ -38,7 +38,7 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   const exposed: string[] = config.exposed_services ?? [];
   expect(exposed.length).toBeGreaterThan(0);
 
-  await page.goto(`/dreamfactory/dist/#/ai/mcp/${id}`);
+  await page.goto(`/dreamfactory/dist/#/ai/mcp/${id}/exposure`);
   const grid = page.getByTestId('mcp-exposure-grid');
   await expect(grid).toBeVisible({ timeout: 20_000 });
 
@@ -76,7 +76,12 @@ test('MCP: exposure grid reflects exposed_services for demo_mcp', async ({
   expect(advertised).toBeGreaterThan(0);
   expect(advertised).toBeLessThanOrEqual(5 + 5 + exposed.length * 16 + 6 * 2);
 
-  // Who can connect + connect card render for the admin identity.
+  // Tabs are route segments; switching keeps the page state (no reload).
+  await page.locator('[role="tab"]', { hasText: 'Access' }).click();
+  await expect(page).toHaveURL(new RegExp(`/ai/mcp/${id}/access$`));
   await expect(page.getByTestId('mcp-access')).toBeVisible();
+  await page.locator('[role="tab"]', { hasText: 'Connect' }).click();
+  await expect(page).toHaveURL(new RegExp(`/ai/mcp/${id}/connect$`));
   await expect(page.getByTestId('mcp-connect')).toContainText('/mcp/demo_mcp');
+  await expect(page.getByTestId('mcp-preview-as')).toContainText('Any admin');
 });

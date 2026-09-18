@@ -907,8 +907,12 @@
           </mat-accordion>
         </ng-container>
 
-        <!-- Other Service Types (unchanged) -->
-        <ng-container *ngIf="!this.isNetworkService && !this.isScriptService">
+        <!-- Other Service Types (unchanged). The MCP edit page renders its
+             remaining config fields inside its Connect tab instead. -->
+        <ng-container
+          *ngIf="
+            !this.isNetworkService && !this.isScriptService && !(isMcp && edit)
+          ">
           <mat-accordion class="full-width">
             <mat-expansion-panel [expanded]="serviceForm.getRawValue().type">
               <mat-expansion-panel-header
@@ -1100,540 +1104,612 @@
         [disabledTools]="disabledTools"
         [customTools]="mcpCustomToolNames"
         [fixedTools]="mcpFixedToolNames"
-        [attachableNames]="mcpAttachableNames"></df-mcp-exposure>
-    </ng-container>
+        [attachableNames]="mcpAttachableNames"
+        [customToolsDirty]="customToolsDirty">
+        <!-- Connect tab: the config fields the page does not own (OAuth
+             client, redirect URIs, custom login URL, auto OAuth service). -->
+        <div mcpConnect class="full-width mcp-connect-fields">
+          <ng-container *ngFor="let item of viewSchema; trackBy: trackByName">
+            <ng-container *ngIf="!isMcpOwnedField(item.name)">
+              <df-dynamic-field
+                *ngIf="
+                  [
+                    'integer',
+                    'password',
+                    'string',
+                    'text',
+                    'picklist',
+                    'multi_picklist',
+                    'boolean',
+                  ].includes(item.type)
+                "
+                color="primary"
+                [schema]="item"
+                [formControl]="getConfigControl(item.name)"
+                class="dynamic-width"></df-dynamic-field>
+              <df-array-field
+                *ngIf="item.type === 'array' || item.type === 'object'"
+                [schema]="item"
+                [formControl]="getConfigControl(item.name)"
+                class="full-width"></df-array-field>
+            </ng-container>
+          </ng-container>
+        </div>
 
-    <!-- System API MCP Server: fixed tool catalogue toggles (no exposure
-         grid). Toggles share disabledTools with the mcp type so
-         disabled_tools round-trips through the service config. -->
-    <ng-container *ngIf="isMcp && isSystemMcp && edit">
-      <mat-accordion class="full-width">
-        <mat-expansion-panel [expanded]="true">
-          <mat-expansion-panel-header>
-            Built-in Tools
-          </mat-expansion-panel-header>
-          <div class="mcp-tools-container">
-            <mat-accordion multi>
+        <!-- Tools and context tab (system_mcp): fixed tool toggles. -->
+        <div mcpFixedTools class="full-width">
+          <!-- System API MCP Server: fixed tool catalogue toggles (no exposure
+             grid). Toggles share disabledTools with the mcp type so
+             disabled_tools round-trips through the service config. -->
+          <ng-container *ngIf="isMcp && isSystemMcp && edit">
+            <mat-accordion class="full-width">
               <mat-expansion-panel [expanded]="true">
                 <mat-expansion-panel-header>
-                  <mat-panel-title class="mcp-service-header">
-                    <mat-slide-toggle
-                      color="primary"
-                      [checked]="isAllSystemToolsEnabled()"
-                      (change)="toggleAllSystemTools($event.checked)"
-                      (click)="$event.stopPropagation()">
-                    </mat-slide-toggle>
-                    <span>System API</span>
-                  </mat-panel-title>
-                  <mat-panel-description>
-                    System API &middot; {{ systemMcpTools.length }} tools
-                  </mat-panel-description>
+                  Built-in Tools
                 </mat-expansion-panel-header>
-                <table class="mcp-services-table full-width">
-                  <thead>
-                    <tr>
-                      <th class="toggle-col"></th>
-                      <th>Tool Name</th>
-                      <th>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      *ngFor="let tool of systemMcpTools; trackBy: trackByName"
-                      [class.disabled-row]="!isToolEnabled(tool.name)">
-                      <td class="toggle-col">
-                        <mat-slide-toggle
-                          color="primary"
-                          [checked]="isToolEnabled(tool.name)"
-                          (change)="toggleTool(tool.name, $event.checked)">
-                        </mat-slide-toggle>
-                      </td>
-                      <td>
-                        <code>{{ tool.name }}</code>
-                      </td>
-                      <td>{{ tool.description }}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div class="mcp-tools-container">
+                  <mat-accordion multi>
+                    <mat-expansion-panel [expanded]="true">
+                      <mat-expansion-panel-header>
+                        <mat-panel-title class="mcp-service-header">
+                          <mat-slide-toggle
+                            color="primary"
+                            [checked]="isAllSystemToolsEnabled()"
+                            (change)="toggleAllSystemTools($event.checked)"
+                            (click)="$event.stopPropagation()">
+                          </mat-slide-toggle>
+                          <span>System API</span>
+                        </mat-panel-title>
+                        <mat-panel-description>
+                          System API &middot; {{ systemMcpTools.length }} tools
+                        </mat-panel-description>
+                      </mat-expansion-panel-header>
+                      <table class="mcp-services-table full-width">
+                        <thead>
+                          <tr>
+                            <th class="toggle-col"></th>
+                            <th>Tool Name</th>
+                            <th>Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            *ngFor="
+                              let tool of systemMcpTools;
+                              trackBy: trackByName
+                            "
+                            [class.disabled-row]="!isToolEnabled(tool.name)">
+                            <td class="toggle-col">
+                              <mat-slide-toggle
+                                color="primary"
+                                [checked]="isToolEnabled(tool.name)"
+                                (change)="
+                                  toggleTool(tool.name, $event.checked)
+                                ">
+                              </mat-slide-toggle>
+                            </td>
+                            <td>
+                              <code>{{ tool.name }}</code>
+                            </td>
+                            <td>{{ tool.description }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </mat-expansion-panel>
+                  </mat-accordion>
+                </div>
               </mat-expansion-panel>
             </mat-accordion>
-          </div>
-        </mat-expansion-panel>
-      </mat-accordion>
-    </ng-container>
+          </ng-container>
+        </div>
 
-    <!-- MCP Custom Tools (not available for the System API MCP server) -->
-    <ng-container *ngIf="isMcp && !isSystemMcp && edit">
-      <mat-accordion class="full-width">
-        <mat-expansion-panel [expanded]="customTools.length > 0">
-          <mat-expansion-panel-header>
-            Custom Tools
-          </mat-expansion-panel-header>
+        <!-- Custom tools tab: the existing editor, unchanged. -->
+        <div mcpCustomTools class="full-width">
+          <!-- MCP Custom Tools (not available for the System API MCP server) -->
+          <ng-container *ngIf="isMcp && !isSystemMcp && edit">
+            <mat-accordion class="full-width">
+              <mat-expansion-panel [expanded]="customTools.length > 0">
+                <mat-expansion-panel-header>
+                  Custom Tools
+                </mat-expansion-panel-header>
 
-          <div class="custom-tools-container">
-            <p class="custom-tools-description">
-              Define custom tools that make HTTP requests to external APIs or
-              execute server-side functions. These tools will be available to
-              MCP clients alongside the built-in DreamFactory tools.
-            </p>
-
-            <div class="custom-tools-actions" *ngIf="editingToolIndex === null">
-              <button mat-flat-button color="primary" (click)="addCustomTool()">
-                <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
-                Add Custom Tool
-              </button>
-            </div>
-
-            <!-- Add/Edit Form -->
-            <div
-              class="custom-tool-form"
-              *ngIf="editingToolIndex !== null"
-              [formGroup]="customToolForm">
-              <h4>
-                {{
-                  editingToolIndex === -1
-                    ? 'Add Custom Tool'
-                    : 'Edit Custom Tool'
-                }}
-              </h4>
-
-              <mat-button-toggle-group
-                formControlName="toolType"
-                class="tool-type-toggle">
-                <mat-button-toggle value="api">API</mat-button-toggle>
-                <mat-button-toggle value="function">Function</mat-button-toggle>
-              </mat-button-toggle-group>
-
-              <div class="form-row">
-                <mat-form-field appearance="outline" class="form-field-half">
-                  <mat-label>Tool Name</mat-label>
-                  <input
-                    matInput
-                    formControlName="name"
-                    placeholder="my_tool_name" />
-                  <mat-hint>Letters, numbers, and underscores only</mat-hint>
-                </mat-form-field>
-
-                <mat-form-field
-                  appearance="outline"
-                  class="form-field-quarter"
-                  *ngIf="customToolForm.get('toolType')?.value === 'api'">
-                  <mat-label>HTTP Method</mat-label>
-                  <mat-select formControlName="httpMethod">
-                    <mat-option value="GET">GET</mat-option>
-                    <mat-option value="POST">POST</mat-option>
-                    <mat-option value="PUT">PUT</mat-option>
-                    <mat-option value="PATCH">PATCH</mat-option>
-                    <mat-option value="DELETE">DELETE</mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </div>
-
-              <mat-form-field
-                appearance="outline"
-                class="full-width"
-                *ngIf="customToolForm.get('toolType')?.value === 'api'">
-                <mat-label>URL</mat-label>
-                <input
-                  matInput
-                  formControlName="url"
-                  placeholder="https://api.example.com/endpoint/{id}" />
-                <button
-                  mat-icon-button
-                  matSuffix
-                  type="button"
-                  [matMenuTriggerFor]="urlLookupMenu"
-                  [disabled]="availableLookups.length === 0"
-                  matTooltip="Insert Lookup">
-                  <fa-icon [icon]="faPlus"></fa-icon>
-                </button>
-                <mat-menu #urlLookupMenu="matMenu">
-                  <button
-                    mat-menu-item
-                    *ngFor="
-                      let lookup of availableLookups;
-                      trackBy: trackByName
-                    "
-                    (click)="insertLookup(lookup.name, 'url')">
-                    {{ lookup.name }}
-                  </button>
-                </mat-menu>
-                <mat-hint
-                  >Use &#123;LOOKUP_NAME&#125; for secrets or &#123;param&#125;
-                  for path parameters</mat-hint
-                >
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Description</mat-label>
-                <textarea
-                  matInput
-                  formControlName="description"
-                  rows="2"
-                  placeholder="Describe what this tool does..."></textarea>
-                <mat-hint>This description is shown to the LLM</mat-hint>
-              </mat-form-field>
-
-              <!-- Parameters -->
-              <div class="parameters-section">
-                <div class="section-header">
-                  <h5>Parameters</h5>
-                  <button
-                    mat-stroked-button
-                    color="primary"
-                    type="button"
-                    (click)="addToolParameter()">
-                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
-                    Add Parameter
-                  </button>
-                </div>
-
-                <div
-                  class="parameter-cards"
-                  *ngIf="customToolParameters.length > 0"
-                  formArrayName="parameters">
-                  <div
-                    class="parameter-card"
-                    *ngFor="
-                      let param of customToolParameters.controls;
-                      let i = index
-                    "
-                    [formGroupName]="i">
-                    <div class="parameter-card-header">
-                      <span class="parameter-index">#{{ i + 1 }}</span>
-                      <button
-                        mat-icon-button
-                        color="warn"
-                        type="button"
-                        (click)="removeToolParameter(i)"
-                        matTooltip="Remove parameter"
-                        class="parameter-remove-btn">
-                        <fa-icon [icon]="faTrashCan"></fa-icon>
-                      </button>
-                    </div>
-                    <div class="parameter-card-fields">
-                      <mat-form-field
-                        appearance="outline"
-                        class="param-field param-field--name">
-                        <mat-label>Name</mat-label>
-                        <input
-                          matInput
-                          formControlName="name"
-                          placeholder="param_name" />
-                      </mat-form-field>
-
-                      <mat-form-field
-                        appearance="outline"
-                        class="param-field param-field--type">
-                        <mat-label>Type</mat-label>
-                        <mat-select formControlName="type">
-                          <mat-option value="string">string</mat-option>
-                          <mat-option value="number">number</mat-option>
-                          <mat-option value="integer">integer</mat-option>
-                          <mat-option value="boolean">boolean</mat-option>
-                        </mat-select>
-                      </mat-form-field>
-
-                      <mat-form-field
-                        appearance="outline"
-                        class="param-field param-field--location"
-                        *ngIf="customToolForm.get('toolType')?.value === 'api'">
-                        <mat-label>Location</mat-label>
-                        <mat-select formControlName="in">
-                          <mat-option value="query">query</mat-option>
-                          <mat-option value="path">path</mat-option>
-                          <mat-option value="body">body</mat-option>
-                          <mat-option value="header">header</mat-option>
-                        </mat-select>
-                      </mat-form-field>
-
-                      <div class="param-field param-field--required">
-                        <mat-checkbox formControlName="required"
-                          >Required</mat-checkbox
-                        >
-                      </div>
-
-                      <mat-form-field
-                        appearance="outline"
-                        class="param-field param-field--desc">
-                        <mat-label>Description</mat-label>
-                        <input
-                          matInput
-                          formControlName="description"
-                          placeholder="What this parameter does" />
-                      </mat-form-field>
-                    </div>
-                  </div>
-                </div>
-
-                <p
-                  class="no-parameters-hint"
-                  *ngIf="customToolParameters.length === 0">
-                  No parameters yet. Add one to define inputs for this tool.
-                </p>
-              </div>
-
-              <!-- Link to SCM Service (function tools only) -->
-              <div
-                class="scm-link-section"
-                *ngIf="
-                  customToolForm.get('toolType')?.value === 'function' &&
-                  availableScmServices.length > 0
-                "
-                [formGroup]="customToolForm">
-                <mat-expansion-panel
-                  [expanded]="!!customToolForm.get('storageServiceId')?.value">
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>Link to Repository</mat-panel-title>
-                  </mat-expansion-panel-header>
-
-                  <div class="form-row">
-                    <mat-form-field
-                      appearance="outline"
-                      class="form-field-half">
-                      <mat-label>SCM Service</mat-label>
-                      <mat-select formControlName="storageServiceId">
-                        <mat-option [value]="null">None</mat-option>
-                        <mat-option
-                          *ngFor="
-                            let svc of availableScmServices;
-                            trackBy: trackById
-                          "
-                          [value]="svc.id">
-                          {{ svc.label || svc.name }}
-                        </mat-option>
-                      </mat-select>
-                      <mat-hint
-                        >Select a GitHub, GitLab, or Bitbucket service</mat-hint
-                      >
-                    </mat-form-field>
-                  </div>
+                <div class="custom-tools-container">
+                  <p class="custom-tools-description">
+                    Define custom tools that make HTTP requests to external APIs
+                    or execute server-side functions. These tools will be
+                    available to MCP clients alongside the built-in DreamFactory
+                    tools.
+                  </p>
 
                   <div
-                    class="form-row"
-                    *ngIf="customToolForm.get('storageServiceId')?.value">
-                    <mat-form-field
-                      appearance="outline"
-                      class="form-field-third">
-                      <mat-label>Repository</mat-label>
-                      <input
-                        matInput
-                        formControlName="scmRepository"
-                        placeholder="my-repo" />
-                    </mat-form-field>
-
-                    <mat-form-field
-                      appearance="outline"
-                      class="form-field-third">
-                      <mat-label>Branch / Tag</mat-label>
-                      <input
-                        matInput
-                        formControlName="scmReference"
-                        placeholder="master" />
-                    </mat-form-field>
-
-                    <mat-form-field
-                      appearance="outline"
-                      class="form-field-third">
-                      <mat-label>File Path</mat-label>
-                      <input
-                        matInput
-                        formControlName="storagePath"
-                        placeholder="scripts/my-tool.js" />
-                    </mat-form-field>
-                  </div>
-
-                  <div
-                    class="scm-actions"
-                    *ngIf="customToolForm.get('storageServiceId')?.value">
+                    class="custom-tools-actions"
+                    *ngIf="editingToolIndex === null">
                     <button
                       mat-flat-button
                       color="primary"
-                      type="button"
-                      (click)="viewLatestScmContent()">
-                      View Latest
+                      (click)="addCustomTool()">
+                      <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                      Add Custom Tool
                     </button>
                   </div>
-                </mat-expansion-panel>
-              </div>
 
-              <!-- Function editor -->
-              <div
-                class="editor-section"
-                *ngIf="customToolForm.get('toolType')?.value === 'function'">
-                <div class="editor-label-row">
-                  <label class="editor-label"
-                    >Function (JavaScript function body)</label
-                  >
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    [matMenuTriggerFor]="fnLookupMenu"
-                    [disabled]="availableLookups.length === 0">
-                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
-                    Insert Lookup
-                  </button>
-                  <mat-menu #fnLookupMenu="matMenu">
-                    <button
-                      mat-menu-item
-                      *ngFor="
-                        let lookup of availableLookups;
-                        trackBy: trackByName
-                      "
-                      (click)="insertLookup(lookup.name, 'function')">
-                      {{ lookup.name }}
-                    </button>
-                  </mat-menu>
-                </div>
-                <div class="editor-wrapper">
-                  <df-ace-editor
-                    #functionEditor
-                    formControlName="function"
-                    [mode]="functionEditorMode"
-                    (valueChange)="onFunctionChange($event)">
-                  </df-ace-editor>
-                </div>
-                <span class="editor-hint">
-                  Write a JavaScript function body. Parameters are available as
-                  variables by name. Use <code>secrets.LOOKUP_NAME</code> to
-                  reference lookup values.
-                </span>
-              </div>
+                  <!-- Add/Edit Form -->
+                  <div
+                    class="custom-tool-form"
+                    *ngIf="editingToolIndex !== null"
+                    [formGroup]="customToolForm">
+                    <h4>
+                      {{
+                        editingToolIndex === -1
+                          ? 'Add Custom Tool'
+                          : 'Edit Custom Tool'
+                      }}
+                    </h4>
 
-              <!-- Headers (API tools only) -->
-              <div
-                class="editor-section"
-                *ngIf="customToolForm.get('toolType')?.value === 'api'">
-                <div class="editor-label-row">
-                  <label class="editor-label">Static Headers (JSON)</label>
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    [matMenuTriggerFor]="hdrLookupMenu"
-                    [disabled]="availableLookups.length === 0">
-                    <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
-                    Insert Lookup
-                  </button>
-                  <mat-menu #hdrLookupMenu="matMenu">
-                    <button
-                      mat-menu-item
-                      *ngFor="
-                        let lookup of availableLookups;
-                        trackBy: trackByName
-                      "
-                      (click)="insertLookup(lookup.name, 'headers')">
-                      {{ lookup.name }}
-                    </button>
-                  </mat-menu>
-                </div>
-                <div class="editor-wrapper editor-wrapper--compact">
-                  <df-ace-editor
-                    #headersEditor
-                    formControlName="headers"
-                    [mode]="headersEditorMode"
-                    (valueChange)="onHeadersChange($event)">
-                  </df-ace-editor>
-                </div>
-              </div>
-
-              <div class="form-actions">
-                <button
-                  mat-button
-                  type="button"
-                  (click)="cancelCustomToolEdit()">
-                  Cancel
-                </button>
-                <button
-                  mat-flat-button
-                  color="primary"
-                  type="button"
-                  (click)="saveCustomTool()"
-                  [disabled]="customToolForm.invalid">
-                  {{ editingToolIndex === -1 ? 'Add' : 'Update' }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Custom Tools Table -->
-            <table
-              class="mcp-services-table full-width"
-              *ngIf="customTools.length > 0">
-              <thead>
-                <tr>
-                  <th class="toggle-col"></th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Method / URL</th>
-                  <th>Description</th>
-                  <th class="action-col"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  *ngFor="let tool of customTools; let i = index"
-                  [class.disabled-row]="!tool.enabled">
-                  <td class="toggle-col">
-                    <mat-slide-toggle
-                      color="primary"
-                      [checked]="tool.enabled"
-                      (change)="toggleCustomTool(i, $event.checked)">
-                    </mat-slide-toggle>
-                  </td>
-                  <td>
-                    <code>{{ tool.name }}</code>
-                  </td>
-                  <td>
-                    <code>{{ (tool.toolType || 'api').toUpperCase() }}</code>
-                  </td>
-                  <td class="url-cell">
-                    <ng-container *ngIf="(tool.toolType || 'api') === 'api'">
-                      <code>{{ tool.httpMethod }}</code> {{ tool.url }}
-                    </ng-container>
-                    <ng-container *ngIf="tool.toolType === 'function'">
-                      <em *ngIf="!tool.storageServiceId">Function</em>
-                      <em *ngIf="tool.storageServiceId"
-                        >SCM: {{ tool.scmRepository }}/{{
-                          tool.storagePath
-                        }}</em
+                    <mat-button-toggle-group
+                      formControlName="toolType"
+                      class="tool-type-toggle">
+                      <mat-button-toggle value="api">API</mat-button-toggle>
+                      <mat-button-toggle value="function"
+                        >Function</mat-button-toggle
                       >
-                    </ng-container>
-                  </td>
-                  <td>{{ tool.description }}</td>
-                  <td class="action-col">
-                    <div class="action-buttons">
+                    </mat-button-toggle-group>
+
+                    <div class="form-row">
+                      <mat-form-field
+                        appearance="outline"
+                        class="form-field-half">
+                        <mat-label>Tool Name</mat-label>
+                        <input
+                          matInput
+                          formControlName="name"
+                          placeholder="my_tool_name" />
+                        <mat-hint
+                          >Letters, numbers, and underscores only</mat-hint
+                        >
+                      </mat-form-field>
+
+                      <mat-form-field
+                        appearance="outline"
+                        class="form-field-quarter"
+                        *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                        <mat-label>HTTP Method</mat-label>
+                        <mat-select formControlName="httpMethod">
+                          <mat-option value="GET">GET</mat-option>
+                          <mat-option value="POST">POST</mat-option>
+                          <mat-option value="PUT">PUT</mat-option>
+                          <mat-option value="PATCH">PATCH</mat-option>
+                          <mat-option value="DELETE">DELETE</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <mat-form-field
+                      appearance="outline"
+                      class="full-width"
+                      *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                      <mat-label>URL</mat-label>
+                      <input
+                        matInput
+                        formControlName="url"
+                        placeholder="https://api.example.com/endpoint/{id}" />
                       <button
                         mat-icon-button
-                        (click)="editCustomTool(i)"
-                        [disabled]="editingToolIndex !== null"
-                        matTooltip="Edit tool">
-                        <fa-icon [icon]="faPenToSquare"></fa-icon>
+                        matSuffix
+                        type="button"
+                        [matMenuTriggerFor]="urlLookupMenu"
+                        [disabled]="availableLookups.length === 0"
+                        matTooltip="Insert Lookup">
+                        <fa-icon [icon]="faPlus"></fa-icon>
+                      </button>
+                      <mat-menu #urlLookupMenu="matMenu">
+                        <button
+                          mat-menu-item
+                          *ngFor="
+                            let lookup of availableLookups;
+                            trackBy: trackByName
+                          "
+                          (click)="insertLookup(lookup.name, 'url')">
+                          {{ lookup.name }}
+                        </button>
+                      </mat-menu>
+                      <mat-hint
+                        >Use &#123;LOOKUP_NAME&#125; for secrets or
+                        &#123;param&#125; for path parameters</mat-hint
+                      >
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Description</mat-label>
+                      <textarea
+                        matInput
+                        formControlName="description"
+                        rows="2"
+                        placeholder="Describe what this tool does..."></textarea>
+                      <mat-hint>This description is shown to the LLM</mat-hint>
+                    </mat-form-field>
+
+                    <!-- Parameters -->
+                    <div class="parameters-section">
+                      <div class="section-header">
+                        <h5>Parameters</h5>
+                        <button
+                          mat-stroked-button
+                          color="primary"
+                          type="button"
+                          (click)="addToolParameter()">
+                          <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                          Add Parameter
+                        </button>
+                      </div>
+
+                      <div
+                        class="parameter-cards"
+                        *ngIf="customToolParameters.length > 0"
+                        formArrayName="parameters">
+                        <div
+                          class="parameter-card"
+                          *ngFor="
+                            let param of customToolParameters.controls;
+                            let i = index
+                          "
+                          [formGroupName]="i">
+                          <div class="parameter-card-header">
+                            <span class="parameter-index">#{{ i + 1 }}</span>
+                            <button
+                              mat-icon-button
+                              color="warn"
+                              type="button"
+                              (click)="removeToolParameter(i)"
+                              matTooltip="Remove parameter"
+                              class="parameter-remove-btn">
+                              <fa-icon [icon]="faTrashCan"></fa-icon>
+                            </button>
+                          </div>
+                          <div class="parameter-card-fields">
+                            <mat-form-field
+                              appearance="outline"
+                              class="param-field param-field--name">
+                              <mat-label>Name</mat-label>
+                              <input
+                                matInput
+                                formControlName="name"
+                                placeholder="param_name" />
+                            </mat-form-field>
+
+                            <mat-form-field
+                              appearance="outline"
+                              class="param-field param-field--type">
+                              <mat-label>Type</mat-label>
+                              <mat-select formControlName="type">
+                                <mat-option value="string">string</mat-option>
+                                <mat-option value="number">number</mat-option>
+                                <mat-option value="integer">integer</mat-option>
+                                <mat-option value="boolean">boolean</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+
+                            <mat-form-field
+                              appearance="outline"
+                              class="param-field param-field--location"
+                              *ngIf="
+                                customToolForm.get('toolType')?.value === 'api'
+                              ">
+                              <mat-label>Location</mat-label>
+                              <mat-select formControlName="in">
+                                <mat-option value="query">query</mat-option>
+                                <mat-option value="path">path</mat-option>
+                                <mat-option value="body">body</mat-option>
+                                <mat-option value="header">header</mat-option>
+                              </mat-select>
+                            </mat-form-field>
+
+                            <div class="param-field param-field--required">
+                              <mat-checkbox formControlName="required"
+                                >Required</mat-checkbox
+                              >
+                            </div>
+
+                            <mat-form-field
+                              appearance="outline"
+                              class="param-field param-field--desc">
+                              <mat-label>Description</mat-label>
+                              <input
+                                matInput
+                                formControlName="description"
+                                placeholder="What this parameter does" />
+                            </mat-form-field>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p
+                        class="no-parameters-hint"
+                        *ngIf="customToolParameters.length === 0">
+                        No parameters yet. Add one to define inputs for this
+                        tool.
+                      </p>
+                    </div>
+
+                    <!-- Link to SCM Service (function tools only) -->
+                    <div
+                      class="scm-link-section"
+                      *ngIf="
+                        customToolForm.get('toolType')?.value === 'function' &&
+                        availableScmServices.length > 0
+                      "
+                      [formGroup]="customToolForm">
+                      <mat-expansion-panel
+                        [expanded]="
+                          !!customToolForm.get('storageServiceId')?.value
+                        ">
+                        <mat-expansion-panel-header>
+                          <mat-panel-title>Link to Repository</mat-panel-title>
+                        </mat-expansion-panel-header>
+
+                        <div class="form-row">
+                          <mat-form-field
+                            appearance="outline"
+                            class="form-field-half">
+                            <mat-label>SCM Service</mat-label>
+                            <mat-select formControlName="storageServiceId">
+                              <mat-option [value]="null">None</mat-option>
+                              <mat-option
+                                *ngFor="
+                                  let svc of availableScmServices;
+                                  trackBy: trackById
+                                "
+                                [value]="svc.id">
+                                {{ svc.label || svc.name }}
+                              </mat-option>
+                            </mat-select>
+                            <mat-hint
+                              >Select a GitHub, GitLab, or Bitbucket
+                              service</mat-hint
+                            >
+                          </mat-form-field>
+                        </div>
+
+                        <div
+                          class="form-row"
+                          *ngIf="customToolForm.get('storageServiceId')?.value">
+                          <mat-form-field
+                            appearance="outline"
+                            class="form-field-third">
+                            <mat-label>Repository</mat-label>
+                            <input
+                              matInput
+                              formControlName="scmRepository"
+                              placeholder="my-repo" />
+                          </mat-form-field>
+
+                          <mat-form-field
+                            appearance="outline"
+                            class="form-field-third">
+                            <mat-label>Branch / Tag</mat-label>
+                            <input
+                              matInput
+                              formControlName="scmReference"
+                              placeholder="master" />
+                          </mat-form-field>
+
+                          <mat-form-field
+                            appearance="outline"
+                            class="form-field-third">
+                            <mat-label>File Path</mat-label>
+                            <input
+                              matInput
+                              formControlName="storagePath"
+                              placeholder="scripts/my-tool.js" />
+                          </mat-form-field>
+                        </div>
+
+                        <div
+                          class="scm-actions"
+                          *ngIf="customToolForm.get('storageServiceId')?.value">
+                          <button
+                            mat-flat-button
+                            color="primary"
+                            type="button"
+                            (click)="viewLatestScmContent()">
+                            View Latest
+                          </button>
+                        </div>
+                      </mat-expansion-panel>
+                    </div>
+
+                    <!-- Function editor -->
+                    <div
+                      class="editor-section"
+                      *ngIf="
+                        customToolForm.get('toolType')?.value === 'function'
+                      ">
+                      <div class="editor-label-row">
+                        <label class="editor-label"
+                          >Function (JavaScript function body)</label
+                        >
+                        <button
+                          mat-stroked-button
+                          type="button"
+                          [matMenuTriggerFor]="fnLookupMenu"
+                          [disabled]="availableLookups.length === 0">
+                          <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                          Insert Lookup
+                        </button>
+                        <mat-menu #fnLookupMenu="matMenu">
+                          <button
+                            mat-menu-item
+                            *ngFor="
+                              let lookup of availableLookups;
+                              trackBy: trackByName
+                            "
+                            (click)="insertLookup(lookup.name, 'function')">
+                            {{ lookup.name }}
+                          </button>
+                        </mat-menu>
+                      </div>
+                      <div class="editor-wrapper">
+                        <df-ace-editor
+                          #functionEditor
+                          formControlName="function"
+                          [mode]="functionEditorMode"
+                          (valueChange)="onFunctionChange($event)">
+                        </df-ace-editor>
+                      </div>
+                      <span class="editor-hint">
+                        Write a JavaScript function body. Parameters are
+                        available as variables by name. Use
+                        <code>secrets.LOOKUP_NAME</code> to reference lookup
+                        values.
+                      </span>
+                    </div>
+
+                    <!-- Headers (API tools only) -->
+                    <div
+                      class="editor-section"
+                      *ngIf="customToolForm.get('toolType')?.value === 'api'">
+                      <div class="editor-label-row">
+                        <label class="editor-label"
+                          >Static Headers (JSON)</label
+                        >
+                        <button
+                          mat-stroked-button
+                          type="button"
+                          [matMenuTriggerFor]="hdrLookupMenu"
+                          [disabled]="availableLookups.length === 0">
+                          <fa-icon [icon]="faPlus" class="btn-icon"></fa-icon>
+                          Insert Lookup
+                        </button>
+                        <mat-menu #hdrLookupMenu="matMenu">
+                          <button
+                            mat-menu-item
+                            *ngFor="
+                              let lookup of availableLookups;
+                              trackBy: trackByName
+                            "
+                            (click)="insertLookup(lookup.name, 'headers')">
+                            {{ lookup.name }}
+                          </button>
+                        </mat-menu>
+                      </div>
+                      <div class="editor-wrapper editor-wrapper--compact">
+                        <df-ace-editor
+                          #headersEditor
+                          formControlName="headers"
+                          [mode]="headersEditorMode"
+                          (valueChange)="onHeadersChange($event)">
+                        </df-ace-editor>
+                      </div>
+                    </div>
+
+                    <div class="form-actions">
+                      <button
+                        mat-button
+                        type="button"
+                        (click)="cancelCustomToolEdit()">
+                        Cancel
                       </button>
                       <button
-                        mat-icon-button
-                        color="warn"
-                        (click)="deleteCustomTool(i)"
-                        [disabled]="editingToolIndex !== null"
-                        matTooltip="Delete tool">
-                        <fa-icon [icon]="faTrashCan"></fa-icon>
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        (click)="saveCustomTool()"
+                        [disabled]="customToolForm.invalid">
+                        {{ editingToolIndex === -1 ? 'Add' : 'Update' }}
                       </button>
                     </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  </div>
 
-            <p
-              *ngIf="customTools.length === 0 && editingToolIndex === null"
-              class="no-tools-message">
-              No custom tools defined. Click "Add Custom Tool" to create one.
-            </p>
-          </div>
-        </mat-expansion-panel>
-      </mat-accordion>
+                  <!-- Custom Tools Table -->
+                  <table
+                    class="mcp-services-table full-width"
+                    *ngIf="customTools.length > 0">
+                    <thead>
+                      <tr>
+                        <th class="toggle-col"></th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Method / URL</th>
+                        <th>Description</th>
+                        <th class="action-col"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *ngFor="let tool of customTools; let i = index"
+                        [class.disabled-row]="!tool.enabled">
+                        <td class="toggle-col">
+                          <mat-slide-toggle
+                            color="primary"
+                            [checked]="tool.enabled"
+                            (change)="toggleCustomTool(i, $event.checked)">
+                          </mat-slide-toggle>
+                        </td>
+                        <td>
+                          <code>{{ tool.name }}</code>
+                        </td>
+                        <td>
+                          <code>{{
+                            (tool.toolType || 'api').toUpperCase()
+                          }}</code>
+                        </td>
+                        <td class="url-cell">
+                          <ng-container
+                            *ngIf="(tool.toolType || 'api') === 'api'">
+                            <code>{{ tool.httpMethod }}</code> {{ tool.url }}
+                          </ng-container>
+                          <ng-container *ngIf="tool.toolType === 'function'">
+                            <em *ngIf="!tool.storageServiceId">Function</em>
+                            <em *ngIf="tool.storageServiceId"
+                              >SCM: {{ tool.scmRepository }}/{{
+                                tool.storagePath
+                              }}</em
+                            >
+                          </ng-container>
+                        </td>
+                        <td>{{ tool.description }}</td>
+                        <td class="action-col">
+                          <div class="action-buttons">
+                            <button
+                              mat-icon-button
+                              (click)="editCustomTool(i)"
+                              [disabled]="editingToolIndex !== null"
+                              matTooltip="Edit tool">
+                              <fa-icon [icon]="faPenToSquare"></fa-icon>
+                            </button>
+                            <button
+                              mat-icon-button
+                              color="warn"
+                              (click)="deleteCustomTool(i)"
+                              [disabled]="editingToolIndex !== null"
+                              matTooltip="Delete tool">
+                              <fa-icon [icon]="faTrashCan"></fa-icon>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <p
+                    *ngIf="
+                      customTools.length === 0 && editingToolIndex === null
+                    "
+                    class="no-tools-message">
+                    No custom tools defined. Click "Add Custom Tool" to create
+                    one.
+                  </p>
+                </div>
+              </mat-expansion-panel>
+            </mat-accordion>
+          </ng-container>
+        </div>
+      </df-mcp-exposure>
     </ng-container>
 
     <div
       class="full-width action-bar"
+      [class.action-bar--sticky]="isMcp && edit"
       *ngIf="!subscriptionRequired && !mcpCreateMode">
       <button
         mat-flat-button
