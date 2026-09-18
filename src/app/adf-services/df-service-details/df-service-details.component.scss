@@ -213,6 +213,17 @@ mat-icon {
   display: flex;
   justify-content: flex-end;
 
+  // MCP edit page: the save bar follows the reader across tabs.
+  &--sticky {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-top: 8px;
+    padding: 12px 0;
+    background: var(--df-surface);
+    border-top: 1px solid var(--df-border-2);
+  }
+
   .button-group {
     display: flex;
     gap: 8px;
@@ -1021,4 +1032,11 @@ mat-icon {
     font-size: 0.85rem;
     opacity: 0.7;
   }
+}
+
+// MCP Connect tab: OAuth/connect config fields projected into the tab.
+.mcp-connect-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
 }

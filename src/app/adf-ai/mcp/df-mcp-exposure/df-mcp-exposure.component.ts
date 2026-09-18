@@ -14,8 +14,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoModule } from '@ngneat/transloco';
 import { Subject, forkJoin, of, switchMap, takeUntil } from 'rxjs';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
@@ -53,6 +54,20 @@ import {
   tokensPerTurn,
   verbsByServiceName,
 } from '../mcp-model';
+import { McpTab, tabFromParam, tabUrl, tabsFor } from '../mcp-tabs';
+
+/** Config controls the tabs own; anything else is OAuth/connect settings. */
+const MCP_OWNED = new Set([
+  'exposedServices',
+  'disabledTools',
+  'lazyMode',
+  'toolStyle',
+  'allowApiKeyAuth',
+  'requireRoleAccess',
+  'allowWrites',
+  'scopeTools',
+  'customTools',
+]);
 
 export interface IdentityOption {
   key: string;
@@ -93,6 +108,7 @@ interface UsageRow {
     MatButtonToggleModule,
     MatFormFieldModule,
     MatSelectModule,
+    MatTabsModule,
     MatTooltipModule,
     DfBadgeComponent,
     DfMcpExposureGridComponent,
@@ -115,6 +131,8 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
   @Input() backends: McpBackend[] = [];
   /** Preview mode only: roles the create flow will grant. */
   @Input() previewRoles: McpRole[] = [];
+  /** Host-owned custom tools editor has pending edits (Custom tools tab dot). */
+  @Input() customToolsDirty = false;
 
   @Output() identityChange = new EventEmitter<McpIdentity>();
 
@@ -146,21 +164,45 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
   client: ConnectClient = 'claude';
   copied = false;
 
+  /** Tabs of the edit page; each one is a route segment. */
+  tabs: McpTab[] = [];
+  selectedIndex = 0;
+  /** disabled_tools as loaded, to spot pending grid/toggle edits. */
+  private disabledSnapshot = '';
+
   private destroy$ = new Subject<void>();
   private formSub$ = new Subject<void>();
   /** Bumped on every (re)load so a late response for another server is dropped. */
   private loadSeq = 0;
 
-  constructor(private api: DfMcpApiService) {}
+  constructor(
+    private api: DfMcpApiService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit(): void {
+    this.tabs = tabsFor(this.systemMcp);
+    this.disabledSnapshot = this.snapshotDisabled();
     this.bindForm();
     this.recompute();
-    if (!this.preview) this.load();
+    if (!this.preview) {
+      this.load();
+      // The tab is the optional last route segment; the route is reused
+      // across tab changes so nothing here reloads or resets.
+      this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+        const tab = tabFromParam(params.get('tab'), this.systemMcp);
+        this.selectedIndex = Math.max(0, this.tabs.indexOf(tab));
+      });
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['config'] && !changes['config'].firstChange) this.bindForm();
+    if (changes['systemMcp']) this.tabs = tabsFor(this.systemMcp);
+    if (changes['disabledTools']) {
+      this.disabledSnapshot = this.snapshotDisabled();
+    }
     const switched =
       (changes['serviceId'] && !changes['serviceId'].firstChange) ||
       (changes['serviceName'] && !changes['serviceName'].firstChange);
@@ -185,6 +227,58 @@ export class DfMcpExposureComponent implements OnInit, OnChanges, OnDestroy {
     this.formSub$.complete();
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  // ------------------------------------------------------------- tabs
+
+  onTabIndex(index: number): void {
+    const tab = this.tabs[index];
+    if (!tab || index === this.selectedIndex) return;
+    this.selectedIndex = index;
+    this.router.navigateByUrl(tabUrl(this.router.url, tab));
+  }
+
+  tabLink(tab: McpTab): string {
+    return tabUrl(this.router.url, tab);
+  }
+
+  private snapshotDisabled(): string {
+    return Array.from(this.disabledTools).sort().join(',');
+  }
+
+  private ctlDirty(...names: string[]): boolean {
+    return names.some(n => !!this.config.get(n)?.dirty);
+  }
+
+  /** Pending, unsaved edits that live on this tab (the label dot). */
+  tabDirty(tab: McpTab): boolean {
+    const disabledChanged = this.snapshotDisabled() !== this.disabledSnapshot;
+    switch (tab) {
+      case 'exposure':
+        return this.ctlDirty('exposedServices') || disabledChanged;
+      case 'access':
+        return this.ctlDirty('requireRoleAccess', 'allowApiKeyAuth');
+      case 'tools':
+        return (
+          this.ctlDirty('lazyMode', 'toolStyle', 'allowWrites') ||
+          (this.systemMcp && disabledChanged)
+        );
+      case 'connect':
+        return Object.keys(this.config.controls).some(
+          n => !MCP_OWNED.has(n) && !!this.config.get(n)?.dirty
+        );
+      case 'custom':
+        return this.customToolsDirty;
+      default:
+        return false;
+    }
+  }
+
+  /** Roles with denied calls in the last 30 days (Activity tab). */
+  get deniedRows() {
+    return (this.access?.roles ?? [])
+      .filter(r => r.denied > 0)
+      .sort((a, b) => b.denied - a.denied);
   }
 
   /** Back to "Any admin" with nothing loaded, as on first render. */

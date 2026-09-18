@@ -1426,6 +1426,27 @@
       "firstCall": "First call received. Your server is live.",
       "openPage": "Open server page",
       "createFailed": "Could not create the server: {{error}}"
+    },
+    "tabs": {
+      "exposure": "Exposure",
+      "access": "Access",
+      "tools": "Tools and context",
+      "connect": "Connect",
+      "custom": "Custom tools",
+      "activity": "Activity",
+      "unsaved": "Unsaved changes on this tab",
+      "oauth": "OAuth and login",
+      "oauthHint": "Client credentials and redirect URIs the MCP clients use to log in."
+    },
+    "activity": {
+      "deniedTitle": "Denied attempts (30 days)",
+      "deniedHint": "Calls the role check refused. Grant or widen the role from the Access tab.",
+      "role": "Role",
+      "denied": "Denied",
+      "requests": "Requests",
+      "lastSeen": "Last seen",
+      "noDenied": "No denied calls in the last 30 days.",
+      "usageLink": "Open AI usage for this server"
     }
   }
 }
