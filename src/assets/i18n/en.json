@@ -1162,5 +1162,268 @@
         "empty": "REST API, generated from the schema."
       }
     }
+  },
+  "mcpServer": {
+    "health": {
+      "success": "Healthy",
+      "warning": "Degraded",
+      "danger": "Unhealthy",
+      "neutral": "Health unknown",
+      "unavailable": "Health checks unavailable (needs a newer df-mcp-server)",
+      "anyUser": "Any logged-in user can connect",
+      "rolesGranted": "{{n}} roles granted",
+      "noRoles": "No role granted yet",
+      "systemPage": "System page"
+    },
+    "previewAs": "Preview as",
+    "identity": {
+      "admin": "Any admin (OAuth login)",
+      "role": "Role: {{name}}",
+      "key": "Key: {{name}} (role {{role}})"
+    },
+    "identityNote": {
+      "admin": "Admins see every exposed backend. Nothing is filtered by role.",
+      "role": "Backends this role holds no verb on are removed from its catalog. Write verbs stay advertised and fail at call time unless the role allows them.",
+      "roleNoData": "This role reaches none of the exposed backends: it connects and gets no data tools.",
+      "roleSystem": "The System API server advertises the same tools to every identity; the role decides what each call may touch."
+    },
+    "tiles": {
+      "tools": "Tools advertised",
+      "facadeOver": "facade over {{n}} tools",
+      "serverReports": "server reports {{n}} right now",
+      "estimated": "estimated from this config",
+      "tokens": "Sent every turn",
+      "tokensHint": "tokens of tool schema (bytes ÷ 4)",
+      "mode": "Catalog mode",
+      "who": "Who can connect"
+    },
+    "mode": {
+      "lazy": "Lazy",
+      "direct": "Direct"
+    },
+    "modeReason": {
+      "forcedOn": "lazy loading forced on",
+      "forcedOff": "lazy loading off",
+      "autoOver": "{{kb}} catalog, over the {{threshold}} threshold",
+      "autoUnder": "{{kb}} catalog, under the {{threshold}} threshold"
+    },
+    "auth": {
+      "oauthOnly": "OAuth only",
+      "oauthKey": "OAuth + key",
+      "oauthKeyLong": "OAuth + key",
+      "anyLogin": "any user with a login",
+      "rolesAndKeys": "{{roles}} roles and {{keys}} keys can connect",
+      "rolesOnly": "{{roles}} roles can connect"
+    },
+    "modes": {
+      "lazy": "Lazy tool loading",
+      "auto": "Auto",
+      "on": "On",
+      "off": "Off",
+      "lazyWhy": {
+        "auto": "Facade only when the catalog passes {{threshold}}",
+        "on": "Clients get 5 facade tools, every turn",
+        "off": "Clients get the full catalog, every turn"
+      },
+      "style": "Database tool style",
+      "merged": "Merged",
+      "prefixed": "Prefixed",
+      "styleWhy": {
+        "merged": "16 tools once; each takes a service argument",
+        "prefixed": "16 tools × {{n}} databases, more context per turn"
+      },
+      "writes": "Writes",
+      "allowed": "Allowed",
+      "blocked": "Blocked",
+      "needsUpgrade": "Needs a newer df-mcp-server; the server default applies until then",
+      "writesWhy": {
+        "on": "{{n}} write tools advertised where the role allows",
+        "off": "No client can create, update or delete through this server"
+      },
+      "auth": "Authentication",
+      "authWhy": {
+        "key": "X-DreamFactory-API-Key accepted; the key's role scopes the tools",
+        "oauth": "Bearer token from the DreamFactory login"
+      },
+      "requireRole": "Require role access",
+      "requireWhy": {
+        "on": "Only roles granted this server can connect",
+        "off": "Any logged-in user can connect; roles only limit data calls"
+      }
+    },
+    "carry": {
+      "title": "What the client carries each turn",
+      "hint": "Lazy loading swaps the full menu for a search box. The tools still exist; the client finds them on demand.",
+      "full": "Full catalog",
+      "facade": "Lazy facade",
+      "barHint": "bar length = share of the {{threshold}} auto threshold",
+      "isLazy": "This server is lazy right now: the client carries {{lite}} per turn instead of {{full}}, and reaches all {{n}} tools through the steps on the right.",
+      "isDirect": "This server is direct right now: every turn carries all {{n}} tool schemas ({{full}}). Auto switches to lazy above {{threshold}}.",
+      "step1": "→ 3 matches: {{tool}}, aggregate_data, get_table_schema",
+      "step2": "→ full input schema, only now",
+      "step3": "→ first 6,000 characters + a handle. Role checks happen here, exactly as on the REST API.",
+      "step4": "→ the rest, page by page",
+      "stepsNote": "Clients that defer tool schemas themselves always get the full list. Results over 6,000 characters are paged through fetch_more."
+    },
+    "grid": {
+      "title": "Exposure",
+      "hint": "Rows are backends, columns are the verbs each backend becomes. Switch a row on to expose it. Click a cell to disable one tool.",
+      "empty": "No database or file services to expose. Create one under API Connections first.",
+      "group": {
+        "read": "Read",
+        "spec": "Spec",
+        "procedures": "Procedures",
+        "write": "Write"
+      },
+      "backend": "Backend",
+      "tools": "Tools",
+      "expose": "Expose {{name}}",
+      "kind": {
+        "database": "database",
+        "file": "file"
+      },
+      "state": {
+        "on": "advertised",
+        "off": "disabled by you",
+        "writes-off": "blocked by the server-wide writes switch",
+        "denied": "advertised, but this role has no matching verb, so calls fail",
+        "gone": "not in this catalog"
+      },
+      "hiddenShort": "hidden",
+      "fileVerbs": "file stores have 6 verbs",
+      "legend": {
+        "on": "advertised, read",
+        "write": "advertised, writes data",
+        "off": "disabled by you",
+        "writes-off": "blocked by the server-wide writes switch",
+        "denied": "advertised but the role denies it at call time",
+        "gone": "hidden from this identity entirely"
+      },
+      "limitedTo": "limited to {{n}} tables"
+    },
+    "catalog": {
+      "title": "What this identity sees",
+      "advertised": "advertised",
+      "canWrite": "can write",
+      "databases": "databases",
+      "files": "file stores",
+      "lazyNote": "Clients search the {{n}}-tool catalog through these five instead of carrying it.",
+      "source": {
+        "catalog": "Sizes and reach come from the server's catalog preview for this identity.",
+        "rpc": "Admin view: sizes calibrated from the server's current tools/list (saved config). Pick a role or key to preview its real catalog.",
+        "estimated": "Sizes are estimates (~540 bytes per tool); the server did not answer tools/list."
+      }
+    },
+    "connect": {
+      "title": "Connect",
+      "client": {
+        "claude": "Claude",
+        "cursor": "Cursor",
+        "vscode": "VS Code",
+        "chatgpt": "ChatGPT",
+        "curl": "curl"
+      },
+      "keyOff": "API key authentication is off for this server; this key can only be used once you allow it above.",
+      "copy": "Copy",
+      "copied": "Copied"
+    },
+    "usage": {
+      "title": "Last 7 days",
+      "unavailable": "usage unavailable",
+      "tool": "Tool",
+      "backend": "Backend",
+      "calls": "Calls",
+      "lastUsed": "Last used",
+      "merged": "All databases (merged tools)",
+      "never": "never",
+      "nothing": "Nothing exposed"
+    },
+    "access": {
+      "title": "Who can connect",
+      "hint": "Roles with access to this server. A role also needs access to each API it should reach.",
+      "addExisting": "Add existing role",
+      "createRole": "Create role",
+      "anyUser": "Any logged-in user can connect",
+      "anyUserHint": "Require role access is off. Roles below only limit what data calls may touch; turn it on to restrict who connects.",
+      "statsUnavailable": "Request counts unavailable (mcp-access endpoint did not answer); roles shown from their grants.",
+      "level": {
+        "rw": "read and write",
+        "read": "read only",
+        "none": "no access",
+        "serverOnly": "server only, no data APIs"
+      },
+      "reachNone": "reaches no exposed API",
+      "tableLimited": "limited to specific tables (edit on the role page)",
+      "notExposed": "not exposed here",
+      "loginOnly": "login only",
+      "requests": "{{n}} requests",
+      "denied": "{{n}} denied",
+      "previewAs": "Preview as",
+      "editAccess": "Edit access",
+      "rolePage": "Role page",
+      "nobody": "Nobody can connect yet. Add a role or create one.",
+      "nobodyOpen": "No role holds a grant on this server; every logged-in user connects with their own role.",
+      "seenTitle": "Seen in the last 30 days without a grant",
+      "lastSeen": "last seen {{at}}",
+      "grant": "Grant",
+      "granted": "{{name}} can now connect to this server.",
+      "createdDesc": "Created from the {{server}} MCP page",
+      "dialog": {
+        "addTitle": "Add a role to {{server}}",
+        "editTitle": "Edit access to {{server}}",
+        "createTitle": "Create a role for {{server}}",
+        "role": "Role",
+        "roleName": "Role name",
+        "addHint": "The role is granted this server only. Tick an API to also grant it there.",
+        "editHint": "Per exposed API. None removes the role's blanket row for that API.",
+        "writesBlocked": "Writes are blocked on this server",
+        "noBackends": "Nothing is exposed yet; the role will only be granted the server.",
+        "alsoKey": "Also create an API key, for bots and scripts that can't log in",
+        "reviewHint": "Review before saving:",
+        "noChanges": "No changes.",
+        "everywhere": "This changes what the role can do everywhere, not only through MCP.",
+        "created": "Role {{name}} created and granted this server.",
+        "keyOnce": "Key created. Copy it now, it is shown once.",
+        "copyKey": "Copy key",
+        "keyFailed": "The API key could not be created; add one under API Keys.",
+        "cancel": "Cancel",
+        "review": "Review changes",
+        "back": "Back",
+        "save": "Save",
+        "createSave": "Create role",
+        "done": "Done"
+      }
+    },
+    "create": {
+      "steps": {
+        "name": "Name",
+        "apis": "Attach APIs",
+        "who": "Who can connect",
+        "client": "Client settings",
+        "review": "Review",
+        "connect": "Connect"
+      },
+      "nameHint": "The name becomes the endpoint: /mcp/<name>.",
+      "apisHint": "Pick the database and file APIs this server exposes. You can change this later from the exposure grid.",
+      "noApis": "No database or file APIs exist yet. Create one under API Connections first.",
+      "whoHint": "Who may connect, and how.",
+      "requireRole": "Require role access",
+      "requireRoleHint": "On: only roles granted this server connect. Off: any logged-in user.",
+      "allowKey": "Allow API key authentication",
+      "allowKeyHint": "Bots and scripts that can't log in send X-DreamFactory-API-Key.",
+      "grantRoles": "Grant these existing roles",
+      "grantRolesHint": "Server access only; each role keeps its own API grants.",
+      "clientHint": "How much the client carries each turn.",
+      "reviewHint": "This is the page you will land on. Everything is editable after creation.",
+      "next": "Next",
+      "back": "Back",
+      "createServer": "Create server",
+      "creating": "Creating…",
+      "waiting": "Waiting for the first call…",
+      "waitingHint": "Add the server to a client with the snippet above. This page updates when the first request arrives.",
+      "firstCall": "First call received. Your server is live.",
+      "openPage": "Open server page",
+      "createFailed": "Could not create the server: {{error}}"
+    }
   }
 }
