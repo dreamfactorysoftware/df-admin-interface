@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import { Routes, UrlSegment } from '@angular/router';
 import { ROUTES } from '../types/routes';
 import {
   accessibleRoutes,
@@ -59,6 +59,31 @@ describe('Route Utilities', () => {
     const result = generateBreadcrumb(routes, '/test/my-mysql-db');
 
     expect(result[1]).toEqual({ label: 'my-mysql-db' });
+  });
+
+  it('should crumb a matcher route by what it consumes, hiding a tab segment', () => {
+    // :id plus an optional known tab segment, as one route (see mcp-tabs.ts)
+    const matcher = (segments: UrlSegment[]) => {
+      if (!segments.length) return null;
+      const consumed = [segments[0]];
+      if (segments[1]?.path === 'access') consumed.push(segments[1]);
+      return { consumed, posParams: { id: segments[0] } };
+    };
+    const routes: Routes = [
+      { path: 'ai', children: [{ path: 'mcp', children: [{ matcher }] }] },
+    ];
+
+    expect(generateBreadcrumb(routes, '/ai/mcp/54')).toEqual([
+      { label: 'ai', path: 'ai', translationKey: 'nav.ai.header' },
+      { label: 'mcp', path: 'ai/mcp', translationKey: 'nav.ai.mcp.header' },
+      { label: '54' },
+    ]);
+    // the tab is the same page: the record stays the last crumb (the title)
+    expect(generateBreadcrumb(routes, '/ai/mcp/54/access')).toEqual([
+      { label: 'ai', path: 'ai', translationKey: 'nav.ai.header' },
+      { label: 'mcp', path: 'ai/mcp', translationKey: 'nav.ai.mcp.header' },
+      { label: '54' },
+    ]);
   });
 
   describe('recordLabelFromRouteData', () => {
