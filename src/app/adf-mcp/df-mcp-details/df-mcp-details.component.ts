@@ -50,6 +50,7 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
   loading = true;
   saving = false;
   private sub?: Subscription;
+  private routeSub?: Subscription;
 
   constructor(
     private activatedRoute: ActivatedRoute,
@@ -62,11 +63,24 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // Same-route navigations (/ai/mcp/9 -> /ai/mcp/21) reuse this component
+    // instance; the resolver re-emits, and the whole editor re-initializes
+    // from the newly resolved service instead of showing the old one.
+    this.routeSub = this.activatedRoute.data.subscribe(() =>
+      this.initFromRoute()
+    );
+  }
+
+  private initFromRoute(): void {
     const data = this.activatedRoute.snapshot.data['data'];
     const qp = this.activatedRoute.snapshot.queryParamMap;
-    this.store.created = qp.get('created') === '1';
     const type: McpServiceType =
       data?.type === 'system_mcp' ? 'system_mcp' : 'mcp';
+    // A fresh store per service: the tabs receive a new @Input reference
+    // and drop their own per-service UI state via ngOnChanges.
+    this.sub?.unsubscribe();
+    this.store = new McpEditorStore();
+    this.sub = this.store.changes.subscribe(() => undefined);
     this.store.init(
       {
         id: data?.id,
@@ -79,16 +93,26 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
       },
       data?.config ?? {}
     );
+    this.store.created = qp.get('created') === '1';
+    this.saving = false;
+    this.tab = 'connect';
     const requestedTab = qp.get('tab') as McpTab | null;
     if (requestedTab && ['connect', 'tools', 'settings'].includes(requestedTab)) {
       this.tab = requestedTab;
     }
+    // The shell H1 falls back to the raw :id URL segment on detail pages;
+    // publish the human label keyed to this URL, like the legacy editor.
+    this.snackbarService.setPageLabel(
+      this.router.url,
+      this.store.service.label || this.store.service.name
+    );
+    this.loading = true;
     this.loadBackendServices();
-    this.sub = this.store.changes.subscribe(() => undefined);
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
   private loadBackendServices(): void {

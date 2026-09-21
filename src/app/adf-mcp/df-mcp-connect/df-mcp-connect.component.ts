@@ -10,9 +10,11 @@ import {
   Component,
   EventEmitter,
   Input,
+  OnChanges,
   OnDestroy,
   OnInit,
   Output,
+  SimpleChanges,
 } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -63,7 +65,7 @@ function randomHex64(): string {
   styleUrls: ['./df-mcp-connect.component.scss'],
   imports: [CommonModule, RouterModule, MatButtonModule, MatTooltipModule],
 })
-export class DfMcpConnectComponent implements OnInit, OnDestroy {
+export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
   @Input({ required: true }) store!: McpEditorStore;
   @Input({ required: true }) mcpUrl!: string;
   @Output() goToTab = new EventEmitter<McpTab>();
@@ -90,13 +92,34 @@ export class DfMcpConnectComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.restoreClientChoice();
+    this.runProbe();
+  }
+
+  /** The shell keeps this component across same-route service switches;
+   *  a new endpoint URL means per-service state must reset and re-probe. */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['mcpUrl'] && !changes['mcpUrl'].firstChange) {
+      this.probe = 'pending';
+      this.secretRevealed = false;
+      this.authVariant = 'oauth';
+      this.restoreClientChoice();
+      this.runProbe();
+    }
+  }
+
+  private runProbe(): void {
     // Raw fetch on purpose: DF's HTTP interceptors would attach a session
     // token; the probe must see what an unauthenticated client sees. ANY
     // HTTP response (401/400/405/200) proves the endpoint is reachable —
     // only a network failure leaves the neutral "—" chip.
-    fetch(this.mcpUrl, { method: 'GET' })
-      .then(() => (this.probe = 'ok'))
-      .catch(() => (this.probe = 'unknown'));
+    const url = this.mcpUrl;
+    fetch(url, { method: 'GET' })
+      .then(() => {
+        if (url === this.mcpUrl) this.probe = 'ok';
+      })
+      .catch(() => {
+        if (url === this.mcpUrl) this.probe = 'unknown';
+      });
   }
 
   ngOnDestroy(): void {

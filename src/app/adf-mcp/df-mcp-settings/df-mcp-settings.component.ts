@@ -14,8 +14,10 @@ import {
   EventEmitter,
   Inject,
   Input,
+  OnChanges,
   OnInit,
   Output,
+  SimpleChanges,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -85,9 +87,16 @@ function randomHex64(): string {
     MatTooltipModule,
   ],
 })
-export class DfMcpSettingsComponent implements OnInit {
+export class DfMcpSettingsComponent implements OnInit, OnChanges {
   @Input({ required: true }) store!: McpEditorStore;
   @Output() requestDelete = new EventEmitter<void>();
+
+  /** A new store means a different service: drop the local draft field. */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['store'] && !changes['store'].firstChange) {
+      this.newRedirectUri = '';
+    }
+  }
 
   /** OAuth-group services on this instance, for the Auto OAuth picker. */
   oauthServices: OAuthServiceOption[] = [];

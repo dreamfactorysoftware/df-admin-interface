@@ -9,8 +9,9 @@
  * its save handler then lands on the new MCP editor via ?created=1).
  */
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { DfServiceDetailsComponent } from '../adf-services/df-service-details/df-service-details.component';
 import { DfMcpDetailsComponent } from './df-mcp-details/df-mcp-details.component';
 import { DfMcpCreateComponent } from './df-mcp-create/df-mcp-create.component';
@@ -30,12 +31,25 @@ import { DfMcpCreateComponent } from './df-mcp-create/df-mcp-create.component';
     <df-service-details *ngIf="mode === 'generic'"></df-service-details>
   `,
 })
-export class DfMcpRouteShimComponent implements OnInit {
+export class DfMcpRouteShimComponent implements OnInit, OnDestroy {
   mode: 'mcp-edit' | 'mcp-create' | 'generic' = 'generic';
+  private routeSub?: Subscription;
 
   constructor(private activatedRoute: ActivatedRoute) {}
 
   ngOnInit(): void {
+    // Same-route navigations (/ai/mcp/9 -> /ai/mcp/21) reuse this component,
+    // so the mode has to be recomputed on every resolver emission, not once.
+    this.routeSub = this.activatedRoute.data.subscribe(() =>
+      this.computeMode()
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+  }
+
+  private computeMode(): void {
     const snap = this.activatedRoute.snapshot;
     const service = snap.data['data'];
     if (service?.type === 'mcp' || service?.type === 'system_mcp') {
@@ -45,8 +59,7 @@ export class DfMcpRouteShimComponent implements OnInit {
     const isCreate = !snap.paramMap.get('id');
     const groups: string[] =
       snap.data['groups'] || snap.parent?.data?.['groups'] || [];
-    if (isCreate && groups.includes('MCP')) {
-      this.mode = 'mcp-create';
-    }
+    this.mode =
+      isCreate && groups.includes('MCP') ? 'mcp-create' : 'generic';
   }
 }

@@ -10,7 +10,12 @@
  * mutations go through store methods + touch(). The shell owns Save.
  */
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -99,9 +104,23 @@ export const PRECEDENCE_POPOVER =
   templateUrl: './df-mcp-tools.component.html',
   styleUrls: ['./df-mcp-tools.component.scss'],
 })
-export class DfMcpToolsComponent {
+export class DfMcpToolsComponent implements OnChanges {
   @Input({ required: true }) store!: McpEditorStore;
   @Input() loading = false;
+
+  /** A new store means a different service: drop per-service UI state. */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['store'] && !changes['store'].firstChange) {
+      this.expanded.clear();
+      this.toolsListOpen.clear();
+      this.selected.clear();
+      this.globalsOpen = false;
+      this.railReachOpen = false;
+      this.filterText = '';
+      this.filterKind = 'all';
+      this.filterModified = false;
+    }
+  }
 
   readonly precedenceTooltip = PRECEDENCE_POPOVER;
   readonly allOffLine =

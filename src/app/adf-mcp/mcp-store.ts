@@ -97,6 +97,14 @@ export class McpEditorStore {
     this.draftLabel = service.label;
     this.draftDescription = service.description;
     this.draftIsActive = service.isActive;
+    // Transient page state must not leak across same-route service
+    // switches (the shell re-inits this store on every resolver emission).
+    this.created = false;
+    this.checklistDismissed = false;
+    this.copiedUrl = false;
+    this.copiedClient = false;
+    this.reconnectBanner = false;
+    this.touch();
   }
 
   get isSystemMcp(): boolean {

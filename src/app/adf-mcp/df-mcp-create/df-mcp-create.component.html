@@ -55,8 +55,8 @@
         (blur)="nameBlurred = true"
         data-testid="mcp-create-name" />
       <p class="mcp-url-preview" data-testid="mcp-create-url-preview">
-        <span class="mcp-url-mono">→ {{ urlPreview }}</span>
-        <span class="mcp-url-note">— the name is the URL</span>
+        <span class="mcp-url-mono">→ {{ urlPreview }}</span
+        >&ngsp;<span class="mcp-url-note">— the name is the URL</span>
       </p>
       <p class="mcp-field-error" *ngIf="nameTaken()">
         A service named {{ name }} already exists.
