@@ -1,0 +1,94 @@
+<div class="mcp-page" *ngIf="store.service">
+  <!-- Persistent endpoint header: URL, auth, live tool count, on every tab -->
+  <header class="mcp-head">
+    <div class="mcp-head-row">
+      <h1>{{ store.draftLabel || store.service.name }}</h1>
+      <span class="mcp-chip" [class.good]="store.service.isActive" [class.warn]="!store.service.isActive">
+        {{ store.service.isActive ? '● Active' : 'Inactive — endpoint refuses connections' }}
+      </span>
+      <button
+        class="mcp-chip primary mcp-chip-btn"
+        type="button"
+        (click)="setTab('tools')"
+        matTooltip="Open the Tools tab">
+        {{ store.effective().total }} tools live
+      </button>
+      <span class="mcp-chip warn" *ngIf="store.effective().total === 0">
+        ⚠ Serves no tools
+      </span>
+    </div>
+    <div class="mcp-head-url">
+      <code data-testid="mcp-endpoint-url">{{ mcpUrl }}</code>
+      <button mat-stroked-button type="button" (click)="copyUrl()" data-testid="mcp-copy-url">
+        Copy
+      </button>
+      <span class="mcp-head-auth">
+        OAuth 2.1{{ store.cfg.allowApiKeyAuth ? ' · API key' : '' }} · Streamable HTTP
+      </span>
+    </div>
+    <nav class="mcp-tabs" role="tablist">
+      <button
+        type="button" role="tab" class="mcp-tab"
+        [class.on]="tab === 'connect'"
+        [attr.aria-selected]="tab === 'connect'"
+        (click)="setTab('connect')"
+        data-testid="mcp-tab-connect">
+        Connect
+      </button>
+      <button
+        type="button" role="tab" class="mcp-tab"
+        [class.on]="tab === 'tools'"
+        [attr.aria-selected]="tab === 'tools'"
+        (click)="setTab('tools')"
+        data-testid="mcp-tab-tools">
+        Tools · {{ store.effective().total }}
+      </button>
+      <button
+        type="button" role="tab" class="mcp-tab"
+        [class.on]="tab === 'settings'"
+        [attr.aria-selected]="tab === 'settings'"
+        (click)="setTab('settings')"
+        data-testid="mcp-tab-settings">
+        Settings
+      </button>
+    </nav>
+  </header>
+
+  <df-mcp-connect
+    *ngIf="tab === 'connect'"
+    [store]="store"
+    [mcpUrl]="mcpUrl"
+    (goToTab)="setTab($event)"></df-mcp-connect>
+  <df-mcp-tools
+    *ngIf="tab === 'tools'"
+    [store]="store"
+    [loading]="loading"></df-mcp-tools>
+  <df-mcp-settings
+    *ngIf="tab === 'settings'"
+    [store]="store"
+    (requestDelete)="deleteServer()"></df-mcp-settings>
+
+  <!-- Sticky dirty bar: the delta is the save button's caption -->
+  <div class="mcp-dirty-bar" *ngIf="store.dirty()" data-testid="mcp-dirty-bar">
+    <div class="mcp-dirty-inner">
+      <span>
+        Unsaved changes
+        <ng-container *ngIf="store.savedEffective().total !== store.effective().total">
+          · <b>{{ store.savedEffective().total }} → {{ store.effective().total }} tools</b>
+        </ng-container>
+      </span>
+      <button mat-button type="button" class="mcp-dirty-discard" (click)="discard()" data-testid="mcp-discard">
+        Discard
+      </button>
+      <button
+        mat-flat-button
+        type="button"
+        class="mcp-dirty-save"
+        [disabled]="saving"
+        (click)="save()"
+        data-testid="mcp-save">
+        {{ saving ? 'Saving…' : 'Save' }}
+      </button>
+    </div>
+  </div>
+</div>
