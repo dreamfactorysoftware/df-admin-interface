@@ -1,0 +1,384 @@
+/* Connect tab. Card + chip primitives match the shell's (component styles
+   don't cascade, so the .mcp-chip primitive is copied from the shell scss). */
+.mcp-connect {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 980px;
+}
+
+/* ---------------------------------------------------------------- cards */
+.mcp-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 16px 18px;
+
+  .mcp-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14.5px;
+    font-weight: 700;
+    margin: 0 0 10px;
+  }
+}
+
+.mcp-section-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin: 6px 0 -4px;
+}
+
+/* ------------------------------------------------- shared chip primitive */
+.mcp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: rgba(0, 0, 0, 0.02);
+  white-space: nowrap;
+
+  &.good {
+    background: #e7f2e8;
+    border-color: rgba(46, 125, 50, 0.35);
+    color: #2e7d32;
+  }
+  &.warn {
+    background: #fdf3dc;
+    border-color: rgba(154, 103, 0, 0.4);
+    color: #9a6700;
+  }
+  &.primary {
+    background: rgba(92, 86, 153, 0.1);
+    border-color: rgba(92, 86, 153, 0.38);
+    color: var(--df-accent, #5c5699);
+  }
+}
+
+/* ------------------------------------------------------ reconnect banner */
+.mcp-reconnect-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fdf3dc;
+  border: 1px solid rgba(154, 103, 0, 0.4);
+  color: #9a6700;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.mcp-x {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: inherit;
+  opacity: 0.7;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* -------------------------------------------------------------- checklist */
+.mcp-checklist {
+  border-color: rgba(92, 86, 153, 0.38);
+
+  .mcp-checklist-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
+    h2 {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+  }
+
+  .mcp-checklist-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+
+    li {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      font-size: 13.5px;
+
+      &.done {
+        color: #2e7d32;
+      }
+    }
+
+    .mcp-step-mark {
+      flex: none;
+      font-weight: 700;
+      width: 18px;
+      text-align: center;
+    }
+  }
+}
+
+/* --------------------------------------------------------------- endpoint */
+.mcp-endpoint {
+  .mcp-endpoint-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .mcp-endpoint-url {
+    font-size: 16px;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.035);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 7px;
+    padding: 7px 12px;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+
+  .mcp-endpoint-sub {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 9px;
+    font-size: 12.5px;
+    opacity: 0.85;
+  }
+}
+
+/* ------------------------------------------------------------------- auth */
+.mcp-auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+
+  p {
+    font-size: 13.5px;
+    margin: 0 0 8px;
+  }
+}
+
+.mcp-cred-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-size: 13px;
+
+  .mcp-cred-label {
+    flex: none;
+    width: 92px;
+    font-weight: 600;
+    opacity: 0.75;
+  }
+
+  .mcp-cred-value {
+    background: rgba(0, 0, 0, 0.035);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 12.5px;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.mcp-regenerate {
+  margin: 4px 0 6px;
+}
+
+.mcp-caption {
+  font-size: 12.5px;
+  opacity: 0.7;
+  margin: 8px 0 0;
+}
+
+.mcp-redirects-line {
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+/* ------------------------------------------------------------ client area */
+.mcp-client-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mcp-client-chip {
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+
+  &:hover {
+    border-color: rgba(92, 86, 153, 0.38);
+  }
+
+  &.on {
+    background: rgba(92, 86, 153, 0.1);
+    border-color: var(--df-accent, #5c5699);
+    color: var(--df-accent, #5c5699);
+  }
+}
+
+.mcp-auth-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0.9;
+
+  button {
+    cursor: pointer;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    background: #fff;
+
+    &.on {
+      background: rgba(92, 86, 153, 0.1);
+      border-color: var(--df-accent, #5c5699);
+      color: var(--df-accent, #5c5699);
+    }
+  }
+}
+
+.mcp-client-panel {
+  p {
+    font-size: 13.5px;
+    margin: 0 0 8px;
+  }
+
+  .mcp-steps {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 13.5px;
+  }
+}
+
+.mcp-inline-code {
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+.mcp-snippet-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 6px 0 8px;
+
+  pre {
+    flex: 1;
+    margin: 0;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+
+  button {
+    flex: none;
+  }
+}
+
+/* ----------------------------------------------------------------- footer */
+.mcp-connect-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 2px 8px;
+  font-size: 13px;
+  opacity: 0.9;
+
+  p {
+    margin: 0;
+  }
+}
+
+.mcp-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: inherit;
+  padding: 0;
+  color: var(--df-accent, #5c5699);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.mcp-docs-link {
+  display: inline-block;
+}
+
+/* ------------------------------------------------------------- responsive */
+@media (max-width: 700px) {
+  .mcp-auth-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mcp-endpoint .mcp-endpoint-url {
+    font-size: 13.5px;
+  }
+
+  .mcp-cred-row .mcp-cred-label {
+    width: 100%;
+  }
+
+  .mcp-snippet-block {
+    flex-direction: column;
+  }
+}

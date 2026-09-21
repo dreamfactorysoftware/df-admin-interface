@@ -4,6 +4,7 @@
  * it and call touch(). All effective math funnels through effective().
  */
 import { Subject } from 'rxjs';
+import { SYSTEM_MCP_TOOLS } from '../adf-services/df-service-details/system-mcp-tools';
 import {
   AccessState,
   EffectiveBreakdown,
@@ -152,6 +153,26 @@ export class McpEditorStore {
   }
   savedEffective(): EffectiveBreakdown {
     return effectiveTools(this.savedCfg, this.backendServices);
+  }
+  /**
+   * The number every header/tab/delta surface shows. For system_mcp the
+   * catalog is the fixed System API tool list (disabled by bare name);
+   * effectiveTools() only knows the data-plane catalog.
+   */
+  totalTools(): number {
+    if (this.isSystemMcp) {
+      return SYSTEM_MCP_TOOLS.filter(t => !this.cfg.disabledTools.has(t.name))
+        .length;
+    }
+    return this.effective().total;
+  }
+  savedTotalTools(): number {
+    if (this.isSystemMcp) {
+      return SYSTEM_MCP_TOOLS.filter(
+        t => !this.savedCfg.disabledTools.has(t.name)
+      ).length;
+    }
+    return this.savedEffective().total;
   }
   rows(): ExposedRow[] {
     return exposedRows(this.cfg, this.backendServices);

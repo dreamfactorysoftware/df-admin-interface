@@ -1,0 +1,403 @@
+<div class="mcp-connect" data-testid="mcp-connect-tab">
+  <!-- One-time amber banner after connection-affecting saves (armed by the shell) -->
+  <div
+    class="mcp-reconnect-banner"
+    *ngIf="store.reconnectBanner"
+    data-testid="mcp-reconnect-banner">
+    <span>
+      Connection details changed — clients may need to reconnect. The snippets
+      below are updated.
+    </span>
+    <button
+      type="button"
+      class="mcp-x"
+      (click)="dismissReconnect()"
+      aria-label="Dismiss">
+      ×
+    </button>
+  </div>
+
+  <!-- First-run checklist -->
+  <section
+    class="mcp-card mcp-checklist"
+    *ngIf="checklistVisible"
+    data-testid="mcp-checklist">
+    <div class="mcp-checklist-head">
+      <h2>Server created — 3 steps to your first tool call</h2>
+      <button
+        type="button"
+        class="mcp-x"
+        (click)="dismissChecklist()"
+        data-testid="mcp-checklist-dismiss"
+        aria-label="Dismiss checklist">
+        ×
+      </button>
+    </div>
+    <ol class="mcp-checklist-steps">
+      <li [class.done]="store.copiedUrl">
+        <span class="mcp-step-mark">{{ store.copiedUrl ? '✓' : '①' }}</span>
+        <span>Copy your endpoint URL</span>
+      </li>
+      <li [class.done]="store.copiedClient">
+        <span class="mcp-step-mark">{{ store.copiedClient ? '✓' : '②' }}</span>
+        <span>Add it to a client below</span>
+      </li>
+      <li [class.done]="step3Done">
+        <ng-container *ngIf="step3Done; else exposePrompt">
+          <span class="mcp-step-mark">✓</span>
+          <span>
+            {{ exposedSummary }} —
+            <button
+              type="button"
+              class="mcp-link"
+              (click)="goToTab.emit('tools')">
+              refine in Tools →
+            </button>
+          </span>
+        </ng-container>
+        <ng-template #exposePrompt>
+          <span class="mcp-step-mark">③</span>
+          <span>
+            <button
+              type="button"
+              class="mcp-link"
+              (click)="goToTab.emit('tools')">
+              Expose your first service → Tools.
+            </button>
+            0 services exposed — agents get global and custom tools only.
+            <b>Empty never means every service.</b>
+          </span>
+        </ng-template>
+      </li>
+    </ol>
+  </section>
+
+  <!-- Endpoint card -->
+  <section class="mcp-card mcp-endpoint" data-testid="mcp-endpoint-card">
+    <div class="mcp-endpoint-row">
+      <code class="mcp-endpoint-url">{{ mcpUrl }}</code>
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="copyEndpointUrl()"
+        data-testid="mcp-endpoint-copy">
+        Copy
+      </button>
+    </div>
+    <div class="mcp-endpoint-sub">
+      <span>Streamable HTTP · MCP 2025-03-26</span>
+      <span
+        class="mcp-chip"
+        [class.good]="probe === 'ok'"
+        data-testid="mcp-probe-chip"
+        [matTooltip]="
+          probe === 'ok'
+            ? 'The endpoint answered with the expected sign-in challenge.'
+            : ''
+        ">
+        {{ probe === 'ok' ? '✓ Reachable — auth enforced' : '—' }}
+      </span>
+    </div>
+  </section>
+
+  <!-- Authentication -->
+  <h2 class="mcp-section-title">Authentication</h2>
+  <div class="mcp-auth-grid">
+    <section class="mcp-card" data-testid="mcp-oauth-card">
+      <h3 class="mcp-card-title">
+        OAuth 2.1 <span class="mcp-chip good">always on</span>
+      </h3>
+      <div class="mcp-cred-row">
+        <span class="mcp-cred-label">Client ID</span>
+        <code class="mcp-cred-value">{{ store.cfg.oauthClientId || '—' }}</code>
+        <button mat-button type="button" (click)="copyClientId()">Copy</button>
+      </div>
+      <div class="mcp-cred-row">
+        <span class="mcp-cred-label">Client secret</span>
+        <code class="mcp-cred-value">{{ secretDisplay }}</code>
+        <button
+          mat-button
+          type="button"
+          (click)="toggleSecret()"
+          data-testid="mcp-secret-reveal">
+          {{ secretRevealed ? 'Hide' : 'Reveal' }}
+        </button>
+        <button mat-button type="button" (click)="copySecret()">Copy</button>
+      </div>
+      <button
+        mat-stroked-button
+        type="button"
+        class="mcp-regenerate"
+        (click)="regenerateSecret()"
+        data-testid="mcp-secret-regenerate">
+        Regenerate…
+      </button>
+      <p class="mcp-caption">
+        These match the URL, Client ID, and Client Secret fields in your
+        client's add-connector dialog.
+      </p>
+      <p class="mcp-redirects-line">
+        Redirect URIs: {{ store.cfg.redirectUris.length }} ·
+        <button
+          type="button"
+          class="mcp-link"
+          (click)="goToTab.emit('settings')">
+          Manage →
+        </button>
+      </p>
+    </section>
+
+    <section class="mcp-card" data-testid="mcp-apikey-card">
+      <h3 class="mcp-card-title">
+        API key
+        <span class="mcp-chip" [class.good]="store.cfg.allowApiKeyAuth">
+          {{ store.cfg.allowApiKeyAuth ? 'on' : 'off' }}
+        </span>
+      </h3>
+      <ng-container *ngIf="store.cfg.allowApiKeyAuth; else apiKeyOff">
+        <p>
+          Any DreamFactory API key whose role grants access to the exposed
+          services can connect.
+          <a class="mcp-link" [routerLink]="['/api-connections/api-keys']">
+            Manage API keys →
+          </a>
+        </p>
+        <p class="mcp-caption">
+          The URL plus any valid key grants access — treat the pair like a
+          password.
+        </p>
+      </ng-container>
+      <ng-template #apiKeyOff>
+        <p>
+          API-key auth is off — enable it in
+          <button
+            type="button"
+            class="mcp-link"
+            (click)="goToTab.emit('settings')">
+            Settings → Authentication</button
+          >.
+        </p>
+      </ng-template>
+    </section>
+  </div>
+
+  <!-- Connect a client -->
+  <h2 class="mcp-section-title">Connect a client</h2>
+  <div class="mcp-client-chips">
+    <button
+      *ngFor="let c of clients"
+      type="button"
+      class="mcp-client-chip"
+      [class.on]="selectedClient === c.id"
+      (click)="selectClient(c.id)"
+      [attr.data-testid]="'mcp-client-chip-' + c.id">
+      {{ c.label }}
+    </button>
+  </div>
+
+  <div class="mcp-auth-toggle" *ngIf="showAuthToggle">
+    <span>Connect with:</span>
+    <button
+      type="button"
+      [class.on]="authVariant === 'oauth'"
+      (click)="setAuthVariant('oauth')">
+      OAuth
+    </button>
+    <button
+      type="button"
+      [class.on]="authVariant === 'apikey'"
+      (click)="setAuthVariant('apikey')">
+      API key
+    </button>
+  </div>
+
+  <section
+    class="mcp-card mcp-client-panel"
+    data-testid="mcp-client-panel"
+    [ngSwitch]="selectedClient">
+    <!-- Claude -->
+    <ng-container *ngSwitchCase="'claude'">
+      <h3 class="mcp-card-title">Claude — add a custom connector</h3>
+      <ol class="mcp-steps">
+        <li>Settings → Connectors → Add custom connector.</li>
+        <li>
+          Remote MCP server URL:
+          <code class="mcp-inline-code">{{ mcpUrl }}</code>
+          <button
+            mat-button
+            type="button"
+            (click)="copyForClient(mcpUrl, true)">
+            Copy
+          </button>
+        </li>
+        <li>
+          Advanced settings → paste the OAuth Client ID and Client Secret from
+          above.
+          <button mat-button type="button" (click)="copyClientId()">
+            Copy ID
+          </button>
+          <button mat-button type="button" (click)="copySecret()">
+            Copy secret
+          </button>
+        </li>
+        <li>
+          Allow Claude's callback:
+          <code class="mcp-inline-code">{{ claudeCallback }}</code>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="claudeCallbackAdded"
+            (click)="addClaudeCallback()"
+            data-testid="mcp-add-redirect">
+            {{
+              claudeCallbackAdded
+                ? '✓ In redirect URIs'
+                : '+ Add to redirect URIs'
+            }}
+          </button>
+        </li>
+        <li>Connect and sign in with DreamFactory.</li>
+      </ol>
+      <p class="mcp-caption" *ngIf="bothAuthOn">
+        Claude connectors sign in with OAuth — API keys don't apply here.
+      </p>
+    </ng-container>
+
+    <!-- Claude Code -->
+    <ng-container *ngSwitchCase="'claude-code'">
+      <h3 class="mcp-card-title">Claude Code</h3>
+      <p>Run in your terminal:</p>
+      <div class="mcp-snippet-block">
+        <pre><code>{{ claudeCodeSnippet }}</code></pre>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="copyForClient(claudeCodeSnippet)">
+          Copy
+        </button>
+      </div>
+      <p class="mcp-caption" *ngIf="!keyMode">
+        Claude Code opens a browser to sign in with OAuth on first use.
+      </p>
+      <p class="mcp-caption" *ngIf="keyMode">
+        Replace YOUR_API_KEY with a DreamFactory API key whose role grants
+        access to the exposed services.
+      </p>
+    </ng-container>
+
+    <!-- Cursor -->
+    <ng-container *ngSwitchCase="'cursor'">
+      <h3 class="mcp-card-title">Cursor</h3>
+      <p>
+        Add to <code class="mcp-inline-code">.cursor/mcp.json</code> (project)
+        or <code class="mcp-inline-code">~/.cursor/mcp.json</code> (global):
+      </p>
+      <div class="mcp-snippet-block">
+        <pre><code>{{ cursorSnippet }}</code></pre>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="copyForClient(cursorSnippet)">
+          Copy
+        </button>
+      </div>
+      <p class="mcp-caption" *ngIf="!keyMode">
+        Cursor opens a browser to sign in with OAuth on first use.
+      </p>
+      <p class="mcp-caption" *ngIf="keyMode">
+        Replace YOUR_API_KEY with a DreamFactory API key whose role grants
+        access to the exposed services.
+      </p>
+    </ng-container>
+
+    <!-- VS Code -->
+    <ng-container *ngSwitchCase="'vscode'">
+      <h3 class="mcp-card-title">VS Code</h3>
+      <p>One-liner:</p>
+      <div class="mcp-snippet-block">
+        <pre><code>{{ vscodeSnippet }}</code></pre>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="copyForClient(vscodeSnippet)">
+          Copy
+        </button>
+      </div>
+      <p class="mcp-caption" *ngIf="!keyMode">
+        VS Code opens a browser to sign in with OAuth on first use.
+      </p>
+      <p class="mcp-caption" *ngIf="keyMode">
+        Replace YOUR_API_KEY with a DreamFactory API key whose role grants
+        access to the exposed services.
+      </p>
+    </ng-container>
+
+    <!-- ChatGPT -->
+    <ng-container *ngSwitchCase="'chatgpt'">
+      <h3 class="mcp-card-title">ChatGPT — add a connector</h3>
+      <ol class="mcp-steps">
+        <li>Settings → Connectors → Create.</li>
+        <li>
+          MCP server URL:
+          <code class="mcp-inline-code">{{ mcpUrl }}</code>
+          <button
+            mat-button
+            type="button"
+            (click)="copyForClient(mcpUrl, true)">
+            Copy
+          </button>
+        </li>
+        <li>Authentication: OAuth — ChatGPT discovers the sign-in flow from the server.</li>
+        <li>Create, then connect and sign in with DreamFactory.</li>
+      </ol>
+      <p class="mcp-caption" *ngIf="bothAuthOn">
+        ChatGPT connectors sign in with OAuth — API keys don't apply here.
+      </p>
+    </ng-container>
+
+    <!-- Generic JSON -->
+    <ng-container *ngSwitchCase="'json'">
+      <h3 class="mcp-card-title">Generic JSON</h3>
+      <p>
+        For any MCP client that reads an
+        <code class="mcp-inline-code">mcpServers</code> block:
+      </p>
+      <div class="mcp-snippet-block">
+        <pre><code>{{ genericSnippet }}</code></pre>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="copyForClient(genericSnippet)">
+          Copy
+        </button>
+      </div>
+      <p class="mcp-caption">
+        Check reachability:
+        <code class="mcp-inline-code">{{ genericCurl }}</code>
+        <button
+          mat-button
+          type="button"
+          (click)="copyForClient(genericCurl)">
+          Copy
+        </button>
+        — a 401 challenge here means healthy auth.
+      </p>
+    </ng-container>
+  </section>
+
+  <!-- Footer -->
+  <footer class="mcp-connect-footer">
+    <p>
+      Roles further filter tools per caller at runtime — this page sets the
+      server-wide maximum.
+      <button type="button" class="mcp-link" (click)="goToTab.emit('tools')">
+        Preview in Tools.
+      </button>
+    </p>
+    <a
+      class="mcp-link mcp-docs-link"
+      [routerLink]="['/api-connections/api-docs', store.service.name]">
+      ▸ Also available: REST endpoint &amp; API Docs
+    </a>
+  </footer>
+</div>

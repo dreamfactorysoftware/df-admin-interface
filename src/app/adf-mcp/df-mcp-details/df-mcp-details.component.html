@@ -11,9 +11,9 @@
         type="button"
         (click)="setTab('tools')"
         matTooltip="Open the Tools tab">
-        {{ store.effective().total }} tools live
+        {{ store.totalTools() }} tools live
       </button>
-      <span class="mcp-chip warn" *ngIf="store.effective().total === 0">
+      <span class="mcp-chip warn" *ngIf="store.totalTools() === 0">
         ⚠ Serves no tools
       </span>
     </div>
@@ -41,7 +41,7 @@
         [attr.aria-selected]="tab === 'tools'"
         (click)="setTab('tools')"
         data-testid="mcp-tab-tools">
-        Tools · {{ store.effective().total }}
+        Tools · {{ store.totalTools() }}
       </button>
       <button
         type="button" role="tab" class="mcp-tab"
@@ -73,8 +73,8 @@
     <div class="mcp-dirty-inner">
       <span>
         Unsaved changes
-        <ng-container *ngIf="store.savedEffective().total !== store.effective().total">
-          · <b>{{ store.savedEffective().total }} → {{ store.effective().total }} tools</b>
+        <ng-container *ngIf="store.savedTotalTools() !== store.totalTools()">
+          · <b>{{ store.savedTotalTools() }} → {{ store.totalTools() }} tools</b>
         </ng-container>
       </span>
       <button mat-button type="button" class="mcp-dirty-discard" (click)="discard()" data-testid="mcp-discard">

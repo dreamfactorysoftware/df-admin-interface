@@ -143,7 +143,7 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
   save(): void {
     if (this.saving || !this.store.dirty()) return;
     const s = this.store;
-    const wasTools = s.savedEffective().total;
+    const wasTools = s.savedTotalTools();
     const renamed = s.draftName !== s.service.name;
     const connectionAffecting = s.connectionAffecting();
     if (renamed) {
@@ -174,7 +174,7 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
           next: () => undefined,
           error: () => undefined,
         });
-        const now = s.effective().total;
+        const now = s.totalTools();
         if (now === 0) {
           this.snackbarService.openSnackBar(
             'Saved — this server serves no tools. Agents can connect but can call nothing.',

@@ -1,0 +1,292 @@
+<div class="mcp-create" data-testid="mcp-create-page">
+  <header class="mcp-create-head">
+    <h1>New MCP server</h1>
+    <p class="mcp-create-tagline">
+      Choose what agents may reach. Naming, catalog size, and auth are handled
+      automatically.
+    </p>
+  </header>
+
+  <!-- Type cards -->
+  <div class="mcp-create-types" role="radiogroup" aria-label="Server type">
+    <button
+      type="button"
+      role="radio"
+      class="mcp-type-card"
+      [class.on]="serverType === 'mcp'"
+      [attr.aria-checked]="serverType === 'mcp'"
+      (click)="setType('mcp')"
+      data-testid="mcp-create-type-mcp">
+      <span class="mcp-type-dot" aria-hidden="true"></span>
+      <span class="mcp-type-body">
+        <span class="mcp-type-title">MCP server</span>
+        <span class="mcp-type-desc">Expose your data services to AI agents.</span>
+      </span>
+    </button>
+    <button
+      type="button"
+      role="radio"
+      class="mcp-type-card"
+      [class.on]="serverType === 'system_mcp'"
+      [attr.aria-checked]="serverType === 'system_mcp'"
+      (click)="setType('system_mcp')"
+      data-testid="mcp-create-type-system">
+      <span class="mcp-type-dot" aria-hidden="true"></span>
+      <span class="mcp-type-body">
+        <span class="mcp-type-title">System API MCP server</span>
+        <span class="mcp-type-desc">Expose the DreamFactory admin API itself.</span>
+      </span>
+    </button>
+  </div>
+
+  <!-- Identity -->
+  <section class="mcp-card mcp-create-card">
+    <div class="mcp-field">
+      <label for="mcp-create-name-input">Name <span class="req">*</span></label>
+      <input
+        id="mcp-create-name-input"
+        class="mcp-input"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="warehouse"
+        [value]="name"
+        (input)="onNameInput($event)"
+        (blur)="nameBlurred = true"
+        data-testid="mcp-create-name" />
+      <p class="mcp-url-preview" data-testid="mcp-create-url-preview">
+        <span class="mcp-url-mono">→ {{ urlPreview }}</span>
+        <span class="mcp-url-note">— the name is the URL</span>
+      </p>
+      <p class="mcp-field-error" *ngIf="nameTaken()">
+        A service named {{ name }} already exists.
+      </p>
+      <p class="mcp-field-error" *ngIf="nameBlurred && name === ''">
+        Name is required.
+      </p>
+    </div>
+
+    <div class="mcp-field">
+      <label for="mcp-create-label-input">Label</label>
+      <input
+        id="mcp-create-label-input"
+        class="mcp-input"
+        type="text"
+        autocomplete="off"
+        [value]="label"
+        (input)="onLabelInput($event)" />
+    </div>
+
+    <button
+      type="button"
+      class="mcp-linklike"
+      *ngIf="!showDescription"
+      (click)="showDescription = true">
+      + Add description
+    </button>
+    <div class="mcp-field" *ngIf="showDescription">
+      <label for="mcp-create-desc-input">Description</label>
+      <textarea
+        id="mcp-create-desc-input"
+        class="mcp-input mcp-textarea"
+        rows="3"
+        [value]="description"
+        (input)="onDescriptionInput($event)"></textarea>
+    </div>
+  </section>
+
+  <!-- Expose services — the centerpiece (mcp type only; system scope is fixed) -->
+  <section class="mcp-create-expose" *ngIf="serverType === 'mcp'">
+    <div class="mcp-section-head">
+      <h2>Expose services</h2>
+    </div>
+
+    <div class="mcp-preset-row">
+      <button
+        type="button"
+        class="mcp-chip mcp-chip-btn"
+        [class.primary]="preset === 'alldb'"
+        (click)="presetAllDb()"
+        data-testid="mcp-create-preset-alldb">
+        All databases (read-only)
+      </button>
+      <button
+        type="button"
+        class="mcp-chip mcp-chip-btn"
+        [class.primary]="preset === 'choose'"
+        (click)="presetChoose()">
+        Choose services
+      </button>
+      <button
+        type="button"
+        class="mcp-chip mcp-chip-btn"
+        [class.primary]="preset === 'clone'"
+        [matMenuTriggerFor]="cloneMenu">
+        Clone another MCP server…
+      </button>
+      <mat-menu #cloneMenu="matMenu">
+        <button
+          mat-menu-item
+          *ngFor="let s of mcpSiblings"
+          (click)="pickClone(s)">
+          {{ s.label }}&nbsp;<span class="mcp-menu-name">({{ s.name }})</span>
+        </button>
+        <button mat-menu-item disabled *ngIf="mcpSiblings.length === 0">
+          No other MCP servers yet
+        </button>
+      </mat-menu>
+      <span class="mcp-chip good" *ngIf="cloneApplied">
+        Cloned from {{ cloneSource }}
+      </span>
+    </div>
+
+    <div class="mcp-access-row">
+      <span class="mcp-access-label">Access for these services:</span>
+      <div class="mcp-seg" role="radiogroup" aria-label="Access for these services">
+        <button
+          type="button"
+          role="radio"
+          class="mcp-seg-btn"
+          [class.on]="access === 'ro'"
+          [attr.aria-checked]="access === 'ro'"
+          (click)="setAccess('ro')"
+          data-testid="mcp-create-access-ro">
+          Read-only — recommended
+        </button>
+        <button
+          type="button"
+          role="radio"
+          class="mcp-seg-btn"
+          [class.on]="access === 'rw'"
+          [attr.aria-checked]="access === 'rw'"
+          (click)="setAccess('rw')"
+          data-testid="mcp-create-access-rw">
+          Read &amp; write
+        </button>
+      </div>
+    </div>
+
+    <div class="mcp-create-pickgrid">
+      <!-- Picker -->
+      <div class="mcp-card mcp-pick-card">
+        <input
+          class="mcp-input mcp-pick-search"
+          type="search"
+          [placeholder]="'Search ' + backendServices.length + ' services…'"
+          [(ngModel)]="q"
+          data-testid="mcp-create-search" />
+
+        <p class="mcp-pick-note" *ngIf="!instanceLoaded">Loading services…</p>
+        <p
+          class="mcp-pick-note"
+          *ngIf="instanceLoaded && backendServices.length === 0">
+          No database or file services yet. Create one under API Generation
+          &amp; Connections.
+        </p>
+        <p class="mcp-pick-note" *ngIf="emptySearch()">
+          No service matches '{{ q }}'. Create one under API Generation &amp;
+          Connections.
+        </p>
+
+        <div class="mcp-pick-group" *ngIf="dbAll().length > 0 && dbFiltered().length > 0">
+          <div class="mcp-pick-grouphead">
+            <span>Databases ({{ dbAll().length }})</span>
+            <mat-checkbox
+              [checked]="groupAllSelected(dbFiltered())"
+              [indeterminate]="groupSomeSelected(dbFiltered())"
+              (change)="toggleGroup(dbFiltered())">
+              Select all
+            </mat-checkbox>
+          </div>
+          <div class="mcp-pick-row" *ngFor="let s of dbFiltered()">
+            <mat-checkbox
+              [checked]="isSelected(s.name)"
+              (change)="toggle(s.name)"
+              [attr.data-testid]="'mcp-create-svc-' + s.name">
+              <span class="mcp-pick-label">{{ s.label }}</span>
+            </mat-checkbox>
+            <span class="mcp-chip">{{ s.name }}</span>
+            <span class="mcp-pick-delta">{{ toolDelta(s) }}</span>
+          </div>
+        </div>
+
+        <div class="mcp-pick-group" *ngIf="fileAll().length > 0 && fileFiltered().length > 0">
+          <div class="mcp-pick-grouphead">
+            <span>File storage ({{ fileAll().length }})</span>
+            <mat-checkbox
+              [checked]="groupAllSelected(fileFiltered())"
+              [indeterminate]="groupSomeSelected(fileFiltered())"
+              (change)="toggleGroup(fileFiltered())">
+              Select all
+            </mat-checkbox>
+          </div>
+          <div class="mcp-pick-row" *ngFor="let s of fileFiltered()">
+            <mat-checkbox
+              [checked]="isSelected(s.name)"
+              (change)="toggle(s.name)"
+              [attr.data-testid]="'mcp-create-svc-' + s.name">
+              <span class="mcp-pick-label">{{ s.label }}</span>
+            </mat-checkbox>
+            <span class="mcp-chip">{{ s.name }}</span>
+            <span class="mcp-pick-delta">{{ toolDelta(s) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected panel -->
+      <aside class="mcp-pick-side">
+        <div class="mcp-side-head">Selected ({{ selected.size }})</div>
+        <p class="mcp-side-none" *ngIf="selected.size === 0">
+          Nothing selected — agents get global tools only.
+        </p>
+        <ul class="mcp-side-list">
+          <li *ngFor="let row of selectedList()">
+            <span class="mcp-side-label">{{ row.svc?.label || row.name }}</span>
+            <span class="mcp-chip" *ngIf="row.svc">
+              {{ row.svc.kind === 'db' ? 'Database' : 'File storage' }}
+            </span>
+            <span class="mcp-chip warn" *ngIf="!row.svc">Not on this instance</span>
+            <span
+              class="mcp-chip"
+              [class.good]="accessKindFor(row) === 'ro'"
+              *ngIf="row.svc">
+              {{ accessLabelFor(row) }}
+            </span>
+            <button
+              type="button"
+              class="mcp-side-remove"
+              (click)="toggle(row.name)"
+              matTooltip="Remove from selection"
+              aria-label="Remove from selection">
+              ✕
+            </button>
+          </li>
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Live consequence line -->
+  <p class="mcp-create-consequence" data-testid="mcp-create-consequence">
+    {{ consequenceMain() }}<b *ngIf="showEmptyBold()"> Empty never means every service.</b>
+  </p>
+
+  <!-- Auth: one static line, no fields -->
+  <p class="mcp-create-auth">
+    Secured with OAuth 2.1, configured automatically. Connection details
+    appear after you create the server.
+  </p>
+
+  <div class="mcp-create-actions">
+    <button mat-stroked-button type="button" (click)="cancel()">Cancel</button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      [disabled]="!canSubmit()"
+      (click)="submit()"
+      data-testid="mcp-create-submit">
+      {{ saving ? 'Creating…' : 'Create server' }}
+    </button>
+  </div>
+</div>

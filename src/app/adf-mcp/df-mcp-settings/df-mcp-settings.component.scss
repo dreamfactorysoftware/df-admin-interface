@@ -1,0 +1,224 @@
+/* Settings tab: single scrollable column, one card per section. Card + chip
+   primitives match the shell's (component styles don't cascade, so the card
+   primitive is copied from the sibling tabs' scss). */
+.mcp-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+
+/* ---------------------------------------------------------------- cards */
+.mcp-card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 16px 18px;
+
+  .mcp-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14.5px;
+    font-weight: 700;
+    margin: 0 0 12px;
+  }
+}
+
+.mcp-sub-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin: 14px 0 8px;
+
+  &:first-of-type {
+    margin-top: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- fields */
+.mcp-field {
+  display: block;
+  width: 100%;
+}
+
+.mcp-hint {
+  font-size: 12.5px;
+  opacity: 0.7;
+  margin: 2px 0 12px;
+
+  &.warn {
+    color: #9a6700;
+    opacity: 1;
+    font-weight: 500;
+  }
+}
+
+.mcp-inline-warning {
+  background: #fdf3dc;
+  border: 1px solid rgba(154, 103, 0, 0.4);
+  color: #9a6700;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  margin: -6px 0 14px;
+}
+
+/* --------------------------------------------------------- redirect URIs */
+.mcp-redirect-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  code {
+    font-size: 12.5px;
+    background: rgba(0, 0, 0, 0.035);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 6px;
+    padding: 3px 8px;
+    word-break: break-all;
+  }
+
+  .mcp-redirect-empty {
+    font-size: 12.5px;
+    opacity: 0.7;
+  }
+}
+
+.mcp-x {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: inherit;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+.mcp-redirect-addrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  .grow {
+    flex: 1;
+  }
+
+  button {
+    margin-top: 6px;
+  }
+}
+
+.mcp-regenerate-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+
+  .mcp-hint {
+    margin: 0;
+  }
+}
+
+/* --------------------------------------------------------------- serving */
+.mcp-toolstyle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+
+  .mcp-radio-label {
+    display: block;
+    font-size: 13.5px;
+    white-space: normal;
+    line-height: 1.45;
+  }
+
+  .mcp-radio-note {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--df-accent, #5c5699);
+    margin-top: 2px;
+  }
+}
+
+.mcp-scope-line {
+  font-size: 13px;
+  opacity: 0.8;
+  margin: 4px 0 0;
+}
+
+/* ----------------------------------------------------------- housekeeping */
+.mcp-flush-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+
+  .mcp-hint {
+    margin: 0;
+  }
+}
+
+/* ------------------------------------------------------ full configuration */
+.mcp-fullconfig {
+  margin: 0;
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow: auto;
+  max-height: 420px;
+}
+
+/* ------------------------------------------------------------ danger zone */
+.mcp-danger {
+  background: #fdf0ef;
+  border-color: rgba(211, 47, 47, 0.35);
+
+  .mcp-danger-copy {
+    font-size: 13.5px;
+    margin: 0 0 10px;
+  }
+}
+
+/* ------------------------------------------------------------- responsive */
+@media (max-width: 700px) {
+  .mcp-card {
+    padding: 14px;
+  }
+
+  .mcp-redirect-addrow {
+    flex-direction: column;
+    align-items: stretch;
+
+    button {
+      margin-top: 0;
+    }
+  }
+}

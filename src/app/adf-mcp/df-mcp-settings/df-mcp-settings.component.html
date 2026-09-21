@@ -1,0 +1,274 @@
+<div class="mcp-settings" data-testid="mcp-settings-tab">
+  <!-- 1 · Identity -->
+  <section class="mcp-card">
+    <h2 class="mcp-card-title">Identity</h2>
+
+    <mat-form-field appearance="outline" class="mcp-field">
+      <mat-label>Name (namespace)</mat-label>
+      <input
+        matInput
+        [ngModel]="store.draftName"
+        (ngModelChange)="setName($event)"
+        data-testid="mcp-set-name" />
+    </mat-form-field>
+    <p
+      class="mcp-inline-warning"
+      *ngIf="renamePending"
+      data-testid="mcp-rename-warning">
+      Renaming changes your endpoint URL to …/mcp/{{ store.draftName }}.
+      Connected clients will break until they update.
+    </p>
+
+    <mat-form-field appearance="outline" class="mcp-field">
+      <mat-label>Label</mat-label>
+      <input
+        matInput
+        [ngModel]="store.draftLabel"
+        (ngModelChange)="setLabel($event)"
+        data-testid="mcp-set-label" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="mcp-field">
+      <mat-label>Description</mat-label>
+      <textarea
+        matInput
+        rows="3"
+        [ngModel]="store.draftDescription"
+        (ngModelChange)="setDescription($event)"
+        data-testid="mcp-set-description"></textarea>
+    </mat-form-field>
+
+    <mat-slide-toggle
+      [checked]="store.draftIsActive"
+      (change)="setActive($event)"
+      data-testid="mcp-set-active">
+      Active
+    </mat-slide-toggle>
+    <p class="mcp-hint warn" *ngIf="!store.draftIsActive">
+      This server is inactive — the endpoint refuses connections.
+    </p>
+  </section>
+
+  <!-- 2 · Authentication -->
+  <section class="mcp-card">
+    <h2 class="mcp-card-title">Authentication</h2>
+
+    <h3 class="mcp-sub-title">Redirect URIs</h3>
+    <ul class="mcp-redirect-list" data-testid="mcp-redirect-list">
+      <li *ngFor="let uri of store.cfg.redirectUris; let i = index">
+        <code>{{ uri }}</code>
+        <button
+          class="mcp-x"
+          type="button"
+          (click)="removeRedirect(i)"
+          [attr.aria-label]="'Remove ' + uri">
+          ×
+        </button>
+      </li>
+      <li class="mcp-redirect-empty" *ngIf="store.cfg.redirectUris.length === 0">
+        No redirect URIs yet — OAuth clients that need a callback can't
+        connect until theirs is added.
+      </li>
+    </ul>
+    <div class="mcp-redirect-addrow">
+      <mat-form-field appearance="outline" class="mcp-field grow">
+        <mat-label>Add redirect URI</mat-label>
+        <input
+          matInput
+          [ngModel]="newRedirectUri"
+          (ngModelChange)="newRedirectUri = $event"
+          (keyup.enter)="addRedirect()"
+          placeholder="https://client.example.com/callback"
+          data-testid="mcp-redirect-add" />
+      </mat-form-field>
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="addRedirect()"
+        data-testid="mcp-redirect-add-btn">
+        Add
+      </button>
+    </div>
+
+    <mat-form-field appearance="outline" class="mcp-field">
+      <mat-label>Custom login URL</mat-label>
+      <input
+        matInput
+        [ngModel]="store.cfg.customLoginUrl"
+        (ngModelChange)="setLoginUrl($event)"
+        placeholder="https://login.example.com"
+        data-testid="mcp-login-url" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="mcp-field">
+      <mat-label>Auto OAuth service</mat-label>
+      <mat-select
+        [value]="store.cfg.autoOauthService"
+        (selectionChange)="setAutoOauth($event.value)"
+        data-testid="mcp-auto-oauth">
+        <mat-option [value]="null">None</mat-option>
+        <mat-option
+          *ngIf="missingAutoOauth"
+          [value]="store.cfg.autoOauthService">
+          {{ store.cfg.autoOauthService }} (not found on this instance)
+        </mat-option>
+        <mat-option *ngFor="let s of oauthServices" [value]="s.name">
+          {{ s.label }} ({{ s.name }})
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+    <p class="mcp-hint">
+      Sign-ins are sent straight to this OAuth provider instead of the
+      DreamFactory login form.
+    </p>
+
+    <mat-slide-toggle
+      [checked]="store.cfg.allowApiKeyAuth"
+      (change)="setAllowApiKey($event)"
+      data-testid="mcp-apikey-toggle">
+      Allow API-key authentication
+    </mat-slide-toggle>
+    <p class="mcp-hint">
+      Anyone with the URL and a valid API key connects without a login
+      prompt. The key's role decides which tools it can use.
+    </p>
+
+    <div class="mcp-regenerate-row">
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="regenerateSecret()"
+        data-testid="mcp-regenerate-secret">
+        Regenerate client secret…
+      </button>
+      <span class="mcp-hint">
+        Clients using the old secret will stop connecting.
+      </span>
+    </div>
+  </section>
+
+  <!-- 3 · Serving -->
+  <section class="mcp-card">
+    <h2 class="mcp-card-title">Serving</h2>
+
+    <!-- system_mcp has nothing to consolidate: no Tool naming control. -->
+    <ng-container *ngIf="!store.isSystemMcp">
+      <h3 class="mcp-sub-title">Tool naming</h3>
+      <mat-radio-group
+        class="mcp-toolstyle"
+        [value]="toolStyleValue"
+        (change)="onToolStyleChange($event)">
+        <mat-radio-button value="merged" data-testid="mcp-toolstyle-merged">
+          <span class="mcp-radio-label">
+            Consolidated (merged) — one tool per verb with a service
+            argument. Recommended.
+          </span>
+          <span class="mcp-radio-note" *ngIf="store.cfg.toolStyle === 'merged'">
+            Matches the recommended default.
+          </span>
+        </mat-radio-button>
+        <mat-radio-button value="prefixed" data-testid="mcp-toolstyle-prefixed">
+          <span class="mcp-radio-label">
+            Per-service names (prefixed) — legacy compatibility for clients
+            pinned to names like crm_get_tables.
+          </span>
+          <span class="mcp-radio-note" *ngIf="store.cfg.toolStyle === null">
+            Server default (per-service names).
+          </span>
+        </mat-radio-button>
+      </mat-radio-group>
+      <p
+        class="mcp-hint warn"
+        *ngIf="styleChanged"
+        data-testid="mcp-toolstyle-note">
+        Style changes rename emitted tools — preview before saving. Clients
+        may need to reconnect.
+      </p>
+    </ng-container>
+
+    <h3 class="mcp-sub-title">Catalog delivery</h3>
+    <mat-form-field appearance="outline" class="mcp-field">
+      <mat-label>Catalog delivery</mat-label>
+      <mat-select
+        [value]="lazyValue"
+        (selectionChange)="setLazy($event.value)"
+        data-testid="mcp-lazy-select">
+        <mat-option value="auto">Auto — recommended</mat-option>
+        <mat-option value="always">Always on-demand</mat-option>
+        <mat-option value="never">Never</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <p class="mcp-hint">
+      When tool definitions exceed ~8k tokens, agents first receive
+      discovery tools instead of the full catalog.
+    </p>
+
+    <p class="mcp-scope-line" data-testid="mcp-scope-line">
+      Scope tools to caller's role: {{ scopeToolsOn ? 'on' : 'off' }} — set
+      by MCP_SCOPE_TOOLS on the server.
+    </p>
+  </section>
+
+  <!-- 4 · Housekeeping -->
+  <section class="mcp-card" data-testid="mcp-housekeeping">
+    <h2 class="mcp-card-title">Housekeeping</h2>
+
+    <ng-container *ngIf="orphanCount > 0; else noOrphans">
+      <p class="mcp-hint warn">
+        {{ orphanCount }} saved tool
+        {{ orphanCount === 1 ? 'setting references' : 'settings reference' }}
+        services that no longer exist. Nothing is removed automatically —
+        review before deleting.
+      </p>
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="openHousekeeping()"
+        data-testid="mcp-housekeeping-review">
+        Review &amp; clean up
+      </button>
+    </ng-container>
+    <ng-template #noOrphans>
+      <p class="mcp-hint">No orphaned tool settings.</p>
+    </ng-template>
+
+    <div class="mcp-flush-row">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="flushingCache"
+        (click)="flushCache()"
+        data-testid="mcp-flush-cache">
+        Flush cache now
+      </button>
+      <span class="mcp-hint">
+        Saves flush the cache automatically — this one is for support.
+      </span>
+    </div>
+  </section>
+
+  <!-- 5 · Full configuration -->
+  <section class="mcp-card">
+    <h2 class="mcp-card-title">Full configuration</h2>
+    <p class="mcp-hint">
+      The stored config, read-only — what the audit sees is what you see.
+    </p>
+    <pre class="mcp-fullconfig" data-testid="mcp-fullconfig">{{ fullConfigJson }}</pre>
+  </section>
+
+  <!-- 6 · Danger zone -->
+  <section class="mcp-card mcp-danger">
+    <h2 class="mcp-card-title">Danger zone</h2>
+    <p class="mcp-danger-copy">
+      Delete this MCP server. Clients lose access immediately.
+    </p>
+    <button
+      mat-flat-button
+      color="warn"
+      type="button"
+      (click)="requestDelete.emit()"
+      data-testid="mcp-delete-server">
+      Delete server…
+    </button>
+  </section>
+</div>
