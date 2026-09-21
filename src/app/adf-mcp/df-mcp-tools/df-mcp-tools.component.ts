@@ -24,6 +24,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import {
   SYSTEM_MCP_TOOLS,
@@ -46,6 +47,7 @@ import {
   McpBackendService,
   emittedDbToolName,
   groupState,
+  isCustomToolEnabled,
   toolKey,
   verbReach,
 } from '../mcp-effective';
@@ -100,6 +102,7 @@ export const PRECEDENCE_POPOVER =
     MatSelectModule,
     MatSlideToggleModule,
     MatTooltipModule,
+    RouterLink,
   ],
   templateUrl: './df-mcp-tools.component.html',
   styleUrls: ['./df-mcp-tools.component.scss'],
@@ -110,6 +113,11 @@ export class DfMcpToolsComponent implements OnChanges {
 
   /** A new store means a different service: drop per-service UI state. */
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['store']) {
+      // A different store instance may reuse version numbers — never let the
+      // local memo survive a store swap.
+      this.localMemo.clear();
+    }
     if (changes['store'] && !changes['store'].firstChange) {
       this.expanded.clear();
       this.toolsListOpen.clear();
@@ -122,9 +130,39 @@ export class DfMcpToolsComponent implements OnChanges {
     }
   }
 
+  /* ---------------------- identity-stable derivations ---------------------- */
+  /**
+   * Local composites over the store's memoized derivations. The templates
+   * iterate these with *ngFor every change-detection pass, so the arrays must
+   * keep their identity between passes — otherwise the row DOM (including any
+   * open mat-menu trigger inside it) is torn down on every pass. Keyed on the
+   * store's version counter plus the local filter/search fields.
+   */
+  private localMemo = new Map<string, { key: string; value: unknown }>();
+
+  private memoized<T>(name: string, key: string, compute: () => T): T {
+    const hit = this.localMemo.get(name);
+    if (hit && hit.key === key) return hit.value as T;
+    const value = compute();
+    this.localMemo.set(name, { key, value });
+    return value;
+  }
+
+  /** trackBy on the stable row/service name. */
+  readonly trackByName = (_: number, row: { name: string }): string => row.name;
+  readonly trackBySvcName = (_: number, s: McpBackendService): string => s.name;
+  readonly trackByToolVerb = (_: number, e: { tool: McpToolDef }): string =>
+    e.tool.verb;
+  readonly trackByVerb = (_: number, r: { verb: string }): string => r.verb;
+
   readonly precedenceTooltip = PRECEDENCE_POPOVER;
   readonly allOffLine =
     'Agents see this service but can call nothing. Enable tools or remove it.';
+  readonly lazyWhyTooltip =
+    'When tool definitions exceed ~8k tokens, agents first receive discovery ' +
+    'tools instead of the full catalog.';
+  /** Permanent role line's Manage-roles target (routes.ts: api-connections → role-based-access). */
+  readonly rolesRoute = '/api-connections/role-based-access';
 
   /** Expanded drill-ins, level-2 individual-tools disclosures, by name. */
   expanded = new Set<string>();
@@ -178,13 +216,17 @@ export class DfMcpToolsComponent implements OnChanges {
 
   /* ------------------------------- rows ------------------------------- */
   serviceRows(): Array<{ name: string; svc: McpBackendService }> {
-    return this.store
-      .rows()
-      .filter((r): r is { name: string; svc: McpBackendService } => !!r.svc);
+    return this.memoized('serviceRows', String(this.store.version), () =>
+      this.store
+        .rows()
+        .filter((r): r is { name: string; svc: McpBackendService } => !!r.svc)
+    );
   }
 
   orphanRows(): ExposedRow[] {
-    return this.store.rows().filter(r => !r.svc);
+    return this.memoized('orphanRows', String(this.store.version), () =>
+      this.store.rows().filter(r => !r.svc)
+    );
   }
 
   showFilter(): boolean {
@@ -200,23 +242,26 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   visibleRows(): Array<{ name: string; svc: McpBackendService }> {
-    let rows = this.serviceRows();
-    if (!this.showFilter()) return rows;
-    const q = this.filterText.trim().toLowerCase();
-    if (q) {
-      rows = rows.filter(
-        r =>
-          r.name.toLowerCase().includes(q) ||
-          r.svc.label.toLowerCase().includes(q)
-      );
-    }
-    if (this.filterKind !== 'all') {
-      rows = rows.filter(r => r.svc.kind === this.filterKind);
-    }
-    if (this.filterModified) {
-      rows = rows.filter(r => this.isModified(r.name));
-    }
-    return rows;
+    const key = `${this.store.version}|${this.filterText}|${this.filterKind}|${this.filterModified}`;
+    return this.memoized('visibleRows', key, () => {
+      let rows = this.serviceRows();
+      if (!this.showFilter()) return rows;
+      const q = this.filterText.trim().toLowerCase();
+      if (q) {
+        rows = rows.filter(
+          r =>
+            r.name.toLowerCase().includes(q) ||
+            r.svc.label.toLowerCase().includes(q)
+        );
+      }
+      if (this.filterKind !== 'all') {
+        rows = rows.filter(r => r.svc.kind === this.filterKind);
+      }
+      if (this.filterModified) {
+        rows = rows.filter(r => this.isModified(r.name));
+      }
+      return rows;
+    });
   }
 
   setFilterKind(kind: 'db' | 'file'): void {
@@ -335,9 +380,14 @@ export class DfMcpToolsComponent implements OnChanges {
 
   /** Other exposed databases a db curation pattern can be copied to. */
   copyTargets(svc: McpBackendService): McpBackendService[] {
-    return this.serviceRows()
-      .map(r => r.svc)
-      .filter(s => s.kind === 'db' && s.name !== svc.name);
+    return this.memoized(
+      `copyTargets:${svc.name}`,
+      String(this.store.version),
+      () =>
+        this.serviceRows()
+          .map(r => r.svc)
+          .filter(s => s.kind === 'db' && s.name !== svc.name)
+    );
   }
 
   /** Copy this service's disabled-verb pattern to a target (null = all). */
@@ -370,10 +420,15 @@ export class DfMcpToolsComponent implements OnChanges {
         for (const n of names) this.store.removeService(n, res.clear);
         names.forEach(n => this.selected.delete(n));
         const what = names.length === 1 ? names[0] : `${names.length} services`;
+        // §8 canonical string (singular): '… its tool selection is kept …'.
+        const kept =
+          names.length === 1
+            ? `Removed ${what} — its tool selection is kept and restores if you expose it again.`
+            : `Removed ${what} — their tool selections are kept and restore if you expose them again.`;
         this.snackbar.openSnackBar(
           res.clear
             ? `Removed ${what} and cleared the saved tool settings.`
-            : `Removed ${what} — the tool selection is kept and restores if you expose it again.`,
+            : kept,
           'success'
         );
       });
@@ -444,8 +499,52 @@ export class DfMcpToolsComponent implements OnChanges {
     this.selectedServices().forEach(s => this.store.setServiceReadOnly(s));
   }
 
+  // Ruling: no separate 'Enable all tools' bulk item — Full access already IS
+  // enable-all (setServiceFull clears every disabled key for the service).
   bulkFull(): void {
     this.selectedServices().forEach(s => this.store.setServiceFull(s));
+  }
+
+  /** Sources for the bulk 'Copy curation from…' menu: every exposed database. */
+  bulkCopySources(): McpBackendService[] {
+    return this.memoized('bulkCopySources', String(this.store.version), () =>
+      this.serviceRows()
+        .map(r => r.svc)
+        .filter(s => s.kind === 'db')
+    );
+  }
+
+  /** True when the selection contains at least one database to copy onto. */
+  bulkCopyShown(): boolean {
+    return (
+      this.selectedServices().some(s => s.kind === 'db') &&
+      this.bulkCopySources().length > 0
+    );
+  }
+
+  /**
+   * Copy the source's disabled-verb pattern to every selected database
+   * (the bulk answer to "make 30 identical DBs identical", §3.5).
+   */
+  bulkCopyFrom(source: McpBackendService): void {
+    const targets = this.selectedServices().filter(
+      s => s.kind === 'db' && s.name !== source.name
+    );
+    if (targets.length === 0) return;
+    for (const t of targets) {
+      for (const v of verbsFor('db')) {
+        this.store.setTool(
+          t.name,
+          v.verb,
+          this.store.isToolEnabled(source.name, v.verb)
+        );
+      }
+    }
+    this.snackbar.openSnackBar(
+      `Copied ${source.name}'s tool selection to ${targets.length} selected ` +
+        `${targets.length === 1 ? 'database' : 'databases'}.`,
+      'success'
+    );
   }
 
   bulkRemove(): void {
@@ -462,11 +561,13 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   globalToolList(): Array<{ tool: McpToolDef; aggregator: boolean }> {
-    const out = GLOBAL_TOOLS.map(tool => ({ tool, aggregator: false }));
-    if (this.aggregatorsShown()) {
-      for (const tool of AGGREGATOR_TOOLS) out.push({ tool, aggregator: true });
-    }
-    return out;
+    return this.memoized('globalToolList', String(this.store.version), () => {
+      const out = GLOBAL_TOOLS.map(tool => ({ tool, aggregator: false }));
+      if (this.aggregatorsShown()) {
+        for (const tool of AGGREGATOR_TOOLS) out.push({ tool, aggregator: true });
+      }
+      return out;
+    });
   }
 
   globalFractionText(): string {
@@ -510,6 +611,8 @@ export class DfMcpToolsComponent implements OnChanges {
         data: { store: this.store },
         width: '560px',
         maxWidth: '95vw',
+        // The dialog confirms Esc/backdrop dismissal itself when dirty.
+        disableClose: true,
       })
       .afterClosed()
       .subscribe(tool => {
@@ -526,6 +629,8 @@ export class DfMcpToolsComponent implements OnChanges {
         data: { store: this.store, tool },
         width: '560px',
         maxWidth: '95vw',
+        // The dialog confirms Esc/backdrop dismissal itself when dirty.
+        disableClose: true,
       })
       .afterClosed()
       .subscribe(updated => {
@@ -566,8 +671,13 @@ export class DfMcpToolsComponent implements OnChanges {
       );
     }
     if (e.fileServices > 0) {
+      // §8 canonical: '84 file (14 services × 6)' — the multiplier is only
+      // truthful when every file service serves its full verb set.
+      const perFile = verbsFor('file').length;
+      const times =
+        e.fileTools === e.fileServices * perFile ? ` × ${perFile}` : '';
       out.push(
-        `${e.fileTools} file (${e.fileServices} ${e.fileServices === 1 ? 'service' : 'services'})`
+        `${e.fileTools} file (${e.fileServices} ${e.fileServices === 1 ? 'service' : 'services'}${times})`
       );
     }
     out.push(`${e.globalTools} global`);
@@ -582,9 +692,10 @@ export class DfMcpToolsComponent implements OnChanges {
     if (this.store.isSystemMcp) return null;
     const e = this.eff();
     if (!e.lazyEngaged) return null;
+    // lazy_mode contract is auto|on|off; engaged + not auto means 'on'.
     return this.store.cfg.lazyMode === 'auto'
       ? 'Delivered on demand (auto): the catalog exceeds ~8k tokens, so clients first see 4 discovery tools.'
-      : 'Delivered on demand (always): clients first see 4 discovery tools.';
+      : 'Delivered on demand (always on): clients first see 4 discovery tools.';
   }
 
   makeReadOnly(): void {
@@ -600,13 +711,83 @@ export class DfMcpToolsComponent implements OnChanges {
       return;
     }
     const e = this.eff();
+    // makeReadOnly also disables write-capable custom tools (function tools,
+    // non-GET API tools) — say so whenever any exist.
+    const customs =
+      e.writeCapableCustoms > 0
+        ? ` and ${e.writeCapableCustoms} custom ${e.writeCapableCustoms === 1 ? 'tool' : 'tools'}`
+        : '';
     const ok = window.confirm(
       `Turn off all ${e.writeVerbs} write and execute tools across ` +
-        `${e.writeReach} ${e.writeReach === 1 ? 'service' : 'services'}? ` +
+        `${e.writeReach} ${e.writeReach === 1 ? 'service' : 'services'}${customs}? ` +
         'You can undo until you save.'
     );
     if (!ok) return;
     this.store.makeReadOnly();
+  }
+
+  /**
+   * The served tool names, from the same effective computation the rail's
+   * total uses — length always equals railTotal().
+   */
+  servedToolNames(): string[] {
+    if (this.store.isSystemMcp) {
+      return SYSTEM_MCP_TOOLS.filter(t =>
+        this.store.isBareToolEnabled(t.name)
+      ).map(t => t.name);
+    }
+    const disabled = this.store.cfg.disabledTools;
+    const style = this.eff().effectiveStyle;
+    const live = this.serviceRows()
+      .map(r => r.svc)
+      .filter(s => s.active);
+    const dbs = live.filter(s => s.kind === 'db');
+    const files = live.filter(s => s.kind === 'file');
+    const names: string[] = [];
+    for (const t of GLOBAL_TOOLS) {
+      if (!disabled.has(t.verb)) names.push(t.verb);
+    }
+    if (dbs.length >= 2) {
+      for (const t of AGGREGATOR_TOOLS) {
+        if (!disabled.has(t.verb)) names.push(t.verb);
+      }
+    }
+    if (style === 'merged') {
+      for (const v of verbsFor('db')) {
+        if (dbs.some(d => !disabled.has(toolKey(d.name, v.verb)))) {
+          names.push(v.verb);
+        }
+      }
+    } else {
+      for (const d of dbs) {
+        for (const v of verbsFor('db')) {
+          if (!disabled.has(toolKey(d.name, v.verb))) {
+            names.push(toolKey(d.name, v.verb));
+          }
+        }
+      }
+    }
+    for (const f of files) {
+      for (const v of verbsFor('file')) {
+        if (!disabled.has(toolKey(f.name, v.verb))) {
+          names.push(toolKey(f.name, v.verb));
+        }
+      }
+    }
+    for (const t of this.store.cfg.customTools ?? []) {
+      if (isCustomToolEnabled(t) && t?.name) names.push(t.name);
+    }
+    return names;
+  }
+
+  /** '▸ Copy tool list' (§3.3): plain-text export, one served name per line. */
+  copyToolList(): void {
+    const names = this.servedToolNames();
+    navigator.clipboard?.writeText(names.join('\n')).catch(() => undefined);
+    this.snackbar.openSnackBar(
+      `Copied ${names.length} tool ${names.length === 1 ? 'name' : 'names'}.`,
+      'success'
+    );
   }
 
   showReach(): boolean {
@@ -618,10 +799,12 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   reachList(): Array<{ verb: string; on: number; total: number }> {
-    return verbsFor('db').map(v => {
-      const r = verbReach(v.verb, this.store.cfg, this.store.backendServices);
-      return { verb: v.verb, on: r.on.length, total: r.total };
-    });
+    return this.memoized('reachList', String(this.store.version), () =>
+      verbsFor('db').map(v => {
+        const r = verbReach(v.verb, this.store.cfg, this.store.backendServices);
+        return { verb: v.verb, on: r.on.length, total: r.total };
+      })
+    );
   }
 
   openPreview(): void {

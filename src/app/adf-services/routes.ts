@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { ROUTES } from '../shared/types/routes';
 import { serviceResolver } from './resolvers/services.resolver';
 import { serviceTypesResolver } from './resolvers/service-types.resolver';
+import { mcpDirtyGuard } from '../adf-mcp/mcp-dirty.guard';
 
 export const ServiceRoutes: Routes = [
   {
@@ -22,6 +23,7 @@ export const ServiceRoutes: Routes = [
     resolve: {
       serviceTypes: serviceTypesResolver,
     },
+    canDeactivate: [mcpDirtyGuard],
   },
   {
     // The shim renders the redesigned MCP editor for mcp/system_mcp services
@@ -35,5 +37,6 @@ export const ServiceRoutes: Routes = [
       data: serviceResolver,
       serviceTypes: serviceTypesResolver,
     },
+    canDeactivate: [mcpDirtyGuard],
   },
 ];

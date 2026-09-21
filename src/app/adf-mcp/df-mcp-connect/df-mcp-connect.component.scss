@@ -96,6 +96,23 @@
   }
 }
 
+/* ------------------------------------------------------- zero-tools banner */
+/* Mirrors .mcp-tools-warnbanner on the Tools tab. */
+.mcp-zero-banner {
+  background: #fdf3dc;
+  border: 1px solid rgba(154, 103, 0, 0.4);
+  color: #9a6700;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+
+  .mcp-link {
+    font-weight: 600;
+  }
+}
+
 /* -------------------------------------------------------------- checklist */
 .mcp-checklist {
   border-color: rgba(92, 86, 153, 0.38);
@@ -123,19 +140,34 @@
 
     li {
       display: flex;
-      align-items: baseline;
+      align-items: flex-start;
       gap: 9px;
       font-size: 13.5px;
 
       &.done {
         color: #2e7d32;
       }
+
+      /* Completed step: the circle fills green and shows the check. */
+      &.done .mcp-step-mark {
+        background: #2e7d32;
+        border-color: #2e7d32;
+        color: #fff;
+      }
     }
 
+    /* One grammar for every step: a numbered circle. */
     .mcp-step-mark {
       flex: none;
-      font-weight: 700;
+      box-sizing: border-box;
       width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      border: 1.5px solid rgba(92, 86, 153, 0.55);
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 15px;
       text-align: center;
     }
   }
@@ -226,6 +258,14 @@
 .mcp-redirects-line {
   font-size: 13px;
   margin: 10px 0 0;
+}
+
+/* Jump prompt when the chosen client needs a callback and none is set. */
+.mcp-redirect-prompt {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #9a6700;
+  margin: 6px 0 0;
 }
 
 /* ------------------------------------------------------------ client area */

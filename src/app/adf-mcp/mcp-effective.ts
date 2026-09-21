@@ -24,7 +24,21 @@ import {
 /* ------------------------------------------------------------------ */
 
 export type ToolStyle = 'prefixed' | 'merged';
-export type LazyMode = 'auto' | 'always' | 'never' | boolean | null;
+/**
+ * Catalog-delivery contract shared with the PHP schema picklist and the
+ * daemon's server.ts: only these three values are ever stored.
+ */
+export type LazyMode = 'auto' | 'on' | 'off';
+
+/**
+ * Read-side tolerance for legacy rows: 'always'/true → 'on',
+ * 'never'/false → 'off', null/absent/anything else → 'auto'.
+ */
+export function normalizeLazyMode(v: unknown): LazyMode {
+  if (v === 'on' || v === 'always' || v === true) return 'on';
+  if (v === 'off' || v === 'never' || v === false) return 'off';
+  return 'auto';
+}
 
 /** Parsed, normalized view of an mcp service's config blob. */
 export interface McpConfig {
@@ -39,6 +53,12 @@ export interface McpConfig {
   customLoginUrl: string;
   autoOauthService: string | null;
   redirectUris: string[];
+  /**
+   * Read-only projection of URIs OAuth clients registered for themselves
+   * (dynamic registration). Never edited here, never folded into
+   * redirectUris — re-emitted verbatim on save so the column survives.
+   */
+  registeredRedirectUris: string[];
   customTools: any[];
   /** Untouched fields, spread back on save so we never drop columns. */
   rest: Record<string, any>;
@@ -82,9 +102,10 @@ export function parseMcpConfig(raw: Record<string, any> | null | undefined): Mcp
   const exposed = pick(r, 'exposed_services', 'exposedServices');
   const disabled = pick(r, 'disabled_tools', 'disabledTools');
   const style = pick(r, 'tool_style', 'toolStyle');
-  const redirect =
-    pick(r, 'redirect_uris', 'redirectUris') ??
-    pick(r, 'registered_redirect_uris', 'registeredRedirectUris');
+  // No fallback between the two: redirect_uris is the admin-managed list,
+  // registered_redirect_uris the clients' read-only projection.
+  const redirect = pick(r, 'redirect_uris', 'redirectUris');
+  const registered = pick(r, 'registered_redirect_uris', 'registeredRedirectUris');
   const rest: Record<string, any> = {};
   for (const k of Object.keys(r)) {
     if (!KNOWN_KEYS.includes(k)) rest[k] = r[k];
@@ -93,13 +114,14 @@ export function parseMcpConfig(raw: Record<string, any> | null | undefined): Mcp
     exposedServices: Array.isArray(exposed) ? [...exposed] : [],
     disabledTools: new Set(Array.isArray(disabled) ? disabled : []),
     toolStyle: style === 'merged' ? 'merged' : style === 'prefixed' ? 'prefixed' : null,
-    lazyMode: pick(r, 'lazy_mode', 'lazyMode') ?? 'auto',
+    lazyMode: normalizeLazyMode(pick(r, 'lazy_mode', 'lazyMode')),
     allowApiKeyAuth: !!pick(r, 'allow_api_key_auth', 'allowApiKeyAuth'),
     oauthClientId: pick(r, 'oauth_client_id', 'oauthClientId') ?? '',
     oauthClientSecret: pick(r, 'oauth_client_secret', 'oauthClientSecret') ?? '',
     customLoginUrl: pick(r, 'custom_login_url', 'customLoginUrl') ?? '',
     autoOauthService: pick(r, 'auto_oauth_service', 'autoOauthService') ?? null,
     redirectUris: Array.isArray(redirect) ? [...redirect] : [],
+    registeredRedirectUris: Array.isArray(registered) ? [...registered] : [],
     customTools: pick(r, 'custom_tools', 'customTools') ?? [],
     rest,
   };
@@ -120,13 +142,16 @@ export function serializeMcpConfig(
     exposedServices: [...c.exposedServices],
     disabledTools: [...c.disabledTools].sort(),
     toolStyle: c.toolStyle,
-    lazyMode: c.lazyMode,
+    // The stored contract is exactly auto|on|off, whatever we were handed.
+    lazyMode: normalizeLazyMode(c.lazyMode),
     allowApiKeyAuth: c.allowApiKeyAuth,
     oauthClientId: c.oauthClientId,
     oauthClientSecret: c.oauthClientSecret,
     customLoginUrl: c.customLoginUrl || null,
     autoOauthService: c.autoOauthService,
     redirectUris: [...c.redirectUris],
+    // Read-only field, re-emitted verbatim so saves never drop the column.
+    registeredRedirectUris: [...(c.registeredRedirectUris ?? [])],
   };
   if (serviceType === 'mcp') {
     out['customTools'] = (c.customTools ?? []).map((tool: any) => ({
@@ -249,6 +274,52 @@ export function allKeys(svc: McpBackendService): string[] {
 }
 
 /* ------------------------------------------------------------------ */
+/* Custom tools                                                         */
+/* ------------------------------------------------------------------ */
+
+/** enabled-flag semantics shared with the legacy editor. */
+export function isCustomToolEnabled(t: any): boolean {
+  return !!t && t.enabled !== false && t.enabled !== 0;
+}
+
+/**
+ * A custom tool that can change state or execute code: server-side
+ * function tools, and API tools with any HTTP method other than GET.
+ * (Classification only — pair with isCustomToolEnabled for "live".)
+ */
+export function isWriteCapableCustomTool(t: any): boolean {
+  if (!t) return false;
+  if ((t.toolType || 'api') === 'function') return true;
+  return String(t.httpMethod ?? 'GET').toUpperCase() !== 'GET';
+}
+
+/* ------------------------------------------------------------------ */
+/* Key ownership                                                        */
+/* ------------------------------------------------------------------ */
+
+const DB_VERB_SET: ReadonlySet<string> = new Set(verbsFor('db').map(v => v.verb));
+const FILE_VERB_SET: ReadonlySet<string> = new Set(verbsFor('file').map(v => v.verb));
+
+/**
+ * True when `key` is exactly `{serviceName}_{verb}` for a verb in the given
+ * kind's catalog — both catalogs when the kind is unknown (orphans). Bare
+ * `startsWith(name + '_')` over-claims sibling services (service `db` would
+ * claim `db_backup_list_files`), so every ownership decision funnels here.
+ */
+export function keyBelongsTo(
+  key: string,
+  serviceName: string,
+  kind?: McpServiceKind | null
+): boolean {
+  const prefix = serviceName + '_';
+  if (!key.startsWith(prefix)) return false;
+  const verb = key.slice(prefix.length);
+  if (kind === 'db') return DB_VERB_SET.has(verb);
+  if (kind === 'file') return FILE_VERB_SET.has(verb);
+  return DB_VERB_SET.has(verb) || FILE_VERB_SET.has(verb);
+}
+
+/* ------------------------------------------------------------------ */
 /* The one effective computation                                        */
 /* ------------------------------------------------------------------ */
 
@@ -280,8 +351,15 @@ export interface EffectiveBreakdown {
   globalTools: number;
   aggregators: number;
   customTools: number;
-  /** distinct write/execute verbs enabled anywhere */
+  /**
+   * SERVED write/execute-capable tools (Appendix A math): merged style =
+   * distinct db write verbs enabled in ≥1 exposed db + per-service file
+   * write instances; prefixed style = per-service instances for dbs and
+   * files. Enabled write-capable custom tools count in both styles.
+   */
   writeVerbs: number;
+  /** Enabled custom tools that are write/execute-capable. */
+  writeCapableCustoms: number;
   /** services with any write/execute verb enabled */
   writeReach: number;
   writeReachDb: number;
@@ -317,11 +395,16 @@ export function effectiveTools(
     dbs.length >= 2
       ? AGGREGATOR_TOOLS.filter(t => !disabled.has(t.verb)).length
       : 0;
-  const customTools = (cfg.customTools ?? []).filter(
-    (t: any) => t?.enabled !== false && t?.enabled !== 0
-  ).length;
+  const enabledCustoms = (cfg.customTools ?? []).filter(isCustomToolEnabled);
+  const customTools = enabledCustoms.length;
+  const writeCapableCustoms = enabledCustoms.filter(isWriteCapableCustomTool).length;
 
-  const writeVerbSet = new Set<string>();
+  // Write math mirrors the served-tool math above: merged db verbs are one
+  // shared tool each; everything else (prefixed dbs, files in both styles)
+  // is a per-service instance.
+  const dbWriteVerbSet = new Set<string>();
+  let dbWriteInstances = 0;
+  let fileWriteInstances = 0;
   let writeReach = 0;
   let writeReachDb = 0;
   for (const s of [...dbs, ...files]) {
@@ -331,16 +414,22 @@ export function effectiveTools(
       .filter(v => !disabled.has(toolKey(s.name, v.verb)));
     if (on.length) {
       writeReach++;
-      if (s.kind === 'db') writeReachDb++;
-      on.forEach(v => writeVerbSet.add(v.verb));
+      if (s.kind === 'db') {
+        writeReachDb++;
+        dbWriteInstances += on.length;
+        on.forEach(v => dbWriteVerbSet.add(v.verb));
+      } else {
+        fileWriteInstances += on.length;
+      }
     }
   }
+  const dbWriteTools = style === 'merged' ? dbWriteVerbSet.size : dbWriteInstances;
+  const writeVerbs = dbWriteTools + fileWriteInstances + writeCapableCustoms;
 
   const total = dbTools + fileTools + globalTools + aggregators + customTools;
   const tokenEstimate = total * TOKENS_PER_TOOL;
   const lazyEngaged =
-    cfg.lazyMode === 'always' ||
-    cfg.lazyMode === true ||
+    cfg.lazyMode === 'on' ||
     (cfg.lazyMode === 'auto' && tokenEstimate > LAZY_AUTO_TOKEN_THRESHOLD);
 
   return {
@@ -352,10 +441,11 @@ export function effectiveTools(
     globalTools,
     aggregators,
     customTools,
-    writeVerbs: writeVerbSet.size,
+    writeVerbs,
+    writeCapableCustoms,
     writeReach,
     writeReachDb,
-    readOnly: writeVerbSet.size === 0,
+    readOnly: writeVerbs === 0,
     tokenEstimate,
     lazyEngaged,
     effectiveStyle: style,
@@ -376,20 +466,31 @@ export function verbReach(
 }
 
 /**
- * disabled_tools entries whose {service} prefix matches no known service name
- * — and which aren't bare global/aggregator/facade/custom tool names.
+ * disabled_tools entries no service owns (per keyBelongsTo's exact
+ * `{service}_{verb}` rule) and which aren't bare global/aggregator/custom
+ * tool names. `extraBareNames` lets the caller add catalog names disabled by
+ * bare name — e.g. SYSTEM_MCP_TOOLS names for a system_mcp server — without
+ * this module importing them.
  */
-export function orphanedKeys(cfg: McpConfig, services: McpBackendService[]): string[] {
+export function orphanedKeys(
+  cfg: McpConfig,
+  services: McpBackendService[],
+  extraBareNames: Iterable<string> = []
+): string[] {
   const bare = new Set<string>([
     ...GLOBAL_TOOLS.map(t => t.verb),
     ...AGGREGATOR_TOOLS.map(t => t.verb),
     ...(cfg.customTools ?? []).map((t: any) => t?.name).filter(Boolean),
+    ...extraBareNames,
   ]);
   const names = new Set(services.map(s => s.name));
+  // Exposed-but-missing entries still claim their keys (dormant, not
+  // orphaned); their kind is unknown, so both verb catalogs apply.
   const exposedOrphans = cfg.exposedServices.filter(n => !names.has(n));
   const owned = (key: string) =>
     bare.has(key) ||
-    [...names, ...exposedOrphans].some(n => key.startsWith(n + '_'));
+    services.some(s => keyBelongsTo(key, s.name, s.kind)) ||
+    exposedOrphans.some(n => keyBelongsTo(key, n));
   return [...cfg.disabledTools].filter(k => !owned(k));
 }
 

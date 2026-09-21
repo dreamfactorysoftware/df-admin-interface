@@ -384,8 +384,10 @@ test.describe('system_mcp variant', () => {
     });
     await expect(readRow).toBeVisible();
     await expect(modifyRow).toBeVisible();
-    const readN = await numberFrom(readRow, /Read system \((\d+)\)/);
-    const modifyN = await numberFrom(modifyRow, /Modify system \((\d+)\)/);
+    // Group rows state the count once — the "x of y on" trailer (§3.2);
+    // with nothing disabled, y per group sums to the fixed catalog.
+    const readN = await numberFrom(readRow, /of (\d+) on/);
+    const modifyN = await numberFrom(modifyRow, /of (\d+) on/);
     expect(readN + modifyN).toBe(SYSTEM_MCP_TOOL_COUNT);
     expect(SYSTEM_MCP_TOOL_COUNT).toBe(18);
 

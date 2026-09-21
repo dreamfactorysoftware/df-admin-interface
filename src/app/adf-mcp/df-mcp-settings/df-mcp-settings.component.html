@@ -39,6 +39,7 @@
     </mat-form-field>
 
     <mat-slide-toggle
+      color="primary"
       [checked]="store.draftIsActive"
       (change)="setActive($event)"
       data-testid="mcp-set-active">
@@ -123,6 +124,7 @@
     </p>
 
     <mat-slide-toggle
+      color="primary"
       [checked]="store.cfg.allowApiKeyAuth"
       (change)="setAllowApiKey($event)"
       data-testid="mcp-apikey-toggle">
@@ -182,7 +184,8 @@
         *ngIf="styleChanged"
         data-testid="mcp-toolstyle-note">
         Style changes rename emitted tools — preview before saving. Clients
-        may need to reconnect.
+        may need to reconnect. Your tool selections are preserved — they
+        apply per service in both modes.
       </p>
     </ng-container>
 
@@ -193,9 +196,10 @@
         [value]="lazyValue"
         (selectionChange)="setLazy($event.value)"
         data-testid="mcp-lazy-select">
+        <!-- Values are the stored contract tokens (auto|on|off). -->
         <mat-option value="auto">Auto — recommended</mat-option>
-        <mat-option value="always">Always on-demand</mat-option>
-        <mat-option value="never">Never</mat-option>
+        <mat-option value="on">Always on-demand</mat-option>
+        <mat-option value="off">Never</mat-option>
       </mat-select>
     </mat-form-field>
     <p class="mcp-hint">

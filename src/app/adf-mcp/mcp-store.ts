@@ -15,6 +15,8 @@ import {
   effectiveTools,
   exposedRows,
   ExposedRow,
+  isWriteCapableCustomTool,
+  keyBelongsTo,
   orphanedKeys,
   parseMcpConfig,
   readOnlyKeys,
@@ -63,6 +65,16 @@ function cfgFingerprint(c: McpConfig): string {
   });
 }
 
+/** Memoized derivations, all invalidated together by a version bump. */
+interface McpStoreMemo {
+  effective?: EffectiveBreakdown;
+  savedEffective?: EffectiveBreakdown;
+  rows?: ExposedRow[];
+  orphans?: string[];
+  totalTools?: number;
+  savedTotalTools?: number;
+}
+
 export class McpEditorStore {
   service!: McpServiceRecord;
   /** Draft the tabs edit. */
@@ -75,8 +87,36 @@ export class McpEditorStore {
   draftDescription = '';
   draftIsActive = true;
 
+  /**
+   * Monotonic edit counter, bumped by touch(). The memoized derivations
+   * below key on it, so every mutation path must end in touch() (they all
+   * do — the mutators here, and the tabs' direct-cfg writes).
+   */
+  private _version = 0;
+  private memoVersion = -1;
+  private memo: McpStoreMemo = {};
+
+  get version(): number {
+    return this._version;
+  }
+
+  private memoFor(): McpStoreMemo {
+    if (this.memoVersion !== this._version) {
+      this.memo = {};
+      this.memoVersion = this._version;
+    }
+    return this.memo;
+  }
+
+  private _backendServices: McpBackendService[] = [];
   /** All instance services the daemon could serve (db/file), from the API. */
-  backendServices: McpBackendService[] = [];
+  get backendServices(): McpBackendService[] {
+    return this._backendServices;
+  }
+  set backendServices(v: McpBackendService[]) {
+    this._backendServices = v;
+    this.touch(); // the memoized derivations depend on the service list
+  }
   backendLoaded = false;
 
   /** First-run (arrived with ?created=1). */
@@ -112,6 +152,7 @@ export class McpEditorStore {
   }
 
   touch(): void {
+    this._version++;
     this.changes.next();
   }
 
@@ -156,11 +197,20 @@ export class McpEditorStore {
   }
 
   /* ------------ derived shortcuts (all funnel through mcp-effective) --- */
+  /* effective/rows/totals are memoized on the version counter: the templates
+   * call them many times per change-detection pass, and at 84 services the
+   * uncached math alone blows the frame budget. access()/fraction() stay
+   * uncached — they are cheap per row. */
   effective(): EffectiveBreakdown {
-    return effectiveTools(this.cfg, this.backendServices);
+    const m = this.memoFor();
+    return (m.effective ??= effectiveTools(this.cfg, this.backendServices));
   }
   savedEffective(): EffectiveBreakdown {
-    return effectiveTools(this.savedCfg, this.backendServices);
+    const m = this.memoFor();
+    return (m.savedEffective ??= effectiveTools(
+      this.savedCfg,
+      this.backendServices
+    ));
   }
   /**
    * The number every header/tab/delta surface shows. For system_mcp the
@@ -168,22 +218,21 @@ export class McpEditorStore {
    * effectiveTools() only knows the data-plane catalog.
    */
   totalTools(): number {
-    if (this.isSystemMcp) {
-      return SYSTEM_MCP_TOOLS.filter(t => !this.cfg.disabledTools.has(t.name))
-        .length;
-    }
-    return this.effective().total;
+    const m = this.memoFor();
+    return (m.totalTools ??= this.isSystemMcp
+      ? SYSTEM_MCP_TOOLS.filter(t => !this.cfg.disabledTools.has(t.name)).length
+      : this.effective().total);
   }
   savedTotalTools(): number {
-    if (this.isSystemMcp) {
-      return SYSTEM_MCP_TOOLS.filter(
-        t => !this.savedCfg.disabledTools.has(t.name)
-      ).length;
-    }
-    return this.savedEffective().total;
+    const m = this.memoFor();
+    return (m.savedTotalTools ??= this.isSystemMcp
+      ? SYSTEM_MCP_TOOLS.filter(t => !this.savedCfg.disabledTools.has(t.name))
+          .length
+      : this.savedEffective().total);
   }
   rows(): ExposedRow[] {
-    return exposedRows(this.cfg, this.backendServices);
+    const m = this.memoFor();
+    return (m.rows ??= exposedRows(this.cfg, this.backendServices));
   }
   fraction(svc: McpBackendService): ServiceFraction {
     return serviceFraction(svc, this.cfg.disabledTools);
@@ -192,7 +241,17 @@ export class McpEditorStore {
     return accessState(svc, this.cfg.disabledTools);
   }
   orphans(): string[] {
-    return orphanedKeys(this.cfg, this.backendServices);
+    const m = this.memoFor();
+    return (m.orphans ??= orphanedKeys(
+      this.cfg,
+      this.backendServices,
+      // system_mcp disables tools by bare System API name — never orphans.
+      this.isSystemMcp ? SYSTEM_MCP_TOOLS.map(t => t.name) : []
+    ));
+  }
+  /** Kind of the live backend service, for key-ownership checks. */
+  private kindOf(name: string): McpBackendService['kind'] | undefined {
+    return this._backendServices.find(s => s.name === name)?.kind;
   }
 
   /* ------------ mutations ------------ */
@@ -240,12 +299,17 @@ export class McpEditorStore {
     }
     this.touch();
   }
-  /** Remove from exposure. Curation keys are kept unless clearCuration. */
+  /**
+   * Remove from exposure. Curation keys are kept unless clearCuration —
+   * and only keys the service actually owns (`{name}_{catalog verb}`) are
+   * cleared, so siblings like `sales` / `sales_eu` never claim each other's.
+   */
   removeService(name: string, clearCuration = false): void {
     this.cfg.exposedServices = this.cfg.exposedServices.filter(n => n !== name);
     if (clearCuration) {
+      const kind = this.kindOf(name);
       for (const k of [...this.cfg.disabledTools]) {
-        if (k.startsWith(name + '_')) this.cfg.disabledTools.delete(k);
+        if (keyBelongsTo(k, name, kind)) this.cfg.disabledTools.delete(k);
       }
     }
     this.touch();
@@ -255,23 +319,35 @@ export class McpEditorStore {
     this.cfg.exposedServices = this.cfg.exposedServices.map(n =>
       n === oldName ? newName : n
     );
+    const kind = this.kindOf(oldName);
     for (const k of [...this.cfg.disabledTools]) {
-      if (k.startsWith(oldName + '_')) {
+      if (keyBelongsTo(k, oldName, kind)) {
         this.cfg.disabledTools.delete(k);
         this.cfg.disabledTools.add(newName + k.slice(oldName.length));
       }
     }
     this.touch();
   }
+  /**
+   * Zero write/execute-capable tools anywhere: compiles read-only across
+   * every active exposed service AND disables write-capable custom tools
+   * (function tools, non-GET API tools).
+   */
   makeReadOnly(): void {
     for (const row of this.rows()) {
       if (row.svc && row.svc.active) this.setServiceReadOnly(row.svc);
     }
+    for (const tool of this.cfg.customTools ?? []) {
+      if (isWriteCapableCustomTool(tool)) tool.enabled = false;
+    }
     this.touch();
   }
   dormantCurationCount(name: string): number {
+    const kind = this.kindOf(name);
     let n = 0;
-    for (const k of this.cfg.disabledTools) if (k.startsWith(name + '_')) n++;
+    for (const k of this.cfg.disabledTools) {
+      if (keyBelongsTo(k, name, kind)) n++;
+    }
     return n;
   }
 }

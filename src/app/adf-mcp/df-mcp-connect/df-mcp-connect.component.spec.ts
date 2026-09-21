@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
@@ -10,6 +12,7 @@ const MCP_URL = 'https://df.test/mcp/warehouse';
 function makeStore(
   overrides: {
     exposed?: string[];
+    disabled?: string[];
     allowKey?: boolean;
     created?: boolean;
   } = {}
@@ -27,7 +30,7 @@ function makeStore(
     },
     {
       exposed_services: overrides.exposed ?? [],
-      disabled_tools: [],
+      disabled_tools: overrides.disabled ?? [],
       tool_style: 'merged',
       allow_api_key_auth: overrides.allowKey ?? false,
       oauth_client_id: 'client-id-123',
@@ -220,14 +223,44 @@ describe('DfMcpConnectComponent', () => {
     });
   });
 
-  describe('probe chip', () => {
-    it('shows reachable on any HTTP response', async () => {
+  describe('probe chip (truthful indicator)', () => {
+    it('claims auth enforced only on a 401 challenge', async () => {
+      (global as any).fetch = jest.fn(() => Promise.resolve({ status: 401 }));
       create(makeStore());
       await fixture.whenStable();
       fixture.detectChanges();
       expect(byTestId('mcp-probe-chip')!.textContent).toContain(
-        'Reachable — auth enforced'
+        '✓ Reachable — auth enforced'
       );
+    });
+
+    it('treats 403 as an auth challenge too', async () => {
+      (global as any).fetch = jest.fn(() => Promise.resolve({ status: 403 }));
+      create(makeStore());
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(byTestId('mcp-probe-chip')!.textContent).toContain(
+        '✓ Reachable — auth enforced'
+      );
+    });
+
+    it('renders plain "Reachable" with NO auth claim on any other HTTP response', async () => {
+      for (const status of [200, 400, 405]) {
+        (global as any).fetch = jest.fn(() => Promise.resolve({ status }));
+        create(makeStore());
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const chip = byTestId('mcp-probe-chip')!;
+        expect(chip.textContent!.trim()).toBe('Reachable');
+        expect(chip.textContent).not.toContain('auth enforced');
+        expect(chip.classList.contains('good')).toBe(false);
+        const tooltip = fixture.debugElement
+          .query(By.css('[data-testid="mcp-probe-chip"]'))
+          .injector.get(MatTooltip);
+        expect(tooltip.message).toBe(
+          'The endpoint answered, but not with the expected sign-in challenge.'
+        );
+      }
     });
 
     it('stays neutral ("—") on network failure', async () => {
@@ -236,6 +269,94 @@ describe('DfMcpConnectComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       expect(byTestId('mcp-probe-chip')!.textContent!.trim()).toBe('—');
+    });
+  });
+
+  describe('zero-tools banner', () => {
+    const ALL_GLOBALS = [
+      'discover_services',
+      'request_access',
+      'list_apis',
+      'search',
+      'fetch',
+    ];
+
+    it('warns at the top of Connect when the server serves no tools', () => {
+      create(makeStore({ exposed: [], disabled: ALL_GLOBALS }));
+      const banner = byTestId('mcp-connect-zero-banner');
+      expect(banner).toBeTruthy();
+      expect(banner!.textContent).toContain(
+        '⚠ This server serves no tools. Agents can connect but can call nothing.'
+      );
+      expect(banner!.textContent).toContain('Expose services in Tools.');
+    });
+
+    it('its link switches to the Tools tab via goToTab', () => {
+      const cmp = create(makeStore({ exposed: [], disabled: ALL_GLOBALS }));
+      const emitted = jest.fn();
+      cmp.goToTab.subscribe(emitted);
+      (byTestId('mcp-connect-zero-link') as HTMLButtonElement).click();
+      expect(emitted).toHaveBeenCalledWith('tools');
+    });
+
+    it('does not render when any tool is served', () => {
+      create(makeStore({ exposed: [] })); // globals still on: 5 tools
+      expect(byTestId('mcp-connect-zero-banner')).toBeNull();
+    });
+  });
+
+  describe('checklist step circles', () => {
+    function marks(): string[] {
+      return Array.from(el().querySelectorAll('.mcp-step-mark')).map(m =>
+        (m.textContent ?? '').trim()
+      );
+    }
+
+    it('uses one numbered-circle grammar for all three steps', () => {
+      create(makeStore({ exposed: [] }));
+      expect(marks()).toEqual(['1', '2', '3']);
+    });
+
+    it('a completed step swaps its number for a check — including the pre-checked step 3', () => {
+      const store = makeStore({ exposed: ['billing'] });
+      create(store);
+      expect(marks()).toEqual(['1', '2', '✓']);
+      (byTestId('mcp-endpoint-copy') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(marks()).toEqual(['✓', '2', '✓']);
+      // The completed li carries the .done class that turns its circle green.
+      const items = el().querySelectorAll('.mcp-checklist-steps li');
+      expect(items[0].classList.contains('done')).toBe(true);
+      expect(items[1].classList.contains('done')).toBe(false);
+      expect(items[2].classList.contains('done')).toBe(true);
+    });
+  });
+
+  describe('OAuth card redirect jump prompt', () => {
+    const PROMPT =
+      "This client needs a redirect URI — add Claude's callback below or in Settings.";
+
+    it('shows for Claude when redirectUris is empty and clears once the callback is added', () => {
+      const cmp = create(makeStore());
+      expect(cmp.selectedClient).toBe('claude');
+      const prompt = byTestId('mcp-redirect-jump-prompt');
+      expect(prompt).toBeTruthy();
+      expect((prompt!.textContent ?? '').replace(/\s+/g, ' ')).toContain(
+        PROMPT
+      );
+      cmp.addClaudeCallback();
+      fixture.detectChanges();
+      expect(byTestId('mcp-redirect-jump-prompt')).toBeNull();
+    });
+
+    it('shows for ChatGPT, but not for clients without a callback requirement', () => {
+      const cmp = create(makeStore());
+      cmp.selectClient('chatgpt');
+      fixture.detectChanges();
+      expect(byTestId('mcp-redirect-jump-prompt')).toBeTruthy();
+      cmp.selectClient('cursor');
+      fixture.detectChanges();
+      expect(byTestId('mcp-redirect-jump-prompt')).toBeNull();
     });
   });
 

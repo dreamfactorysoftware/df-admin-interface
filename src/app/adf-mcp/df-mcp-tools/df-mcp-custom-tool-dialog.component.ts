@@ -246,6 +246,23 @@ export class DfMcpCustomToolDialogComponent implements OnInit {
       headers: [this.toJsonText(t?.headers)],
       functionCode: [t?.function ?? ''],
     });
+    // The caller opens this dialog with disableClose: true, so Esc and
+    // backdrop clicks land here — confirm before discarding dirty edits.
+    // The Cancel button keeps closing directly.
+    this.dialogRef.keydownEvents().subscribe(event => {
+      if (event.key === 'Escape') this.attemptDismiss();
+    });
+    this.dialogRef.backdropClick().subscribe(() => this.attemptDismiss());
+  }
+
+  /** Esc/backdrop dismissal: straight close when pristine, confirm when dirty. */
+  attemptDismiss(): void {
+    if (
+      !this.form.dirty ||
+      window.confirm('Discard this custom tool? Your unsaved edits will be lost.')
+    ) {
+      this.dialogRef.close();
+    }
   }
 
   private toJsonText(v: any): string {

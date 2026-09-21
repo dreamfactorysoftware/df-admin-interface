@@ -25,6 +25,7 @@ import {
   GenericCreateResponse,
   GenericListResponse,
 } from 'src/app/shared/types/generic-http';
+import { SYSTEM_MCP_TOOLS } from '../../adf-services/df-service-details/system-mcp-tools';
 import { verbsFor } from '../mcp-catalog';
 import {
   EffectiveBreakdown,
@@ -69,6 +70,17 @@ interface SelectedRow {
   styleUrls: ['./df-mcp-create.component.scss'],
 })
 export class DfMcpCreateComponent implements OnInit {
+  /** Set right before the post-create navigation so the guard lets it pass. */
+  private createdOk = false;
+
+  /** Dirty-navigation check, reached via the route shim + mcpDirtyGuard. */
+  canDeactivate(): boolean {
+    if (this.createdOk || (!this.name && this.selected.size === 0)) return true;
+    return window.confirm(
+      'Leave without creating the server? Your entries will be discarded.'
+    );
+  }
+
   /* ------------------------------ identity ------------------------------ */
   serverType: McpCreateType = 'mcp';
   name = '';
@@ -301,7 +313,12 @@ export class DfMcpCreateComponent implements OnInit {
         // Copy exposure + curation + naming style. Never credentials.
         this.selected = new Set(cfg.exposedServices);
         this.clonedDisabled = new Set(cfg.disabledTools);
-        this.toolStyle = cfg.toolStyle ?? 'merged';
+        // A null tool_style on the source (legacy column, never set) BEHAVES
+        // as prefixed on the daemon, so the behavior-preserving explicit
+        // clone value is 'prefixed' — 'merged' would emit differently-shaped
+        // tool names than the server the clone claims to copy (§4: names
+        // never change without an informed click).
+        this.toolStyle = cfg.toolStyle ?? 'prefixed';
         this.cloneApplied = true;
         this.cloneSource = sibling.label || sibling.name;
         this.accessTouchedAfterClone = false;
@@ -358,7 +375,8 @@ export class DfMcpCreateComponent implements OnInit {
 
   consequenceMain(): string {
     if (this.serverType === 'system_mcp') {
-      return 'Agents will get the 18 System API admin tools.';
+      // Derived from the catalog, never hardcoded (§8).
+      return `Agents will get the ${SYSTEM_MCP_TOOLS.length} System API admin tools.`;
     }
     const b = this.breakdown();
     if (this.selected.size === 0) {
@@ -366,9 +384,13 @@ export class DfMcpCreateComponent implements OnInit {
     }
     const parts: string[] = [];
     if (b.dbServices > 0) {
+      // §8 canonical string: the "(shared)" parenthetical only when the
+      // emitted names are consolidated — a cloned prefixed style serves
+      // per-service tools, so no shared-set claim.
       parts.push(
-        `${b.dbTools} database (shared set across ${b.dbServices} ` +
-          `${b.dbServices === 1 ? 'service' : 'services'})`
+        b.effectiveStyle === 'merged'
+          ? `${b.dbTools} database (shared)`
+          : `${b.dbTools} database`
       );
     }
     if (b.fileServices > 0) parts.push(`${b.fileTools} file`);
@@ -419,6 +441,7 @@ export class DfMcpCreateComponent implements OnInit {
       .subscribe({
         next: res => {
           this.saving = false;
+          this.createdOk = true;
           const newId = res?.resource?.[0]?.id;
           if (newId != null) {
             // §2.1: land on the new server's own Connect tab, first-run.

@@ -129,10 +129,33 @@ export class DfMcpPickerComponent {
     return this.data.store;
   }
 
+  /**
+   * Identity-stable candidate lists: the template's *ngFor re-evaluates them
+   * every change-detection pass, so they are memoized on the store version
+   * plus the search text (and tracked by name) to keep row DOM stable.
+   */
+  private listMemo = new Map<string, { key: string; value: McpBackendService[] }>();
+
+  private memoized(
+    name: string,
+    compute: () => McpBackendService[]
+  ): McpBackendService[] {
+    const key = `${this.store.version}|${this.q}`;
+    const hit = this.listMemo.get(name);
+    if (hit && hit.key === key) return hit.value;
+    const value = compute();
+    this.listMemo.set(name, { key, value });
+    return value;
+  }
+
+  readonly trackBySvcName = (_: number, s: McpBackendService): string => s.name;
+
   /** Only not-yet-exposed services are listed. */
   candidates(): McpBackendService[] {
-    return this.store.backendServices.filter(
-      s => !this.store.cfg.exposedServices.includes(s.name)
+    return this.memoized('candidates', () =>
+      this.store.backendServices.filter(
+        s => !this.store.cfg.exposedServices.includes(s.name)
+      )
     );
   }
 
@@ -145,11 +168,15 @@ export class DfMcpPickerComponent {
   }
 
   dbCandidates(): McpBackendService[] {
-    return this.candidates().filter(s => s.kind === 'db' && this.matches(s));
+    return this.memoized('db', () =>
+      this.candidates().filter(s => s.kind === 'db' && this.matches(s))
+    );
   }
 
   fileCandidates(): McpBackendService[] {
-    return this.candidates().filter(s => s.kind === 'file' && this.matches(s));
+    return this.memoized('file', () =>
+      this.candidates().filter(s => s.kind === 'file' && this.matches(s))
+    );
   }
 
   toolDelta(svc: McpBackendService): string {

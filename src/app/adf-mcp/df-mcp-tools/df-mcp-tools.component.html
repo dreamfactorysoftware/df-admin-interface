@@ -16,11 +16,12 @@
           <div class="mcp-card">
             <div class="mcp-sys-group" *ngFor="let g of systemGroups">
               <div class="mcp-group-row">
+                <!-- Count stated once, in the 'x of y on' trailer (§3.2 anatomy). -->
                 <mat-checkbox
                   [checked]="sysGroupState(g) === 'on'"
                   [indeterminate]="sysGroupState(g) === 'part'"
                   (change)="sysToggleGroup(g)">
-                  {{ g.label }} ({{ g.tools.length }})
+                  {{ g.label }}
                 </mat-checkbox>
                 <span class="mcp-warn-tag" *ngIf="g.warn">⚠ writes</span>
                 <span class="mcp-group-count">
@@ -54,7 +55,7 @@
             <h2 class="mcp-orphans-title">⚠ Needs attention ({{ orphanRows().length }})</h2>
             <div
               class="mcp-card mcp-orphan-row"
-              *ngFor="let row of orphanRows()"
+              *ngFor="let row of orphanRows(); trackBy: trackByName"
               [attr.data-testid]="'mcp-orphan-row-' + row.name">
               <p>{{ orphanText(row.name) }}</p>
               <div class="mcp-orphan-actions">
@@ -133,7 +134,7 @@
           <div class="mcp-card mcp-rows" *ngIf="serviceRows().length > 0">
             <div
               class="mcp-row"
-              *ngFor="let row of visibleRows()"
+              *ngFor="let row of visibleRows(); trackBy: trackByName"
               [class.inactive]="!row.svc.active"
               [attr.data-testid]="'mcp-svc-row-' + row.name">
               <div class="mcp-row-head">
@@ -153,13 +154,16 @@
                   <span class="mcp-chip mcp-type-badge">{{ typeBadge(row.svc.kind) }}</span>
                 </button>
                 <span class="mcp-chip warn" *ngIf="!row.svc.active">
-                  Inactive — tools not served
+                  Service inactive — tools not served
                 </span>
+                <!-- Chip semantics: Read-only = green (the safe state), Full =
+                     neutral (never green on the most-permissive preset),
+                     Custom ◐ = indigo, 0-of-m = warn. -->
                 <button
                   type="button"
                   class="mcp-chip mcp-chip-btn mcp-access-chip"
-                  [class.good]="accessKind(row.svc) === 'full'"
-                  [class.primary]="accessKind(row.svc) === 'ro'"
+                  [class.good]="accessKind(row.svc) === 'ro'"
+                  [class.primary]="accessKind(row.svc) === 'custom'"
                   [class.warn]="accessKind(row.svc) === 'zero'"
                   [attr.data-testid]="'mcp-svc-access-' + row.name"
                   [matMenuTriggerFor]="accessMenu"
@@ -214,9 +218,8 @@
                   <button mat-menu-item type="button" (click)="setReadOnly(row.svc)">
                     Read-only
                   </button>
-                  <button mat-menu-item type="button" (click)="setFull(row.svc)">
-                    Reset to all
-                  </button>
+                  <!-- No 'Reset to all' here: identical to Full access; the
+                       drill-in footer keeps the in-context 'Reset to all N'. -->
                   <button
                     mat-menu-item
                     type="button"
@@ -236,7 +239,7 @@
                   <button
                     mat-menu-item
                     type="button"
-                    *ngFor="let target of copyTargets(row.svc)"
+                    *ngFor="let target of copyTargets(row.svc); trackBy: trackBySvcName"
                     (click)="copySelectionTo(row.svc, target)">
                     {{ target.label }} ({{ target.name }})
                   </button>
@@ -264,12 +267,13 @@
                 <p class="mcp-drill-caption" *ngIf="showMergedCaption(row.svc)">
                   {{ mergedCaption(row.svc) }}
                 </p>
+                <!-- Count stated once, in the 'x of y on' trailer (§3.2 anatomy). -->
                 <div class="mcp-group-row" *ngFor="let g of groupsFor(row.svc)">
                   <mat-checkbox
                     [checked]="groupStateOf(row.svc, g) === 'on'"
                     [indeterminate]="groupStateOf(row.svc, g) === 'part'"
                     (change)="toggleGroup(row.svc, g)">
-                    {{ g.label }} ({{ groupOnCount(row.svc, g) }}/{{ g.verbs.length }})
+                    {{ g.label }}
                   </mat-checkbox>
                   <span class="mcp-warn-tag" *ngIf="g.warn === 'writes'">⚠ writes</span>
                   <span class="mcp-warn-tag" *ngIf="g.warn === 'executes'">⚠ executes</span>
@@ -310,7 +314,7 @@
                       <button
                         mat-menu-item
                         type="button"
-                        *ngFor="let target of copyTargets(row.svc)"
+                        *ngFor="let target of copyTargets(row.svc); trackBy: trackBySvcName"
                         (click)="copySelectionTo(row.svc, target)">
                         {{ target.label }} ({{ target.name }})
                       </button>
@@ -332,10 +336,28 @@
           </div>
 
           <!-- Bulk bar -->
+          <!-- No 'Enable all tools' item: Full access already is that (ruling). -->
           <div class="mcp-bulk-bar" *ngIf="selected.size > 0" data-testid="mcp-bulk-bar">
             <span>{{ selected.size }} selected</span>
             <button mat-stroked-button type="button" (click)="bulkReadOnly()">Read-only</button>
             <button mat-stroked-button type="button" (click)="bulkFull()">Full access</button>
+            <button
+              mat-stroked-button
+              type="button"
+              *ngIf="bulkCopyShown()"
+              data-testid="mcp-bulk-copyfrom"
+              [matMenuTriggerFor]="bulkCopyMenu">
+              Copy curation from…
+            </button>
+            <mat-menu #bulkCopyMenu="matMenu">
+              <button
+                mat-menu-item
+                type="button"
+                *ngFor="let src of bulkCopySources(); trackBy: trackBySvcName"
+                (click)="bulkCopyFrom(src)">
+                {{ src.label }} ({{ src.name }})
+              </button>
+            </mat-menu>
             <button mat-stroked-button type="button" (click)="bulkRemove()">Remove from server</button>
             <button mat-button type="button" (click)="clearSelection()">Clear</button>
           </div>
@@ -349,7 +371,7 @@
               <span class="mcp-row-caret">{{ globalsOpen ? '▾' : '▸' }}</span>
             </button>
             <div class="mcp-tool-list" *ngIf="globalsOpen">
-              <div class="mcp-tool-row" *ngFor="let entry of globalToolList()">
+              <div class="mcp-tool-row" *ngFor="let entry of globalToolList(); trackBy: trackByToolVerb">
                 <mat-checkbox
                   [checked]="bareEnabled(entry.tool.verb)"
                   (change)="setBareChecked(entry.tool.verb, $event.checked)">
@@ -376,6 +398,7 @@
             <div class="mcp-custom-list" *ngIf="customTools().length > 0">
               <div class="mcp-custom-row" *ngFor="let tool of customTools()">
                 <mat-slide-toggle
+                  color="primary"
                   [checked]="customEnabled(tool)"
                   (change)="setCustomEnabled(tool, $event.checked)"
                   [attr.aria-label]="'Enable ' + tool.name"></mat-slide-toggle>
@@ -425,7 +448,15 @@
           </ng-template>
         </div>
 
-        <p class="mcp-rail-serving" *ngIf="servingLine()">{{ servingLine() }}</p>
+        <p class="mcp-rail-serving" *ngIf="servingLine()">
+          {{ servingLine() }}
+          <span
+            class="mcp-info"
+            tabindex="0"
+            data-testid="mcp-lazy-why"
+            [matTooltip]="lazyWhyTooltip"
+            aria-label="Why tools are delivered on demand">[Why?]</span>
+        </p>
 
         <div class="mcp-rail-previewas">
           <mat-form-field appearance="outline" class="mcp-rail-role">
@@ -447,12 +478,20 @@
           Preview what an agent sees
         </button>
 
+        <button
+          class="mcp-linklike"
+          type="button"
+          data-testid="mcp-copy-toollist"
+          (click)="copyToolList()">
+          ▸ Copy tool list
+        </button>
+
         <div class="mcp-rail-reach" *ngIf="showReach()">
           <button class="mcp-linklike" type="button" (click)="railReachOpen = !railReachOpen">
             {{ railReachOpen ? '▾' : '▸' }} Per-tool reach
           </button>
           <ul *ngIf="railReachOpen">
-            <li *ngFor="let r of reachList()">
+            <li *ngFor="let r of reachList(); trackBy: trackByVerb">
               <code>{{ r.verb }}</code> → {{ r.on }} of {{ r.total }}
             </li>
           </ul>
@@ -465,6 +504,12 @@
             tabindex="0"
             [matTooltip]="precedenceTooltip"
             aria-label="How access is computed">ⓘ</span>
+          <a
+            class="mcp-rail-roles-link"
+            data-testid="mcp-manage-roles"
+            [routerLink]="rolesRoute">
+            Manage roles ↗
+          </a>
         </p>
       </aside>
     </div>

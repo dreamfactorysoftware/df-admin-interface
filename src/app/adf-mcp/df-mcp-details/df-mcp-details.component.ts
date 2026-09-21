@@ -163,6 +163,14 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
     this.tab = tab;
   }
 
+  /** Dirty-navigation check, reached via the route shim + mcpDirtyGuard. */
+  canDeactivate(): boolean {
+    if (!this.store?.service || !this.store.dirty()) return true;
+    return window.confirm(
+      'You have unsaved changes. Leave this page and discard them?'
+    );
+  }
+
   /* ------------------------------- save ------------------------------- */
   save(): void {
     if (this.saving || !this.store.dirty()) return;

@@ -7,6 +7,7 @@ import {
   SERVICE_TYPE_SERVICE_TOKEN,
 } from 'src/app/shared/constants/tokens';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { SYSTEM_MCP_TOOLS } from '../../adf-services/df-service-details/system-mcp-tools';
 import {
   effectiveTools,
   parseMcpConfig,
@@ -161,9 +162,9 @@ describe('DfMcpCreateComponent', () => {
       expect(b.globalTools).toBe(5);
       expect(b.total).toBe(23);
       expect(consequence()).toBe(
-        `Agents will get ${b.total} tools: ${b.dbTools} database (shared ` +
-          `set across 2 services) · ${b.fileTools} file · ` +
-          `${b.globalTools} global. Write tools are off.`
+        `Agents will get ${b.total} tools: ${b.dbTools} database (shared) ` +
+          `· ${b.fileTools} file · ${b.globalTools} global. ` +
+          'Write tools are off.'
       );
     });
 
@@ -177,9 +178,8 @@ describe('DfMcpCreateComponent', () => {
       const b = expectedBreakdown(['billing', 'hr', 'reports'], 'rw');
       expect(b.total).toBe(33);
       expect(consequence()).toBe(
-        `Agents will get ${b.total} tools: ${b.dbTools} database (shared ` +
-          `set across 2 services) · ${b.fileTools} file · ` +
-          `${b.globalTools} global.`
+        `Agents will get ${b.total} tools: ${b.dbTools} database (shared) ` +
+          `· ${b.fileTools} file · ${b.globalTools} global.`
       );
       expect(consequence()).not.toContain('Write tools are off.');
     });
@@ -344,10 +344,12 @@ describe('DfMcpCreateComponent', () => {
       expect(byTestId('mcp-create-access-rw')).toBeNull();
     });
 
-    it('states the fixed 18-tool consequence, without the empty warning', () => {
+    it('states the catalog-derived tool consequence, without the empty warning', () => {
       expect(consequence()).toBe(
-        'Agents will get the 18 System API admin tools.'
+        `Agents will get the ${SYSTEM_MCP_TOOLS.length} System API admin tools.`
       );
+      // Pin the current catalog size so a catalog change surfaces here too.
+      expect(SYSTEM_MCP_TOOLS.length).toBe(18);
       expect(consequence()).not.toContain('Empty never means every service.');
     });
 
@@ -401,6 +403,31 @@ describe('DfMcpCreateComponent', () => {
       (byTestId('mcp-create-submit') as HTMLButtonElement).click();
       const body = (servicesService.create as jest.Mock).mock.calls[0][0];
       expect(JSON.stringify(body)).not.toContain('never-copied');
+      expect(body.resource[0].config.toolStyle).toBe('prefixed');
+    });
+
+    it("a null tool_style on the source clones as 'prefixed' (behavior-preserving), never 'merged'", () => {
+      // Legacy sources with an unset column behave prefixed on the daemon;
+      // the clone must emit the same tool-name shape as its source.
+      servicesService.get.mockReturnValue(
+        of({
+          config: {
+            exposed_services: ['billing'],
+            disabled_tools: [],
+            // no tool_style key at all
+          },
+        }) as any
+      );
+      cmp.pickClone({ id: 4, name: 'warehouse', label: 'Warehouse' });
+      fixture.detectChanges();
+
+      expect(cmp.toolStyle).toBe('prefixed');
+      // And the prefixed consequence makes no "(shared)" claim.
+      expect(consequence()).not.toContain('(shared)');
+
+      setName('cloned_legacy');
+      (byTestId('mcp-create-submit') as HTMLButtonElement).click();
+      const body = (servicesService.create as jest.Mock).mock.calls[0][0];
       expect(body.resource[0].config.toolStyle).toBe('prefixed');
     });
   });

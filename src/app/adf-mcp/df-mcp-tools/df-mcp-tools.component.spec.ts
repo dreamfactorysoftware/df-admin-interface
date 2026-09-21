@@ -6,8 +6,12 @@
  */
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { OverlayContainer } from '@angular/cdk/overlay';
+import { provideRouter } from '@angular/router';
+import { of, Subject } from 'rxjs';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { SYSTEM_MCP_TOOLS } from 'src/app/adf-services/df-service-details/system-mcp-tools';
+import { verbsFor } from '../mcp-catalog';
 import { McpBackendService, effectiveTools } from '../mcp-effective';
 import { McpEditorStore, McpServiceRecord } from '../mcp-store';
 import {
@@ -52,7 +56,10 @@ describe('DfMcpToolsComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [DfMcpToolsComponent, NoopAnimationsModule],
-      providers: [{ provide: DfSnackbarService, useValue: snackbar }],
+      providers: [
+        { provide: DfSnackbarService, useValue: snackbar },
+        provideRouter([]),
+      ],
     }).compileComponents();
   });
 
@@ -134,8 +141,9 @@ describe('DfMcpToolsComponent', () => {
       [svc('crm'), svc('archive', 'db', false)]
     );
     render(store);
+    // §8 canonical string.
     expect(q('mcp-svc-row-archive')!.textContent).toContain(
-      'Inactive — tools not served'
+      'Service inactive — tools not served'
     );
     // 1 active db → 16 db + 5 global, no aggregators.
     expect(q('mcp-rail-total')!.textContent).toContain('21');
@@ -244,6 +252,225 @@ describe('DfMcpToolsComponent', () => {
       render(store);
       expect(component.sysModifyOn()).toBe(0);
       expect(q('mcp-rail-readonly')!.textContent).toContain('Read-only ✓');
+    });
+  });
+
+  describe('identity-stable rows and menus (trackBy/memoization)', () => {
+    it('returns the same array instances until the store version changes', () => {
+      const store = makeStore(
+        { exposed_services: ['crm', 's3'] },
+        [svc('crm'), svc('s3', 'file')]
+      );
+      render(store);
+      const rows = component.visibleRows();
+      fixture.detectChanges();
+      expect(component.visibleRows()).toBe(rows);
+      expect(component.orphanRows()).toBe(component.orphanRows());
+      expect(component.globalToolList()).toBe(component.globalToolList());
+      // A real edit bumps the store version and recomputes.
+      store.setTool('crm', 'create_records', false);
+      expect(component.visibleRows()).not.toBe(rows);
+      expect(component.visibleRows()).toBe(component.visibleRows());
+    });
+
+    it('keeps the access-chip menu open across change-detection passes', () => {
+      const store = makeStore({ exposed_services: ['crm'] }, [svc('crm')]);
+      render(store);
+      (q('mcp-svc-access-crm') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      // The reproduced failure: the pass after the opening click used to tear
+      // the row (and its open menu) down. Run two passes and assert survival.
+      fixture.detectChanges();
+      const overlay = TestBed.inject(OverlayContainer).getContainerElement();
+      expect(overlay.querySelectorAll('.mat-mdc-menu-panel').length).toBe(1);
+      expect(overlay.textContent).toContain('Choose tools…');
+    });
+
+    it('offers no redundant Reset-to-all in the row kebab', () => {
+      const store = makeStore({ exposed_services: ['crm'] }, [svc('crm')]);
+      render(store);
+      (q('mcp-svc-menu-crm') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      const overlay = TestBed.inject(OverlayContainer).getContainerElement();
+      const menu = overlay.querySelector('.mat-mdc-menu-panel')!;
+      expect(menu.textContent).toContain('Full access');
+      expect(menu.textContent).not.toContain('Reset to all');
+    });
+  });
+
+  describe('access chip semantics', () => {
+    it('green Read-only, neutral Full, indigo Custom, warn zero', () => {
+      const store = makeStore({ exposed_services: ['crm'] }, [svc('crm')]);
+      render(store);
+      const chip = () => q('mcp-svc-access-crm')!;
+      // Full (most permissive) is neutral — never green.
+      expect(chip().textContent).toContain('Full');
+      expect(chip().classList.contains('good')).toBe(false);
+      expect(chip().classList.contains('primary')).toBe(false);
+      expect(chip().classList.contains('warn')).toBe(false);
+      // Read-only is the safe state — green.
+      store.setServiceReadOnly(store.backendServices[0]);
+      fixture.detectChanges();
+      expect(chip().textContent).toContain('Read-only');
+      expect(chip().classList.contains('good')).toBe(true);
+      // Custom ◐ is indigo.
+      store.setTool('crm', 'get_table_data', false);
+      fixture.detectChanges();
+      expect(chip().textContent).toContain('Custom ◐');
+      expect(chip().classList.contains('primary')).toBe(true);
+      expect(chip().classList.contains('good')).toBe(false);
+      // 0 of m is warn.
+      for (const v of verbsFor('db')) store.setTool('crm', v.verb, false);
+      fixture.detectChanges();
+      expect(chip().textContent).toContain('0 of 16 ⚠');
+      expect(chip().classList.contains('warn')).toBe(true);
+    });
+  });
+
+  describe('capability group rows', () => {
+    it('state the count once, in the trailing x-of-y-on', () => {
+      const store = makeStore(
+        { exposed_services: ['crm'], disabled_tools: ['crm_aggregate_data'] },
+        [svc('crm')]
+      );
+      render(store);
+      component.toggleExpand('crm');
+      fixture.detectChanges();
+      const row = q('mcp-svc-row-crm')!;
+      expect(row.textContent).toContain('Read data');
+      expect(row.textContent).toContain('1 of 2 on');
+      expect(row.textContent).not.toContain('(1/2)');
+    });
+  });
+
+  describe('bulk bar Copy curation from…', () => {
+    it('copies the source pattern to every selected database only', () => {
+      const names = Array.from({ length: 9 }, (_, i) => `db${i}`);
+      const store = makeStore(
+        {
+          exposed_services: names,
+          disabled_tools: ['db0_create_records', 'db0_delete_records'],
+        },
+        names.map(n => svc(n))
+      );
+      render(store);
+      component.toggleSelected('db1');
+      component.toggleSelected('db2');
+      fixture.detectChanges();
+      expect(q('mcp-bulk-copyfrom')).toBeTruthy();
+      component.bulkCopyFrom(store.backendServices[0]);
+      expect(store.isToolEnabled('db1', 'create_records')).toBe(false);
+      expect(store.isToolEnabled('db1', 'delete_records')).toBe(false);
+      expect(store.isToolEnabled('db2', 'create_records')).toBe(false);
+      // Unselected databases are untouched.
+      expect(store.isToolEnabled('db3', 'create_records')).toBe(true);
+      expect(snackbar.openSnackBar).toHaveBeenCalledWith(
+        "Copied db0's tool selection to 2 selected databases.",
+        'success'
+      );
+    });
+  });
+
+  describe('rail affordances', () => {
+    it('Copy tool list exports the served names from the effective math', () => {
+      const store = makeStore(
+        {
+          exposed_services: ['crm', 's3'],
+          disabled_tools: ['crm_create_records', 'search'],
+        },
+        [svc('crm'), svc('s3', 'file')]
+      );
+      render(store);
+      const names = component.servedToolNames();
+      expect(names.length).toBe(component.railTotal());
+      expect(names).toContain('crm_get_tables');
+      expect(names).toContain('s3_list_files');
+      expect(names).not.toContain('crm_create_records');
+      expect(names).not.toContain('search');
+      const writeText = jest.fn().mockResolvedValue(undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+      });
+      q('mcp-copy-toollist')!.click();
+      expect(writeText).toHaveBeenCalledWith(names.join('\n'));
+      expect(snackbar.openSnackBar).toHaveBeenCalledWith(
+        `Copied ${names.length} tool names.`,
+        'success'
+      );
+    });
+
+    it('links to the roles page and explains lazy serving under the on token', () => {
+      const store = makeStore(
+        { exposed_services: ['crm'], lazy_mode: 'on' },
+        [svc('crm')]
+      );
+      // Lazy token contract: stored 'on' engages; legacy 'always' normalizes.
+      expect(store.cfg.lazyMode).toBe('on');
+      const legacy = makeStore({ lazy_mode: 'always' }, []);
+      expect(legacy.cfg.lazyMode).toBe('on');
+      render(store);
+      const link = q('mcp-manage-roles') as HTMLAnchorElement;
+      expect(link).toBeTruthy();
+      expect(link.getAttribute('href')).toBe(
+        '/api-connections/role-based-access'
+      );
+      expect(component.servingLine()).toContain(
+        'Delivered on demand (always on)'
+      );
+      expect(q('mcp-lazy-why')).toBeTruthy();
+    });
+
+    it('rail file line carries the × multiplier only when files are full', () => {
+      const store = makeStore({ exposed_services: ['s3'] }, [svc('s3', 'file')]);
+      render(store);
+      expect(component.railBreakdown().join(' ')).toContain(
+        '6 file (1 service × 6)'
+      );
+      store.setTool('s3', 'delete_file', false);
+      expect(component.railBreakdown().join(' ')).toContain('5 file (1 service)');
+    });
+
+    it('Make read-only confirm names write-capable customs and turns them off', () => {
+      const store = makeStore(
+        {
+          exposed_services: ['crm'],
+          custom_tools: [
+            {
+              name: 'post_hook',
+              toolType: 'api',
+              httpMethod: 'POST',
+              url: 'https://x',
+              enabled: true,
+            },
+          ],
+        },
+        [svc('crm')]
+      );
+      render(store);
+      const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+      component.makeReadOnly();
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringContaining('and 1 custom tool?')
+      );
+      expect(store.cfg.customTools[0].enabled).toBe(false);
+      expect(store.effective().readOnly).toBe(true);
+      confirmSpy.mockRestore();
+    });
+  });
+
+  describe('canonical strings', () => {
+    it('remove snackbar keeps the its-tool-selection wording', () => {
+      const store = makeStore({ exposed_services: ['crm'] }, [svc('crm')]);
+      render(store);
+      jest
+        .spyOn(component['dialog'], 'open')
+        .mockReturnValue({ afterClosed: () => of({ clear: false }) } as any);
+      component.removeServices(['crm']);
+      expect(snackbar.openSnackBar).toHaveBeenCalledWith(
+        'Removed crm — its tool selection is kept and restores if you expose it again.',
+        'success'
+      );
     });
   });
 });
@@ -455,10 +682,20 @@ describe('dialog templates render', () => {
     // Exposed crm in prefixed style emits crm_get_tables; that name collides.
     expect(emittedNameSet(store).has('crm_get_tables')).toBe(true);
     const close = jest.fn();
+    // Opened with disableClose: Esc/backdrop reach the dialog via these streams.
+    const keydown = new Subject<KeyboardEvent>();
+    const backdrop = new Subject<MouseEvent>();
     TestBed.configureTestingModule({
       imports: [DfMcpCustomToolDialogComponent, NoopAnimationsModule],
       providers: [
-        { provide: MatDialogRef, useValue: { close } },
+        {
+          provide: MatDialogRef,
+          useValue: {
+            close,
+            keydownEvents: () => keydown,
+            backdropClick: () => backdrop,
+          },
+        },
         { provide: MAT_DIALOG_DATA, useValue: { store } },
       ],
     });
@@ -486,5 +723,61 @@ describe('dialog templates render', () => {
         enabled: true,
       })
     );
+
+    // Esc/backdrop dismissal (dialog opens with disableClose): a dirty form
+    // asks first; declining keeps it open, accepting closes it.
+    close.mockClear();
+    ct.form.markAsDirty();
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    keydown.next(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(close).not.toHaveBeenCalled();
+    confirmSpy.mockReturnValue(true);
+    backdrop.next(new MouseEvent('click'));
+    expect(close).toHaveBeenCalledWith();
+    // A pristine form closes without asking.
+    close.mockClear();
+    confirmSpy.mockClear();
+    ct.form.markAsPristine();
+    keydown.next(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledWith();
+    confirmSpy.mockRestore();
+  });
+
+  it('preview reflects the on token and keeps group identity stable', async () => {
+    const { MatDialogRef, MAT_DIALOG_DATA } = await import('@angular/material/dialog');
+    const { DfMcpPreviewComponent } = await import(
+      '../df-mcp-preview/df-mcp-preview.component'
+    );
+    const store = makeStore(
+      { exposed_services: ['crm'], lazy_mode: 'on' },
+      [svc('crm')]
+    );
+    await TestBed.configureTestingModule({
+      imports: [DfMcpPreviewComponent, NoopAnimationsModule],
+      providers: [
+        { provide: MatDialogRef, useValue: { close: jest.fn() } },
+        { provide: MAT_DIALOG_DATA, useValue: { store } },
+        { provide: DfSnackbarService, useValue: { openSnackBar: jest.fn() } },
+      ],
+    }).compileComponents();
+    const fx = TestBed.createComponent(DfMcpPreviewComponent);
+    fx.detectChanges();
+    const c = fx.componentInstance;
+    expect(c.lazyEngaged).toBe(true);
+    expect(c.view).toBe('first');
+    expect(c.lazyLabel()).toBe('Lazy loading: engaged (always on)');
+    // Identity-stable groups feed trackBy'd ngFors.
+    expect(c.visibleGroups()).toBe(c.visibleGroups());
+    expect(fx.nativeElement.textContent).toContain(
+      'First response — discovery tools (4)'
+    );
+    // One-line polish: the description carries its full text in title.
+    c.view = 'full';
+    fx.detectChanges();
+    const desc = fx.nativeElement.querySelector(
+      '.mcp-preview-desc'
+    ) as HTMLElement;
+    expect(desc.getAttribute('title')).toBe(desc.textContent!.trim());
   });
 });

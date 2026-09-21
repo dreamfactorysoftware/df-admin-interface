@@ -17,6 +17,9 @@ import {
   emittedDbToolName,
   exposedRows,
   groupState,
+  isWriteCapableCustomTool,
+  keyBelongsTo,
+  normalizeLazyMode,
   orphanedKeys,
   parseMcpConfig,
   readOnlyKeys,
@@ -68,7 +71,8 @@ describe('parseMcpConfig / serializeMcpConfig', () => {
     expect(c.exposedServices).toEqual(['crm', 'hr']);
     expect(c.disabledTools.has('crm_create_records')).toBe(true);
     expect(c.toolStyle).toBe('merged');
-    expect(c.lazyMode).toBe('always');
+    // Legacy 'always' normalizes to the contract value on read.
+    expect(c.lazyMode).toBe('on');
     expect(c.allowApiKeyAuth).toBe(true);
     expect(c.oauthClientId).toBe('id');
     expect(c.oauthClientSecret).toBe('sec');
@@ -131,6 +135,53 @@ describe('parseMcpConfig / serializeMcpConfig', () => {
     const c = parseMcpConfig({ custom_tools: [{ name: 'x' }] });
     expect(serializeMcpConfig(c, 'system_mcp')['customTools']).toBeUndefined();
     expect(serializeMcpConfig(c, 'mcp')['customTools']).toBeDefined();
+  });
+
+  it('lazy_mode contract is auto|on|off; legacy values normalize on read', () => {
+    expect(normalizeLazyMode('auto')).toBe('auto');
+    expect(normalizeLazyMode('on')).toBe('on');
+    expect(normalizeLazyMode('off')).toBe('off');
+    expect(normalizeLazyMode('always')).toBe('on');
+    expect(normalizeLazyMode('never')).toBe('off');
+    expect(normalizeLazyMode(true)).toBe('on');
+    expect(normalizeLazyMode(false)).toBe('off');
+    expect(normalizeLazyMode(null)).toBe('auto');
+    expect(normalizeLazyMode(undefined)).toBe('auto');
+    expect(parseMcpConfig({ lazy_mode: 'on' }).lazyMode).toBe('on');
+    expect(parseMcpConfig({ lazy_mode: 'never' }).lazyMode).toBe('off');
+    expect(parseMcpConfig({ lazy_mode: null }).lazyMode).toBe('auto');
+    // Serialize writes ONLY contract values, even for a legacy-loaded row.
+    expect(serializeMcpConfig(parseMcpConfig({ lazy_mode: 'always' }))['lazyMode']).toBe('on');
+    expect(serializeMcpConfig(parseMcpConfig({ lazy_mode: false }))['lazyMode']).toBe('off');
+    expect(serializeMcpConfig(parseMcpConfig({}))['lazyMode']).toBe('auto');
+  });
+
+  it('registered_redirect_uris is read-only: no fallback in, verbatim out', () => {
+    const c = parseMcpConfig({
+      redirect_uris: null,
+      registered_redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+    });
+    // Never folded into the editable list (that would fake revocability).
+    expect(c.redirectUris).toEqual([]);
+    expect(c.registeredRedirectUris).toEqual([
+      'https://claude.ai/api/mcp/auth_callback',
+    ]);
+    const out = serializeMcpConfig(c);
+    expect(out['redirectUris']).toEqual([]);
+    expect(out['registeredRedirectUris']).toEqual([
+      'https://claude.ai/api/mcp/auth_callback',
+    ]);
+    // Survives a full round-trip untouched.
+    const again = parseMcpConfig(out);
+    expect(again.registeredRedirectUris).toEqual(c.registeredRedirectUris);
+    expect(again.redirectUris).toEqual([]);
+    // Both lists coexist without cross-contamination.
+    const both = parseMcpConfig({
+      redirect_uris: ['https://mine.example/cb'],
+      registered_redirect_uris: ['https://claude.ai/cb'],
+    });
+    expect(both.redirectUris).toEqual(['https://mine.example/cb']);
+    expect(both.registeredRedirectUris).toEqual(['https://claude.ai/cb']);
   });
 });
 
@@ -280,14 +331,21 @@ describe('effectiveTools', () => {
     expect(effectiveTools(cfg, []).customTools).toBe(2);
   });
 
-  it('engages lazy mode on always, and on auto over the token threshold', () => {
+  it("engages lazy on 'on', and on 'auto' over the token threshold", () => {
     const small = cfgWith({ exposedServices: ['crm'] });
     expect(effectiveTools(small, services).lazyEngaged).toBe(false);
     expect(
-      effectiveTools({ ...small, lazyMode: 'always' }, services).lazyEngaged
+      effectiveTools({ ...small, lazyMode: 'on' }, services).lazyEngaged
     ).toBe(true);
     expect(
-      effectiveTools({ ...small, lazyMode: true }, services).lazyEngaged
+      effectiveTools({ ...small, lazyMode: 'off' }, services).lazyEngaged
+    ).toBe(false);
+    // Legacy stored values engage through parse-time normalization.
+    expect(
+      effectiveTools(
+        cfgWith({ ...parseMcpConfig({ lazy_mode: true }), exposedServices: ['crm'] }),
+        services
+      ).lazyEngaged
     ).toBe(true);
     // 7 dbs × 16 + 5 globals + 6 aggregators = 123 tools > 8000/81 ≈ 98.8.
     const many = Array.from({ length: 7 }, (_, i) => svc(`db${i}`));
@@ -297,7 +355,7 @@ describe('effectiveTools', () => {
     expect(e.tokenEstimate).toBe(e.total * TOKENS_PER_TOOL);
     expect(e.lazyEngaged).toBe(true);
     expect(
-      effectiveTools({ ...big, lazyMode: 'never' }, many).lazyEngaged
+      effectiveTools({ ...big, lazyMode: 'off' }, many).lazyEngaged
     ).toBe(false);
   });
 
@@ -310,6 +368,8 @@ describe('effectiveTools', () => {
     const e = effectiveTools(cfg, services);
     expect(e.writeReachDb).toBe(1); // only hr still has write verbs
     expect(e.writeReach).toBe(2); // hr + the s3 file service
+    // prefixed (null style): per-service instances — hr's 7 + s3's 3.
+    expect(e.writeVerbs).toBe(10);
     expect(e.readOnly).toBe(false);
     // Turn off every write/execute verb everywhere → derived read-only.
     const allOff = new Set([
@@ -324,6 +384,64 @@ describe('effectiveTools', () => {
     expect(ro.readOnly).toBe(true);
     // Read/schema tools are still served.
     expect(ro.dbTools).toBe(READ_DB_VERBS.length * 2);
+  });
+
+  it('counts SERVED write tools per style (Appendix A)', () => {
+    // prefixed: per-service instances for dbs AND files.
+    const pre = cfgWith({
+      exposedServices: ['crm', 'hr', 's3'],
+      toolStyle: 'prefixed',
+    });
+    expect(effectiveTools(pre, services).writeVerbs).toBe(7 + 7 + 3);
+    // merged: distinct db write verbs + per-service file write instances.
+    const mer = cfgWith({
+      exposedServices: ['crm', 'hr', 's3'],
+      toolStyle: 'merged',
+    });
+    expect(effectiveTools(mer, services).writeVerbs).toBe(7 + 3);
+    // merged: a verb off in one db is still served through the other.
+    const merOne = cfgWith({
+      exposedServices: ['crm', 'hr'],
+      toolStyle: 'merged',
+      disabledTools: new Set(['crm_create_records']),
+    });
+    expect(effectiveTools(merOne, services).writeVerbs).toBe(7);
+    // file services are per-service instances in BOTH styles.
+    const fileSvcs = [svc('s3', 'file'), svc('gcs', 'file')];
+    for (const style of ['merged', 'prefixed'] as const) {
+      const cfg = cfgWith({ exposedServices: ['s3', 'gcs'], toolStyle: style });
+      expect(effectiveTools(cfg, fileSvcs).writeVerbs).toBe(6);
+    }
+  });
+
+  it('classifies custom tools into the write math and readOnly', () => {
+    expect(isWriteCapableCustomTool({ httpMethod: 'GET' })).toBe(false);
+    expect(isWriteCapableCustomTool({})).toBe(false); // api + default GET
+    expect(isWriteCapableCustomTool({ httpMethod: 'post' })).toBe(true);
+    expect(isWriteCapableCustomTool({ httpMethod: 'DELETE' })).toBe(true);
+    expect(isWriteCapableCustomTool({ toolType: 'function' })).toBe(true);
+
+    const cfg = cfgWith({
+      customTools: [
+        { name: 'lookup', httpMethod: 'GET', enabled: true },
+        { name: 'notify', httpMethod: 'POST', enabled: true },
+        { name: 'calc', toolType: 'function', enabled: true },
+        { name: 'purge', httpMethod: 'DELETE', enabled: false }, // off
+      ],
+    });
+    const e = effectiveTools(cfg, []);
+    expect(e.customTools).toBe(3);
+    expect(e.writeCapableCustoms).toBe(2); // notify + calc; purge is off
+    expect(e.writeVerbs).toBe(2); // no services exposed
+    expect(e.readOnly).toBe(false);
+
+    // GET-only customs keep the server read-only.
+    const ro = effectiveTools(
+      cfgWith({ customTools: [{ name: 'lookup', httpMethod: 'GET', enabled: true }] }),
+      []
+    );
+    expect(ro.writeCapableCustoms).toBe(0);
+    expect(ro.readOnly).toBe(true);
   });
 });
 
@@ -361,6 +479,50 @@ describe('exposedRows / orphanedKeys', () => {
     });
     // The keys are dormant, not orphaned: the entry still claims them.
     expect(orphanedKeys(cfg, services)).toEqual([]);
+  });
+
+  it('never lets a service claim a sibling service’s keys', () => {
+    // Service 'db' must not own 'db_backup_list_files' — the suffix
+    // 'backup_list_files' is no catalog verb.
+    const sibs = [svc('db'), svc('db_backup', 'file')];
+    const cfg = cfgWith({
+      disabledTools: new Set(['db_backup_list_files', 'db_get_tables']),
+    });
+    expect(orphanedKeys(cfg, sibs)).toEqual([]);
+    // Once db_backup is gone, its key is an orphan — 'db' does not absorb it.
+    expect(orphanedKeys(cfg, [svc('db')])).toEqual(['db_backup_list_files']);
+  });
+
+  it('flags a known-service key whose suffix is no catalog verb', () => {
+    const cfg = cfgWith({ disabledTools: new Set(['crm_bogus_verb']) });
+    expect(orphanedKeys(cfg, services)).toEqual(['crm_bogus_verb']);
+  });
+
+  it('accepts extra bare names (system_mcp tool names) as owned', () => {
+    const cfg = cfgWith({
+      disabledTools: new Set(['create_service', 'ghost_get_tables']),
+    });
+    // Without the bare set, a system tool name looks orphaned…
+    expect(orphanedKeys(cfg, [])).toEqual(
+      expect.arrayContaining(['create_service'])
+    );
+    // …with it, only the genuinely dead key remains.
+    expect(orphanedKeys(cfg, [], ['create_service'])).toEqual([
+      'ghost_get_tables',
+    ]);
+  });
+
+  it('keyBelongsTo requires an exact {service}_{verb} catalog match', () => {
+    expect(keyBelongsTo('crm_get_tables', 'crm', 'db')).toBe(true);
+    expect(keyBelongsTo('crm_get_tables', 'crm', 'file')).toBe(false);
+    expect(keyBelongsTo('s3_list_files', 's3', 'file')).toBe(true);
+    // Unknown kind checks both catalogs.
+    expect(keyBelongsTo('x_create_records', 'x')).toBe(true);
+    expect(keyBelongsTo('x_create_file', 'x')).toBe(true);
+    expect(keyBelongsTo('x_bogus', 'x')).toBe(false);
+    // Prefix alone is never ownership.
+    expect(keyBelongsTo('db_backup_list_files', 'db')).toBe(false);
+    expect(keyBelongsTo('db_backup_list_files', 'db_backup')).toBe(true);
   });
 });
 

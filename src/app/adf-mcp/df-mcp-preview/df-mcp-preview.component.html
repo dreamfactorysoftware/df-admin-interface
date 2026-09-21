@@ -13,13 +13,19 @@
   </div>
 
   <div class="mcp-preview-body">
-    <section class="mcp-preview-group" *ngFor="let group of visibleGroups()">
+    <section
+      class="mcp-preview-group"
+      *ngFor="let group of visibleGroups(); trackBy: trackByLabel">
       <h3>{{ group.label }}</h3>
       <p class="mcp-preview-none" *ngIf="group.items.length === 0">None served.</p>
-      <div class="mcp-preview-item" *ngFor="let item of group.items">
+      <div
+        class="mcp-preview-item"
+        *ngFor="let item of group.items; trackBy: trackByItemName">
         <code>{{ item.name }}</code>
         <span class="mcp-preview-meta" *ngIf="item.meta">{{ item.meta }}</span>
-        <span class="mcp-preview-desc">{{ item.description }}</span>
+        <span class="mcp-preview-desc" [attr.title]="item.description">
+          {{ item.description }}
+        </span>
       </div>
     </section>
 
@@ -28,7 +34,9 @@
       <p class="mcp-preview-none" *ngIf="excluded.length === 0">
         Nothing is excluded — every catalog tool is served.
       </p>
-      <div class="mcp-preview-item" *ngFor="let item of excluded">
+      <div
+        class="mcp-preview-item"
+        *ngFor="let item of excluded; trackBy: trackByExcluded">
         <code>{{ item.name }}</code>
         <span class="mcp-preview-reason">{{ item.reason }}</span>
       </div>

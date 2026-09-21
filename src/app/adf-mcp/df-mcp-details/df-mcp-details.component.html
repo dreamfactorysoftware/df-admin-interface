@@ -1,8 +1,9 @@
 <div class="mcp-page" *ngIf="store.service">
   <!-- Persistent endpoint header: URL, auth, live tool count, on every tab -->
+  <!-- The admin chrome already prints the page label (setPageLabel), so the
+       header carries only the live state chips + URL, never a second title. -->
   <header class="mcp-head">
     <div class="mcp-head-row">
-      <h1>{{ store.draftLabel || store.service.name }}</h1>
       <span class="mcp-chip" [class.good]="store.service.isActive" [class.warn]="!store.service.isActive">
         {{ store.service.isActive ? '● Active' : 'Inactive — endpoint refuses connections' }}
       </span>
@@ -17,7 +18,8 @@
         ⚠ Serves no tools
       </span>
     </div>
-    <div class="mcp-head-url">
+    <!-- On Connect the endpoint card below is the hero — no duplicate URL row. -->
+    <div class="mcp-head-url" *ngIf="tab !== 'connect'">
       <code data-testid="mcp-endpoint-url">{{ mcpUrl }}</code>
       <button mat-stroked-button type="button" (click)="copyUrl()" data-testid="mcp-copy-url">
         Copy

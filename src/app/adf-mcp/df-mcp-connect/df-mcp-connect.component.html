@@ -1,4 +1,19 @@
 <div class="mcp-connect" data-testid="mcp-connect-tab">
+  <!-- Zero-effective-tools warning (§7) — same message as the Tools tab -->
+  <div
+    class="mcp-zero-banner"
+    *ngIf="zeroTools"
+    data-testid="mcp-connect-zero-banner">
+    ⚠ This server serves no tools. Agents can connect but can call nothing.
+    <button
+      type="button"
+      class="mcp-link"
+      (click)="goToTab.emit('tools')"
+      data-testid="mcp-connect-zero-link">
+      Expose services in Tools.
+    </button>
+  </div>
+
   <!-- One-time amber banner after connection-affecting saves (armed by the shell) -->
   <div
     class="mcp-reconnect-banner"
@@ -33,18 +48,20 @@
         ×
       </button>
     </div>
+    <!-- One step grammar for all three: a numbered circle that turns green
+         with a check when the step completes (step 3 may start completed). -->
     <ol class="mcp-checklist-steps">
       <li [class.done]="store.copiedUrl">
-        <span class="mcp-step-mark">{{ store.copiedUrl ? '✓' : '①' }}</span>
+        <span class="mcp-step-mark">{{ store.copiedUrl ? '✓' : '1' }}</span>
         <span>Copy your endpoint URL</span>
       </li>
       <li [class.done]="store.copiedClient">
-        <span class="mcp-step-mark">{{ store.copiedClient ? '✓' : '②' }}</span>
+        <span class="mcp-step-mark">{{ store.copiedClient ? '✓' : '2' }}</span>
         <span>Add it to a client below</span>
       </li>
       <li [class.done]="step3Done">
+        <span class="mcp-step-mark">{{ step3Done ? '✓' : '3' }}</span>
         <ng-container *ngIf="step3Done; else exposePrompt">
-          <span class="mcp-step-mark">✓</span>
           <span>
             {{ exposedSummary }} —
             <button
@@ -56,7 +73,6 @@
           </span>
         </ng-container>
         <ng-template #exposePrompt>
-          <span class="mcp-step-mark">③</span>
           <span>
             <button
               type="button"
@@ -75,7 +91,7 @@
   <!-- Endpoint card -->
   <section class="mcp-card mcp-endpoint" data-testid="mcp-endpoint-card">
     <div class="mcp-endpoint-row">
-      <code class="mcp-endpoint-url">{{ mcpUrl }}</code>
+      <code class="mcp-endpoint-url" data-testid="mcp-endpoint-url">{{ mcpUrl }}</code>
       <button
         mat-stroked-button
         type="button"
@@ -86,16 +102,26 @@
     </div>
     <div class="mcp-endpoint-sub">
       <span>Streamable HTTP · MCP 2025-03-26</span>
+      <!-- Truthful probe: only a live 401/403 challenge earns the auth
+           claim; any other HTTP response is plain "Reachable". -->
       <span
         class="mcp-chip"
-        [class.good]="probe === 'ok'"
+        [class.good]="probe === 'auth'"
         data-testid="mcp-probe-chip"
         [matTooltip]="
-          probe === 'ok'
+          probe === 'auth'
             ? 'The endpoint answered with the expected sign-in challenge.'
+            : probe === 'open'
+            ? 'The endpoint answered, but not with the expected sign-in challenge.'
             : ''
         ">
-        {{ probe === 'ok' ? '✓ Reachable — auth enforced' : '—' }}
+        {{
+          probe === 'auth'
+            ? '✓ Reachable — auth enforced'
+            : probe === 'open'
+            ? 'Reachable'
+            : '—'
+        }}
       </span>
     </div>
   </section>
@@ -144,6 +170,13 @@
           (click)="goToTab.emit('settings')">
           Manage →
         </button>
+      </p>
+      <p
+        class="mcp-redirect-prompt"
+        *ngIf="needsRedirectPrompt"
+        data-testid="mcp-redirect-jump-prompt">
+        This client needs a redirect URI — add Claude's callback below or in
+        Settings.
       </p>
     </section>
 

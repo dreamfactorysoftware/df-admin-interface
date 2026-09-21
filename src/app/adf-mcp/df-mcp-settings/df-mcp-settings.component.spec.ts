@@ -38,6 +38,7 @@ function makeStore(
     oauth_client_id: 'client-id-123',
     oauth_client_secret: 'super-secret-value',
     redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+    registered_redirect_uris: ['https://client.example/registered-cb'],
     scope_tools: true,
   };
   if (overrides.toolStyle !== undefined && overrides.toolStyle !== null) {
@@ -221,22 +222,54 @@ describe('DfMcpSettingsComponent', () => {
     });
   });
 
-  describe('catalog delivery', () => {
-    it('coerces legacy boolean values on read', () => {
-      const cmp = create(makeStore({ lazy: true }));
-      expect(cmp.lazyValue).toBe('always');
-      cmp.store.cfg.lazyMode = false;
-      expect(cmp.lazyValue).toBe('never');
+  describe('catalog delivery (auto|on|off contract)', () => {
+    it('displays contract tokens as themselves', () => {
+      const cmp = create(makeStore({ lazy: 'on' }));
+      expect(cmp.lazyValue).toBe('on');
+      cmp.store.cfg.lazyMode = 'off' as any;
+      expect(cmp.lazyValue).toBe('off');
       cmp.store.cfg.lazyMode = 'auto';
       expect(cmp.lazyValue).toBe('auto');
     });
 
-    it('writes the selected token into cfg.lazyMode', () => {
+    it("coerces legacy stored values on read: 'always'/true → on, 'never'/false → off", () => {
+      const cmp = create(makeStore({ lazy: 'always' }));
+      expect(cmp.lazyValue).toBe('on');
+      cmp.store.cfg.lazyMode = 'never' as any;
+      expect(cmp.lazyValue).toBe('off');
+      cmp.store.cfg.lazyMode = true as any;
+      expect(cmp.lazyValue).toBe('on');
+      cmp.store.cfg.lazyMode = false as any;
+      expect(cmp.lazyValue).toBe('off');
+    });
+
+    it("writes only contract tokens into cfg.lazyMode — never 'always'/'never'", () => {
       const store = makeStore();
       const cmp = create(store);
-      cmp.setLazy('always');
-      expect(store.cfg.lazyMode).toBe('always');
+      cmp.setLazy('on');
+      expect(store.cfg.lazyMode).toBe('on');
       expect(store.dirty()).toBe(true);
+      cmp.setLazy('off');
+      expect(store.cfg.lazyMode).toBe('off');
+    });
+
+    it("the select's option values are the contract tokens with the unchanged labels", async () => {
+      create(makeStore());
+      const trigger = byTestId('mcp-lazy-select') as HTMLElement;
+      trigger.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const options = Array.from(
+        document.querySelectorAll('mat-option')
+      ).map(o => ({
+        value: o.getAttribute('ng-reflect-value'),
+        label: (o.textContent ?? '').trim(),
+      }));
+      expect(options).toEqual([
+        { value: 'auto', label: 'Auto — recommended' },
+        { value: 'on', label: 'Always on-demand' },
+        { value: 'off', label: 'Never' },
+      ]);
     });
   });
 
@@ -306,6 +339,22 @@ describe('DfMcpSettingsComponent', () => {
       expect(store.dirty()).toBe(false);
     });
 
+    it('system_mcp: disabled System API tool names are never reported as orphans', () => {
+      // The model excludes SYSTEM_MCP_TOOLS names for system_mcp stores;
+      // this pins the settings card to that behavior.
+      const store = makeStore({
+        type: 'system_mcp',
+        disabled: ['create_service', 'update_role', 'call_system_api'],
+      });
+      const cmp = create(store);
+      expect(store.orphans()).toEqual([]);
+      expect(cmp.orphanCount).toBe(0);
+      expect(byTestId('mcp-housekeeping-review')).toBeNull();
+      expect(byTestId('mcp-housekeeping')!.textContent).toContain(
+        'No orphaned tool settings.'
+      );
+    });
+
     it('flush cache calls the cache API with the service name and toasts', () => {
       create(makeStore());
       (byTestId('mcp-flush-cache') as HTMLButtonElement).click();
@@ -331,6 +380,20 @@ describe('DfMcpSettingsComponent', () => {
       expect(
         fixture.componentInstance.store.cfg.oauthClientSecret
       ).toBe('super-secret-value');
+    });
+
+    it('shows the read-only registeredRedirectUris fact, kept apart from redirectUris', () => {
+      create(makeStore());
+      const json = JSON.parse(
+        byTestId('mcp-fullconfig')!.textContent ?? '{}'
+      );
+      expect(json.registeredRedirectUris).toEqual([
+        'https://client.example/registered-cb',
+      ]);
+      // Never folded into the admin-managed list.
+      expect(json.redirectUris).toEqual([
+        'https://claude.ai/api/mcp/auth_callback',
+      ]);
     });
   });
 
@@ -431,6 +494,16 @@ describe('DfMcpSettingsComponent', () => {
       expect(store.draftIsActive).toBe(false);
       expect(el().textContent).toContain(
         'This server is inactive — the endpoint refuses connections.'
+      );
+    });
+
+    it('both slide-toggles use the primary (DF purple) palette, not the coral accent', () => {
+      create(makeStore());
+      expect(byTestId('mcp-set-active')!.getAttribute('color')).toBe(
+        'primary'
+      );
+      expect(byTestId('mcp-apikey-toggle')!.getAttribute('color')).toBe(
+        'primary'
       );
     });
 

@@ -40,14 +40,17 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
-import { ToolStyle, serializeMcpConfig } from '../mcp-effective';
+import {
+  LazyMode,
+  ToolStyle,
+  normalizeLazyMode,
+  serializeMcpConfig,
+} from '../mcp-effective';
 import { McpEditorStore } from '../mcp-store';
 import {
   DfMcpHousekeepingDialogComponent,
   McpHousekeepingDialogData,
 } from './df-mcp-housekeeping-dialog.component';
-
-type LazyChoice = 'auto' | 'always' | 'never';
 
 interface OAuthServiceOption {
   name: string;
@@ -248,15 +251,17 @@ export class DfMcpSettingsComponent implements OnInit, OnChanges {
     return this.store.cfg.toolStyle !== this.store.savedCfg.toolStyle;
   }
 
-  /** Legacy boolean values coerce on read: true => always, false => never. */
-  get lazyValue(): LazyChoice {
-    const v = this.store.cfg.lazyMode;
-    if (v === true) return 'always';
-    if (v === false) return 'never';
-    return v === 'always' || v === 'never' ? v : 'auto';
+  /**
+   * The stored contract is exactly auto|on|off (PHP picklist + daemon).
+   * Display funnels through the model's normalization so legacy stored
+   * tokens ('always'/'never'/booleans) render as their on/off equivalent.
+   */
+  get lazyValue(): LazyMode {
+    return normalizeLazyMode(this.store.cfg.lazyMode);
   }
 
-  setLazy(value: LazyChoice): void {
+  /** Writes only contract tokens — never 'always'/'never'. */
+  setLazy(value: LazyMode): void {
     this.store.cfg.lazyMode = value;
     this.store.touch();
   }

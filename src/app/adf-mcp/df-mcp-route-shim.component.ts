@@ -9,9 +9,10 @@
  * its save handler then lands on the new MCP editor via ?created=1).
  */
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { McpDeactivatable } from './mcp-dirty.guard';
 import { DfServiceDetailsComponent } from '../adf-services/df-service-details/df-service-details.component';
 import { DfMcpDetailsComponent } from './df-mcp-details/df-mcp-details.component';
 import { DfMcpCreateComponent } from './df-mcp-create/df-mcp-create.component';
@@ -31,11 +32,23 @@ import { DfMcpCreateComponent } from './df-mcp-create/df-mcp-create.component';
     <df-service-details *ngIf="mode === 'generic'"></df-service-details>
   `,
 })
-export class DfMcpRouteShimComponent implements OnInit, OnDestroy {
+export class DfMcpRouteShimComponent
+  implements OnInit, OnDestroy, McpDeactivatable
+{
   mode: 'mcp-edit' | 'mcp-create' | 'generic' = 'generic';
   private routeSub?: Subscription;
 
+  @ViewChild(DfMcpDetailsComponent) details?: DfMcpDetailsComponent;
+  @ViewChild(DfMcpCreateComponent) create?: DfMcpCreateComponent;
+
   constructor(private activatedRoute: ActivatedRoute) {}
+
+  /** Delegates the dirty-navigation check to whichever editor is rendered. */
+  canDeactivate(): boolean {
+    if (this.mode === 'mcp-edit') return this.details?.canDeactivate() ?? true;
+    if (this.mode === 'mcp-create') return this.create?.canDeactivate() ?? true;
+    return true; // the legacy editor keeps its own dialogs
+  }
 
   ngOnInit(): void {
     // Same-route navigations (/ai/mcp/9 -> /ai/mcp/21) reuse this component,

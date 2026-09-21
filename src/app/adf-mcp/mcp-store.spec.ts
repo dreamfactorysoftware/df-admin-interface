@@ -149,6 +149,55 @@ describe('removeService', () => {
   });
 });
 
+describe('prefix ownership (sibling services)', () => {
+  const sibs = [svc('sales'), svc('sales_eu')];
+
+  it('removeService(clear) deletes only keys sales actually owns', () => {
+    const store = makeStore(
+      {
+        exposed_services: ['sales', 'sales_eu'],
+        disabled_tools: ['sales_create_records', 'sales_eu_create_records'],
+      },
+      sibs
+    );
+    store.removeService('sales', true);
+    expect(store.cfg.disabledTools.has('sales_create_records')).toBe(false);
+    // The sibling's curation is untouched.
+    expect(store.cfg.disabledTools.has('sales_eu_create_records')).toBe(true);
+  });
+
+  it('renameExposedEntry leaves sibling keys alone', () => {
+    const store = makeStore(
+      {
+        exposed_services: ['sales', 'sales_eu'],
+        disabled_tools: ['sales_create_records', 'sales_eu_create_records'],
+      },
+      [svc('crm'), svc('sales_eu')] // 'sales' itself is an orphan entry
+    );
+    store.renameExposedEntry('sales', 'crm');
+    expect(store.cfg.disabledTools.has('crm_create_records')).toBe(true);
+    expect(store.cfg.disabledTools.has('sales_create_records')).toBe(false);
+    expect(store.cfg.disabledTools.has('sales_eu_create_records')).toBe(true);
+    // No garbage key from re-prefixing the sibling's entry.
+    expect(store.cfg.disabledTools.has('crm_eu_create_records')).toBe(false);
+  });
+
+  it('dormantCurationCount counts only owned {service}_{verb} keys', () => {
+    const store = makeStore(
+      {
+        disabled_tools: [
+          'sales_create_records',
+          'sales_eu_create_records',
+          'sales_bogus',
+        ],
+      },
+      sibs
+    );
+    expect(store.dormantCurationCount('sales')).toBe(1);
+    expect(store.dormantCurationCount('sales_eu')).toBe(1);
+  });
+});
+
 describe('renameExposedEntry', () => {
   it('repoints the entry and re-prefixes only its keys', () => {
     const store = makeStore({
@@ -193,6 +242,45 @@ describe('makeReadOnly', () => {
     expect(store.cfg.disabledTools.has('archive_create_records')).toBe(false);
     expect(store.cfg.disabledTools.has('ghost_create_records')).toBe(false);
   });
+
+  it('disables write-capable custom tools, keeps GET-only ones on', () => {
+    const store = makeStore({
+      exposed_services: ['crm'],
+      custom_tools: [
+        { name: 'lookup', httpMethod: 'GET', enabled: true },
+        { name: 'notify', httpMethod: 'POST', enabled: true },
+        { name: 'calc', toolType: 'function', enabled: true },
+      ],
+    });
+    store.makeReadOnly();
+    const enabled = Object.fromEntries(
+      store.cfg.customTools.map((t: any) => [t.name, t.enabled])
+    );
+    expect(enabled['lookup']).toBe(true);
+    expect(enabled['notify']).toBe(false);
+    expect(enabled['calc']).toBe(false);
+    const e = store.effective();
+    expect(e.writeVerbs).toBe(0);
+    expect(e.writeCapableCustoms).toBe(0);
+    expect(e.readOnly).toBe(true);
+    // The read-capable custom tool is still served.
+    expect(e.customTools).toBe(1);
+  });
+});
+
+describe('orphans', () => {
+  it('system_mcp: bare System API tool names are never orphans', () => {
+    const store = makeStore(
+      { disabled_tools: ['create_service', 'update_role', 'call_system_api'] },
+      [],
+      'system_mcp'
+    );
+    expect(store.orphans()).toEqual([]);
+    // A genuinely dead prefixed key still surfaces.
+    store.cfg.disabledTools.add('ghost_get_tables');
+    store.touch();
+    expect(store.orphans()).toEqual(['ghost_get_tables']);
+  });
 });
 
 describe('connectionAffecting', () => {
@@ -235,12 +323,65 @@ describe('derived shortcuts', () => {
     expect(store.effective().globalTools).toBe(4);
   });
 
-  it('touch() notifies subscribers', () => {
+  it('touch() notifies subscribers and bumps the version', () => {
     const store = makeStore();
     const seen = jest.fn();
     const sub = store.changes.subscribe(seen);
+    const v = store.version;
     store.setBareTool('search', false);
     expect(seen).toHaveBeenCalled();
+    expect(store.version).toBeGreaterThan(v);
     sub.unsubscribe();
+  });
+});
+
+describe('memoization (version-keyed derivations)', () => {
+  it('returns the identical object within a version, a new one after touch', () => {
+    const store = makeStore({ exposed_services: ['crm'] });
+    const e = store.effective();
+    const s = store.savedEffective();
+    const r = store.rows();
+    const o = store.orphans();
+    // Same version → same object identity (stable for trackBy/CD).
+    expect(store.effective()).toBe(e);
+    expect(store.savedEffective()).toBe(s);
+    expect(store.rows()).toBe(r);
+    expect(store.orphans()).toBe(o);
+    expect(store.totalTools()).toBe(store.totalTools());
+    store.touch();
+    expect(store.effective()).not.toBe(e);
+    expect(store.savedEffective()).not.toBe(s);
+    expect(store.rows()).not.toBe(r);
+    expect(store.orphans()).not.toBe(o);
+  });
+
+  it('mutations and markSaved/discard invalidate through the touch bump', () => {
+    const store = makeStore({ exposed_services: ['crm'] });
+    expect(store.effective().total).toBe(16 + 5);
+    expect(store.totalTools()).toBe(21);
+    store.setTool('crm', 'create_records', false);
+    expect(store.effective().total).toBe(20);
+    expect(store.totalTools()).toBe(20);
+    // savedEffective refreshes when the saved snapshot moves.
+    const savedBefore = store.savedEffective();
+    expect(savedBefore.total).toBe(21);
+    store.markSaved();
+    expect(store.savedEffective()).not.toBe(savedBefore);
+    expect(store.savedEffective().total).toBe(20);
+    expect(store.savedTotalTools()).toBe(20);
+    store.setTool('crm', 'update_records', false);
+    expect(store.effective().total).toBe(19);
+    store.discard();
+    expect(store.effective().total).toBe(20);
+  });
+
+  it('assigning backendServices invalidates the cached math', () => {
+    const store = makeStore({ exposed_services: ['crm', 'hr'] });
+    const before = store.effective();
+    expect(before.dbServices).toBe(2);
+    store.backendServices = [svc('crm')];
+    const after = store.effective();
+    expect(after).not.toBe(before);
+    expect(after.dbServices).toBe(1);
   });
 });

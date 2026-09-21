@@ -37,7 +37,7 @@
           </div>
           <div
             class="mcp-picker-row"
-            *ngFor="let svc of dbs"
+            *ngFor="let svc of dbs; trackBy: trackBySvcName"
             (click)="toggle(svc.name)">
             <mat-checkbox
               [checked]="isSelected(svc.name)"
@@ -67,7 +67,7 @@
           </div>
           <div
             class="mcp-picker-row"
-            *ngFor="let svc of files"
+            *ngFor="let svc of files; trackBy: trackBySvcName"
             (click)="toggle(svc.name)">
             <mat-checkbox
               [checked]="isSelected(svc.name)"

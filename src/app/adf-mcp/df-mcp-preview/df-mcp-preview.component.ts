@@ -307,11 +307,12 @@ export class DfMcpPreviewComponent implements OnInit {
     }
     this.total = served.length;
     this.tokenEstimate = this.total * TOKENS_PER_TOOL;
+    // lazy_mode contract is 'auto'|'on'|'off' (parseMcpConfig normalizes
+    // legacy 'always'/'never'/booleans on read).
     const lm = s.cfg.lazyMode;
     this.lazyAuto = lm === 'auto';
     this.lazyEngaged =
-      lm === 'always' ||
-      lm === true ||
+      lm === 'on' ||
       (lm === 'auto' && this.tokenEstimate > LAZY_AUTO_TOKEN_THRESHOLD);
   }
 
@@ -323,17 +324,26 @@ export class DfMcpPreviewComponent implements OnInit {
     }));
   }
 
+  /** Built once: *ngFor needs identity-stable arrays between CD passes. */
+  private readonly firstResponseGroups: PreviewGroup[] = [
+    {
+      label: `First response — discovery tools (${LAZY_FACADE_TOOLS.length})`,
+      items: this.firstResponseItems(),
+    },
+  ];
+
   visibleGroups(): PreviewGroup[] {
     if (this.lazyEngaged && this.view === 'first') {
-      return [
-        {
-          label: `First response — discovery tools (${LAZY_FACADE_TOOLS.length})`,
-          items: this.firstResponseItems(),
-        },
-      ];
+      return this.firstResponseGroups;
     }
     return this.groups;
   }
+
+  /* trackBy on stable keys, so open tooltips/DOM survive CD passes. */
+  readonly trackByLabel = (_: number, g: PreviewGroup): string => g.label;
+  readonly trackByItemName = (_: number, i: PreviewItem): string => i.name;
+  readonly trackByExcluded = (_: number, i: ExcludedItem): string =>
+    `${i.name}|${i.reason}`;
 
   tokenLabel(): string {
     return `~${(this.tokenEstimate / 1000).toFixed(1)}k tokens of definitions`;
@@ -341,9 +351,10 @@ export class DfMcpPreviewComponent implements OnInit {
 
   lazyLabel(): string {
     if (!this.lazyEngaged) return 'Lazy loading: not engaged';
+    // Engaged + not auto means lazy_mode 'on' (always on-demand).
     return this.lazyAuto
       ? 'Lazy loading: engaged (auto)'
-      : 'Lazy loading: engaged';
+      : 'Lazy loading: engaged (always on)';
   }
 
   copyJson(): void {

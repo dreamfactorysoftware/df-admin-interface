@@ -31,7 +31,12 @@ export type McpClientId =
   | 'chatgpt'
   | 'json';
 
-type ProbeState = 'pending' | 'ok' | 'unknown';
+/**
+ * 'auth'    → an HTTP 401/403: reachable AND the sign-in challenge is live.
+ * 'open'    → any other HTTP response: reachable, but NO auth claim is made.
+ * 'unknown' → network failure: the neutral "—" chip.
+ */
+type ProbeState = 'pending' | 'auth' | 'open' | 'unknown';
 type AuthVariant = 'oauth' | 'apikey';
 
 export const CLAUDE_CALLBACK_URI = 'https://claude.ai/api/mcp/auth_callback';
@@ -109,13 +114,17 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
 
   private runProbe(): void {
     // Raw fetch on purpose: DF's HTTP interceptors would attach a session
-    // token; the probe must see what an unauthenticated client sees. ANY
-    // HTTP response (401/400/405/200) proves the endpoint is reachable —
-    // only a network failure leaves the neutral "—" chip.
+    // token; the probe must see what an unauthenticated client sees. Only a
+    // 401/403 challenge proves auth is enforced — any other HTTP response
+    // (200/400/405/…) is merely "reachable" with no auth claim, and a
+    // network failure leaves the neutral "—" chip. Truthful indicators:
+    // never claim "auth enforced" when the server answered without one.
     const url = this.mcpUrl;
     fetch(url, { method: 'GET' })
-      .then(() => {
-        if (url === this.mcpUrl) this.probe = 'ok';
+      .then(res => {
+        if (url !== this.mcpUrl) return;
+        this.probe =
+          res.status === 401 || res.status === 403 ? 'auth' : 'open';
       })
       .catch(() => {
         if (url === this.mcpUrl) this.probe = 'unknown';
@@ -124,6 +133,16 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.autoDismissTimer) clearTimeout(this.autoDismissTimer);
+  }
+
+  /* --------------------------- zero-tools banner -------------------------- */
+  /** §7: the zero-effective-tools warning renders on Connect AND Tools —
+   *  gated on the catalog load so it never flashes while counts are a guess. */
+  get zeroTools(): boolean {
+    return (
+      (this.store.isSystemMcp || this.store.backendLoaded) &&
+      this.store.totalTools() === 0
+    );
   }
 
   /* ------------------------------ checklist ------------------------------ */
@@ -288,6 +307,15 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
 
   get claudeCallbackAdded(): boolean {
     return this.store.cfg.redirectUris.includes(CLAUDE_CALLBACK_URI);
+  }
+
+  /** Jump prompt on the OAuth card: the chosen client needs a callback and
+   *  none is configured yet (Claude and ChatGPT both require one). */
+  get needsRedirectPrompt(): boolean {
+    return (
+      (this.selectedClient === 'claude' || this.selectedClient === 'chatgpt') &&
+      this.store.cfg.redirectUris.length === 0
+    );
   }
 
   addClaudeCallback(): void {
