@@ -178,23 +178,42 @@ export class DfMcpPreviewComponent implements OnInit {
       }
     }
 
-    // File group (always per-service names).
+    // File group: merged style shares one verb across the file services, the
+    // same way databases do, so the names lose their service prefix.
     const fileItems: PreviewItem[] = [];
-    for (const f of activeFiles) {
-      for (const v of verbsFor('file')) {
-        if (isVerbServed(cfg, f.name, v.verb)) {
+    if (activeFiles.length > 0) {
+      if (style === 'merged') {
+        for (const v of verbsFor('file')) {
+          const on = activeFiles
+            .filter(f => isVerbServed(cfg, f.name, v.verb))
+            .map(f => f.name);
+          if (on.length === 0) continue;
           fileItems.push({
-            name: toolKey(f.name, v.verb),
+            name: v.verb,
             description: v.description,
+            meta: `service: ${on.join(', ')} (${on.length} of ${activeFiles.length})`,
           });
         }
+        this.groups.push({
+          label: `File — consolidated, service argument (${fileItems.length})`,
+          items: fileItems,
+        });
+      } else {
+        for (const f of activeFiles) {
+          for (const v of verbsFor('file')) {
+            if (isVerbServed(cfg, f.name, v.verb)) {
+              fileItems.push({
+                name: toolKey(f.name, v.verb),
+                description: v.description,
+              });
+            }
+          }
+        }
+        this.groups.push({
+          label: `File (${fileItems.length})`,
+          items: fileItems,
+        });
       }
-    }
-    if (activeFiles.length > 0) {
-      this.groups.push({
-        label: `File (${fileItems.length})`,
-        items: fileItems,
-      });
     }
 
     // Custom group.

@@ -53,11 +53,7 @@ export function emittedNameSet(
   for (const row of store.rows()) {
     if (!row.svc) continue;
     for (const v of verbsFor(row.svc.kind)) {
-      names.add(
-        row.svc.kind === 'db'
-          ? emittedDbToolName(style, row.svc.name, v.verb)
-          : toolKey(row.svc.name, v.verb)
-      );
+      names.add(emittedDbToolName(style, row.svc.name, v.verb));
     }
   }
   for (const t of store.cfg.customTools ?? []) {

@@ -309,6 +309,46 @@ describe('effectiveTools', () => {
     expect(e.dbTools).toBe(15); // 16 verbs − delete_records
   });
 
+  it('merged: file verbs collapse to one shared tool each, like databases', () => {
+    const cfg = cfgWith({
+      exposedServices: ['crm', 'logs', 'docs'],
+      toolStyle: 'merged',
+    });
+    const e = effectiveTools(cfg, [
+      svc('crm'),
+      svc('logs', 'file'),
+      svc('docs', 'file'),
+    ]);
+    // Two file services used to cost 2 x FILE_VERBS; merged pays for the set once.
+    expect(e.fileTools).toBe(FILE_VERBS.length);
+    expect(e.fileServices).toBe(2);
+  });
+
+  it('merged: a file verb disabled everywhere drops, disabled in one survives', () => {
+    const cfg = cfgWith({
+      exposedServices: ['logs', 'docs'],
+      toolStyle: 'merged',
+      disabledTools: new Set([
+        // delete_file off in logs only -> still reachable through docs.
+        'logs_delete_file',
+        // create_folder off everywhere -> verb gone.
+        'logs_create_folder',
+        'docs_create_folder',
+      ]),
+    });
+    const e = effectiveTools(cfg, [svc('logs', 'file'), svc('docs', 'file')]);
+    expect(e.fileTools).toBe(FILE_VERBS.length - 1);
+  });
+
+  it('prefixed: file verbs stay per-service', () => {
+    const cfg = cfgWith({
+      exposedServices: ['logs', 'docs'],
+      toolStyle: 'prefixed',
+    });
+    const e = effectiveTools(cfg, [svc('logs', 'file'), svc('docs', 'file')]);
+    expect(e.fileTools).toBe(FILE_VERBS.length * 2);
+  });
+
   it('null toolStyle behaves as prefixed', () => {
     const cfg = cfgWith({ exposedServices: ['crm'], toolStyle: null });
     expect(effectiveTools(cfg, services).effectiveStyle).toBe('prefixed');
@@ -439,7 +479,7 @@ describe('effectiveTools', () => {
       toolStyle: 'prefixed',
     });
     expect(effectiveTools(pre, services).writeVerbs).toBe(7 + 7 + 3);
-    // merged: distinct db write verbs + per-service file write instances.
+    // merged: distinct db write verbs + distinct file write verbs.
     const mer = cfgWith({
       exposedServices: ['crm', 'hr', 's3'],
       toolStyle: 'merged',
@@ -452,12 +492,22 @@ describe('effectiveTools', () => {
       disabledTools: new Set(['crm_create_records']),
     });
     expect(effectiveTools(merOne, services).writeVerbs).toBe(7);
-    // file services are per-service instances in BOTH styles.
+    // File services follow the same rule as databases: merged shares one write
+    // tool per verb across every file service, prefixed pays per service.
     const fileSvcs = [svc('s3', 'file'), svc('gcs', 'file')];
-    for (const style of ['merged', 'prefixed'] as const) {
-      const cfg = cfgWith({ exposedServices: ['s3', 'gcs'], toolStyle: style });
-      expect(effectiveTools(cfg, fileSvcs).writeVerbs).toBe(6);
-    }
+    const perFileWrites = 3; // create_file, create_folder, delete_file
+    expect(
+      effectiveTools(
+        cfgWith({ exposedServices: ['s3', 'gcs'], toolStyle: 'merged' }),
+        fileSvcs
+      ).writeVerbs
+    ).toBe(perFileWrites);
+    expect(
+      effectiveTools(
+        cfgWith({ exposedServices: ['s3', 'gcs'], toolStyle: 'prefixed' }),
+        fileSvcs
+      ).writeVerbs
+    ).toBe(perFileWrites * 2);
   });
 
   it('classifies custom tools into the write math and readOnly', () => {
