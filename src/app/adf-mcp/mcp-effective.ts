@@ -8,12 +8,14 @@
  */
 import {
   AGGREGATOR_TOOLS,
+  DEFAULT_BYTES_PER_TOOL,
   GLOBAL_TOOLS,
-  LAZY_AUTO_TOKEN_THRESHOLD,
+  LAZY_FACADE_TOOLS,
+  LAZY_THRESHOLD_BYTES,
   McpServiceKind,
   McpVerbGroup,
-  TOKENS_PER_TOOL,
   WRITE_GROUP_KEYS,
+  WRITE_VERBS,
   serviceKindOf,
   verbGroupsFor,
   verbsFor,
@@ -48,6 +50,10 @@ export interface McpConfig {
   toolStyle: ToolStyle | null;
   lazyMode: LazyMode;
   allowApiKeyAuth: boolean;
+  /** false = read-only server: the daemon never registers write verbs or writing custom tools. */
+  allowWrites: boolean;
+  /** true = only roles granted access to this MCP service may connect (admins always pass). */
+  requireRoleAccess: boolean;
   oauthClientId: string;
   oauthClientSecret: string;
   customLoginUrl: string;
@@ -75,6 +81,10 @@ const KNOWN_KEYS = [
   'lazyMode',
   'allow_api_key_auth',
   'allowApiKeyAuth',
+  'allow_writes',
+  'allowWrites',
+  'require_role_access',
+  'requireRoleAccess',
   'oauth_client_id',
   'oauthClientId',
   'oauth_client_secret',
@@ -116,6 +126,10 @@ export function parseMcpConfig(raw: Record<string, any> | null | undefined): Mcp
     toolStyle: style === 'merged' ? 'merged' : style === 'prefixed' ? 'prefixed' : null,
     lazyMode: normalizeLazyMode(pick(r, 'lazy_mode', 'lazyMode')),
     allowApiKeyAuth: !!pick(r, 'allow_api_key_auth', 'allowApiKeyAuth'),
+    // Column defaults: allow_writes true; require_role_access false on
+    // rows that predate it (new services are created with it on).
+    allowWrites: pick(r, 'allow_writes', 'allowWrites') !== false,
+    requireRoleAccess: !!pick(r, 'require_role_access', 'requireRoleAccess'),
     oauthClientId: pick(r, 'oauth_client_id', 'oauthClientId') ?? '',
     oauthClientSecret: pick(r, 'oauth_client_secret', 'oauthClientSecret') ?? '',
     customLoginUrl: pick(r, 'custom_login_url', 'customLoginUrl') ?? '',
@@ -145,6 +159,8 @@ export function serializeMcpConfig(
     // The stored contract is exactly auto|on|off, whatever we were handed.
     lazyMode: normalizeLazyMode(c.lazyMode),
     allowApiKeyAuth: c.allowApiKeyAuth,
+    allowWrites: c.allowWrites !== false,
+    requireRoleAccess: !!c.requireRoleAccess,
     oauthClientId: c.oauthClientId,
     oauthClientSecret: c.oauthClientSecret,
     customLoginUrl: c.customLoginUrl || null,
@@ -273,6 +289,19 @@ export function allKeys(svc: McpBackendService): string[] {
   return verbsFor(svc.kind).map(v => toolKey(svc.name, v.verb));
 }
 
+/**
+ * Whether the daemon serves this verb: not curated off, and not a write
+ * verb on a server with allow_writes=false.
+ */
+export function isVerbServed(
+  cfg: Pick<McpConfig, 'disabledTools' | 'allowWrites'>,
+  serviceName: string,
+  verb: string
+): boolean {
+  if (cfg.allowWrites === false && WRITE_VERBS.has(verb)) return false;
+  return !cfg.disabledTools.has(toolKey(serviceName, verb));
+}
+
 /* ------------------------------------------------------------------ */
 /* Custom tools                                                         */
 /* ------------------------------------------------------------------ */
@@ -280,6 +309,11 @@ export function allKeys(svc: McpBackendService): string[] {
 /** enabled-flag semantics shared with the legacy editor. */
 export function isCustomToolEnabled(t: any): boolean {
   return !!t && t.enabled !== false && t.enabled !== 0;
+}
+
+/** Enabled AND served: allow_writes=false hides write-capable custom tools. */
+export function isCustomToolServed(cfg: Pick<McpConfig, 'allowWrites'>, t: any): boolean {
+  return isCustomToolEnabled(t) && (cfg.allowWrites !== false || !isWriteCapableCustomTool(t));
 }
 
 /**
@@ -364,6 +398,7 @@ export interface EffectiveBreakdown {
   writeReach: number;
   writeReachDb: number;
   readOnly: boolean;
+  /** Tokens a client carries per turn (facade when lazy) — client-side estimate. */
   tokenEstimate: number;
   lazyEngaged: boolean;
   effectiveStyle: ToolStyle;
@@ -378,24 +413,26 @@ export function effectiveTools(
   const files = activeExposed(cfg, services, 'file');
   const disabled = cfg.disabledTools;
 
+  const served = (s: McpBackendService) =>
+    verbsFor(s.kind).filter(v => isVerbServed(cfg, s.name, v.verb)).length;
   let dbTools = 0;
   if (dbs.length) {
     if (style === 'merged') {
       for (const v of verbsFor('db')) {
-        if (dbs.some(d => !disabled.has(toolKey(d.name, v.verb)))) dbTools++;
+        if (dbs.some(d => isVerbServed(cfg, d.name, v.verb))) dbTools++;
       }
     } else {
-      dbTools = dbs.reduce((a, d) => a + serviceFraction(d, disabled).on, 0);
+      dbTools = dbs.reduce((a, d) => a + served(d), 0);
     }
   }
-  const fileTools = files.reduce((a, f) => a + serviceFraction(f, disabled).on, 0);
+  const fileTools = files.reduce((a, f) => a + served(f), 0);
   // Global tools disable by their bare name in the same disabled_tools list.
   const globalTools = GLOBAL_TOOLS.filter(t => !disabled.has(t.verb)).length;
   const aggregators =
     dbs.length >= 2
       ? AGGREGATOR_TOOLS.filter(t => !disabled.has(t.verb)).length
       : 0;
-  const enabledCustoms = (cfg.customTools ?? []).filter(isCustomToolEnabled);
+  const enabledCustoms = (cfg.customTools ?? []).filter(t => isCustomToolServed(cfg, t));
   const customTools = enabledCustoms.length;
   const writeCapableCustoms = enabledCustoms.filter(isWriteCapableCustomTool).length;
 
@@ -407,11 +444,13 @@ export function effectiveTools(
   let fileWriteInstances = 0;
   let writeReach = 0;
   let writeReachDb = 0;
-  for (const s of [...dbs, ...files]) {
+  // allow_writes=false: nothing served can write (the get_stored_* listings
+  // left in the procs group are reads).
+  for (const s of cfg.allowWrites === false ? [] : [...dbs, ...files]) {
     const on = verbGroupsFor(s.kind)
       .filter(g => WRITE_GROUP_KEYS.has(g.key))
       .flatMap(g => g.verbs)
-      .filter(v => !disabled.has(toolKey(s.name, v.verb)));
+      .filter(v => isVerbServed(cfg, s.name, v.verb));
     if (on.length) {
       writeReach++;
       if (s.kind === 'db') {
@@ -427,10 +466,7 @@ export function effectiveTools(
   const writeVerbs = dbWriteTools + fileWriteInstances + writeCapableCustoms;
 
   const total = dbTools + fileTools + globalTools + aggregators + customTools;
-  const tokenEstimate = total * TOKENS_PER_TOOL;
-  const lazyEngaged =
-    cfg.lazyMode === 'on' ||
-    (cfg.lazyMode === 'auto' && tokenEstimate > LAZY_AUTO_TOKEN_THRESHOLD);
+  const est = estimateCatalog(total, cfg.lazyMode);
 
   return {
     total,
@@ -446,8 +482,8 @@ export function effectiveTools(
     writeReach,
     writeReachDb,
     readOnly: writeVerbs === 0,
-    tokenEstimate,
-    lazyEngaged,
+    tokenEstimate: est.tokens,
+    lazyEngaged: est.lazy,
     effectiveStyle: style,
   };
 }
@@ -460,7 +496,7 @@ export function verbReach(
 ): { on: string[]; total: number } {
   const dbs = activeExposed(cfg, services, 'db');
   return {
-    on: dbs.filter(d => !cfg.disabledTools.has(toolKey(d.name, verb))).map(d => d.name),
+    on: dbs.filter(d => isVerbServed(cfg, d.name, verb)).map(d => d.name),
     total: dbs.length,
   };
 }
@@ -497,4 +533,155 @@ export function orphanedKeys(
 /** Emitted tool name a client sees for a db verb in the given style. */
 export function emittedDbToolName(style: ToolStyle, serviceName: string, verb: string): string {
   return style === 'merged' ? verb : toolKey(serviceName, verb);
+}
+
+/* ------------------------------------------------------------------ */
+/* Catalog size + lazy delivery (bytes, as the daemon decides)          */
+/* ------------------------------------------------------------------ */
+
+/** tools/list size and what a client carries per turn. */
+export interface CatalogStats {
+  /** Tools in the full catalog; null when the server hid it behind the facade. */
+  count: number | null;
+  /** Full catalog JSON size. */
+  bytes: number;
+  /** Facade JSON size, served instead when lazy. */
+  facadeBytes: number;
+  lazy: boolean;
+  /** Rough tokens per turn: served bytes / 4. */
+  tokens: number;
+  /** 'server' = the daemon's own numbers for the saved config; 'estimate' = simulated. */
+  source: 'server' | 'estimate';
+}
+
+/**
+ * Nic's shapeCatalog/shapeFixedCatalog size model over a tool count: bytes
+ * scale per tool, lazy_mode auto flips to the facade above the daemon's
+ * byte threshold, tokens ≈ bytes / 4 of whatever is actually sent.
+ */
+export function estimateCatalog(
+  count: number,
+  lazyMode: LazyMode,
+  bytesPerTool = DEFAULT_BYTES_PER_TOOL
+): CatalogStats {
+  const bytes = count * bytesPerTool;
+  const facadeBytes = LAZY_FACADE_TOOLS.length * bytesPerTool;
+  const lazy =
+    lazyMode === 'on' || (lazyMode === 'auto' && bytes > LAZY_THRESHOLD_BYTES);
+  return {
+    count,
+    bytes,
+    facadeBytes,
+    lazy,
+    tokens: tokensPerTurn(lazy, bytes, facadeBytes),
+    source: 'estimate',
+  };
+}
+
+export function tokensPerTurn(lazy: boolean, bytes: number, facadeBytes: number): number {
+  return Math.round((lazy ? facadeBytes : bytes) / 4);
+}
+
+export function formatTokens(n: number): string {
+  return n >= 1000 ? `~${(n / 1000).toFixed(1)}k` : `~${n}`;
+}
+
+export function formatKb(bytes: number): string {
+  return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+}
+
+/**
+ * What the server reported for the SAVED config: mcp-catalog (per role /
+ * app) or the admin's own tools/list over JSON-RPC.
+ */
+export interface ServerCatalog {
+  /** Full-catalog tool count; null when only the facade was visible. */
+  count: number | null;
+  bytes: number;
+  lazy: boolean;
+}
+
+/** Shape a JSON-RPC tools/list result: a facade answer means lazy engaged. */
+export function serverCatalogFromToolsList(tools: Array<{ name: string }>): ServerCatalog | null {
+  if (!tools.length) return null;
+  const bytes = JSON.stringify({ tools }).length;
+  const facade = new Set(LAZY_FACADE_TOOLS.map(t => t.verb));
+  const lazy = tools.some(t => facade.has(t.name));
+  return { count: lazy ? null : tools.length, bytes, lazy };
+}
+
+/**
+ * Server numbers when they describe what is on screen (form clean), else
+ * the simulation — calibrated to the server's bytes-per-tool when known.
+ */
+export function catalogStats(
+  simulatedCount: number,
+  lazyMode: LazyMode,
+  server: ServerCatalog | null,
+  dirty: boolean
+): CatalogStats {
+  const bpt =
+    server?.count && server.bytes
+      ? Math.round(server.bytes / server.count)
+      : DEFAULT_BYTES_PER_TOOL;
+  const est = estimateCatalog(simulatedCount, lazyMode, bpt);
+  if (!server || dirty) return est;
+  if (server.count === null) {
+    // Only the facade was visible: its size is real, the full size simulated.
+    return {
+      ...est,
+      facadeBytes: server.bytes,
+      lazy: true,
+      tokens: Math.round(server.bytes / 4),
+      source: 'server',
+    };
+  }
+  const facadeBytes = LAZY_FACADE_TOOLS.length * bpt;
+  return {
+    count: server.count,
+    bytes: server.bytes,
+    facadeBytes,
+    lazy: server.lazy,
+    tokens: tokensPerTurn(server.lazy, server.bytes, facadeBytes),
+    source: 'server',
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Health (/_internal/ai/mcp-health)                                    */
+/* ------------------------------------------------------------------ */
+
+export interface McpHealthCheck {
+  id: string;
+  status: string;
+  message: string;
+  details?: Record<string, any>;
+}
+
+export interface McpHealth {
+  status: string;
+  checks: McpHealthCheck[];
+}
+
+export type HealthLevel = 'ok' | 'warn' | 'error';
+
+export function healthLevel(h: McpHealth): HealthLevel {
+  const s = (h.status || '').toLowerCase();
+  if (s === 'ok' || s === 'healthy' || s === 'pass') return 'ok';
+  if (s === 'warn' || s === 'warning' || s === 'degraded') return 'warn';
+  return 'error';
+}
+
+/** First non-ok check's message — the APP_URL warning when that is the one. */
+export function healthMessage(h: McpHealth): string {
+  const bad = (h.checks ?? []).find(
+    c => (c.status || '').toLowerCase() !== 'ok' && c.message
+  );
+  return bad?.message ?? '';
+}
+
+/** APP_URL origin from the app_url check (no trailing slash), or null. */
+export function appUrlOrigin(h: McpHealth | null): string | null {
+  const url = h?.checks?.find(c => c.id === 'app_url')?.details?.['app_url'];
+  return typeof url === 'string' && url ? url.replace(/\/+$/, '') : null;
 }

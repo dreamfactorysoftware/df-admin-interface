@@ -6,7 +6,8 @@
 import {
   AGGREGATOR_TOOLS,
   GLOBAL_TOOLS,
-  TOKENS_PER_TOOL,
+  DEFAULT_BYTES_PER_TOOL,
+  LAZY_FACADE_TOOLS,
   verbsFor,
 } from './mcp-catalog';
 import {
@@ -347,12 +348,15 @@ describe('effectiveTools', () => {
         services
       ).lazyEngaged
     ).toBe(true);
-    // 7 dbs × 16 + 5 globals + 6 aggregators = 123 tools > 8000/81 ≈ 98.8.
+    // 7 dbs × 16 + 5 globals + 6 aggregators = 123 tools × 540 B > 32 KiB.
     const many = Array.from({ length: 7 }, (_, i) => svc(`db${i}`));
     const big = cfgWith({ exposedServices: many.map(m => m.name) });
     const e = effectiveTools(big, many);
     expect(e.total).toBe(7 * 16 + 5 + 6);
-    expect(e.tokenEstimate).toBe(e.total * TOKENS_PER_TOOL);
+    // Lazy: the client carries the facade, not the catalog.
+    expect(e.tokenEstimate).toBe(
+      Math.round((LAZY_FACADE_TOOLS.length * DEFAULT_BYTES_PER_TOOL) / 4)
+    );
     expect(e.lazyEngaged).toBe(true);
     expect(
       effectiveTools({ ...big, lazyMode: 'off' }, many).lazyEngaged

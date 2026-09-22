@@ -7,7 +7,11 @@ import { Subject } from 'rxjs';
 import { SYSTEM_MCP_TOOLS } from '../adf-services/df-service-details/system-mcp-tools';
 import {
   AccessState,
+  CatalogStats,
   EffectiveBreakdown,
+  McpHealth,
+  ServerCatalog,
+  catalogStats,
   McpBackendService,
   McpConfig,
   accessState,
@@ -56,6 +60,8 @@ function cfgFingerprint(c: McpConfig): string {
     s: c.toolStyle,
     l: c.lazyMode,
     k: c.allowApiKeyAuth,
+    w: c.allowWrites,
+    rr: c.requireRoleAccess,
     ci: c.oauthClientId,
     cs: c.oauthClientSecret,
     lu: c.customLoginUrl,
@@ -73,6 +79,13 @@ interface McpStoreMemo {
   orphans?: string[];
   totalTools?: number;
   savedTotalTools?: number;
+  catalogStats?: CatalogStats;
+}
+
+/** Who the server catalog is previewed as; empty = the admin (server maximum). */
+export interface McpPreviewIdentity {
+  roleId?: number;
+  appId?: number;
 }
 
 export class McpEditorStore {
@@ -129,6 +142,32 @@ export class McpEditorStore {
 
   readonly changes = new Subject<void>();
 
+  /** /_internal/ai/mcp-health report; null until loaded or when unavailable. */
+  health: McpHealth | null = null;
+  healthChecked = false;
+  /** The server's own catalog numbers for the SAVED config (null = unavailable). */
+  serverCatalog: ServerCatalog | null = null;
+  previewIdentity: McpPreviewIdentity = {};
+  /** Set by the shell: refetches serverCatalog for previewIdentity. */
+  reloadServerCatalog: () => void = () => undefined;
+
+  /**
+   * Preview the server catalog as a role or app key (mcp-catalog), or as
+   * the admin with {}. Role preview UI calls this; numbers land in
+   * serverCatalog and flow through catalogStats().
+   */
+  setPreviewIdentity(identity: McpPreviewIdentity): void {
+    this.previewIdentity = { ...identity };
+    this.serverCatalog = null;
+    this.touch();
+    this.reloadServerCatalog();
+  }
+
+  setServerCatalog(c: ServerCatalog | null): void {
+    this.serverCatalog = c;
+    this.touch();
+  }
+
   init(service: McpServiceRecord, rawConfig: any): void {
     this.service = service;
     this.cfg = parseMcpConfig(rawConfig);
@@ -171,6 +210,8 @@ export class McpEditorStore {
     return (
       this.draftName !== this.service.name ||
       this.cfg.allowApiKeyAuth !== this.savedCfg.allowApiKeyAuth ||
+      // The daemon registers tools at connect: clients must reconnect.
+      this.cfg.allowWrites !== this.savedCfg.allowWrites ||
       this.cfg.toolStyle !== this.savedCfg.toolStyle ||
       this.cfg.oauthClientSecret !== this.savedCfg.oauthClientSecret ||
       JSON.stringify(this.cfg.redirectUris) !==
@@ -229,6 +270,20 @@ export class McpEditorStore {
       ? SYSTEM_MCP_TOOLS.filter(t => !this.savedCfg.disabledTools.has(t.name))
           .length
       : this.savedEffective().total);
+  }
+  /**
+   * Catalog size / lazy decision / tokens per turn. The server's numbers
+   * while the draft matches what is saved; the simulation over
+   * totalTools() once the form is dirty or the endpoint failed.
+   */
+  catalogStats(): CatalogStats {
+    const m = this.memoFor();
+    return (m.catalogStats ??= catalogStats(
+      this.totalTools(),
+      this.cfg.lazyMode,
+      this.serverCatalog,
+      this.dirty()
+    ));
   }
   rows(): ExposedRow[] {
     const m = this.memoFor();

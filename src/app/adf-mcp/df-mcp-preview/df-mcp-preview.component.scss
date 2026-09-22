@@ -35,6 +35,12 @@
   .mcp-preview-controls-label {
     font-weight: 600;
   }
+
+  .mcp-preview-flow {
+    flex-basis: 100%;
+    margin: 0;
+    opacity: 0.75;
+  }
 }
 
 .mcp-preview-body {

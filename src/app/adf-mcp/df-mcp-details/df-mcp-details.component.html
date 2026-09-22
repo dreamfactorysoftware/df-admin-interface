@@ -17,6 +17,24 @@
       <span class="mcp-chip warn" *ngIf="store.totalTools() === 0">
         ⚠ Serves no tools
       </span>
+      <span
+        class="mcp-chip"
+        *ngIf="healthLevel"
+        [class.good]="healthLevel === 'ok'"
+        [class.warn]="healthLevel === 'warn'"
+        [class.bad]="healthLevel === 'error'"
+        [matTooltip]="healthText"
+        tabindex="0"
+        data-testid="mcp-health-chip">
+        {{ healthChip }}
+      </span>
+      <span
+        class="mcp-chip"
+        *ngIf="!store.health && store.healthChecked"
+        matTooltip="/_internal/ai/mcp-health did not answer."
+        data-testid="mcp-health-chip">
+        Health unavailable
+      </span>
     </div>
     <!-- On Connect the endpoint card below is the hero — no duplicate URL row. -->
     <div class="mcp-head-url" *ngIf="tab !== 'connect'">
@@ -28,6 +46,12 @@
         OAuth 2.1{{ store.cfg.allowApiKeyAuth ? ' · API key' : '' }} · Streamable HTTP
       </span>
     </div>
+    <p class="mcp-head-appurl" *ngIf="healthLevel && healthLevel !== 'ok' && healthText" data-testid="mcp-health-message">
+      {{ healthText }}
+    </p>
+    <p class="mcp-head-appurl" *ngIf="appUrlDiffers" data-testid="mcp-appurl-note">
+      Endpoint uses APP_URL; this page is open at a different address.
+    </p>
     <nav class="mcp-tabs" role="tablist">
       <button
         type="button" role="tab" class="mcp-tab"

@@ -20,8 +20,16 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
-import { serializeMcpConfig, toBackendServices } from '../mcp-effective';
+import {
+  HealthLevel,
+  appUrlOrigin,
+  healthLevel,
+  healthMessage,
+  serializeMcpConfig,
+  toBackendServices,
+} from '../mcp-effective';
 import { McpEditorStore, McpServiceType } from '../mcp-store';
+import { McpServerApiService } from '../mcp-server-api.service';
 import { DfMcpConnectComponent } from '../df-mcp-connect/df-mcp-connect.component';
 import { DfMcpToolsComponent } from '../df-mcp-tools/df-mcp-tools.component';
 import { DfMcpSettingsComponent } from '../df-mcp-settings/df-mcp-settings.component';
@@ -59,7 +67,8 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
     @Inject(SERVICE_TYPE_SERVICE_TOKEN)
     private serviceTypeService: DfBaseCrudService,
     @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
-    private snackbarService: DfSnackbarService
+    private snackbarService: DfSnackbarService,
+    private mcpApi: McpServerApiService
   ) {}
 
   ngOnInit(): void {
@@ -108,6 +117,25 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
     );
     this.loading = true;
     this.loadBackendServices();
+    const store = this.store;
+    store.reloadServerCatalog = () => this.loadServerCatalog(store);
+    this.loadServerCatalog(store);
+    this.mcpApi.health().subscribe(h => {
+      if (this.store !== store) return;
+      store.health = h;
+      store.healthChecked = true;
+      store.touch();
+    });
+  }
+
+  /** The saved server's real catalog numbers, for the current preview identity. */
+  private loadServerCatalog(store: McpEditorStore): void {
+    const identity = store.previewIdentity;
+    this.mcpApi.catalog(store.service.name, identity).subscribe(c => {
+      // Drop late answers for another service or another identity.
+      if (this.store !== store || store.previewIdentity !== identity) return;
+      store.setServerCatalog(c);
+    });
   }
 
   ngOnDestroy(): void {
@@ -149,8 +177,41 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
   }
 
   /* ------------------------------ header ------------------------------ */
+  /**
+   * Endpoint clients should use: APP_URL-based when the health report has
+   * it (OAuth redirects go to APP_URL), else this page's origin.
+   */
   get mcpUrl(): string {
-    return `${window.location.origin}/mcp/${this.store.service.name}`;
+    const origin = appUrlOrigin(this.store.health) ?? window.location.origin;
+    return `${origin}/mcp/${this.store.service.name}`;
+  }
+
+  /** APP_URL differs from the address this page is open at. */
+  get appUrlDiffers(): boolean {
+    const app = appUrlOrigin(this.store.health);
+    return !!app && app !== window.location.origin;
+  }
+
+  get healthLevel(): HealthLevel | null {
+    return this.store.health ? healthLevel(this.store.health) : null;
+  }
+
+  get healthText(): string {
+    const h = this.store.health;
+    if (!h) return '';
+    const msg = healthMessage(h);
+    if (msg) return msg;
+    return this.healthLevel === 'ok' ? 'MCP health: all checks pass' : 'MCP health: check failed';
+  }
+
+  get healthChip(): string {
+    const level = this.healthLevel;
+    if (level === 'ok') return '● Healthy';
+    const bad = this.store.health?.checks?.find(
+      c => (c.status || '').toLowerCase() !== 'ok'
+    );
+    const what = bad?.id === 'app_url' ? 'APP_URL mismatch' : level === 'warn' ? 'Health warning' : 'Health error';
+    return `⚠ ${what}`;
   }
 
   copyUrl(): void {
@@ -206,6 +267,8 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
           next: () => undefined,
           error: () => undefined,
         });
+        // The saved config is what the server now serves: re-read it.
+        this.loadServerCatalog(s);
         const now = s.totalTools();
         if (now === 0) {
           this.snackbarService.openSnackBar(

@@ -251,11 +251,15 @@ export const AGGREGATOR_TOOLS: readonly McpToolDef[] = [
   },
 ];
 
-/** Discovery facade served first when lazy catalog delivery engages. */
+/**
+ * Discovery facade served INSTEAD of the catalog when lazy delivery engages
+ * (daemon lazy.service FACADE): search → describe → call, paged by fetch_more.
+ */
 export const LAZY_FACADE_TOOLS: readonly McpToolDef[] = [
   { verb: 'search_tools', title: 'Search Tools', description: 'Find tools by capability' },
   { verb: 'describe_tool', title: 'Describe Tool', description: 'Get one tool’s full schema' },
   { verb: 'call_tool', title: 'Call Tool', description: 'Invoke a tool by name' },
+  { verb: 'fetch_more', title: 'Fetch More', description: 'Page through a long result' },
   { verb: 'list_tools', title: 'List Tools', description: 'Page through the full catalog' },
 ];
 
@@ -286,7 +290,23 @@ export const WRITE_GROUP_KEYS: ReadonlySet<string> = new Set([
   'fwrite',
 ]);
 
-/** Rough per-tool token cost of a tools/list entry, for the catalog estimate. */
-export const TOKENS_PER_TOOL = 81;
-/** Threshold (tokens) beyond which lazy_mode 'auto' engages, per the daemon. */
-export const LAZY_AUTO_TOKEN_THRESHOLD = 8000;
+/**
+ * Verbs the daemon never registers when allow_writes=false (tool-utils
+ * WRITE_VERBS) — narrower than WRITE_GROUP_KEYS, which also holds the
+ * read-only get_stored_* listings.
+ */
+export const WRITE_VERBS: ReadonlySet<string> = new Set([
+  'create_records',
+  'update_records',
+  'delete_records',
+  'call_stored_procedure',
+  'call_stored_function',
+  'create_file',
+  'create_folder',
+  'delete_file',
+]);
+
+/** lazy_mode 'auto' serves the facade above this tools/list size (daemon LAZY_THRESHOLD_BYTES, ≈ 8k tokens). */
+export const LAZY_THRESHOLD_BYTES = 32 * 1024;
+/** ~540 B of JSON schema per tool observed on df-dev (58 tools ≈ 31 KB); replaced by the server's own ratio once known. */
+export const DEFAULT_BYTES_PER_TOOL = 540;

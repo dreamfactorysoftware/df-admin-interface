@@ -24,17 +24,23 @@ import { SYSTEM_MCP_TOOLS } from 'src/app/adf-services/df-service-details/system
 import {
   AGGREGATOR_TOOLS,
   GLOBAL_TOOLS,
-  LAZY_AUTO_TOKEN_THRESHOLD,
   LAZY_FACADE_TOOLS,
-  TOKENS_PER_TOOL,
+  LAZY_THRESHOLD_BYTES,
   WRITE_GROUP_KEYS,
+  WRITE_VERBS,
   verbGroupsFor,
   verbsFor,
 } from '../mcp-catalog';
 import {
+  CatalogStats,
   McpBackendService,
   emittedDbToolName,
+  formatKb,
+  formatTokens,
   groupState,
+  isCustomToolServed,
+  isVerbServed,
+  isWriteCapableCustomTool,
   toolKey,
   verbReach,
 } from '../mcp-effective';
@@ -78,7 +84,8 @@ export class DfMcpPreviewComponent implements OnInit {
   groups: PreviewGroup[] = [];
   excluded: ExcludedItem[] = [];
   total = 0;
-  tokenEstimate = 0;
+  /** Size / lazy / tokens: the server's numbers when saved, else simulated. */
+  stats!: CatalogStats;
   lazyEngaged = false;
   lazyAuto = true;
   /** 'first' = the lazy discovery facade; 'full' = the whole catalog. */
@@ -96,6 +103,10 @@ export class DfMcpPreviewComponent implements OnInit {
 
   ngOnInit(): void {
     this.store.isSystemMcp ? this.buildSystem() : this.buildMcp();
+    this.stats = this.store.catalogStats();
+    this.lazyEngaged = this.stats.lazy;
+    // lazy_mode contract is 'auto'|'on'|'off' (parseMcpConfig normalizes).
+    this.lazyAuto = this.store.cfg.lazyMode === 'auto';
     if (this.lazyEngaged) this.view = 'first';
   }
 
@@ -150,7 +161,7 @@ export class DfMcpPreviewComponent implements OnInit {
       } else {
         for (const db of activeDbs) {
           for (const v of verbsFor('db')) {
-            if (!disabled.has(toolKey(db.name, v.verb))) {
+            if (isVerbServed(cfg, db.name, v.verb)) {
               dbItems.push({
                 name: emittedDbToolName('prefixed', db.name, v.verb),
                 description: v.description,
@@ -169,7 +180,7 @@ export class DfMcpPreviewComponent implements OnInit {
     const fileItems: PreviewItem[] = [];
     for (const f of activeFiles) {
       for (const v of verbsFor('file')) {
-        if (!disabled.has(toolKey(f.name, v.verb))) {
+        if (isVerbServed(cfg, f.name, v.verb)) {
           fileItems.push({
             name: toolKey(f.name, v.verb),
             description: v.description,
@@ -183,7 +194,7 @@ export class DfMcpPreviewComponent implements OnInit {
 
     // Custom group.
     const customItems: PreviewItem[] = (cfg.customTools ?? [])
-      .filter((t: any) => t?.enabled !== false && t?.enabled !== 0)
+      .filter((t: any) => isCustomToolServed(cfg, t))
       .map((t: any) => ({
         name: t.name ?? '',
         description: t.description ?? '',
@@ -205,6 +216,16 @@ export class DfMcpPreviewComponent implements OnInit {
       const shown = names.slice(0, 3).join(', ');
       const more = names.length > 3 ? `, +${names.length - 3} more` : '';
       this.excluded.push({ name: shown + more, reason: 'not exposed' });
+    }
+    // 1b. Server-wide read-only switch.
+    if (cfg.allowWrites === false) {
+      const hidden = (cfg.customTools ?? []).filter(
+        (t: any) => t?.enabled !== false && t?.enabled !== 0 && isWriteCapableCustomTool(t)
+      ).length;
+      this.excluded.push({
+        name: 'write & execute tools' + (hidden ? ` + ${hidden} custom` : ''),
+        reason: 'writes are off for this server',
+      });
     }
     // 2. Inactive exposed services.
     for (const r of liveRows) {
@@ -246,6 +267,8 @@ export class DfMcpPreviewComponent implements OnInit {
     // 5. Merged: verbs off in every exposed database.
     if (style === 'merged' && activeDbs.length > 0) {
       for (const v of verbsFor('db')) {
+        // Already covered by the server-wide "writes are off" entry.
+        if (cfg.allowWrites === false && WRITE_VERBS.has(v.verb)) continue;
         const reach = verbReach(v.verb, cfg, s.backendServices);
         if (reach.on.length === 0) {
           this.excluded.push({
@@ -286,9 +309,6 @@ export class DfMcpPreviewComponent implements OnInit {
     }
 
     this.total = eff.total;
-    this.tokenEstimate = eff.tokenEstimate;
-    this.lazyEngaged = eff.lazyEngaged;
-    this.lazyAuto = cfg.lazyMode === 'auto';
   }
 
   /* --------------------------- system_mcp --------------------------- */
@@ -306,14 +326,6 @@ export class DfMcpPreviewComponent implements OnInit {
       }
     }
     this.total = served.length;
-    this.tokenEstimate = this.total * TOKENS_PER_TOOL;
-    // lazy_mode contract is 'auto'|'on'|'off' (parseMcpConfig normalizes
-    // legacy 'always'/'never'/booleans on read).
-    const lm = s.cfg.lazyMode;
-    this.lazyAuto = lm === 'auto';
-    this.lazyEngaged =
-      lm === 'on' ||
-      (lm === 'auto' && this.tokenEstimate > LAZY_AUTO_TOKEN_THRESHOLD);
   }
 
   /* ------------------------------ view ------------------------------ */
@@ -346,16 +358,23 @@ export class DfMcpPreviewComponent implements OnInit {
     `${i.name}|${i.reason}`;
 
   tokenLabel(): string {
-    return `~${(this.tokenEstimate / 1000).toFixed(1)}k tokens of definitions`;
+    const src = this.stats.source === 'server' ? '' : ' (estimate)';
+    return `${formatTokens(this.stats.tokens)} tokens per turn${src}`;
   }
 
   lazyLabel(): string {
-    if (!this.lazyEngaged) return 'Lazy loading: not engaged';
+    if (!this.lazyEngaged) {
+      return `Lazy loading: not engaged (${formatKb(this.stats.bytes)} of ${formatKb(LAZY_THRESHOLD_BYTES)})`;
+    }
     // Engaged + not auto means lazy_mode 'on' (always on-demand).
-    return this.lazyAuto
-      ? 'Lazy loading: engaged (auto)'
-      : 'Lazy loading: engaged (always on)';
+    const how = this.lazyAuto ? 'auto' : 'always on';
+    return `Lazy loading: engaged (${how}) — ${formatKb(this.stats.facadeBytes)} facade instead of ${formatKb(this.stats.bytes)}`;
   }
+
+  /** How an agent reaches the full catalog through the facade. */
+  readonly lazyFlow =
+    'Agents call search_tools to find a tool, describe_tool for its schema, ' +
+    'then call_tool to run it; fetch_more pages long results.';
 
   copyJson(): void {
     const list = this.visibleGroups()

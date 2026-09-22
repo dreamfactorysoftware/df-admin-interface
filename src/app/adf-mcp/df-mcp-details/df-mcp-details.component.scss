@@ -94,6 +94,11 @@
     border-color: rgba(154, 103, 0, 0.4);
     color: #9a6700;
   }
+  &.bad {
+    background: #fde7e7;
+    border-color: rgba(198, 40, 40, 0.4);
+    color: #c62828;
+  }
   &.primary {
     background: rgba(92, 86, 153, 0.1);
     border-color: rgba(92, 86, 153, 0.38);
@@ -145,4 +150,10 @@
   .mcp-head .mcp-head-row h1 {
     font-size: 18px;
   }
+}
+
+.mcp-head-appurl {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #9a6700;
 }

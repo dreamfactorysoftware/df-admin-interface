@@ -34,6 +34,8 @@ import { FormsModule } from '@angular/forms';
 import {
   AGGREGATOR_TOOLS,
   GLOBAL_TOOLS,
+  LAZY_FACADE_TOOLS,
+  LAZY_THRESHOLD_BYTES,
   McpServiceKind,
   McpToolDef,
   McpVerbGroup,
@@ -41,13 +43,17 @@ import {
   verbsFor,
 } from '../mcp-catalog';
 import {
+  CatalogStats,
   EffectiveBreakdown,
   ExposedRow,
   GroupState,
   McpBackendService,
   emittedDbToolName,
+  formatKb,
+  formatTokens,
   groupState,
-  isCustomToolEnabled,
+  isCustomToolServed,
+  isVerbServed,
   toolKey,
   verbReach,
 } from '../mcp-effective';
@@ -159,8 +165,10 @@ export class DfMcpToolsComponent implements OnChanges {
   readonly allOffLine =
     'Agents see this service but can call nothing. Enable tools or remove it.';
   readonly lazyWhyTooltip =
-    'When tool definitions exceed ~8k tokens, agents first receive discovery ' +
-    'tools instead of the full catalog.';
+    `When the tool list exceeds ${formatKb(LAZY_THRESHOLD_BYTES)} (~8k tokens), agents first ` +
+    `receive ${LAZY_FACADE_TOOLS.length} discovery tools instead of the full catalog: ` +
+    'search_tools → describe_tool → call_tool, with fetch_more for long results. ' +
+    'Every tool stays callable by name.';
   /** Permanent role line's Manage-roles target (routes.ts: api-connections → role-based-access). */
   readonly rolesRoute = '/api-connections/role-based-access';
 
@@ -208,6 +216,33 @@ export class DfMcpToolsComponent implements OnChanges {
 
   railReadOnly(): boolean {
     return this.store.isSystemMcp ? this.sysModifyOn() === 0 : this.eff().readOnly;
+  }
+
+  /** allow_writes=false on a data server: write tools are never served. */
+  writesOff(): boolean {
+    return !this.store.isSystemMcp && this.store.cfg.allowWrites === false;
+  }
+
+  stats(): CatalogStats {
+    return this.store.catalogStats();
+  }
+
+  /** "~4.8k tokens per turn · 19 KB" — full vs facade when lazy. */
+  sizeLine(): string {
+    const c = this.stats();
+    const size = c.lazy
+      ? `${formatKb(c.facadeBytes)} facade instead of ${formatKb(c.bytes)}`
+      : formatKb(c.bytes);
+    return `${formatTokens(c.tokens)} tokens per turn · ${size}`;
+  }
+
+  /** The server's own count, when it disagrees with the simulated total. */
+  serverCountNote(): string | null {
+    const c = this.stats();
+    if (c.source !== 'server' || c.count === null || c.count === this.railTotal()) {
+      return null;
+    }
+    return `Server reports ${c.count}`;
   }
 
   railWriteActive(): number {
@@ -689,13 +724,13 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   servingLine(): string | null {
-    if (this.store.isSystemMcp) return null;
-    const e = this.eff();
-    if (!e.lazyEngaged) return null;
+    const c = this.stats();
+    if (!c.lazy) return null;
+    const n = LAZY_FACADE_TOOLS.length;
     // lazy_mode contract is auto|on|off; engaged + not auto means 'on'.
     return this.store.cfg.lazyMode === 'auto'
-      ? 'Delivered on demand (auto): the catalog exceeds ~8k tokens, so clients first see 4 discovery tools.'
-      : 'Delivered on demand (always on): clients first see 4 discovery tools.';
+      ? `Delivered on demand (auto): the catalog (${formatKb(c.bytes)}) exceeds ${formatKb(LAZY_THRESHOLD_BYTES)}, so clients first see ${n} discovery tools.`
+      : `Delivered on demand (always on): clients first see ${n} discovery tools.`;
   }
 
   makeReadOnly(): void {
@@ -754,14 +789,14 @@ export class DfMcpToolsComponent implements OnChanges {
     }
     if (style === 'merged') {
       for (const v of verbsFor('db')) {
-        if (dbs.some(d => !disabled.has(toolKey(d.name, v.verb)))) {
+        if (dbs.some(d => isVerbServed(this.store.cfg, d.name, v.verb))) {
           names.push(v.verb);
         }
       }
     } else {
       for (const d of dbs) {
         for (const v of verbsFor('db')) {
-          if (!disabled.has(toolKey(d.name, v.verb))) {
+          if (isVerbServed(this.store.cfg, d.name, v.verb)) {
             names.push(toolKey(d.name, v.verb));
           }
         }
@@ -769,13 +804,13 @@ export class DfMcpToolsComponent implements OnChanges {
     }
     for (const f of files) {
       for (const v of verbsFor('file')) {
-        if (!disabled.has(toolKey(f.name, v.verb))) {
+        if (isVerbServed(this.store.cfg, f.name, v.verb)) {
           names.push(toolKey(f.name, v.verb));
         }
       }
     }
     for (const t of this.store.cfg.customTools ?? []) {
-      if (isCustomToolEnabled(t) && t?.name) names.push(t.name);
+      if (isCustomToolServed(this.store.cfg, t) && t?.name) names.push(t.name);
     }
     return names;
   }
