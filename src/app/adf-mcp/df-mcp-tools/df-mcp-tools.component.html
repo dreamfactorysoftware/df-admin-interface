@@ -458,16 +458,6 @@
             aria-label="Why tools are delivered on demand">[Why?]</span>
         </p>
 
-        <div class="mcp-rail-previewas">
-          <mat-form-field appearance="outline" class="mcp-rail-role">
-            <mat-label>Preview as</mat-label>
-            <mat-select [value]="'max'" disabled>
-              <mat-option value="max">Server maximum</mat-option>
-            </mat-select>
-            <mat-hint>Role preview arrives with the roles integration.</mat-hint>
-          </mat-form-field>
-        </div>
-
         <button
           mat-flat-button
           color="primary"
@@ -497,20 +487,9 @@
           </ul>
         </div>
 
-        <p class="mcp-rail-roles">
-          Roles filter further per caller
-          <span
-            class="mcp-info"
-            tabindex="0"
-            [matTooltip]="precedenceTooltip"
-            aria-label="How access is computed">ⓘ</span>
-          <a
-            class="mcp-rail-roles-link"
-            data-testid="mcp-manage-roles"
-            [routerLink]="rolesRoute">
-            Manage roles ↗
-          </a>
-        </p>
+        <!-- Access: roles that can use this server (replaces the old
+             "Preview as" placeholder and "Manage roles" link). -->
+        <df-mcp-access [store]="store"></df-mcp-access>
       </aside>
     </div>
   </ng-container>

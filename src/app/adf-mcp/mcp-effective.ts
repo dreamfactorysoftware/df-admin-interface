@@ -180,6 +180,8 @@ export function serializeMcpConfig(
 
 /** One backend service the daemon could serve tools for. */
 export interface McpBackendService {
+  /** system/service id — role_service_access rows key on it. */
+  id?: number;
   name: string;
   label: string;
   kind: McpServiceKind;
@@ -188,7 +190,7 @@ export interface McpBackendService {
 
 /** Build from GET system/service rows + service type groups. */
 export function toBackendServices(
-  rows: Array<{ name: string; label?: string; type: string; isActive?: boolean; is_active?: boolean }>,
+  rows: Array<{ id?: number; name: string; label?: string; type: string; isActive?: boolean; is_active?: boolean }>,
   typeGroups: Record<string, string>
 ): McpBackendService[] {
   const out: McpBackendService[] = [];
@@ -196,6 +198,7 @@ export function toBackendServices(
     const kind = serviceKindOf(typeGroups[r.type] ?? '', r.type);
     if (!kind) continue;
     out.push({
+      id: r.id,
       name: r.name,
       label: r.label || r.name,
       kind,

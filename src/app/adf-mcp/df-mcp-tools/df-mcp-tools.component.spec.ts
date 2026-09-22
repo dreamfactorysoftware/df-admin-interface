@@ -18,6 +18,7 @@ import {
   DfMcpPickerComponent,
   simulateExposeTotal,
 } from '../df-mcp-picker/df-mcp-picker.component';
+import { DfMcpAccessApiService } from '../mcp-access-api.service';
 import { DfMcpToolsComponent } from './df-mcp-tools.component';
 
 const svc = (
@@ -58,6 +59,14 @@ describe('DfMcpToolsComponent', () => {
       imports: [DfMcpToolsComponent, NoopAnimationsModule],
       providers: [
         { provide: DfSnackbarService, useValue: snackbar },
+        {
+          provide: DfMcpAccessApiService,
+          useValue: {
+            access: () => of(null),
+            roles: () => of([]),
+            apps: () => of([]),
+          },
+        },
         provideRouter([]),
       ],
     }).compileComponents();
@@ -400,7 +409,7 @@ describe('DfMcpToolsComponent', () => {
       );
     });
 
-    it('links to the roles page and explains lazy serving under the on token', () => {
+    it('shows the Access section (not a Manage roles link) and explains lazy serving under the on token', () => {
       const store = makeStore(
         { exposed_services: ['crm'], lazy_mode: 'on' },
         [svc('crm')]
@@ -410,11 +419,9 @@ describe('DfMcpToolsComponent', () => {
       const legacy = makeStore({ lazy_mode: 'always' }, []);
       expect(legacy.cfg.lazyMode).toBe('on');
       render(store);
-      const link = q('mcp-manage-roles') as HTMLAnchorElement;
-      expect(link).toBeTruthy();
-      expect(link.getAttribute('href')).toBe(
-        '/api-connections/role-based-access'
-      );
+      expect(q('mcp-manage-roles')).toBeNull();
+      expect(q('mcp-access')).toBeTruthy();
+      expect(q('mcp-access-create')).toBeTruthy();
       expect(component.servingLine()).toContain(
         'Delivered on demand (always on)'
       );

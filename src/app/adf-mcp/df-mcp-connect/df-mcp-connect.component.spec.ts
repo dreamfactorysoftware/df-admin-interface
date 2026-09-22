@@ -179,6 +179,24 @@ describe('DfMcpConnectComponent', () => {
       expect(panel!.textContent).toContain('YOUR_API_KEY');
       expect(panel!.textContent).not.toContain('session_token');
     });
+
+    it('fills a key just created from the Access section instead of the placeholder', () => {
+      const store = makeStore({ allowKey: true });
+      store.createdApiKey = 'abc123key';
+      const cmp = create(store);
+      cmp.selectClient('claude-code');
+      cmp.setAuthVariant('apikey');
+      fixture.detectChanges();
+      const panel = byTestId('mcp-client-panel');
+      expect(panel!.textContent).toContain(
+        '--header "X-DreamFactory-API-Key: abc123key"'
+      );
+      expect(panel!.textContent).not.toContain('YOUR_API_KEY');
+      expect(byTestId('mcp-created-key-caption')).toBeTruthy();
+      // A re-init (service switch) drops the key: never leaks across servers.
+      store.init(store.service, {});
+      expect(store.createdApiKey).toBeNull();
+    });
   });
 
   describe('regenerate secret', () => {
