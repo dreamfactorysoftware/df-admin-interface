@@ -14,10 +14,7 @@ import {
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
-import {
-  DB_VERB_GROUPS,
-  FILE_VERB_GROUPS,
-} from '../mcp-catalog';
+import { DB_VERB_GROUPS, FILE_VERB_GROUPS } from '../mcp-catalog';
 
 export interface McpHousekeepingDialogData {
   /** The exact orphaned disabled_tools keys, from store.orphans(). */

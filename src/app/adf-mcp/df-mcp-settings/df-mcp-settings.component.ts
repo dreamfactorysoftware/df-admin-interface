@@ -293,10 +293,11 @@ export class DfMcpSettingsComponent implements OnInit, OnChanges {
     const keys = this.store.orphans();
     if (!keys.length) return;
     this.dialog
-      .open<DfMcpHousekeepingDialogComponent, McpHousekeepingDialogData, string[]>(
+      .open<
         DfMcpHousekeepingDialogComponent,
-        { data: { keys }, width: '480px' }
-      )
+        McpHousekeepingDialogData,
+        string[]
+      >(DfMcpHousekeepingDialogComponent, { data: { keys }, width: '480px' })
       .afterClosed()
       .subscribe(selected => {
         if (!selected || selected.length === 0) return;

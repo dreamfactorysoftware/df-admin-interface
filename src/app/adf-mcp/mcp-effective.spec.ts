@@ -152,8 +152,12 @@ describe('parseMcpConfig / serializeMcpConfig', () => {
     expect(parseMcpConfig({ lazy_mode: 'never' }).lazyMode).toBe('off');
     expect(parseMcpConfig({ lazy_mode: null }).lazyMode).toBe('auto');
     // Serialize writes ONLY contract values, even for a legacy-loaded row.
-    expect(serializeMcpConfig(parseMcpConfig({ lazy_mode: 'always' }))['lazyMode']).toBe('on');
-    expect(serializeMcpConfig(parseMcpConfig({ lazy_mode: false }))['lazyMode']).toBe('off');
+    expect(
+      serializeMcpConfig(parseMcpConfig({ lazy_mode: 'always' }))['lazyMode']
+    ).toBe('on');
+    expect(
+      serializeMcpConfig(parseMcpConfig({ lazy_mode: false }))['lazyMode']
+    ).toBe('off');
     expect(serializeMcpConfig(parseMcpConfig({}))['lazyMode']).toBe('auto');
   });
 
@@ -188,8 +192,14 @@ describe('parseMcpConfig / serializeMcpConfig', () => {
 
 describe('serviceFraction / groupState', () => {
   it('counts 16 db verbs and 6 file verbs', () => {
-    expect(serviceFraction(svc('crm'), new Set())).toEqual({ on: 16, total: 16 });
-    expect(serviceFraction(svc('s3', 'file'), new Set())).toEqual({ on: 6, total: 6 });
+    expect(serviceFraction(svc('crm'), new Set())).toEqual({
+      on: 16,
+      total: 16,
+    });
+    expect(serviceFraction(svc('s3', 'file'), new Set())).toEqual({
+      on: 6,
+      total: 6,
+    });
   });
 
   it('subtracts only this service’s disabled keys', () => {
@@ -198,13 +208,17 @@ describe('serviceFraction / groupState', () => {
       'crm_delete_records',
       'other_update_records',
     ]);
-    expect(serviceFraction(svc('crm'), disabled)).toEqual({ on: 14, total: 16 });
+    expect(serviceFraction(svc('crm'), disabled)).toEqual({
+      on: 14,
+      total: 16,
+    });
   });
 
   it('derives on/part/off group states', () => {
     const s = svc('crm');
-    const writeGroup = verbsFor('db')
-      .filter(v => ['create_records', 'update_records', 'delete_records'].includes(v.verb));
+    const writeGroup = verbsFor('db').filter(v =>
+      ['create_records', 'update_records', 'delete_records'].includes(v.verb)
+    );
     expect(writeGroup).toHaveLength(3);
     const group = {
       key: 'write' as const,
@@ -218,7 +232,11 @@ describe('serviceFraction / groupState', () => {
       groupState(
         s,
         group,
-        new Set(['crm_create_records', 'crm_update_records', 'crm_delete_records'])
+        new Set([
+          'crm_create_records',
+          'crm_update_records',
+          'crm_delete_records',
+        ])
       )
     ).toBe('off');
   });
@@ -233,7 +251,10 @@ describe('accessState — all four kinds', () => {
 
   it('Read-only when all write/execute off and all read/schema on', () => {
     const disabled = new Set(WRITE_DB_VERBS.map(v => toolKey('crm', v)));
-    expect(accessState(s, disabled)).toEqual({ kind: 'ro', label: 'Read-only' });
+    expect(accessState(s, disabled)).toEqual({
+      kind: 'ro',
+      label: 'Read-only',
+    });
     // readOnlyKeys() compiles exactly that state.
     expect(new Set(readOnlyKeys(s))).toEqual(disabled);
   });
@@ -246,7 +267,10 @@ describe('accessState — all four kinds', () => {
 
   it('zero when every tool is off (legacy master-toggle-off)', () => {
     const disabled = new Set(allKeys(s));
-    expect(accessState(s, disabled)).toEqual({ kind: 'zero', label: '0 of 16' });
+    expect(accessState(s, disabled)).toEqual({
+      kind: 'zero',
+      label: '0 of 16',
+    });
   });
 });
 
@@ -294,7 +318,9 @@ describe('effectiveTools', () => {
     const one = cfgWith({ exposedServices: ['crm'] });
     const two = cfgWith({ exposedServices: ['crm', 'hr'] });
     expect(effectiveTools(one, services).aggregators).toBe(0);
-    expect(effectiveTools(two, services).aggregators).toBe(AGGREGATOR_TOOLS.length);
+    expect(effectiveTools(two, services).aggregators).toBe(
+      AGGREGATOR_TOOLS.length
+    );
     // A file service does not count toward the gate.
     const dbPlusFile = cfgWith({ exposedServices: ['crm', 's3'] });
     expect(effectiveTools(dbPlusFile, services).aggregators).toBe(0);
@@ -344,7 +370,10 @@ describe('effectiveTools', () => {
     // Legacy stored values engage through parse-time normalization.
     expect(
       effectiveTools(
-        cfgWith({ ...parseMcpConfig({ lazy_mode: true }), exposedServices: ['crm'] }),
+        cfgWith({
+          ...parseMcpConfig({ lazy_mode: true }),
+          exposedServices: ['crm'],
+        }),
         services
       ).lazyEngaged
     ).toBe(true);
@@ -358,9 +387,9 @@ describe('effectiveTools', () => {
       Math.round((LAZY_FACADE_TOOLS.length * DEFAULT_BYTES_PER_TOOL) / 4)
     );
     expect(e.lazyEngaged).toBe(true);
-    expect(
-      effectiveTools({ ...big, lazyMode: 'off' }, many).lazyEngaged
-    ).toBe(false);
+    expect(effectiveTools({ ...big, lazyMode: 'off' }, many).lazyEngaged).toBe(
+      false
+    );
   });
 
   it('computes write reach and the derived read-only state', () => {
@@ -378,12 +407,17 @@ describe('effectiveTools', () => {
     // Turn off every write/execute verb everywhere → derived read-only.
     const allOff = new Set([
       ...WRITE_DB_VERBS.flatMap(v => [toolKey('crm', v), toolKey('hr', v)]),
-      ...['create_file', 'create_folder', 'delete_file'].map(v => toolKey('s3', v)),
+      ...['create_file', 'create_folder', 'delete_file'].map(v =>
+        toolKey('s3', v)
+      ),
     ]);
-    const ro = effectiveTools(cfgWith({
-      exposedServices: ['crm', 'hr', 's3'],
-      disabledTools: allOff,
-    }), services);
+    const ro = effectiveTools(
+      cfgWith({
+        exposedServices: ['crm', 'hr', 's3'],
+        disabledTools: allOff,
+      }),
+      services
+    );
     expect(ro.writeVerbs).toBe(0);
     expect(ro.readOnly).toBe(true);
     // Read/schema tools are still served.
@@ -441,7 +475,9 @@ describe('effectiveTools', () => {
 
     // GET-only customs keep the server read-only.
     const ro = effectiveTools(
-      cfgWith({ customTools: [{ name: 'lookup', httpMethod: 'GET', enabled: true }] }),
+      cfgWith({
+        customTools: [{ name: 'lookup', httpMethod: 'GET', enabled: true }],
+      }),
       []
     );
     expect(ro.writeCapableCustoms).toBe(0);
@@ -541,7 +577,10 @@ describe('verbReach / emittedDbToolName', () => {
       on: ['hr'],
       total: 2, // inactive archive excluded
     });
-    expect(verbReach('get_table_data', cfg, services).on).toEqual(['crm', 'hr']);
+    expect(verbReach('get_table_data', cfg, services).on).toEqual([
+      'crm',
+      'hr',
+    ]);
   });
 
   it('emits bare verbs in merged style, prefixed otherwise', () => {

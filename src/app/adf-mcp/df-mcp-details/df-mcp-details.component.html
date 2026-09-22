@@ -4,8 +4,15 @@
        header carries only the live state chips + URL, never a second title. -->
   <header class="mcp-head">
     <div class="mcp-head-row">
-      <span class="mcp-chip" [class.good]="store.service.isActive" [class.warn]="!store.service.isActive">
-        {{ store.service.isActive ? '● Active' : 'Inactive — endpoint refuses connections' }}
+      <span
+        class="mcp-chip"
+        [class.good]="store.service.isActive"
+        [class.warn]="!store.service.isActive">
+        {{
+          store.service.isActive
+            ? '● Active'
+            : 'Inactive — endpoint refuses connections'
+        }}
       </span>
       <button
         class="mcp-chip primary mcp-chip-btn"
@@ -39,22 +46,35 @@
     <!-- On Connect the endpoint card below is the hero — no duplicate URL row. -->
     <div class="mcp-head-url" *ngIf="tab !== 'connect'">
       <code data-testid="mcp-endpoint-url">{{ mcpUrl }}</code>
-      <button mat-stroked-button type="button" (click)="copyUrl()" data-testid="mcp-copy-url">
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="copyUrl()"
+        data-testid="mcp-copy-url">
         Copy
       </button>
       <span class="mcp-head-auth">
-        OAuth 2.1{{ store.cfg.allowApiKeyAuth ? ' · API key' : '' }} · Streamable HTTP
+        OAuth 2.1{{ store.cfg.allowApiKeyAuth ? ' · API key' : '' }} ·
+        Streamable HTTP
       </span>
     </div>
-    <p class="mcp-head-appurl" *ngIf="healthLevel && healthLevel !== 'ok' && healthText" data-testid="mcp-health-message">
+    <p
+      class="mcp-head-appurl"
+      *ngIf="healthLevel && healthLevel !== 'ok' && healthText"
+      data-testid="mcp-health-message">
       {{ healthText }}
     </p>
-    <p class="mcp-head-appurl" *ngIf="appUrlDiffers" data-testid="mcp-appurl-note">
+    <p
+      class="mcp-head-appurl"
+      *ngIf="appUrlDiffers"
+      data-testid="mcp-appurl-note">
       Endpoint uses APP_URL; this page is open at a different address.
     </p>
     <nav class="mcp-tabs" role="tablist">
       <button
-        type="button" role="tab" class="mcp-tab"
+        type="button"
+        role="tab"
+        class="mcp-tab"
         [class.on]="tab === 'connect'"
         [attr.aria-selected]="tab === 'connect'"
         (click)="setTab('connect')"
@@ -62,7 +82,9 @@
         Connect
       </button>
       <button
-        type="button" role="tab" class="mcp-tab"
+        type="button"
+        role="tab"
+        class="mcp-tab"
         [class.on]="tab === 'tools'"
         [attr.aria-selected]="tab === 'tools'"
         (click)="setTab('tools')"
@@ -70,7 +92,9 @@
         Tools · {{ store.totalTools() }}
       </button>
       <button
-        type="button" role="tab" class="mcp-tab"
+        type="button"
+        role="tab"
+        class="mcp-tab"
         [class.on]="tab === 'settings'"
         [attr.aria-selected]="tab === 'settings'"
         (click)="setTab('settings')"
@@ -100,10 +124,16 @@
       <span>
         Unsaved changes
         <ng-container *ngIf="store.savedTotalTools() !== store.totalTools()">
-          · <b>{{ store.savedTotalTools() }} → {{ store.totalTools() }} tools</b>
+          ·
+          <b>{{ store.savedTotalTools() }} → {{ store.totalTools() }} tools</b>
         </ng-container>
       </span>
-      <button mat-button type="button" class="mcp-dirty-discard" (click)="discard()" data-testid="mcp-discard">
+      <button
+        mat-button
+        type="button"
+        class="mcp-dirty-discard"
+        (click)="discard()"
+        data-testid="mcp-discard">
         Discard
       </button>
       <button

@@ -42,7 +42,10 @@ export interface McpCustomToolDialogData {
  * itself: built-ins for exposed services in the current style, globals,
  * aggregators, and the other custom tools.
  */
-export function emittedNameSet(store: McpEditorStore, excludeToolName?: string): Set<string> {
+export function emittedNameSet(
+  store: McpEditorStore,
+  excludeToolName?: string
+): Set<string> {
   const names = new Set<string>();
   GLOBAL_TOOLS.forEach(t => names.add(t.verb));
   AGGREGATOR_TOOLS.forEach(t => names.add(t.verb));
@@ -84,13 +87,18 @@ export function emittedNameSet(store: McpEditorStore, excludeToolName?: string):
           <span class="mcp-ct-type-label">Tool type:</span>
           <mat-radio-group formControlName="toolType">
             <mat-radio-button value="api">API endpoint</mat-radio-button>
-            <mat-radio-button value="function">Server-side function</mat-radio-button>
+            <mat-radio-button value="function"
+              >Server-side function</mat-radio-button
+            >
           </mat-radio-group>
         </div>
 
         <mat-form-field appearance="outline" class="mcp-ct-field">
           <mat-label>Name</mat-label>
-          <input matInput formControlName="name" data-testid="mcp-custom-name" />
+          <input
+            matInput
+            formControlName="name"
+            data-testid="mcp-custom-name" />
           <mat-error *ngIf="form.controls['name'].hasError('required')">
             A name is required.
           </mat-error>
@@ -98,8 +106,8 @@ export function emittedNameSet(store: McpEditorStore, excludeToolName?: string):
             Letters, numbers and underscores only.
           </mat-error>
           <mat-error *ngIf="form.controls['name'].hasError('collision')">
-            A tool named {{ form.controls['name'].value }} already exists. Choose
-            another name.
+            A tool named {{ form.controls['name'].value }} already exists.
+            Choose another name.
           </mat-error>
         </mat-form-field>
 
@@ -113,7 +121,9 @@ export function emittedNameSet(store: McpEditorStore, excludeToolName?: string):
             <mat-form-field appearance="outline" class="mcp-ct-method">
               <mat-label>Method</mat-label>
               <mat-select formControlName="httpMethod">
-                <mat-option *ngFor="let m of methods" [value]="m">{{ m }}</mat-option>
+                <mat-option *ngFor="let m of methods" [value]="m">{{
+                  m
+                }}</mat-option>
               </mat-select>
             </mat-form-field>
             <mat-form-field appearance="outline" class="mcp-ct-url">
@@ -154,7 +164,9 @@ export function emittedNameSet(store: McpEditorStore, excludeToolName?: string):
         </mat-form-field>
 
         <div class="mcp-ct-actions">
-          <button mat-button type="button" (click)="dialogRef.close()">Cancel</button>
+          <button mat-button type="button" (click)="dialogRef.close()">
+            Cancel
+          </button>
           <button
             mat-flat-button
             color="primary"
@@ -259,7 +271,9 @@ export class DfMcpCustomToolDialogComponent implements OnInit {
   attemptDismiss(): void {
     if (
       !this.form.dirty ||
-      window.confirm('Discard this custom tool? Your unsaved edits will be lost.')
+      window.confirm(
+        'Discard this custom tool? Your unsaved edits will be lost.'
+      )
     ) {
       this.dialogRef.close();
     }
@@ -321,11 +335,11 @@ export class DfMcpCustomToolDialogComponent implements OnInit {
       toolType: v.toolType,
       name: v.name,
       description: v.description ?? '',
-      httpMethod: isApi ? v.httpMethod : original.httpMethod ?? 'GET',
-      url: isApi ? v.url : original.url ?? '',
-      parameters: isApi ? params : original.parameters ?? null,
-      headers: isApi ? headers : original.headers ?? null,
-      function: isApi ? original.function ?? '' : v.functionCode,
+      httpMethod: isApi ? v.httpMethod : (original.httpMethod ?? 'GET'),
+      url: isApi ? v.url : (original.url ?? ''),
+      parameters: isApi ? params : (original.parameters ?? null),
+      headers: isApi ? headers : (original.headers ?? null),
+      function: isApi ? (original.function ?? '') : v.functionCode,
       enabled: original.enabled !== false && original.enabled !== 0,
     });
   }

@@ -259,12 +259,12 @@ describe('DfMcpSettingsComponent', () => {
       trigger.click();
       fixture.detectChanges();
       await fixture.whenStable();
-      const options = Array.from(
-        document.querySelectorAll('mat-option')
-      ).map(o => ({
-        value: o.getAttribute('ng-reflect-value'),
-        label: (o.textContent ?? '').trim(),
-      }));
+      const options = Array.from(document.querySelectorAll('mat-option')).map(
+        o => ({
+          value: o.getAttribute('ng-reflect-value'),
+          label: (o.textContent ?? '').trim(),
+        })
+      );
       expect(options).toEqual([
         { value: 'auto', label: 'Auto — recommended' },
         { value: 'on', label: 'Always on-demand' },
@@ -377,16 +377,14 @@ describe('DfMcpSettingsComponent', () => {
       expect(pre.textContent).toContain('"billing"');
       expect(pre.textContent).toContain('"scope_tools"');
       // The draft secret itself was not overwritten by the mask.
-      expect(
-        fixture.componentInstance.store.cfg.oauthClientSecret
-      ).toBe('super-secret-value');
+      expect(fixture.componentInstance.store.cfg.oauthClientSecret).toBe(
+        'super-secret-value'
+      );
     });
 
     it('shows the read-only registeredRedirectUris fact, kept apart from redirectUris', () => {
       create(makeStore());
-      const json = JSON.parse(
-        byTestId('mcp-fullconfig')!.textContent ?? '{}'
-      );
+      const json = JSON.parse(byTestId('mcp-fullconfig')!.textContent ?? '{}');
       expect(json.registeredRedirectUris).toEqual([
         'https://client.example/registered-cb',
       ]);
@@ -460,7 +458,12 @@ describe('DfMcpSettingsComponent', () => {
       servicesService.getAll.mockReturnValue(
         of({
           resource: [
-            { id: 1, name: 'github_sso', label: 'GitHub', type: 'oauth_github' },
+            {
+              id: 1,
+              name: 'github_sso',
+              label: 'GitHub',
+              type: 'oauth_github',
+            },
             { id: 2, name: 'billing', label: 'Billing', type: 'mysql' },
           ],
         }) as any
@@ -499,9 +502,7 @@ describe('DfMcpSettingsComponent', () => {
 
     it('both slide-toggles use the primary (DF purple) palette, not the coral accent', () => {
       create(makeStore());
-      expect(byTestId('mcp-set-active')!.getAttribute('color')).toBe(
-        'primary'
-      );
+      expect(byTestId('mcp-set-active')!.getAttribute('color')).toBe('primary');
       expect(byTestId('mcp-apikey-toggle')!.getAttribute('color')).toBe(
         'primary'
       );

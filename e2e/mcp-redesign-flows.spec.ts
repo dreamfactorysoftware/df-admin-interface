@@ -1,4 +1,10 @@
-import { APIRequestContext, Locator, Page, expect, test } from '@playwright/test';
+import {
+  APIRequestContext,
+  Locator,
+  Page,
+  expect,
+  test,
+} from '@playwright/test';
 import { loginAsAdmin, waitForAppReady } from './fixtures/admin-login';
 import { DfApi, E2E_SERVICE_PREFIX } from './fixtures/df-api';
 import {
@@ -191,9 +197,9 @@ test.describe('picker exposure round-trip on mcp_full', () => {
         })
       ).toBeVisible();
     }
-    await expect(
-      dialog.locator('.mcp-chip', { hasText: /^db$/ })
-    ).toHaveCount(0);
+    await expect(dialog.locator('.mcp-chip', { hasText: /^db$/ })).toHaveCount(
+      0
+    );
 
     // Read-only is the pre-selected default.
     await expect(

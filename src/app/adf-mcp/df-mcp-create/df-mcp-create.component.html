@@ -20,7 +20,9 @@
       <span class="mcp-type-dot" aria-hidden="true"></span>
       <span class="mcp-type-body">
         <span class="mcp-type-title">MCP server</span>
-        <span class="mcp-type-desc">Expose your data services to AI agents.</span>
+        <span class="mcp-type-desc"
+          >Expose your data services to AI agents.</span
+        >
       </span>
     </button>
     <button
@@ -34,7 +36,9 @@
       <span class="mcp-type-dot" aria-hidden="true"></span>
       <span class="mcp-type-body">
         <span class="mcp-type-title">System API MCP server</span>
-        <span class="mcp-type-desc">Expose the DreamFactory admin API itself.</span>
+        <span class="mcp-type-desc"
+          >Expose the DreamFactory admin API itself.</span
+        >
       </span>
     </button>
   </div>
@@ -142,7 +146,10 @@
 
     <div class="mcp-access-row">
       <span class="mcp-access-label">Access for these services:</span>
-      <div class="mcp-seg" role="radiogroup" aria-label="Access for these services">
+      <div
+        class="mcp-seg"
+        role="radiogroup"
+        aria-label="Access for these services">
         <button
           type="button"
           role="radio"
@@ -188,7 +195,9 @@
           Connections.
         </p>
 
-        <div class="mcp-pick-group" *ngIf="dbAll().length > 0 && dbFiltered().length > 0">
+        <div
+          class="mcp-pick-group"
+          *ngIf="dbAll().length > 0 && dbFiltered().length > 0">
           <div class="mcp-pick-grouphead">
             <span>Databases ({{ dbAll().length }})</span>
             <mat-checkbox
@@ -210,7 +219,9 @@
           </div>
         </div>
 
-        <div class="mcp-pick-group" *ngIf="fileAll().length > 0 && fileFiltered().length > 0">
+        <div
+          class="mcp-pick-group"
+          *ngIf="fileAll().length > 0 && fileFiltered().length > 0">
           <div class="mcp-pick-grouphead">
             <span>File storage ({{ fileAll().length }})</span>
             <mat-checkbox
@@ -245,7 +256,9 @@
             <span class="mcp-chip" *ngIf="row.svc">
               {{ row.svc.kind === 'db' ? 'Database' : 'File storage' }}
             </span>
-            <span class="mcp-chip warn" *ngIf="!row.svc">Not on this instance</span>
+            <span class="mcp-chip warn" *ngIf="!row.svc"
+              >Not on this instance</span
+            >
             <span
               class="mcp-chip"
               [class.good]="accessKindFor(row) === 'ro'"
@@ -268,13 +281,14 @@
 
   <!-- Live consequence line -->
   <p class="mcp-create-consequence" data-testid="mcp-create-consequence">
-    {{ consequenceMain() }}<b *ngIf="showEmptyBold()"> Empty never means every service.</b>
+    {{ consequenceMain()
+    }}<b *ngIf="showEmptyBold()"> Empty never means every service.</b>
   </p>
 
   <!-- Auth: one static line, no fields -->
   <p class="mcp-create-auth">
-    Secured with OAuth 2.1, configured automatically. Connection details
-    appear after you create the server.
+    Secured with OAuth 2.1, configured automatically. Connection details appear
+    after you create the server.
   </p>
 
   <div class="mcp-create-actions">

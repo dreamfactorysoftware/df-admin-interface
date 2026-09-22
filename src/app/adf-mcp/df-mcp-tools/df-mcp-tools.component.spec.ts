@@ -85,10 +85,11 @@ describe('DfMcpToolsComponent', () => {
   }
 
   it('renders rows only for exposed services', () => {
-    const store = makeStore(
-      { exposed_services: ['crm', 's3'] },
-      [svc('crm'), svc('hr'), svc('s3', 'file')]
-    );
+    const store = makeStore({ exposed_services: ['crm', 's3'] }, [
+      svc('crm'),
+      svc('hr'),
+      svc('s3', 'file'),
+    ]);
     render(store);
     expect(q('mcp-svc-row-crm')).toBeTruthy();
     expect(q('mcp-svc-row-s3')).toBeTruthy();
@@ -145,10 +146,10 @@ describe('DfMcpToolsComponent', () => {
   });
 
   it('marks the inactive service and keeps it out of the rail total', () => {
-    const store = makeStore(
-      { exposed_services: ['crm', 'archive'] },
-      [svc('crm'), svc('archive', 'db', false)]
-    );
+    const store = makeStore({ exposed_services: ['crm', 'archive'] }, [
+      svc('crm'),
+      svc('archive', 'db', false),
+    ]);
     render(store);
     // §8 canonical string.
     expect(q('mcp-svc-row-archive')!.textContent).toContain(
@@ -198,14 +199,17 @@ describe('DfMcpToolsComponent', () => {
   });
 
   it('renders the global section with aggregators only at 2+ databases', () => {
-    const one = makeStore({ exposed_services: ['crm'] }, [svc('crm'), svc('hr')]);
+    const one = makeStore({ exposed_services: ['crm'] }, [
+      svc('crm'),
+      svc('hr'),
+    ]);
     render(one);
     expect(q('mcp-global-section')!.textContent).toContain('5 of 5');
 
-    const two = makeStore(
-      { exposed_services: ['crm', 'hr'] },
-      [svc('crm'), svc('hr')]
-    );
+    const two = makeStore({ exposed_services: ['crm', 'hr'] }, [
+      svc('crm'),
+      svc('hr'),
+    ]);
     render(two);
     expect(q('mcp-global-section')!.textContent).toContain('11 of 11');
   });
@@ -215,7 +219,13 @@ describe('DfMcpToolsComponent', () => {
       {
         exposed_services: [],
         custom_tools: [
-          { name: 'env_info', toolType: 'api', httpMethod: 'GET', url: 'https://x', enabled: true },
+          {
+            name: 'env_info',
+            toolType: 'api',
+            httpMethod: 'GET',
+            url: 'https://x',
+            enabled: true,
+          },
         ],
       },
       []
@@ -246,15 +256,17 @@ describe('DfMcpToolsComponent', () => {
           component.systemGroups[1].tools.length
       ).toBe(SYSTEM_MCP_TOOLS.length);
       expect(
-        component.systemGroups[0].tools.every(t =>
-          /^(get_|list_)/.test(t.name)
-        )
+        component.systemGroups[0].tools.every(t => /^(get_|list_)/.test(t.name))
       ).toBe(true);
     });
 
     it('bare-name disables drive the rail count and read-only state', () => {
       const store = makeStore(
-        { disabled_tools: SYSTEM_MCP_TOOLS.filter(t => !/^(get_|list_)/.test(t.name)).map(t => t.name) },
+        {
+          disabled_tools: SYSTEM_MCP_TOOLS.filter(
+            t => !/^(get_|list_)/.test(t.name)
+          ).map(t => t.name),
+        },
         [],
         'system_mcp'
       );
@@ -266,10 +278,10 @@ describe('DfMcpToolsComponent', () => {
 
   describe('identity-stable rows and menus (trackBy/memoization)', () => {
     it('returns the same array instances until the store version changes', () => {
-      const store = makeStore(
-        { exposed_services: ['crm', 's3'] },
-        [svc('crm'), svc('s3', 'file')]
-      );
+      const store = makeStore({ exposed_services: ['crm', 's3'] }, [
+        svc('crm'),
+        svc('s3', 'file'),
+      ]);
       render(store);
       const rows = component.visibleRows();
       fixture.detectChanges();
@@ -410,10 +422,9 @@ describe('DfMcpToolsComponent', () => {
     });
 
     it('shows the Access section (not a Manage roles link) and explains lazy serving under the on token', () => {
-      const store = makeStore(
-        { exposed_services: ['crm'], lazy_mode: 'on' },
-        [svc('crm')]
-      );
+      const store = makeStore({ exposed_services: ['crm'], lazy_mode: 'on' }, [
+        svc('crm'),
+      ]);
       // Lazy token contract: stored 'on' engages; legacy 'always' normalizes.
       expect(store.cfg.lazyMode).toBe('on');
       const legacy = makeStore({ lazy_mode: 'always' }, []);
@@ -429,13 +440,17 @@ describe('DfMcpToolsComponent', () => {
     });
 
     it('rail file line carries the × multiplier only when files are full', () => {
-      const store = makeStore({ exposed_services: ['s3'] }, [svc('s3', 'file')]);
+      const store = makeStore({ exposed_services: ['s3'] }, [
+        svc('s3', 'file'),
+      ]);
       render(store);
       expect(component.railBreakdown().join(' ')).toContain(
         '6 file (1 service × 6)'
       );
       store.setTool('s3', 'delete_file', false);
-      expect(component.railBreakdown().join(' ')).toContain('5 file (1 service)');
+      expect(component.railBreakdown().join(' ')).toContain(
+        '5 file (1 service)'
+      );
     });
 
     it('Make read-only confirm names write-capable customs and turns them off', () => {
@@ -490,10 +505,11 @@ describe('DfMcpPickerComponent — consequence simulation', () => {
   }
 
   it('lists only not-yet-exposed services', () => {
-    const store = makeStore(
-      { exposed_services: ['crm'] },
-      [svc('crm'), svc('hr'), svc('s3', 'file')]
-    );
+    const store = makeStore({ exposed_services: ['crm'] }, [
+      svc('crm'),
+      svc('hr'),
+      svc('s3', 'file'),
+    ]);
     const p = picker(store);
     expect(p.candidates().map(s => s.name)).toEqual(['hr', 's3']);
     expect(p.dbCandidates().map(s => s.name)).toEqual(['hr']);
@@ -501,10 +517,10 @@ describe('DfMcpPickerComponent — consequence simulation', () => {
   });
 
   it('computes the read-only consequence by simulation', () => {
-    const store = makeStore(
-      { exposed_services: ['crm'] },
-      [svc('crm'), svc('hr')]
-    );
+    const store = makeStore({ exposed_services: ['crm'] }, [
+      svc('crm'),
+      svc('hr'),
+    ]);
     const old = effectiveTools(store.cfg, store.backendServices).total; // 16+5
     const p = picker(store);
     p.toggle('hr');
@@ -559,7 +575,8 @@ describe('DfMcpPickerComponent — consequence simulation', () => {
 
 describe('dialog templates render', () => {
   it('picker template renders groups, curation notes and the consequence line', async () => {
-    const { MatDialogRef, MAT_DIALOG_DATA } = await import('@angular/material/dialog');
+    const { MatDialogRef, MAT_DIALOG_DATA } =
+      await import('@angular/material/dialog');
     const store = makeStore(
       { exposed_services: [], disabled_tools: ['hr_get_tables'] },
       [svc('crm'), svc('hr'), svc('s3', 'file')]
@@ -576,7 +593,9 @@ describe('dialog templates render', () => {
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('[data-testid="mcp-picker-dialog"]')).toBeTruthy();
     expect(el.querySelector('[data-testid="mcp-picker-search"]')).toBeTruthy();
-    expect(el.querySelector('[data-testid="mcp-picker-access-ro"]')).toBeTruthy();
+    expect(
+      el.querySelector('[data-testid="mcp-picker-access-ro"]')
+    ).toBeTruthy();
     expect(el.textContent).toContain('Databases (2)');
     expect(el.textContent).toContain('File storage (1)');
     expect(el.textContent).toContain('saved curation: 1 tools off');
@@ -590,10 +609,10 @@ describe('dialog templates render', () => {
   });
 
   it('preview template renders served groups and the named exclusions', async () => {
-    const { MatDialogRef, MAT_DIALOG_DATA } = await import('@angular/material/dialog');
-    const { DfMcpPreviewComponent } = await import(
-      '../df-mcp-preview/df-mcp-preview.component'
-    );
+    const { MatDialogRef, MAT_DIALOG_DATA } =
+      await import('@angular/material/dialog');
+    const { DfMcpPreviewComponent } =
+      await import('../df-mcp-preview/df-mcp-preview.component');
     const store = makeStore(
       {
         exposed_services: ['crm', 'archive', 'legacy_dw'],
@@ -637,12 +656,14 @@ describe('dialog templates render', () => {
   });
 
   it('remove, rename and custom-tool dialogs render and validate', async () => {
-    const { MatDialogRef, MAT_DIALOG_DATA } = await import('@angular/material/dialog');
-    const { DfMcpRemoveDialogComponent } = await import('./df-mcp-remove-dialog.component');
-    const { DfMcpRenameDialogComponent } = await import('./df-mcp-rename-dialog.component');
-    const { DfMcpCustomToolDialogComponent, emittedNameSet } = await import(
-      './df-mcp-custom-tool-dialog.component'
-    );
+    const { MatDialogRef, MAT_DIALOG_DATA } =
+      await import('@angular/material/dialog');
+    const { DfMcpRemoveDialogComponent } =
+      await import('./df-mcp-remove-dialog.component');
+    const { DfMcpRenameDialogComponent } =
+      await import('./df-mcp-rename-dialog.component');
+    const { DfMcpCustomToolDialogComponent, emittedNameSet } =
+      await import('./df-mcp-custom-tool-dialog.component');
     const store = makeStore(
       { exposed_services: ['crm'], disabled_tools: ['legacy_dw_get_tables'] },
       [svc('crm'), svc('hr')]
@@ -677,7 +698,9 @@ describe('dialog templates render', () => {
     });
     const renameFx = TestBed.createComponent(DfMcpRenameDialogComponent);
     renameFx.detectChanges();
-    expect(renameFx.componentInstance.candidates().map(s => s.name)).toEqual(['hr']);
+    expect(renameFx.componentInstance.candidates().map(s => s.name)).toEqual([
+      'hr',
+    ]);
     renameFx.componentInstance.newName = 'hr';
     renameFx.detectChanges();
     expect(renameFx.nativeElement.textContent).toContain(
@@ -752,14 +775,13 @@ describe('dialog templates render', () => {
   });
 
   it('preview reflects the on token and keeps group identity stable', async () => {
-    const { MatDialogRef, MAT_DIALOG_DATA } = await import('@angular/material/dialog');
-    const { DfMcpPreviewComponent } = await import(
-      '../df-mcp-preview/df-mcp-preview.component'
-    );
-    const store = makeStore(
-      { exposed_services: ['crm'], lazy_mode: 'on' },
-      [svc('crm')]
-    );
+    const { MatDialogRef, MAT_DIALOG_DATA } =
+      await import('@angular/material/dialog');
+    const { DfMcpPreviewComponent } =
+      await import('../df-mcp-preview/df-mcp-preview.component');
+    const store = makeStore({ exposed_services: ['crm'], lazy_mode: 'on' }, [
+      svc('crm'),
+    ]);
     await TestBed.configureTestingModule({
       imports: [DfMcpPreviewComponent, NoopAnimationsModule],
       providers: [
@@ -773,7 +795,9 @@ describe('dialog templates render', () => {
     const c = fx.componentInstance;
     expect(c.lazyEngaged).toBe(true);
     expect(c.view).toBe('first');
-    expect(c.lazyLabel()).toMatch(/^Lazy loading: engaged \(always on\) — .* facade instead of /);
+    expect(c.lazyLabel()).toMatch(
+      /^Lazy loading: engaged \(always on\) — .* facade instead of /
+    );
     // Identity-stable groups feed trackBy'd ngFors.
     expect(c.visibleGroups()).toBe(c.visibleGroups());
     expect(fx.nativeElement.textContent).toContain(

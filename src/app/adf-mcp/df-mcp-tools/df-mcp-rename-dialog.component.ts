@@ -38,8 +38,8 @@ export interface McpRenameDialogData {
     <div class="mcp-rename-dialog">
       <h2>Point this entry at its renamed service</h2>
       <p class="mcp-rename-intro">
-        “{{ data.oldName }}” no longer exists on this instance. Pick the
-        service it was renamed to.
+        “{{ data.oldName }}” no longer exists on this instance. Pick the service
+        it was renamed to.
       </p>
       <mat-form-field appearance="outline" class="mcp-rename-field">
         <mat-label>Renamed to</mat-label>
@@ -54,7 +54,9 @@ export interface McpRenameDialogData {
         tool settings ({{ data.oldName }}_* → {{ newName }}_*)?
       </p>
       <div class="mcp-rename-actions">
-        <button mat-button type="button" (click)="dialogRef.close()">Cancel</button>
+        <button mat-button type="button" (click)="dialogRef.close()">
+          Cancel
+        </button>
         <button
           mat-flat-button
           color="primary"

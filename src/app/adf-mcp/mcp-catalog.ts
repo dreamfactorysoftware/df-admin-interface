@@ -84,7 +84,8 @@ export const DB_VERB_GROUPS: readonly McpVerbGroup[] = [
       {
         verb: 'get_data_model',
         title: 'Get Data Model',
-        description: 'Get a condensed data model showing all tables and columns',
+        description:
+          'Get a condensed data model showing all tables and columns',
       },
     ],
   },
@@ -191,8 +192,7 @@ export const GLOBAL_TOOLS: readonly McpToolDef[] = [
   {
     verb: 'discover_services',
     title: 'Discover Services',
-    description:
-      'List the services and operations the calling role can access',
+    description: 'List the services and operations the calling role can access',
   },
   {
     verb: 'request_access',
@@ -242,7 +242,8 @@ export const AGGREGATOR_TOOLS: readonly McpToolDef[] = [
   {
     verb: 'all_get_resources',
     title: 'Get Resources from All',
-    description: 'Retrieve all available resources from all connected databases',
+    description:
+      'Retrieve all available resources from all connected databases',
   },
   {
     verb: 'all_list_files',
@@ -256,11 +257,31 @@ export const AGGREGATOR_TOOLS: readonly McpToolDef[] = [
  * (daemon lazy.service FACADE): search → describe → call, paged by fetch_more.
  */
 export const LAZY_FACADE_TOOLS: readonly McpToolDef[] = [
-  { verb: 'search_tools', title: 'Search Tools', description: 'Find tools by capability' },
-  { verb: 'describe_tool', title: 'Describe Tool', description: 'Get one tool’s full schema' },
-  { verb: 'call_tool', title: 'Call Tool', description: 'Invoke a tool by name' },
-  { verb: 'fetch_more', title: 'Fetch More', description: 'Page through a long result' },
-  { verb: 'list_tools', title: 'List Tools', description: 'Page through the full catalog' },
+  {
+    verb: 'search_tools',
+    title: 'Search Tools',
+    description: 'Find tools by capability',
+  },
+  {
+    verb: 'describe_tool',
+    title: 'Describe Tool',
+    description: 'Get one tool’s full schema',
+  },
+  {
+    verb: 'call_tool',
+    title: 'Call Tool',
+    description: 'Invoke a tool by name',
+  },
+  {
+    verb: 'fetch_more',
+    title: 'Fetch More',
+    description: 'Page through a long result',
+  },
+  {
+    verb: 'list_tools',
+    title: 'List Tools',
+    description: 'Page through the full catalog',
+  },
 ];
 
 /** Kind of backend service an MCP server can expose. */
@@ -270,7 +291,10 @@ export type McpServiceKind = 'db' | 'file';
  * Service types the daemon serves tools for, matching loadMcpServices() in
  * the legacy editor: every 'Database' group type plus local_file.
  */
-export function serviceKindOf(typeGroup: string, type: string): McpServiceKind | null {
+export function serviceKindOf(
+  typeGroup: string,
+  type: string
+): McpServiceKind | null {
   if (typeGroup === 'Database') return 'db';
   if (type === 'local_file' || typeGroup === 'File') return 'file';
   return null;

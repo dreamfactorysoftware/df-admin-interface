@@ -87,13 +87,17 @@ export function simulateExposeTotal(
     const svc = store.backendServices.find(s => s.name === name);
     if (!svc || keep.has(name)) continue;
     allKeys(svc).forEach(k => cfg.disabledTools.delete(k));
-    if (access === 'ro') readOnlyKeys(svc).forEach(k => cfg.disabledTools.add(k));
+    if (access === 'ro')
+      readOnlyKeys(svc).forEach(k => cfg.disabledTools.add(k));
   }
   return effectiveTools(cfg, store.backendServices).total;
 }
 
 /** Apply a confirmed picker result to the store (same rules the simulation used). */
-export function applyPickerResult(store: McpEditorStore, res: McpPickerResult): void {
+export function applyPickerResult(
+  store: McpEditorStore,
+  res: McpPickerResult
+): void {
   const keep = pickerKeepNames(store, res.names, res.accessTouched);
   const applied = res.names.filter(n => !keep.has(n));
   if (applied.length) store.exposeServices(applied, res.access);
@@ -134,7 +138,10 @@ export class DfMcpPickerComponent {
    * every change-detection pass, so they are memoized on the store version
    * plus the search text (and tracked by name) to keep row DOM stable.
    */
-  private listMemo = new Map<string, { key: string; value: McpBackendService[] }>();
+  private listMemo = new Map<
+    string,
+    { key: string; value: McpBackendService[] }
+  >();
 
   private memoized(
     name: string,
@@ -223,7 +230,10 @@ export class DfMcpPickerComponent {
 
   consequenceText(): string {
     const k = this.selected.size;
-    const old = effectiveTools(this.store.cfg, this.store.backendServices).total;
+    const old = effectiveTools(
+      this.store.cfg,
+      this.store.backendServices
+    ).total;
     const next = simulateExposeTotal(
       this.store,
       [...this.selected],

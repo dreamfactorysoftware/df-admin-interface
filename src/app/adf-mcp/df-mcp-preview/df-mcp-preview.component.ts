@@ -139,7 +139,10 @@ export class DfMcpPreviewComponent implements OnInit {
         }
       }
     }
-    this.groups.push({ label: `Global (${globalItems.length})`, items: globalItems });
+    this.groups.push({
+      label: `Global (${globalItems.length})`,
+      items: globalItems,
+    });
 
     // Database group.
     const dbItems: PreviewItem[] = [];
@@ -189,7 +192,10 @@ export class DfMcpPreviewComponent implements OnInit {
       }
     }
     if (activeFiles.length > 0) {
-      this.groups.push({ label: `File (${fileItems.length})`, items: fileItems });
+      this.groups.push({
+        label: `File (${fileItems.length})`,
+        items: fileItems,
+      });
     }
 
     // Custom group.
@@ -220,7 +226,10 @@ export class DfMcpPreviewComponent implements OnInit {
     // 1b. Server-wide read-only switch.
     if (cfg.allowWrites === false) {
       const hidden = (cfg.customTools ?? []).filter(
-        (t: any) => t?.enabled !== false && t?.enabled !== 0 && isWriteCapableCustomTool(t)
+        (t: any) =>
+          t?.enabled !== false &&
+          t?.enabled !== 0 &&
+          isWriteCapableCustomTool(t)
       ).length;
       this.excluded.push({
         name: 'write & execute tools' + (hidden ? ` + ${hidden} custom` : ''),
@@ -252,7 +261,10 @@ export class DfMcpPreviewComponent implements OnInit {
             name: `${r.name} · ${g.label.toLowerCase()}`,
             reason: 'turned off by you',
           });
-        } else if (st === 'part' && (style === 'prefixed' || r.svc.kind === 'file')) {
+        } else if (
+          st === 'part' &&
+          (style === 'prefixed' || r.svc.kind === 'file')
+        ) {
           for (const v of g.verbs) {
             if (disabled.has(toolKey(r.name, v.verb))) {
               this.excluded.push({

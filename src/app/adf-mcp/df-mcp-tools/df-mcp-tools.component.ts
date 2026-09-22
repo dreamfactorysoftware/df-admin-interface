@@ -10,12 +10,7 @@
  * mutations go through store methods + touch(). The shell owns Save.
  */
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  Input,
-  OnChanges,
-  SimpleChanges,
-} from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -62,9 +57,7 @@ import {
 } from '../df-mcp-picker/df-mcp-picker.component';
 import { DfMcpPreviewComponent } from '../df-mcp-preview/df-mcp-preview.component';
 import { DfMcpAccessComponent } from '../df-mcp-access/df-mcp-access.component';
-import {
-  DfMcpCustomToolDialogComponent,
-} from './df-mcp-custom-tool-dialog.component';
+import { DfMcpCustomToolDialogComponent } from './df-mcp-custom-tool-dialog.component';
 import {
   DfMcpRemoveDialogComponent,
   McpRemoveDialogResult,
@@ -204,7 +197,9 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   railReadOnly(): boolean {
-    return this.store.isSystemMcp ? this.sysModifyOn() === 0 : this.eff().readOnly;
+    return this.store.isSystemMcp
+      ? this.sysModifyOn() === 0
+      : this.eff().readOnly;
   }
 
   /** allow_writes=false on a data server: write tools are never served. */
@@ -228,7 +223,11 @@ export class DfMcpToolsComponent implements OnChanges {
   /** The server's own count, when it disagrees with the simulated total. */
   serverCountNote(): string | null {
     const c = this.stats();
-    if (c.source !== 'server' || c.count === null || c.count === this.railTotal()) {
+    if (
+      c.source !== 'server' ||
+      c.count === null ||
+      c.count === this.railTotal()
+    ) {
       return null;
     }
     return `Server reports ${c.count}`;
@@ -381,8 +380,7 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   emittedName(svc: McpBackendService, verb: string): string {
-    const style =
-      svc.kind === 'db' ? this.eff().effectiveStyle : 'prefixed';
+    const style = svc.kind === 'db' ? this.eff().effectiveStyle : 'prefixed';
     return emittedDbToolName(style, svc.name, verb);
   }
 
@@ -415,12 +413,19 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   /** Copy this service's disabled-verb pattern to a target (null = all). */
-  copySelectionTo(source: McpBackendService, target: McpBackendService | null): void {
+  copySelectionTo(
+    source: McpBackendService,
+    target: McpBackendService | null
+  ): void {
     const targets = target ? [target] : this.copyTargets(source);
     if (targets.length === 0) return;
     for (const t of targets) {
       for (const v of verbsFor('db')) {
-        this.store.setTool(t.name, v.verb, this.store.isToolEnabled(source.name, v.verb));
+        this.store.setTool(
+          t.name,
+          v.verb,
+          this.store.isToolEnabled(source.name, v.verb)
+        );
       }
     }
     const label = target ? target.name : 'all exposed databases';
@@ -588,7 +593,8 @@ export class DfMcpToolsComponent implements OnChanges {
     return this.memoized('globalToolList', String(this.store.version), () => {
       const out = GLOBAL_TOOLS.map(tool => ({ tool, aggregator: false }));
       if (this.aggregatorsShown()) {
-        for (const tool of AGGREGATOR_TOOLS) out.push({ tool, aggregator: true });
+        for (const tool of AGGREGATOR_TOOLS)
+          out.push({ tool, aggregator: true });
       }
       return out;
     });
@@ -596,7 +602,9 @@ export class DfMcpToolsComponent implements OnChanges {
 
   globalFractionText(): string {
     const list = this.globalToolList();
-    const on = list.filter(e => this.store.isBareToolEnabled(e.tool.verb)).length;
+    const on = list.filter(e =>
+      this.store.isBareToolEnabled(e.tool.verb)
+    ).length;
     return `${on} of ${list.length}`;
   }
 

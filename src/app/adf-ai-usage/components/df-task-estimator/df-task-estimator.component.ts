@@ -112,9 +112,9 @@ interface RunState {
           </span>
         </header>
         <p class="taskest__hint">
-          What would this task cost before you run it? Routing picks the
-          agent, the meter's history prices it, and nothing is spent until
-          you click Run.
+          What would this task cost before you run it? Routing picks the agent,
+          the meter's history prices it, and nothing is spent until you click
+          Run.
         </p>
 
         <textarea
@@ -270,8 +270,9 @@ interface RunState {
             </span>
             <span *ngSwitchCase="'over'">
               <fa-icon [icon]="faTriangleExclamation"></fa-icon>
-              Over budget — the high estimate {{ formatUsd(est!.costHigh) }}
-              exceeds your {{ formatUsd(budget!) }} budget.
+              Over budget — the high estimate
+              {{ formatUsd(est!.costHigh) }} exceeds your
+              {{ formatUsd(budget!) }} budget.
             </span>
           </div>
         </ng-container>
@@ -284,7 +285,9 @@ interface RunState {
             [disabled]="busy || run?.busy || !task.trim()"
             (click)="runTask()">
             <fa-icon [icon]="faPlay"></fa-icon>
-            <span>{{ verdict === 'over' ? 'Run anyway' : 'Run for real' }}</span>
+            <span>{{
+              verdict === 'over' ? 'Run anyway' : 'Run for real'
+            }}</span>
           </button>
           <span class="taskest__run-cap">
             Runs through {{ runTargetName }} and meters real spend.
@@ -308,9 +311,7 @@ interface RunState {
             {{ run!.content }}
           </div>
 
-          <div
-            *ngIf="run!.actualCost !== null && est"
-            class="taskest__compare">
+          <div *ngIf="run!.actualCost !== null && est" class="taskest__compare">
             <div class="taskest__tile">
               <span class="taskest__tile-label">Estimated</span>
               <span class="taskest__tile-value">

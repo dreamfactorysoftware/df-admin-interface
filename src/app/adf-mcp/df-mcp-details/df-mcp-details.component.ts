@@ -106,7 +106,10 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
     this.saving = false;
     this.tab = 'connect';
     const requestedTab = qp.get('tab') as McpTab | null;
-    if (requestedTab && ['connect', 'tools', 'settings'].includes(requestedTab)) {
+    if (
+      requestedTab &&
+      ['connect', 'tools', 'settings'].includes(requestedTab)
+    ) {
       this.tab = requestedTab;
     }
     // The shell H1 falls back to the raw :id URL segment on detail pages;
@@ -201,7 +204,9 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
     if (!h) return '';
     const msg = healthMessage(h);
     if (msg) return msg;
-    return this.healthLevel === 'ok' ? 'MCP health: all checks pass' : 'MCP health: check failed';
+    return this.healthLevel === 'ok'
+      ? 'MCP health: all checks pass'
+      : 'MCP health: check failed';
   }
 
   get healthChip(): string {
@@ -210,7 +215,12 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
     const bad = this.store.health?.checks?.find(
       c => (c.status || '').toLowerCase() !== 'ok'
     );
-    const what = bad?.id === 'app_url' ? 'APP_URL mismatch' : level === 'warn' ? 'Health warning' : 'Health error';
+    const what =
+      bad?.id === 'app_url'
+        ? 'APP_URL mismatch'
+        : level === 'warn'
+          ? 'Health warning'
+          : 'Health error';
     return `⚠ ${what}`;
   }
 
@@ -315,8 +325,7 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
         this.snackbarService.openSnackBar('Server deleted.', 'success');
         this.router.navigate(['../'], { relativeTo: this.activatedRoute });
       },
-      error: () =>
-        this.snackbarService.openSnackBar('Delete failed.', 'error'),
+      error: () => this.snackbarService.openSnackBar('Delete failed.', 'error'),
     });
   }
 }

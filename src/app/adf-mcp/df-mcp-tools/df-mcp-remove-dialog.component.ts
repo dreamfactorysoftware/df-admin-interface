@@ -28,16 +28,30 @@ export interface McpRemoveDialogResult {
 @Component({
   selector: 'df-mcp-remove-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatDialogModule, MatRadioModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatRadioModule,
+  ],
   template: `
     <div class="mcp-remove-dialog">
       <h2>{{ title }}</h2>
       <mat-radio-group [(ngModel)]="clear" class="mcp-remove-choices">
         <mat-radio-button [value]="false">
-          {{ data.names.length === 1 ? 'Keep its tool curation (recommended)' : 'Keep their tool curation (recommended)' }}
+          {{
+            data.names.length === 1
+              ? 'Keep its tool curation (recommended)'
+              : 'Keep their tool curation (recommended)'
+          }}
         </mat-radio-button>
         <mat-radio-button [value]="true">
-          {{ data.names.length === 1 ? 'Also clear its saved tool settings' : 'Also clear their saved tool settings' }}
+          {{
+            data.names.length === 1
+              ? 'Also clear its saved tool settings'
+              : 'Also clear their saved tool settings'
+          }}
         </mat-radio-button>
       </mat-radio-group>
       <p class="mcp-remove-note">
@@ -45,7 +59,9 @@ export interface McpRemoveDialogResult {
         {{ data.names.length === 1 ? 'the service' : 'a service' }} again.
       </p>
       <div class="mcp-remove-actions">
-        <button mat-button type="button" (click)="dialogRef.close()">Cancel</button>
+        <button mat-button type="button" (click)="dialogRef.close()">
+          Cancel
+        </button>
         <button
           mat-flat-button
           color="warn"
@@ -92,7 +108,10 @@ export class DfMcpRemoveDialogComponent {
   clear = false;
 
   constructor(
-    public dialogRef: MatDialogRef<DfMcpRemoveDialogComponent, McpRemoveDialogResult>,
+    public dialogRef: MatDialogRef<
+      DfMcpRemoveDialogComponent,
+      McpRemoveDialogResult
+    >,
     @Inject(MAT_DIALOG_DATA) public data: McpRemoveDialogData
   ) {}
 

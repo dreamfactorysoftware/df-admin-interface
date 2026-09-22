@@ -72,7 +72,6 @@ export class DfMcpRouteShimComponent
     const isCreate = !snap.paramMap.get('id');
     const groups: string[] =
       snap.data['groups'] || snap.parent?.data?.['groups'] || [];
-    this.mode =
-      isCreate && groups.includes('MCP') ? 'mcp-create' : 'generic';
+    this.mode = isCreate && groups.includes('MCP') ? 'mcp-create' : 'generic';
   }
 }

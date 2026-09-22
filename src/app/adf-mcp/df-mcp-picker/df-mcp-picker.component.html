@@ -1,7 +1,9 @@
 <div class="mcp-picker" data-testid="mcp-picker-dialog">
   <div class="mcp-picker-head">
     <h2>Expose services</h2>
-    <button mat-icon-button type="button" aria-label="Close" (click)="cancel()">✕</button>
+    <button mat-icon-button type="button" aria-label="Close" (click)="cancel()">
+      ✕
+    </button>
   </div>
 
   <input
@@ -86,14 +88,18 @@
 
       <p
         class="mcp-picker-empty"
-        *ngIf="dbCandidates().length === 0 && fileCandidates().length === 0 && !q.trim()">
+        *ngIf="
+          dbCandidates().length === 0 &&
+          fileCandidates().length === 0 &&
+          !q.trim()
+        ">
         Every service on this instance is already exposed.
       </p>
     </ng-container>
     <ng-template #noMatch>
       <p class="mcp-picker-empty">
-        No service matches “{{ q.trim() }}”. Create one under API Generation &amp;
-        Connections.
+        No service matches “{{ q.trim() }}”. Create one under API Generation
+        &amp; Connections.
       </p>
     </ng-template>
   </div>
@@ -111,7 +117,8 @@
         data-testid="mcp-picker-confirm"
         [disabled]="selected.size === 0"
         (click)="confirm()">
-        Expose {{ selected.size }} {{ selected.size === 1 ? 'service' : 'services' }}
+        Expose {{ selected.size }}
+        {{ selected.size === 1 ? 'service' : 'services' }}
       </button>
     </span>
   </div>

@@ -91,7 +91,9 @@
   <!-- Endpoint card -->
   <section class="mcp-card mcp-endpoint" data-testid="mcp-endpoint-card">
     <div class="mcp-endpoint-row">
-      <code class="mcp-endpoint-url" data-testid="mcp-endpoint-url">{{ mcpUrl }}</code>
+      <code class="mcp-endpoint-url" data-testid="mcp-endpoint-url">{{
+        mcpUrl
+      }}</code>
       <button
         mat-stroked-button
         type="button"
@@ -112,15 +114,15 @@
           probe === 'auth'
             ? 'The endpoint answered with the expected sign-in challenge.'
             : probe === 'open'
-            ? 'The endpoint answered, but not with the expected sign-in challenge.'
-            : ''
+              ? 'The endpoint answered, but not with the expected sign-in challenge.'
+              : ''
         ">
         {{
           probe === 'auth'
             ? '✓ Reachable — auth enforced'
             : probe === 'open'
-            ? 'Reachable'
-            : '—'
+              ? 'Reachable'
+              : '—'
         }}
       </span>
     </div>
@@ -312,7 +314,9 @@
       <p class="mcp-caption" *ngIf="!keyMode">
         Claude Code opens a browser to sign in with OAuth on first use.
       </p>
-      <ng-container *ngIf="keyMode" [ngTemplateOutlet]="keyCaption"></ng-container>
+      <ng-container
+        *ngIf="keyMode"
+        [ngTemplateOutlet]="keyCaption"></ng-container>
     </ng-container>
 
     <!-- Cursor -->
@@ -334,7 +338,9 @@
       <p class="mcp-caption" *ngIf="!keyMode">
         Cursor opens a browser to sign in with OAuth on first use.
       </p>
-      <ng-container *ngIf="keyMode" [ngTemplateOutlet]="keyCaption"></ng-container>
+      <ng-container
+        *ngIf="keyMode"
+        [ngTemplateOutlet]="keyCaption"></ng-container>
     </ng-container>
 
     <!-- VS Code -->
@@ -353,7 +359,9 @@
       <p class="mcp-caption" *ngIf="!keyMode">
         VS Code opens a browser to sign in with OAuth on first use.
       </p>
-      <ng-container *ngIf="keyMode" [ngTemplateOutlet]="keyCaption"></ng-container>
+      <ng-container
+        *ngIf="keyMode"
+        [ngTemplateOutlet]="keyCaption"></ng-container>
     </ng-container>
 
     <!-- ChatGPT -->
@@ -371,7 +379,10 @@
             Copy
           </button>
         </li>
-        <li>Authentication: OAuth — ChatGPT discovers the sign-in flow from the server.</li>
+        <li>
+          Authentication: OAuth — ChatGPT discovers the sign-in flow from the
+          server.
+        </li>
         <li>Create, then connect and sign in with DreamFactory.</li>
       </ol>
       <p class="mcp-caption" *ngIf="bothAuthOn">
@@ -398,10 +409,7 @@
       <p class="mcp-caption">
         Check reachability:
         <code class="mcp-inline-code">{{ genericCurl }}</code>
-        <button
-          mat-button
-          type="button"
-          (click)="copyForClient(genericCurl)">
+        <button mat-button type="button" (click)="copyForClient(genericCurl)">
           Copy
         </button>
         — a 401 challenge here means healthy auth.
@@ -428,11 +436,14 @@
 
 <ng-template #keyCaption>
   <p class="mcp-caption" *ngIf="!store.createdApiKey">
-    Replace YOUR_API_KEY with a DreamFactory API key whose role grants
-    access to the exposed services.
+    Replace YOUR_API_KEY with a DreamFactory API key whose role grants access to
+    the exposed services.
   </p>
-  <p class="mcp-caption" *ngIf="store.createdApiKey" data-testid="mcp-created-key-caption">
-    Filled with the API key you just created on the Tools tab — it is not
-    shown again after you leave this page.
+  <p
+    class="mcp-caption"
+    *ngIf="store.createdApiKey"
+    data-testid="mcp-created-key-caption">
+    Filled with the API key you just created on the Tools tab — it is not shown
+    again after you leave this page.
   </p>
 </ng-template>

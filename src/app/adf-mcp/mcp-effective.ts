@@ -107,7 +107,9 @@ function pick(raw: Record<string, any>, snake: string, camel: string): any {
 }
 
 /** Accepts either snake_case (API) or camelCase (legacy resolver) blobs. */
-export function parseMcpConfig(raw: Record<string, any> | null | undefined): McpConfig {
+export function parseMcpConfig(
+  raw: Record<string, any> | null | undefined
+): McpConfig {
   const r = raw ?? {};
   const exposed = pick(r, 'exposed_services', 'exposedServices');
   const disabled = pick(r, 'disabled_tools', 'disabledTools');
@@ -115,7 +117,11 @@ export function parseMcpConfig(raw: Record<string, any> | null | undefined): Mcp
   // No fallback between the two: redirect_uris is the admin-managed list,
   // registered_redirect_uris the clients' read-only projection.
   const redirect = pick(r, 'redirect_uris', 'redirectUris');
-  const registered = pick(r, 'registered_redirect_uris', 'registeredRedirectUris');
+  const registered = pick(
+    r,
+    'registered_redirect_uris',
+    'registeredRedirectUris'
+  );
   const rest: Record<string, any> = {};
   for (const k of Object.keys(r)) {
     if (!KNOWN_KEYS.includes(k)) rest[k] = r[k];
@@ -123,7 +129,8 @@ export function parseMcpConfig(raw: Record<string, any> | null | undefined): Mcp
   return {
     exposedServices: Array.isArray(exposed) ? [...exposed] : [],
     disabledTools: new Set(Array.isArray(disabled) ? disabled : []),
-    toolStyle: style === 'merged' ? 'merged' : style === 'prefixed' ? 'prefixed' : null,
+    toolStyle:
+      style === 'merged' ? 'merged' : style === 'prefixed' ? 'prefixed' : null,
     lazyMode: normalizeLazyMode(pick(r, 'lazy_mode', 'lazyMode')),
     allowApiKeyAuth: !!pick(r, 'allow_api_key_auth', 'allowApiKeyAuth'),
     // Column defaults: allow_writes true; require_role_access false on
@@ -131,7 +138,8 @@ export function parseMcpConfig(raw: Record<string, any> | null | undefined): Mcp
     allowWrites: pick(r, 'allow_writes', 'allowWrites') !== false,
     requireRoleAccess: !!pick(r, 'require_role_access', 'requireRoleAccess'),
     oauthClientId: pick(r, 'oauth_client_id', 'oauthClientId') ?? '',
-    oauthClientSecret: pick(r, 'oauth_client_secret', 'oauthClientSecret') ?? '',
+    oauthClientSecret:
+      pick(r, 'oauth_client_secret', 'oauthClientSecret') ?? '',
     customLoginUrl: pick(r, 'custom_login_url', 'customLoginUrl') ?? '',
     autoOauthService: pick(r, 'auto_oauth_service', 'autoOauthService') ?? null,
     redirectUris: Array.isArray(redirect) ? [...redirect] : [],
@@ -206,7 +214,14 @@ export interface McpBackendService {
 
 /** Build from GET system/service rows + service type groups. */
 export function toBackendServices(
-  rows: Array<{ id?: number; name: string; label?: string; type: string; isActive?: boolean; is_active?: boolean }>,
+  rows: Array<{
+    id?: number;
+    name: string;
+    label?: string;
+    type: string;
+    isActive?: boolean;
+    is_active?: boolean;
+  }>,
   typeGroups: Record<string, string>
 ): McpBackendService[] {
   const out: McpBackendService[] = [];
@@ -237,7 +252,10 @@ export interface ServiceFraction {
   total: number;
 }
 
-export function serviceFraction(svc: McpBackendService, disabled: ReadonlySet<string>): ServiceFraction {
+export function serviceFraction(
+  svc: McpBackendService,
+  disabled: ReadonlySet<string>
+): ServiceFraction {
   const verbs = verbsFor(svc.kind);
   return {
     on: verbs.filter(v => !disabled.has(toolKey(svc.name, v.verb))).length,
@@ -252,7 +270,9 @@ export function groupState(
   group: McpVerbGroup,
   disabled: ReadonlySet<string>
 ): GroupState {
-  const on = group.verbs.filter(v => !disabled.has(toolKey(svc.name, v.verb))).length;
+  const on = group.verbs.filter(
+    v => !disabled.has(toolKey(svc.name, v.verb))
+  ).length;
   if (on === 0) return 'off';
   return on === group.verbs.length ? 'on' : 'part';
 }
@@ -265,7 +285,10 @@ export interface AccessState {
   label: string;
 }
 
-export function accessState(svc: McpBackendService, disabled: ReadonlySet<string>): AccessState {
+export function accessState(
+  svc: McpBackendService,
+  disabled: ReadonlySet<string>
+): AccessState {
   const f = serviceFraction(svc, disabled);
   if (f.on === 0) return { kind: 'zero', label: `0 of ${f.total}` };
   if (f.on === f.total) return { kind: 'full', label: 'Full' };
@@ -315,8 +338,14 @@ export function isCustomToolEnabled(t: any): boolean {
 }
 
 /** Enabled AND served: allow_writes=false hides write-capable custom tools. */
-export function isCustomToolServed(cfg: Pick<McpConfig, 'allowWrites'>, t: any): boolean {
-  return isCustomToolEnabled(t) && (cfg.allowWrites !== false || !isWriteCapableCustomTool(t));
+export function isCustomToolServed(
+  cfg: Pick<McpConfig, 'allowWrites'>,
+  t: any
+): boolean {
+  return (
+    isCustomToolEnabled(t) &&
+    (cfg.allowWrites !== false || !isWriteCapableCustomTool(t))
+  );
 }
 
 /**
@@ -334,8 +363,12 @@ export function isWriteCapableCustomTool(t: any): boolean {
 /* Key ownership                                                        */
 /* ------------------------------------------------------------------ */
 
-const DB_VERB_SET: ReadonlySet<string> = new Set(verbsFor('db').map(v => v.verb));
-const FILE_VERB_SET: ReadonlySet<string> = new Set(verbsFor('file').map(v => v.verb));
+const DB_VERB_SET: ReadonlySet<string> = new Set(
+  verbsFor('db').map(v => v.verb)
+);
+const FILE_VERB_SET: ReadonlySet<string> = new Set(
+  verbsFor('file').map(v => v.verb)
+);
 
 /**
  * True when `key` is exactly `{serviceName}_{verb}` for a verb in the given
@@ -365,17 +398,27 @@ export interface ExposedRow {
   svc: McpBackendService | null; // null => orphan (renamed/deleted)
 }
 
-export function exposedRows(cfg: McpConfig, services: McpBackendService[]): ExposedRow[] {
+export function exposedRows(
+  cfg: McpConfig,
+  services: McpBackendService[]
+): ExposedRow[] {
   return cfg.exposedServices.map(name => ({
     name,
     svc: services.find(s => s.name === name) ?? null,
   }));
 }
 
-function activeExposed(cfg: McpConfig, services: McpBackendService[], kind?: McpServiceKind): McpBackendService[] {
+function activeExposed(
+  cfg: McpConfig,
+  services: McpBackendService[],
+  kind?: McpServiceKind
+): McpBackendService[] {
   return exposedRows(cfg, services)
     .map(r => r.svc)
-    .filter((s): s is McpBackendService => !!s && s.active && (!kind || s.kind === kind));
+    .filter(
+      (s): s is McpBackendService =>
+        !!s && s.active && (!kind || s.kind === kind)
+    );
 }
 
 export interface EffectiveBreakdown {
@@ -435,9 +478,13 @@ export function effectiveTools(
     dbs.length >= 2
       ? AGGREGATOR_TOOLS.filter(t => !disabled.has(t.verb)).length
       : 0;
-  const enabledCustoms = (cfg.customTools ?? []).filter(t => isCustomToolServed(cfg, t));
+  const enabledCustoms = (cfg.customTools ?? []).filter(t =>
+    isCustomToolServed(cfg, t)
+  );
   const customTools = enabledCustoms.length;
-  const writeCapableCustoms = enabledCustoms.filter(isWriteCapableCustomTool).length;
+  const writeCapableCustoms = enabledCustoms.filter(
+    isWriteCapableCustomTool
+  ).length;
 
   // Write math mirrors the served-tool math above: merged db verbs are one
   // shared tool each; everything else (prefixed dbs, files in both styles)
@@ -465,7 +512,8 @@ export function effectiveTools(
       }
     }
   }
-  const dbWriteTools = style === 'merged' ? dbWriteVerbSet.size : dbWriteInstances;
+  const dbWriteTools =
+    style === 'merged' ? dbWriteVerbSet.size : dbWriteInstances;
   const writeVerbs = dbWriteTools + fileWriteInstances + writeCapableCustoms;
 
   const total = dbTools + fileTools + globalTools + aggregators + customTools;
@@ -534,7 +582,11 @@ export function orphanedKeys(
 }
 
 /** Emitted tool name a client sees for a db verb in the given style. */
-export function emittedDbToolName(style: ToolStyle, serviceName: string, verb: string): string {
+export function emittedDbToolName(
+  style: ToolStyle,
+  serviceName: string,
+  verb: string
+): string {
   return style === 'merged' ? verb : toolKey(serviceName, verb);
 }
 
@@ -581,7 +633,11 @@ export function estimateCatalog(
   };
 }
 
-export function tokensPerTurn(lazy: boolean, bytes: number, facadeBytes: number): number {
+export function tokensPerTurn(
+  lazy: boolean,
+  bytes: number,
+  facadeBytes: number
+): number {
   return Math.round((lazy ? facadeBytes : bytes) / 4);
 }
 
@@ -605,7 +661,9 @@ export interface ServerCatalog {
 }
 
 /** Shape a JSON-RPC tools/list result: a facade answer means lazy engaged. */
-export function serverCatalogFromToolsList(tools: Array<{ name: string }>): ServerCatalog | null {
+export function serverCatalogFromToolsList(
+  tools: Array<{ name: string }>
+): ServerCatalog | null {
   if (!tools.length) return null;
   const bytes = JSON.stringify({ tools }).length;
   const facade = new Set(LAZY_FACADE_TOOLS.map(t => t.verb));

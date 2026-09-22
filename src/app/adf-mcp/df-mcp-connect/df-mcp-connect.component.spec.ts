@@ -122,9 +122,7 @@ describe('DfMcpConnectComponent', () => {
     it('shows the off-state hint when allowApiKeyAuth is off', () => {
       create(makeStore({ allowKey: false }));
       const card = byTestId('mcp-apikey-card');
-      expect(card!.textContent).toContain(
-        'API-key auth is off — enable it in'
-      );
+      expect(card!.textContent).toContain('API-key auth is off — enable it in');
       expect(card!.textContent).toContain('Settings → Authentication');
     });
 

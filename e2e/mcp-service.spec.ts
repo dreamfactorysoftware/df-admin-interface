@@ -1,4 +1,10 @@
-import { APIRequestContext, Locator, Page, expect, test } from '@playwright/test';
+import {
+  APIRequestContext,
+  Locator,
+  Page,
+  expect,
+  test,
+} from '@playwright/test';
 import { loginAsAdmin, waitForAppReady } from './fixtures/admin-login';
 import { DfApi } from './fixtures/df-api';
 import {
@@ -153,7 +159,9 @@ test.describe('MCP editor — Connect tab', () => {
 
     // Generic JSON panel: key header variant + the legacy alias comment.
     await page.getByTestId('mcp-client-chip-json').click();
-    await expect(panel).toContainText('"X-DreamFactory-API-Key": "YOUR_API_KEY"');
+    await expect(panel).toContainText(
+      '"X-DreamFactory-API-Key": "YOUR_API_KEY"'
+    );
     await expect(panel).toContainText(
       `Legacy alias (same server): ${origin}/api/v2/mcp_full/_mcp`
     );
@@ -334,9 +342,7 @@ test.describe('MCP editor — Settings tab (discard only)', () => {
     if (!hasOrphans) {
       await expect(housekeeping).toContainText('No orphaned tool settings.');
     } else {
-      await expect(
-        page.getByTestId('mcp-housekeeping-review')
-      ).toBeVisible();
+      await expect(page.getByTestId('mcp-housekeeping-review')).toBeVisible();
     }
     await expect(page.getByTestId('mcp-flush-cache')).toBeVisible();
     // Danger zone is present but untouched.

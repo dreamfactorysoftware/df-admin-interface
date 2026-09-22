@@ -123,8 +123,7 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
     fetch(url, { method: 'GET' })
       .then(res => {
         if (url !== this.mcpUrl) return;
-        this.probe =
-          res.status === 401 || res.status === 403 ? 'auth' : 'open';
+        this.probe = res.status === 401 || res.status === 403 ? 'auth' : 'open';
       })
       .catch(() => {
         if (url === this.mcpUrl) this.probe = 'unknown';
@@ -253,7 +252,9 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
 
   private restoreClientChoice(): void {
     try {
-      const v = localStorage.getItem(this.clientChoiceKey) as McpClientId | null;
+      const v = localStorage.getItem(
+        this.clientChoiceKey
+      ) as McpClientId | null;
       if (v && this.clients.some(c => c.id === v)) this.selectedClient = v;
     } catch {
       /* storage blocked — default stands */

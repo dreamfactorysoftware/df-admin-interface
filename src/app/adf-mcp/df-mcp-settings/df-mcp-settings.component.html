@@ -66,9 +66,11 @@
           ×
         </button>
       </li>
-      <li class="mcp-redirect-empty" *ngIf="store.cfg.redirectUris.length === 0">
-        No redirect URIs yet — OAuth clients that need a callback can't
-        connect until theirs is added.
+      <li
+        class="mcp-redirect-empty"
+        *ngIf="store.cfg.redirectUris.length === 0">
+        No redirect URIs yet — OAuth clients that need a callback can't connect
+        until theirs is added.
       </li>
     </ul>
     <div class="mcp-redirect-addrow">
@@ -131,8 +133,8 @@
       Allow API-key authentication
     </mat-slide-toggle>
     <p class="mcp-hint">
-      Anyone with the URL and a valid API key connects without a login
-      prompt. The key's role decides which tools it can use.
+      Anyone with the URL and a valid API key connects without a login prompt.
+      The key's role decides which tools it can use.
     </p>
 
     <mat-slide-toggle
@@ -144,12 +146,12 @@
     </mat-slide-toggle>
     <p class="mcp-hint" [class.warn]="!store.cfg.requireRoleAccess">
       <ng-container *ngIf="store.cfg.requireRoleAccess; else anyUser">
-        Only users and API keys whose role is granted access to this MCP
-        service can connect. Admins always can.
+        Only users and API keys whose role is granted access to this MCP service
+        can connect. Admins always can.
       </ng-container>
       <ng-template #anyUser>
-        Anyone who can sign in to DreamFactory can connect; their role
-        still decides what they can reach.
+        Anyone who can sign in to DreamFactory can connect; their role still
+        decides what they can reach.
       </ng-template>
     </p>
 
@@ -180,8 +182,8 @@
         (change)="onToolStyleChange($event)">
         <mat-radio-button value="merged" data-testid="mcp-toolstyle-merged">
           <span class="mcp-radio-label">
-            Consolidated (merged) — one tool per verb with a service
-            argument. Recommended.
+            Consolidated (merged) — one tool per verb with a service argument.
+            Recommended.
           </span>
           <span class="mcp-radio-note" *ngIf="store.cfg.toolStyle === 'merged'">
             Matches the recommended default.
@@ -201,9 +203,9 @@
         class="mcp-hint warn"
         *ngIf="styleChanged"
         data-testid="mcp-toolstyle-note">
-        Style changes rename emitted tools — preview before saving. Clients
-        may need to reconnect. Your tool selections are preserved — they
-        apply per service in both modes.
+        Style changes rename emitted tools — preview before saving. Clients may
+        need to reconnect. Your tool selections are preserved — they apply per
+        service in both modes.
       </p>
     </ng-container>
 
@@ -219,13 +221,13 @@
       </mat-slide-toggle>
       <p class="mcp-hint" [class.warn]="!store.cfg.allowWrites">
         <ng-container *ngIf="store.cfg.allowWrites; else readOnlyServer">
-          Write tools you leave on can create, update and delete records
-          and files and call procedures, subject to the caller's role.
+          Write tools you leave on can create, update and delete records and
+          files and call procedures, subject to the caller's role.
         </ng-container>
         <ng-template #readOnlyServer>
-          Read-only server: write tools and custom tools that write are
-          never offered, whatever the per-tool settings. Clients must
-          reconnect to pick up a change.
+          Read-only server: write tools and custom tools that write are never
+          offered, whatever the per-tool settings. Clients must reconnect to
+          pick up a change.
         </ng-template>
       </p>
     </ng-container>
@@ -244,13 +246,13 @@
       </mat-select>
     </mat-form-field>
     <p class="mcp-hint">
-      When the tool list exceeds 32 KB (~8k tokens), agents first receive
-      five discovery tools instead of the full catalog.
+      When the tool list exceeds 32 KB (~8k tokens), agents first receive five
+      discovery tools instead of the full catalog.
     </p>
 
     <p class="mcp-scope-line" data-testid="mcp-scope-line">
-      Scope tools to caller's role: {{ scopeToolsOn ? 'on' : 'off' }} — set
-      by MCP_SCOPE_TOOLS on the server.
+      Scope tools to caller's role: {{ scopeToolsOn ? 'on' : 'off' }} — set by
+      MCP_SCOPE_TOOLS on the server.
     </p>
   </section>
 
@@ -262,8 +264,8 @@
       <p class="mcp-hint warn">
         {{ orphanCount }} saved tool
         {{ orphanCount === 1 ? 'setting references' : 'settings reference' }}
-        services that no longer exist. Nothing is removed automatically —
-        review before deleting.
+        services that no longer exist. Nothing is removed automatically — review
+        before deleting.
       </p>
       <button
         mat-stroked-button
@@ -298,7 +300,9 @@
     <p class="mcp-hint">
       The stored config, read-only — what the audit sees is what you see.
     </p>
-    <pre class="mcp-fullconfig" data-testid="mcp-fullconfig">{{ fullConfigJson }}</pre>
+    <pre class="mcp-fullconfig" data-testid="mcp-fullconfig">{{
+      fullConfigJson
+    }}</pre>
   </section>
 
   <!-- 6 · Danger zone -->

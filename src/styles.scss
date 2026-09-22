@@ -713,7 +713,9 @@ a {
 // Checkbox — checked AND indeterminate both take the DF purple; without the
 // indeterminate variant the tri-state minus falls through to the coral accent.
 .mat-mdc-checkbox.mat-mdc-checkbox-checked .mdc-checkbox__background,
-.mat-mdc-checkbox .mdc-checkbox__native-control:indeterminate ~ .mdc-checkbox__background,
+.mat-mdc-checkbox
+  .mdc-checkbox__native-control:indeterminate
+  ~ .mdc-checkbox__background,
 .mdc-checkbox__ripple {
   background-color: mat.get-color-from-palette(
     $df-purple-palette,
