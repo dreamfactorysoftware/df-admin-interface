@@ -91,6 +91,16 @@ function headerToolsLiveChip(page: Page): Locator {
   return page.locator('.mcp-head').getByRole('button', { name: /tools live/ });
 }
 
+/**
+ * The header chip's current number, or null while it has not rendered one.
+ * Deliberately assertion-free so it can drive expect.poll.
+ */
+async function toolsLiveCount(page: Page): Promise<number | null> {
+  const text = (await headerToolsLiveChip(page).textContent()) ?? '';
+  const m = text.match(/(\d+) tools live/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 async function numberFrom(locator: Locator, re: RegExp): Promise<number> {
   const text = (await locator.textContent()) ?? '';
   const m = text.match(re);
@@ -135,10 +145,14 @@ test.describe('MCP editor — Connect tab', () => {
       { timeout: 15_000 }
     );
 
-    // Header carries the live effective count, N > 0 and = model(config).
-    const n = await numberFrom(headerToolsLiveChip(page), /(\d+) tools live/);
-    expect(n).toBeGreaterThan(0);
-    expect(n).toBe(expectedTotal());
+    // Header carries the live effective count, = model(config). The chip paints
+    // as soon as the editor does, before the backend-services fetch lands, so it
+    // starts at the services-less count and settles once the catalog arrives.
+    // Read it with a retrying assertion rather than once.
+    expect(expectedTotal()).toBeGreaterThan(0);
+    await expect
+      .poll(() => toolsLiveCount(page), { timeout: 15_000 })
+      .toBe(expectedTotal());
   });
 
   test('client panels are auth-aware and never leak a real credential', async ({
