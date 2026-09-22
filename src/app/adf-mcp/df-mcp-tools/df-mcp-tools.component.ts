@@ -19,12 +19,9 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterLink } from '@angular/router';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import {
   SYSTEM_MCP_TOOLS,
@@ -64,6 +61,7 @@ import {
   applyPickerResult,
 } from '../df-mcp-picker/df-mcp-picker.component';
 import { DfMcpPreviewComponent } from '../df-mcp-preview/df-mcp-preview.component';
+import { DfMcpAccessComponent } from '../df-mcp-access/df-mcp-access.component';
 import {
   DfMcpCustomToolDialogComponent,
 } from './df-mcp-custom-tool-dialog.component';
@@ -90,10 +88,6 @@ function isSystemReadTool(t: SystemMcpTool): boolean {
   return /^(get_|list_)/.test(t.name);
 }
 
-export const PRECEDENCE_POPOVER =
-  '1. Exposed services contribute their tools. 2. Minus tools you turn off. ' +
-  '3. Roles filter further per caller at runtime.';
-
 @Component({
   selector: 'df-mcp-tools',
   standalone: true,
@@ -103,12 +97,10 @@ export const PRECEDENCE_POPOVER =
     MatButtonModule,
     MatCheckboxModule,
     MatDialogModule,
-    MatFormFieldModule,
     MatMenuModule,
-    MatSelectModule,
     MatSlideToggleModule,
     MatTooltipModule,
-    RouterLink,
+    DfMcpAccessComponent,
   ],
   templateUrl: './df-mcp-tools.component.html',
   styleUrls: ['./df-mcp-tools.component.scss'],
@@ -161,7 +153,6 @@ export class DfMcpToolsComponent implements OnChanges {
     e.tool.verb;
   readonly trackByVerb = (_: number, r: { verb: string }): string => r.verb;
 
-  readonly precedenceTooltip = PRECEDENCE_POPOVER;
   readonly allOffLine =
     'Agents see this service but can call nothing. Enable tools or remove it.';
   readonly lazyWhyTooltip =
@@ -169,8 +160,6 @@ export class DfMcpToolsComponent implements OnChanges {
     `receive ${LAZY_FACADE_TOOLS.length} discovery tools instead of the full catalog: ` +
     'search_tools → describe_tool → call_tool, with fetch_more for long results. ' +
     'Every tool stays callable by name.';
-  /** Permanent role line's Manage-roles target (routes.ts: api-connections → role-based-access). */
-  readonly rolesRoute = '/api-connections/role-based-access';
 
   /** Expanded drill-ins, level-2 individual-tools disclosures, by name. */
   expanded = new Set<string>();

@@ -312,10 +312,7 @@
       <p class="mcp-caption" *ngIf="!keyMode">
         Claude Code opens a browser to sign in with OAuth on first use.
       </p>
-      <p class="mcp-caption" *ngIf="keyMode">
-        Replace YOUR_API_KEY with a DreamFactory API key whose role grants
-        access to the exposed services.
-      </p>
+      <ng-container *ngIf="keyMode" [ngTemplateOutlet]="keyCaption"></ng-container>
     </ng-container>
 
     <!-- Cursor -->
@@ -337,10 +334,7 @@
       <p class="mcp-caption" *ngIf="!keyMode">
         Cursor opens a browser to sign in with OAuth on first use.
       </p>
-      <p class="mcp-caption" *ngIf="keyMode">
-        Replace YOUR_API_KEY with a DreamFactory API key whose role grants
-        access to the exposed services.
-      </p>
+      <ng-container *ngIf="keyMode" [ngTemplateOutlet]="keyCaption"></ng-container>
     </ng-container>
 
     <!-- VS Code -->
@@ -359,10 +353,7 @@
       <p class="mcp-caption" *ngIf="!keyMode">
         VS Code opens a browser to sign in with OAuth on first use.
       </p>
-      <p class="mcp-caption" *ngIf="keyMode">
-        Replace YOUR_API_KEY with a DreamFactory API key whose role grants
-        access to the exposed services.
-      </p>
+      <ng-container *ngIf="keyMode" [ngTemplateOutlet]="keyCaption"></ng-container>
     </ng-container>
 
     <!-- ChatGPT -->
@@ -434,3 +425,14 @@
     </a>
   </footer>
 </div>
+
+<ng-template #keyCaption>
+  <p class="mcp-caption" *ngIf="!store.createdApiKey">
+    Replace YOUR_API_KEY with a DreamFactory API key whose role grants
+    access to the exposed services.
+  </p>
+  <p class="mcp-caption" *ngIf="store.createdApiKey" data-testid="mcp-created-key-caption">
+    Filled with the API key you just created on the Tools tab — it is not
+    shown again after you leave this page.
+  </p>
+</ng-template>

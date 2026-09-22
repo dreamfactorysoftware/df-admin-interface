@@ -328,10 +328,15 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
     );
   }
 
+  /** The key created from the Tools tab's Access section, else a placeholder. */
+  get apiKeyValue(): string {
+    return this.store.createdApiKey ?? 'YOUR_API_KEY';
+  }
+
   get claudeCodeSnippet(): string {
     const base = `claude mcp add --transport http ${this.serviceName} ${this.mcpUrl}`;
     return this.keyMode
-      ? `${base} --header "${API_KEY_HEADER}: YOUR_API_KEY"`
+      ? `${base} --header "${API_KEY_HEADER}: ${this.apiKeyValue}"`
       : base;
   }
 
@@ -340,7 +345,7 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
       ? { type: 'http', url: this.mcpUrl }
       : { url: this.mcpUrl };
     if (this.keyMode) {
-      entry['headers'] = { [API_KEY_HEADER]: 'YOUR_API_KEY' };
+      entry['headers'] = { [API_KEY_HEADER]: this.apiKeyValue };
     }
     return entry;
   }

@@ -139,6 +139,11 @@ export class McpEditorStore {
   copiedClient = false;
   /** One-shot amber banner on Connect after connection-affecting saves. */
   reconnectBanner = false;
+  /**
+   * API key created from the Access section this visit, shown once. Connect
+   * snippets fill it in place of YOUR_API_KEY; never persisted.
+   */
+  createdApiKey: string | null = null;
 
   readonly changes = new Subject<void>();
 
@@ -183,6 +188,7 @@ export class McpEditorStore {
     this.copiedUrl = false;
     this.copiedClient = false;
     this.reconnectBanner = false;
+    this.createdApiKey = null;
     this.touch();
   }
 
