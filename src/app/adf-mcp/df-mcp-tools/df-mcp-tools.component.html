@@ -424,16 +424,29 @@
         <h2 class="mcp-rail-title">What an agent gets</h2>
         <p class="mcp-rail-total" data-testid="mcp-rail-total">
           <b>{{ railTotal() }}</b> callable tools
+          <span class="mcp-rail-note" *ngIf="serverCountNote()" data-testid="mcp-server-count">
+            · {{ serverCountNote() }}
+          </span>
+        </p>
+        <p class="mcp-rail-note" data-testid="mcp-rail-size">
+          {{ sizeLine() }}
+          <ng-container *ngIf="stats().source === 'estimate'">(estimate)</ng-container>
         </p>
         <ul class="mcp-rail-breakdown">
           <li *ngFor="let line of railBreakdown()">{{ line }}</li>
         </ul>
 
         <div class="mcp-rail-ro" data-testid="mcp-rail-readonly">
+          <ng-container *ngIf="writesOff(); else curated">
+            <span class="mcp-chip good" data-testid="mcp-writes-off">Read-only ✓</span>
+            <span class="mcp-rail-note">writes are off for this server (Settings) — write tools are not served</span>
+          </ng-container>
+          <ng-template #curated>
           <ng-container *ngIf="railReadOnly(); else writesActive">
             <span class="mcp-chip good">Read-only ✓</span>
             <span class="mcp-rail-note">zero write or execute tools enabled</span>
           </ng-container>
+          </ng-template>
           <ng-template #writesActive>
             <span class="mcp-rail-note">
               {{ railWriteActive() }} write {{ railWriteActive() === 1 ? 'tool' : 'tools' }} active

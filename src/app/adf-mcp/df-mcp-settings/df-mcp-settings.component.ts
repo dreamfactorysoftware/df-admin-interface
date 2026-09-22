@@ -221,6 +221,16 @@ export class DfMcpSettingsComponent implements OnInit, OnChanges {
     this.store.touch();
   }
 
+  setRequireRoleAccess(event: MatSlideToggleChange): void {
+    this.store.cfg.requireRoleAccess = event.checked;
+    this.store.touch();
+  }
+
+  setAllowWrites(event: MatSlideToggleChange): void {
+    this.store.cfg.allowWrites = event.checked;
+    this.store.touch();
+  }
+
   regenerateSecret(): void {
     const ok = window.confirm(
       'Clients using the old secret will stop connecting. Regenerate?'

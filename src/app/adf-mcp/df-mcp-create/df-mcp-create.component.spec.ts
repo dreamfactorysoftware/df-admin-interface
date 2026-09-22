@@ -304,6 +304,8 @@ describe('DfMcpCreateComponent', () => {
               toolStyle: 'merged',
               lazyMode: 'auto',
               allowApiKeyAuth: false,
+              allowWrites: true,
+              requireRoleAccess: true,
             },
           },
         ],
@@ -353,12 +355,12 @@ describe('DfMcpCreateComponent', () => {
       expect(consequence()).not.toContain('Empty never means every service.');
     });
 
-    it('creates with type system_mcp and an empty config', () => {
+    it('creates with type system_mcp and only require_role_access', () => {
       setName('admin_mcp');
       (byTestId('mcp-create-submit') as HTMLButtonElement).click();
       const body = (servicesService.create as jest.Mock).mock.calls[0][0];
       expect(body.resource[0].type).toBe('system_mcp');
-      expect(body.resource[0].config).toEqual({});
+      expect(body.resource[0].config).toEqual({ requireRoleAccess: true });
       expect(router.navigate).toHaveBeenCalledWith(['../', 9], {
         relativeTo: route,
         queryParams: { created: 1 },

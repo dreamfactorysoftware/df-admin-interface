@@ -766,11 +766,11 @@ describe('dialog templates render', () => {
     const c = fx.componentInstance;
     expect(c.lazyEngaged).toBe(true);
     expect(c.view).toBe('first');
-    expect(c.lazyLabel()).toBe('Lazy loading: engaged (always on)');
+    expect(c.lazyLabel()).toMatch(/^Lazy loading: engaged \(always on\) — .* facade instead of /);
     // Identity-stable groups feed trackBy'd ngFors.
     expect(c.visibleGroups()).toBe(c.visibleGroups());
     expect(fx.nativeElement.textContent).toContain(
-      'First response — discovery tools (4)'
+      'First response — discovery tools (5)'
     );
     // One-line polish: the description carries its full text in title.
     c.view = 'full';

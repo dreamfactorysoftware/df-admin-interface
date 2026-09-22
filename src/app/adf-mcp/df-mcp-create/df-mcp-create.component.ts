@@ -423,8 +423,14 @@ export class DfMcpCreateComponent implements OnInit {
             toolStyle: this.toolStyle,
             lazyMode: 'auto',
             allowApiKeyAuth: false,
+            // Read-only is compiled into disabled_tools above, so writes stay
+            // re-enableable per tool; the server-wide switch lives in Settings.
+            allowWrites: true,
+            // Backend default for new services, sent explicitly: only granted
+            // roles may connect until an admin opens it up.
+            requireRoleAccess: true,
           }
-        : {};
+        : { requireRoleAccess: true };
     this.servicesService
       .create<GenericCreateResponse>({
         resource: [
