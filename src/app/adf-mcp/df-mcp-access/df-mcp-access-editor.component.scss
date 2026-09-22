@@ -18,8 +18,8 @@
 
 .mcp-acc-warn {
   font-size: 12.5px;
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
   border-radius: 8px;
   padding: 6px 10px;
   margin: 0 0 10px;
@@ -39,7 +39,7 @@
   align-items: center;
 
   a {
-    color: var(--df-accent, #5c5699);
+    color: var(--df-accent);
     font-weight: 600;
     text-decoration: none;
   }
@@ -47,14 +47,14 @@
 
 .mcp-acc-filter {
   padding: 6px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid color-mix(in srgb, var(--df-text) 20%, transparent);
   border-radius: 6px;
   font: inherit;
   min-width: 200px;
 }
 
 .mcp-acc-group {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 10px;
   margin-bottom: 10px;
   padding: 4px 12px 8px;
@@ -77,7 +77,7 @@
   align-items: center;
   gap: 8px 12px;
   padding: 6px 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 5%, transparent);
 }
 
 .mcp-acc-name {
@@ -107,14 +107,14 @@
 
 .mcp-acc-seg {
   display: inline-flex;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid color-mix(in srgb, var(--df-text) 18%, transparent);
   border-radius: 8px;
   overflow: hidden;
 }
 
 .mcp-acc-opt {
   border: 0;
-  background: #fff;
+  background: var(--df-surface);
   padding: 4px 10px;
   font: inherit;
   font-size: 12px;
@@ -122,11 +122,11 @@
   white-space: nowrap;
 
   & + & {
-    border-left: 1px solid rgba(0, 0, 0, 0.12);
+    border-left: 1px solid color-mix(in srgb, var(--df-text) 12%, transparent);
   }
   &.on {
-    background: rgba(92, 86, 153, 0.14);
-    color: var(--df-accent, #5c5699);
+    background: color-mix(in srgb, var(--df-accent) 14%, transparent);
+    color: var(--df-accent);
     font-weight: 700;
   }
   &:disabled {
@@ -141,7 +141,7 @@
   padding: 0;
   font: inherit;
   font-size: 12px;
-  color: var(--df-accent, #5c5699);
+  color: var(--df-accent);
   cursor: pointer;
 }
 
@@ -157,14 +157,14 @@
 }
 
 .mcp-acc-summary {
-  background: rgba(92, 86, 153, 0.07);
+  background: color-mix(in srgb, var(--df-accent) 7%, transparent);
   border-radius: 8px;
   padding: 8px 12px;
   margin: 6px 0 4px;
 }
 
 .mcp-acc-error {
-  color: #b3261e;
+  color: var(--df-danger);
   margin: 4px 0;
 }
 
@@ -177,8 +177,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
   border-radius: 8px;
   padding: 10px 12px;
 

@@ -145,235 +145,219 @@
 
           <!-- Exposed-service rows -->
           <div class="mcp-card mcp-rows" *ngIf="serviceRows().length > 0">
-            <div
-              class="mcp-row"
-              *ngFor="let row of visibleRows(); trackBy: trackByName"
-              [class.inactive]="!row.svc.active"
-              [attr.data-testid]="'mcp-svc-row-' + row.name">
-              <div class="mcp-row-head">
-                <mat-checkbox
-                  *ngIf="showFilter()"
-                  class="mcp-row-bulk"
-                  [checked]="isSelected(row.name)"
-                  (change)="toggleSelected(row.name)"
-                  (click)="$event.stopPropagation()"></mat-checkbox>
-                <button
-                  type="button"
-                  class="mcp-row-main"
-                  (click)="toggleExpand(row.name)">
-                  <span class="mcp-row-icon" aria-hidden="true">{{
-                    typeIcon(row.svc.kind)
+            <ng-container
+              *ngFor="
+                let row of gridRows();
+                let i = index;
+                trackBy: trackByName
+              ">
+              <!-- Column header once per kind: tool names, column + group switches -->
+              <div
+                class="mcp-grid-head"
+                *ngIf="startsKind(i)"
+                [attr.data-testid]="'mcp-grid-head-' + row.svc.kind">
+                <div class="mcp-grid-head-left">
+                  <span class="mcp-grid-head-title">{{
+                    kindTitle(row.svc.kind)
                   }}</span>
-                  <span class="mcp-row-label">{{ row.svc.label }}</span>
-                  <span class="mcp-chip">{{ row.name }}</span>
-                  <span class="mcp-chip mcp-type-badge">{{
-                    typeBadge(row.svc.kind)
-                  }}</span>
-                </button>
-                <span class="mcp-chip warn" *ngIf="!row.svc.active">
-                  Service inactive — tools not served
-                </span>
-                <!-- Chip semantics: Read-only = green (the safe state), Full =
+                  <span class="mcp-grid-head-hint"
+                    >Click a cell to turn one tool off. The switches change a
+                    whole column or group.</span
+                  >
+                </div>
+                <div class="mcp-cells">
+                  <div
+                    class="mcp-cellgroup"
+                    *ngFor="let g of groupsForKind(row.svc.kind)"
+                    [class.write]="!!g.warn">
+                    <div class="mcp-cellgroup-label">
+                      <span>{{ shortGroupLabel(g) }}</span>
+                      <button
+                        type="button"
+                        class="mcp-sw"
+                        role="switch"
+                        [attr.data-state]="columnState(row.svc.kind, g.verbs)"
+                        [attr.aria-checked]="
+                          columnState(row.svc.kind, g.verbs) === 'on'
+                        "
+                        [attr.aria-label]="
+                          columnTip(row.svc.kind, g.label, g.verbs)
+                        "
+                        [matTooltip]="columnTip(row.svc.kind, g.label, g.verbs)"
+                        (click)="toggleColumn(row.svc.kind, g.verbs)">
+                        <i></i>
+                      </button>
+                    </div>
+                    <div class="mcp-cellgroup-cols">
+                      <div class="mcp-colhead" *ngFor="let v of g.verbs">
+                        <span class="mcp-colhead-name">{{ v.verb }}</span>
+                        <button
+                          type="button"
+                          class="mcp-sw"
+                          role="switch"
+                          [attr.data-state]="columnState(row.svc.kind, [v])"
+                          [attr.aria-checked]="
+                            columnState(row.svc.kind, [v]) === 'on'
+                          "
+                          [attr.aria-label]="
+                            columnTip(row.svc.kind, v.verb, [v])
+                          "
+                          [matTooltip]="columnTip(row.svc.kind, v.verb, [v])"
+                          (click)="toggleColumn(row.svc.kind, [v])">
+                          <i></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <span class="mcp-row-tail"></span>
+              </div>
+              <div
+                class="mcp-row"
+                [class.inactive]="!row.svc.active"
+                [attr.data-testid]="'mcp-svc-row-' + row.name">
+                <div class="mcp-row-head">
+                  <div class="mcp-row-left">
+                    <mat-checkbox
+                      *ngIf="showFilter()"
+                      class="mcp-row-bulk"
+                      [checked]="isSelected(row.name)"
+                      (change)="toggleSelected(row.name)"
+                      (click)="$event.stopPropagation()"></mat-checkbox>
+                    <button
+                      type="button"
+                      class="mcp-row-main"
+                      (click)="toggleExpand(row.name)">
+                      <span class="mcp-row-icon" aria-hidden="true">{{
+                        typeIcon(row.svc.kind)
+                      }}</span>
+                      <span class="mcp-row-label">{{ row.svc.label }}</span>
+                      <span class="mcp-chip">{{ row.name }}</span>
+                      <span class="mcp-chip mcp-type-badge">{{
+                        typeBadge(row.svc.kind)
+                      }}</span>
+                    </button>
+                    <span class="mcp-chip warn" *ngIf="!row.svc.active">
+                      Service inactive — tools not served
+                    </span>
+                    <!-- Chip semantics: Read-only = green (the safe state), Full =
                      neutral (never green on the most-permissive preset),
                      Custom ◐ = indigo, 0-of-m = warn. -->
-                <button
-                  type="button"
-                  class="mcp-chip mcp-chip-btn mcp-access-chip"
-                  [class.good]="accessKind(row.svc) === 'ro'"
-                  [class.primary]="accessKind(row.svc) === 'custom'"
-                  [class.warn]="accessKind(row.svc) === 'zero'"
-                  [attr.data-testid]="'mcp-svc-access-' + row.name"
-                  [matMenuTriggerFor]="accessMenu"
-                  (click)="$event.stopPropagation()">
-                  {{ accessDisplay(row.svc) }}
-                </button>
-                <mat-menu #accessMenu="matMenu">
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="setFull(row.svc)">
-                    Full access
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="setReadOnly(row.svc)">
-                    Read-only
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="expanded.add(row.name)">
-                    Choose tools…
-                  </button>
-                </mat-menu>
-                <span
-                  class="mcp-fraction"
-                  [attr.data-testid]="'mcp-svc-fraction-' + row.name">
-                  {{ fractionText(row.svc) }}
-                </span>
-                <span class="mcp-cap-strip" aria-hidden="true">
-                  <ng-container
-                    *ngFor="let g of groupsFor(row.svc); let last = last">
-                    <span
-                      class="mcp-cap"
-                      [class.off]="groupStateOf(row.svc, g) === 'off'"
-                      [class.part]="groupStateOf(row.svc, g) === 'part'">
-                      <span class="mcp-cap-full"
-                        >{{ groupStateOf(row.svc, g) === 'part' ? '◐ ' : ''
-                        }}{{ g.label }}</span
-                      >
-                      <span class="mcp-cap-init">{{
-                        groupStateOf(row.svc, g) === 'part'
-                          ? '◐'
-                          : g.label.charAt(0)
-                      }}</span>
-                    </span>
-                    <span class="mcp-cap-sep" *ngIf="!last">·</span>
-                  </ng-container>
-                </span>
-                <button
-                  mat-icon-button
-                  type="button"
-                  class="mcp-row-menu-btn"
-                  aria-label="Service actions"
-                  [attr.data-testid]="'mcp-svc-menu-' + row.name"
-                  [matMenuTriggerFor]="rowMenu"
-                  (click)="$event.stopPropagation()">
-                  ⋮
-                </button>
-                <mat-menu #rowMenu="matMenu">
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="expanded.add(row.name)">
-                    Edit tools
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="setFull(row.svc)">
-                    Full access
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="setReadOnly(row.svc)">
-                    Read-only
-                  </button>
-                  <!-- No 'Reset to all' here: identical to Full access; the
-                       drill-in footer keeps the in-context 'Reset to all N'. -->
-                  <button
-                    mat-menu-item
-                    type="button"
-                    *ngIf="
-                      row.svc.kind === 'db' && copyTargets(row.svc).length > 0
-                    "
-                    [matMenuTriggerFor]="copyMenu">
-                    Copy this selection to…
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    class="mcp-menu-danger"
-                    (click)="removeServices([row.name])">
-                    Remove from server
-                  </button>
-                </mat-menu>
-                <mat-menu #copyMenu="matMenu">
-                  <button
-                    mat-menu-item
-                    type="button"
-                    *ngFor="
-                      let target of copyTargets(row.svc);
-                      trackBy: trackBySvcName
-                    "
-                    (click)="copySelectionTo(row.svc, target)">
-                    {{ target.label }} ({{ target.name }})
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    (click)="copySelectionTo(row.svc, null)">
-                    All exposed databases
-                  </button>
-                </mat-menu>
-                <button
-                  type="button"
-                  class="mcp-row-caret"
-                  [attr.aria-expanded]="isExpanded(row.name)"
-                  (click)="toggleExpand(row.name)">
-                  {{ isExpanded(row.name) ? '▾' : '▸' }}
-                </button>
-              </div>
-
-              <!-- Drill-in: capability groups + individual tools -->
-              <div class="mcp-drill" *ngIf="isExpanded(row.name)">
-                <p
-                  class="mcp-drill-alloff"
-                  *ngIf="accessKind(row.svc) === 'zero'">
-                  {{ allOffLine }}
-                </p>
-                <p class="mcp-drill-caption" *ngIf="showMergedCaption(row.svc)">
-                  {{ mergedCaption(row.svc) }}
-                </p>
-                <!-- Count stated once, in the 'x of y on' trailer (§3.2 anatomy). -->
-                <div class="mcp-group-row" *ngFor="let g of groupsFor(row.svc)">
-                  <mat-checkbox
-                    [checked]="groupStateOf(row.svc, g) === 'on'"
-                    [indeterminate]="groupStateOf(row.svc, g) === 'part'"
-                    (change)="toggleGroup(row.svc, g)">
-                    {{ g.label }}
-                  </mat-checkbox>
-                  <span class="mcp-warn-tag" *ngIf="g.warn === 'writes'"
-                    >⚠ writes</span
-                  >
-                  <span class="mcp-warn-tag" *ngIf="g.warn === 'executes'"
-                    >⚠ executes</span
-                  >
-                  <span class="mcp-group-count">
-                    {{ groupOnCount(row.svc, g) }} of {{ g.verbs.length }} on
-                  </span>
-                </div>
-                <button
-                  class="mcp-linklike"
-                  type="button"
-                  (click)="toggleToolsList(row.name)">
-                  {{ isToolsListOpen(row.name) ? '▾' : '▸' }} Individual tools
-                  ({{ verbCount(row.svc) }})
-                </button>
-                <div class="mcp-tool-list" *ngIf="isToolsListOpen(row.name)">
-                  <ng-container *ngFor="let g of groupsFor(row.svc)">
-                    <div class="mcp-tool-row" *ngFor="let v of g.verbs">
-                      <mat-checkbox
-                        [checked]="toolEnabled(row.svc, v.verb)"
-                        (change)="
-                          setToolChecked(row.svc, v.verb, $event.checked)
-                        ">
-                        <code>{{ emittedName(row.svc, v.verb) }}</code>
-                      </mat-checkbox>
-                      <span class="mcp-tool-desc">{{ v.description }}</span>
-                    </div>
-                  </ng-container>
-                </div>
-                <div class="mcp-drill-foot">
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    (click)="setFull(row.svc)">
-                    Reset to all {{ verbCount(row.svc) }}
-                  </button>
-                  <ng-container
-                    *ngIf="
-                      row.svc.kind === 'db' && copyTargets(row.svc).length > 0
-                    ">
                     <button
-                      mat-stroked-button
                       type="button"
-                      [matMenuTriggerFor]="copyMenuFoot">
-                      Copy this selection to…
+                      class="mcp-chip mcp-chip-btn mcp-access-chip"
+                      [class.good]="accessKind(row.svc) === 'ro'"
+                      [class.primary]="accessKind(row.svc) === 'custom'"
+                      [class.warn]="accessKind(row.svc) === 'zero'"
+                      [attr.data-testid]="'mcp-svc-access-' + row.name"
+                      [matMenuTriggerFor]="accessMenu"
+                      (click)="$event.stopPropagation()">
+                      {{ accessDisplay(row.svc) }}
                     </button>
-                    <mat-menu #copyMenuFoot="matMenu">
+                    <mat-menu #accessMenu="matMenu">
+                      <button
+                        mat-menu-item
+                        type="button"
+                        (click)="setFull(row.svc)">
+                        Full access
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        (click)="setReadOnly(row.svc)">
+                        Read-only
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        (click)="expanded.add(row.name)">
+                        Choose tools…
+                      </button>
+                    </mat-menu>
+                    <span
+                      class="mcp-fraction"
+                      [attr.data-testid]="'mcp-svc-fraction-' + row.name">
+                      {{ fractionText(row.svc) }}
+                    </span>
+                  </div>
+                  <div
+                    class="mcp-cells"
+                    role="group"
+                    [attr.aria-label]="'Tools of ' + row.name">
+                    <div
+                      class="mcp-cellgroup"
+                      *ngFor="let g of groupsFor(row.svc)"
+                      [class.write]="!!g.warn">
+                      <div class="mcp-cellgroup-cols">
+                        <button
+                          type="button"
+                          class="mcp-cell"
+                          *ngFor="let v of g.verbs"
+                          [class.write]="isWriteVerb(v.verb)"
+                          [attr.data-state]="cellState(row.svc, v.verb)"
+                          [attr.data-testid]="
+                            'mcp-cell-' + row.name + '-' + v.verb
+                          "
+                          [attr.aria-pressed]="toolEnabled(row.svc, v.verb)"
+                          [attr.aria-label]="cellTip(row.svc, v.verb)"
+                          [matTooltip]="cellTip(row.svc, v.verb)"
+                          (click)="toggleCell(row.svc, v.verb)">
+                          <i></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="mcp-row-tail">
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="mcp-row-menu-btn"
+                      aria-label="Service actions"
+                      [attr.data-testid]="'mcp-svc-menu-' + row.name"
+                      [matMenuTriggerFor]="rowMenu"
+                      (click)="$event.stopPropagation()">
+                      ⋮
+                    </button>
+                    <mat-menu #rowMenu="matMenu">
+                      <button
+                        mat-menu-item
+                        type="button"
+                        (click)="expanded.add(row.name)">
+                        Edit tools
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        (click)="setFull(row.svc)">
+                        Full access
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        (click)="setReadOnly(row.svc)">
+                        Read-only
+                      </button>
+                      <!-- No 'Reset to all' here: identical to Full access; the
+                       drill-in footer keeps the in-context 'Reset to all N'. -->
+                      <button
+                        mat-menu-item
+                        type="button"
+                        *ngIf="
+                          row.svc.kind === 'db' &&
+                          copyTargets(row.svc).length > 0
+                        "
+                        [matMenuTriggerFor]="copyMenu">
+                        Copy this selection to…
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        class="mcp-menu-danger"
+                        (click)="removeServices([row.name])">
+                        Remove from server
+                      </button>
+                    </mat-menu>
+                    <mat-menu #copyMenu="matMenu">
                       <button
                         mat-menu-item
                         type="button"
@@ -391,14 +375,127 @@
                         All exposed databases
                       </button>
                     </mat-menu>
-                  </ng-container>
+                    <button
+                      type="button"
+                      class="mcp-row-caret"
+                      [attr.aria-expanded]="isExpanded(row.name)"
+                      (click)="toggleExpand(row.name)">
+                      {{ isExpanded(row.name) ? '▾' : '▸' }}
+                    </button>
+                  </span>
+                </div>
+
+                <!-- Drill-in: capability groups + individual tools -->
+                <div class="mcp-drill" *ngIf="isExpanded(row.name)">
+                  <p
+                    class="mcp-drill-alloff"
+                    *ngIf="accessKind(row.svc) === 'zero'">
+                    {{ allOffLine }}
+                  </p>
+                  <p
+                    class="mcp-drill-caption"
+                    *ngIf="showMergedCaption(row.svc)">
+                    {{ mergedCaption(row.svc) }}
+                  </p>
+                  <!-- Count stated once, in the 'x of y on' trailer (§3.2 anatomy). -->
+                  <div
+                    class="mcp-group-row"
+                    *ngFor="let g of groupsFor(row.svc)">
+                    <mat-checkbox
+                      [checked]="groupStateOf(row.svc, g) === 'on'"
+                      [indeterminate]="groupStateOf(row.svc, g) === 'part'"
+                      (change)="toggleGroup(row.svc, g)">
+                      {{ g.label }}
+                    </mat-checkbox>
+                    <span class="mcp-warn-tag" *ngIf="g.warn === 'writes'"
+                      >⚠ writes</span
+                    >
+                    <span class="mcp-warn-tag" *ngIf="g.warn === 'executes'"
+                      >⚠ executes</span
+                    >
+                    <span class="mcp-group-count">
+                      {{ groupOnCount(row.svc, g) }} of {{ g.verbs.length }} on
+                    </span>
+                  </div>
+                  <button
+                    class="mcp-linklike"
+                    type="button"
+                    (click)="toggleToolsList(row.name)">
+                    {{ isToolsListOpen(row.name) ? '▾' : '▸' }} Individual tools
+                    ({{ verbCount(row.svc) }})
+                  </button>
+                  <div class="mcp-tool-list" *ngIf="isToolsListOpen(row.name)">
+                    <ng-container *ngFor="let g of groupsFor(row.svc)">
+                      <div class="mcp-tool-row" *ngFor="let v of g.verbs">
+                        <mat-checkbox
+                          [checked]="toolEnabled(row.svc, v.verb)"
+                          (change)="
+                            setToolChecked(row.svc, v.verb, $event.checked)
+                          ">
+                          <code>{{ emittedName(row.svc, v.verb) }}</code>
+                        </mat-checkbox>
+                        <span class="mcp-tool-desc">{{ v.description }}</span>
+                      </div>
+                    </ng-container>
+                  </div>
+                  <div class="mcp-drill-foot">
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="setFull(row.svc)">
+                      Reset to all {{ verbCount(row.svc) }}
+                    </button>
+                    <ng-container
+                      *ngIf="
+                        row.svc.kind === 'db' && copyTargets(row.svc).length > 0
+                      ">
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        [matMenuTriggerFor]="copyMenuFoot">
+                        Copy this selection to…
+                      </button>
+                      <mat-menu #copyMenuFoot="matMenu">
+                        <button
+                          mat-menu-item
+                          type="button"
+                          *ngFor="
+                            let target of copyTargets(row.svc);
+                            trackBy: trackBySvcName
+                          "
+                          (click)="copySelectionTo(row.svc, target)">
+                          {{ target.label }} ({{ target.name }})
+                        </button>
+                        <button
+                          mat-menu-item
+                          type="button"
+                          (click)="copySelectionTo(row.svc, null)">
+                          All exposed databases
+                        </button>
+                      </mat-menu>
+                    </ng-container>
+                  </div>
                 </div>
               </div>
-            </div>
+            </ng-container>
 
             <p class="mcp-rows-nomatch" *ngIf="visibleRows().length === 0">
               No exposed service matches the current filter.
             </p>
+          </div>
+          <div class="mcp-legend" *ngIf="serviceRows().length > 0">
+            <span
+              ><i class="mcp-cell-dot" data-state="on"></i>served, reads</span
+            >
+            <span
+              ><i class="mcp-cell-dot write" data-state="on"></i>served, writes
+              or executes</span
+            >
+            <span><i class="mcp-cell-dot" data-state="off"></i>turned off</span>
+            <span *ngIf="store.cfg.allowWrites === false"
+              ><i class="mcp-cell-dot" data-state="writes-off"></i>blocked:
+              writes are off for this server</span
+            >
           </div>
 
           <!-- Bulk bar -->

@@ -28,11 +28,11 @@
   font: inherit;
   font-size: 13.5px;
   padding: 8px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid color-mix(in srgb, var(--df-text) 18%, transparent);
   border-radius: 8px;
 
   &:focus {
-    outline: 2px solid var(--df-accent, #5c5699);
+    outline: 2px solid var(--df-accent);
     outline-offset: -1px;
   }
 }
@@ -59,9 +59,9 @@
 .mcp-picker-body {
   flex: 1;
   overflow-y: auto;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 10px;
-  background: #fff;
+  background: var(--df-surface);
   min-height: 160px;
 }
 
@@ -86,10 +86,10 @@
   flex-wrap: wrap;
   padding: 4px 12px;
   cursor: pointer;
-  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 4%, transparent);
 
   &:hover {
-    background: rgba(92, 86, 153, 0.05);
+    background: color-mix(in srgb, var(--df-accent) 5%, transparent);
   }
 
   .mcp-picker-label {
@@ -140,14 +140,14 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
+  background: color-mix(in srgb, var(--df-text) 2%, transparent);
   white-space: nowrap;
 
   &.warn {
-    background: #fdf3dc;
-    border-color: rgba(154, 103, 0, 0.4);
-    color: #9a6700;
+    background: var(--df-warning-soft);
+    border-color: color-mix(in srgb, var(--df-warning) 40%, transparent);
+    color: var(--df-warning);
   }
 }
 

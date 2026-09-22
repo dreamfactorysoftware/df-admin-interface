@@ -105,8 +105,8 @@ export function guessOrigin(key: string): string | null {
       }
       .mcp-hk-list code {
         font-size: 12.5px;
-        background: rgba(0, 0, 0, 0.035);
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+        border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
         border-radius: 5px;
         padding: 1px 6px;
         word-break: break-all;

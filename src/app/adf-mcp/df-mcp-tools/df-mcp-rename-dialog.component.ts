@@ -91,8 +91,8 @@ export interface McpRenameDialogData {
       }
       .mcp-rename-preview {
         font-size: 13px;
-        background: #fdf3dc;
-        border: 1px solid rgba(154, 103, 0, 0.4);
+        background: var(--df-warning-soft);
+        border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
         border-radius: 8px;
         padding: 8px 12px;
         margin: 0 0 4px;

@@ -10,9 +10,9 @@
 }
 
 .mcp-tools-warnbanner {
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
-  color: #9a6700;
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
+  color: var(--df-warning);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 13px;
@@ -40,8 +40,8 @@
 
 /* Cards */
 .mcp-card {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--df-surface);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 10px;
   margin-bottom: 14px;
 }
@@ -82,14 +82,14 @@
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #9a6700;
+    color: var(--df-warning);
     margin: 0 0 8px;
   }
 }
 
 .mcp-orphan-row {
-  border-color: rgba(154, 103, 0, 0.4);
-  background: #fffbf1;
+  border-color: color-mix(in srgb, var(--df-warning) 40%, transparent);
+  background: var(--df-warning-soft);
   padding: 12px 16px;
 
   p {
@@ -116,14 +116,14 @@
     font: inherit;
     font-size: 13px;
     padding: 7px 12px;
-    border: 1px solid rgba(0, 0, 0, 0.18);
+    border: 1px solid color-mix(in srgb, var(--df-text) 18%, transparent);
     border-radius: 8px;
     min-width: 200px;
     flex: 1;
     max-width: 320px;
 
     &:focus {
-      outline: 2px solid var(--df-accent, #5c5699);
+      outline: 2px solid var(--df-accent);
       outline-offset: -1px;
     }
   }
@@ -135,7 +135,7 @@
 }
 
 .mcp-row {
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 6%, transparent);
   padding: 6px 12px;
 
   &:first-child {
@@ -151,7 +151,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* cells must stay on the name's line to align */
 }
 
 .mcp-row-main {
@@ -193,38 +193,243 @@
   cursor: pointer;
 }
 
-/* Capability strip: full labels, initials below 1280px */
-.mcp-cap-strip {
-  display: inline-flex;
+/* Tool grid: rows double as a grid, one cell per tool; columns line up
+   across rows because the cells sit in fixed-width tracks at the row's end. */
+$cell: 26px;
+$group-gap: 8px;
+$tail: 76px;
+
+/* The kind header already says Databases / File storage. */
+.mcp-rows .mcp-type-badge {
+  display: none;
+}
+
+.mcp-row-left {
+  display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  opacity: 0.85;
+  gap: 4px 8px;
   flex-wrap: wrap;
+  flex: 1 1 0;
+  min-width: 0;
+}
 
-  .mcp-cap.off {
-    text-decoration: line-through;
-    opacity: 0.45;
-  }
+.mcp-cells {
+  display: flex;
+  gap: $group-gap;
+  flex: none;
+}
 
-  .mcp-cap-sep {
-    opacity: 0.4;
-  }
+.mcp-cellgroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 
-  .mcp-cap-init {
-    display: none;
+  & + & {
+    border-left: 1px solid var(--df-border-2);
+    padding-left: $group-gap;
+    margin-left: -1px;
   }
 }
 
-@media (max-width: 1279px) {
-  .mcp-cap-strip {
-    .mcp-cap-full {
-      display: none;
+.mcp-cellgroup-cols {
+  display: flex;
+}
+
+.mcp-row-tail {
+  width: $tail;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.mcp-cell {
+  width: $cell;
+  height: $cell;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--df-radius-sm, 4px);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--df-hover);
+    border-color: var(--df-border);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--df-accent);
+    outline-offset: 1px;
+  }
+}
+
+.mcp-cell i,
+.mcp-cell-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-sizing: border-box;
+  background: var(--df-success);
+}
+
+.mcp-cell.write i,
+.mcp-cell-dot.write {
+  background: var(--df-warning);
+}
+
+.mcp-cell[data-state='off'] i,
+.mcp-cell-dot[data-state='off'] {
+  background: transparent;
+  border: 1.5px solid var(--df-text-faint);
+}
+
+.mcp-cell[data-state='writes-off'] i,
+.mcp-cell-dot[data-state='writes-off'] {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--df-border) 0 2px,
+    transparent 2px 4px
+  );
+  border: 1px solid var(--df-border);
+}
+
+/* Header above each kind: rotated tool names over their columns. */
+.mcp-grid-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--df-border);
+  background: var(--df-surface-2);
+
+  .mcp-row + & {
+    border-top: 1px solid var(--df-border);
+  }
+}
+
+.mcp-grid-head-left {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: flex-end;
+  padding-bottom: 4px;
+
+  .mcp-grid-head-title {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .mcp-grid-head-hint {
+    font-size: 12px;
+    color: var(--df-text-muted);
+  }
+}
+
+.mcp-cellgroup-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--df-text-muted);
+  white-space: nowrap;
+
+  .write > & {
+    color: var(--df-warning);
+  }
+}
+
+.mcp-colhead {
+  width: $cell;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  height: 172px;
+
+  .mcp-colhead-name {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--df-text-2);
+    white-space: nowrap;
+  }
+}
+
+/* Mini switch for columns and groups: on = filled, mixed = half. */
+.mcp-sw {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid var(--df-border);
+  border-radius: 999px;
+  background: var(--df-surface-2);
+  cursor: pointer;
+
+  i {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--df-text-faint);
+    transition: left 120ms ease;
+  }
+
+  &[data-state='on'] {
+    background: var(--df-accent);
+    border-color: var(--df-accent);
+    i {
+      left: 9px;
+      background: var(--df-accent-contrast);
     }
-    .mcp-cap-init {
-      display: inline;
-      font-weight: 600;
+  }
+  &[data-state='mixed'] {
+    background: linear-gradient(
+      90deg,
+      var(--df-accent) 50%,
+      var(--df-surface-2) 50%
+    );
+    border-color: var(--df-accent);
+    i {
+      left: 5px;
+      background: var(--df-accent-contrast);
     }
+  }
+  &:hover {
+    box-shadow: 0 0 0 3px var(--df-accent-soft);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--df-accent);
+    outline-offset: 1px;
+  }
+}
+
+.mcp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--df-text-muted);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
 }
 
@@ -241,11 +446,10 @@
   font-size: 13px;
   opacity: 0.7;
   padding: 4px 6px;
-  margin-left: auto;
 }
 
 .mcp-menu-danger {
-  color: #b3261e;
+  color: var(--df-danger);
 }
 
 /* Drill-in */
@@ -255,9 +459,9 @@
   .mcp-drill-alloff {
     font-size: 13px;
     font-weight: 600;
-    color: #9a6700;
-    background: #fdf3dc;
-    border: 1px solid rgba(154, 103, 0, 0.4);
+    color: var(--df-warning);
+    background: var(--df-warning-soft);
+    border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
     border-radius: 8px;
     padding: 7px 11px;
     margin: 4px 0 8px;
@@ -287,7 +491,7 @@
 .mcp-warn-tag {
   font-size: 11.5px;
   font-weight: 700;
-  color: #9a6700;
+  color: var(--df-warning);
 }
 
 .mcp-linklike {
@@ -297,7 +501,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: var(--df-accent, #5c5699);
+  color: var(--df-accent);
   padding: 6px 0 2px;
   text-align: left;
 }
@@ -343,8 +547,8 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  background: rgba(92, 86, 153, 0.08);
-  border: 1px solid rgba(92, 86, 153, 0.35);
+  background: color-mix(in srgb, var(--df-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--df-accent) 35%, transparent);
   border-radius: 10px;
   padding: 8px 14px;
   margin-bottom: 14px;
@@ -397,7 +601,7 @@ button.mcp-peer-head {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 6%, transparent);
   padding: 5px 0;
 
   code {
@@ -419,7 +623,7 @@ button.mcp-peer-head {
 /* System groups */
 .mcp-sys-group {
   padding: 10px 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 6%, transparent);
 
   &:first-child {
     border-top: none;
@@ -428,8 +632,8 @@ button.mcp-peer-head {
 
 /* ─────────────────────────── The rail ─────────────────────────── */
 .mcp-rail {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--df-surface);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 10px;
   padding: 14px 16px;
   position: sticky;
@@ -488,7 +692,7 @@ button.mcp-peer-head {
 .mcp-rail-serving {
   font-size: 12px;
   opacity: 0.75;
-  background: rgba(0, 0, 0, 0.03);
+  background: color-mix(in srgb, var(--df-text) 3%, transparent);
   border-radius: 8px;
   padding: 8px 10px;
   margin: 0 0 12px;
@@ -496,7 +700,7 @@ button.mcp-peer-head {
   .mcp-info {
     cursor: help;
     font-weight: 600;
-    color: var(--df-accent, #5c5699);
+    color: var(--df-accent);
     white-space: nowrap;
   }
 }
@@ -531,24 +735,24 @@ button.mcp-peer-head {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
+  background: color-mix(in srgb, var(--df-text) 2%, transparent);
   white-space: nowrap;
 
   &.good {
-    background: #e7f2e8;
-    border-color: rgba(46, 125, 50, 0.35);
-    color: #2e7d32;
+    background: var(--df-success-soft);
+    border-color: color-mix(in srgb, var(--df-success) 35%, transparent);
+    color: var(--df-success);
   }
   &.warn {
-    background: #fdf3dc;
-    border-color: rgba(154, 103, 0, 0.4);
-    color: #9a6700;
+    background: var(--df-warning-soft);
+    border-color: color-mix(in srgb, var(--df-warning) 40%, transparent);
+    color: var(--df-warning);
   }
   &.primary {
-    background: rgba(92, 86, 153, 0.1);
-    border-color: rgba(92, 86, 153, 0.38);
-    color: var(--df-accent, #5c5699);
+    background: color-mix(in srgb, var(--df-accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--df-accent) 38%, transparent);
+    color: var(--df-accent);
   }
 }
 
@@ -560,8 +764,9 @@ button.mcp-peer-head {
 }
 
 /* Phone width: stack row internals, keep the 16px gutter breathing room. */
-@media (max-width: 700px) {
+@media (max-width: 1100px) {
   .mcp-row-head {
+    flex-wrap: wrap;
     row-gap: 4px;
   }
 
@@ -569,7 +774,11 @@ button.mcp-peer-head {
     padding-left: 12px;
   }
 
-  .mcp-cap-strip {
+  /* Too narrow for aligned columns: drop the header, let cells wrap. */
+  .mcp-grid-head {
     display: none;
+  }
+  .mcp-row-tail {
+    width: auto;
   }
 }

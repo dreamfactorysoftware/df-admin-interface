@@ -9,6 +9,8 @@ import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
+import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, forkJoin } from 'rxjs';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -47,6 +49,8 @@ export type McpTab = 'connect' | 'tools' | 'settings';
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
+    MatTabsModule,
+    DfAlertComponent,
     DfMcpConnectComponent,
     DfMcpToolsComponent,
     DfMcpSettingsComponent,
@@ -190,9 +194,30 @@ export class DfMcpDetailsComponent implements OnInit, OnDestroy {
   }
 
   /** APP_URL differs from the address this page is open at. */
-  get appUrlDiffers(): boolean {
-    const app = appUrlOrigin(this.store.health);
-    return !!app && app !== window.location.origin;
+  /** The APP_URL check when it is not ok, with the two addresses it compared. */
+  get appUrlIssue(): { appUrl: string; seen: string } | null {
+    const c = this.store.health?.checks?.find(
+      x => x.id === 'app_url' && (x.status || '').toLowerCase() !== 'ok'
+    );
+    if (!c) return null;
+    const d: Record<string, any> = c.details ?? {};
+    return {
+      appUrl: typeof d['app_url'] === 'string' ? d['app_url'] : '',
+      seen:
+        d['forwarded_origin'] || d['request_origin'] || window.location.origin,
+    };
+  }
+
+  /** First failing check other than APP_URL (daemon down, key unreadable...). */
+  get otherHealthIssue(): { level: 'error' | 'warning'; text: string } | null {
+    const c = this.store.health?.checks?.find(
+      x => x.id !== 'app_url' && (x.status || '').toLowerCase() !== 'ok'
+    );
+    if (!c) return null;
+    return {
+      level: (c.status || '').toLowerCase() === 'error' ? 'error' : 'warning',
+      text: c.message ?? '',
+    };
   }
 
   get healthLevel(): HealthLevel | null {

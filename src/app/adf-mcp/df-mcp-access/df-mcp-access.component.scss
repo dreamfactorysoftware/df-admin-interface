@@ -1,5 +1,5 @@
 .mcp-access {
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   padding-top: 10px;
   margin-top: 8px;
   font-size: 12.5px;
@@ -20,8 +20,8 @@
 }
 
 .mcp-access-warn {
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
   border-radius: 8px;
   padding: 6px 8px;
   margin: 0 0 8px;
@@ -40,7 +40,7 @@
 
   li {
     padding: 5px 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid color-mix(in srgb, var(--df-text) 5%, transparent);
   }
 }
 
@@ -74,7 +74,7 @@
 }
 
 .mcp-access-denied {
-  color: #b3261e;
+  color: var(--df-danger);
   opacity: 1;
 }
 
@@ -89,7 +89,7 @@
   border: 0;
   padding: 0;
   font: inherit;
-  color: var(--df-accent, #5c5699);
+  color: var(--df-accent);
   font-weight: 600;
   cursor: pointer;
 }
@@ -102,12 +102,12 @@
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
   white-space: nowrap;
 
   &.good {
-    background: #e7f2e8;
-    border-color: rgba(46, 125, 50, 0.35);
-    color: #2e7d32;
+    background: var(--df-success-soft);
+    border-color: color-mix(in srgb, var(--df-success) 35%, transparent);
+    color: var(--df-success);
   }
 }

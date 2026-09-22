@@ -9,8 +9,8 @@
 
 /* ---------------------------------------------------------------- cards */
 .mcp-card {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--df-surface);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 10px;
   padding: 16px 18px;
 
@@ -42,24 +42,24 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
+  background: color-mix(in srgb, var(--df-text) 2%, transparent);
   white-space: nowrap;
 
   &.good {
-    background: #e7f2e8;
-    border-color: rgba(46, 125, 50, 0.35);
-    color: #2e7d32;
+    background: var(--df-success-soft);
+    border-color: color-mix(in srgb, var(--df-success) 35%, transparent);
+    color: var(--df-success);
   }
   &.warn {
-    background: #fdf3dc;
-    border-color: rgba(154, 103, 0, 0.4);
-    color: #9a6700;
+    background: var(--df-warning-soft);
+    border-color: color-mix(in srgb, var(--df-warning) 40%, transparent);
+    color: var(--df-warning);
   }
   &.primary {
-    background: rgba(92, 86, 153, 0.1);
-    border-color: rgba(92, 86, 153, 0.38);
-    color: var(--df-accent, #5c5699);
+    background: color-mix(in srgb, var(--df-accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--df-accent) 38%, transparent);
+    color: var(--df-accent);
   }
 }
 
@@ -69,9 +69,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
-  color: #9a6700;
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
+  color: var(--df-warning);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 13.5px;
@@ -92,16 +92,16 @@
 
   &:hover {
     opacity: 1;
-    background: rgba(0, 0, 0, 0.05);
+    background: color-mix(in srgb, var(--df-text) 5%, transparent);
   }
 }
 
 /* ------------------------------------------------------- zero-tools banner */
 /* Mirrors .mcp-tools-warnbanner on the Tools tab. */
 .mcp-zero-banner {
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
-  color: #9a6700;
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
+  color: var(--df-warning);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 13px;
@@ -115,7 +115,7 @@
 
 /* -------------------------------------------------------------- checklist */
 .mcp-checklist {
-  border-color: rgba(92, 86, 153, 0.38);
+  border-color: color-mix(in srgb, var(--df-accent) 38%, transparent);
 
   .mcp-checklist-head {
     display: flex;
@@ -145,14 +145,14 @@
       font-size: 13.5px;
 
       &.done {
-        color: #2e7d32;
+        color: var(--df-success);
       }
 
       /* Completed step: the circle fills green and shows the check. */
       &.done .mcp-step-mark {
-        background: #2e7d32;
-        border-color: #2e7d32;
-        color: #fff;
+        background: var(--df-success);
+        border-color: var(--df-success);
+        color: var(--df-accent-contrast);
       }
     }
 
@@ -163,7 +163,7 @@
       width: 18px;
       height: 18px;
       margin-top: 1px;
-      border: 1.5px solid rgba(92, 86, 153, 0.55);
+      border: 1.5px solid color-mix(in srgb, var(--df-accent) 55%, transparent);
       border-radius: 50%;
       font-size: 11px;
       font-weight: 700;
@@ -185,8 +185,8 @@
   .mcp-endpoint-url {
     font-size: 16px;
     font-weight: 600;
-    background: rgba(0, 0, 0, 0.035);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
     border-radius: 7px;
     padding: 7px 12px;
     overflow-x: auto;
@@ -233,8 +233,8 @@
   }
 
   .mcp-cred-value {
-    background: rgba(0, 0, 0, 0.035);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
     border-radius: 6px;
     padding: 3px 8px;
     font-size: 12.5px;
@@ -264,7 +264,7 @@
 .mcp-redirect-prompt {
   font-size: 12.5px;
   font-weight: 600;
-  color: #9a6700;
+  color: var(--df-warning);
   margin: 6px 0 0;
 }
 
@@ -282,17 +282,17 @@
   font-weight: 600;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
+  background: var(--df-surface);
 
   &:hover {
-    border-color: rgba(92, 86, 153, 0.38);
+    border-color: color-mix(in srgb, var(--df-accent) 38%, transparent);
   }
 
   &.on {
-    background: rgba(92, 86, 153, 0.1);
-    border-color: var(--df-accent, #5c5699);
-    color: var(--df-accent, #5c5699);
+    background: color-mix(in srgb, var(--df-accent) 10%, transparent);
+    border-color: var(--df-accent);
+    color: var(--df-accent);
   }
 }
 
@@ -311,13 +311,13 @@
     font-weight: 600;
     padding: 3px 10px;
     border-radius: 999px;
-    border: 1px solid rgba(0, 0, 0, 0.14);
-    background: #fff;
+    border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
+    background: var(--df-surface);
 
     &.on {
-      background: rgba(92, 86, 153, 0.1);
-      border-color: var(--df-accent, #5c5699);
-      color: var(--df-accent, #5c5699);
+      background: color-mix(in srgb, var(--df-accent) 10%, transparent);
+      border-color: var(--df-accent);
+      color: var(--df-accent);
     }
   }
 }
@@ -339,8 +339,8 @@
 }
 
 .mcp-inline-code {
-  background: rgba(0, 0, 0, 0.035);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 6px;
   padding: 2px 7px;
   font-size: 12.5px;
@@ -351,8 +351,8 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(0, 0, 0, 0.035);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 8px;
   padding: 10px 12px;
   margin: 6px 0 8px;
@@ -391,7 +391,7 @@
   font: inherit;
   font-size: inherit;
   padding: 0;
-  color: var(--df-accent, #5c5699);
+  color: var(--df-accent);
   font-weight: 600;
   text-decoration: none;
 

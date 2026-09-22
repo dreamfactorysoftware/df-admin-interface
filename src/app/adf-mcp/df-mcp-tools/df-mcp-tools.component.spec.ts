@@ -239,6 +239,43 @@ describe('DfMcpToolsComponent', () => {
     expect(store.dirty()).toBe(true);
   });
 
+  it('grid: a cell toggles one tool, a column switch every exposed db', () => {
+    const store = makeStore({ exposed_services: ['crm', 'hr', 's3'] }, [
+      svc('crm'),
+      svc('hr'),
+      svc('s3', 'file'),
+    ]);
+    render(store);
+    // One header per kind, databases first.
+    expect(q('mcp-grid-head-db')).toBeTruthy();
+    expect(q('mcp-grid-head-file')).toBeTruthy();
+
+    const cell = q('mcp-cell-crm-get_tables') as HTMLButtonElement;
+    expect(cell.dataset['state']).toBe('on');
+    cell.click();
+    fixture.detectChanges();
+    expect(store.cfg.disabledTools.has('crm_get_tables')).toBe(true);
+    expect(cell.dataset['state']).toBe('off');
+
+    // Column is now mixed (hr still on); one click turns it on everywhere,
+    // the next turns it off in both databases and never touches files.
+    const col = { verb: 'get_tables', title: '', description: '' };
+    expect(component.columnState('db', [col])).toBe('mixed');
+    component.toggleColumn('db', [col]);
+    expect(component.columnState('db', [col])).toBe('on');
+    component.toggleColumn('db', [col]);
+    expect([...store.cfg.disabledTools].sort()).toEqual([
+      'crm_get_tables',
+      'hr_get_tables',
+    ]);
+
+    // Writes switched off server-wide: write cells show as blocked, not on.
+    store.cfg.allowWrites = false;
+    expect(
+      component.cellState(store.backendServices[0], 'create_records')
+    ).toBe('writes-off');
+  });
+
   describe('system_mcp variant', () => {
     it('renders the fixed catalog as Read/Modify groups without a picker', () => {
       const store = makeStore({}, [], 'system_mcp');

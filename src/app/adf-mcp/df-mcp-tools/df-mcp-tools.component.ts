@@ -33,6 +33,7 @@ import {
   McpVerbGroup,
   verbGroupsFor,
   verbsFor,
+  WRITE_VERBS,
 } from '../mcp-catalog';
 import {
   CatalogStats,
@@ -350,6 +351,122 @@ export class DfMcpToolsComponent implements OnChanges {
 
   setReadOnly(svc: McpBackendService): void {
     this.store.setServiceReadOnly(svc);
+  }
+
+  /* ------------------------------ grid ------------------------------ */
+  // Rows double as a grid: one cell per tool, columns aligned across rows,
+  // with column and group switches in a header above each kind.
+
+  /** visibleRows with databases first, so each kind gets one header. */
+  gridRows(): Array<{ name: string; svc: McpBackendService }> {
+    const key = `${this.store.version}|${this.filterText}|${this.filterKind}|${this.filterModified}`;
+    return this.memoized('gridRows', key, () => {
+      const rows = this.visibleRows();
+      return [
+        ...rows.filter(r => r.svc.kind === 'db'),
+        ...rows.filter(r => r.svc.kind !== 'db'),
+      ];
+    });
+  }
+
+  startsKind(i: number): boolean {
+    const rows = this.gridRows();
+    return i === 0 || rows[i - 1].svc.kind !== rows[i].svc.kind;
+  }
+
+  groupsForKind(kind: McpServiceKind): readonly McpVerbGroup[] {
+    return verbGroupsFor(kind);
+  }
+
+  kindTitle(kind: McpServiceKind): string {
+    return kind === 'db' ? 'Databases' : 'File storage';
+  }
+
+  shortGroupLabel(g: McpVerbGroup): string {
+    const short: Record<string, string> = {
+      read: 'Read',
+      schema: 'Schema',
+      write: 'Write',
+      procs: 'Procs',
+      fread: 'Read',
+      fwrite: 'Write',
+    };
+    return short[g.key] ?? g.label;
+  }
+
+  isWriteVerb(verb: string): boolean {
+    return WRITE_VERBS.has(verb);
+  }
+
+  cellState(svc: McpBackendService, verb: string): 'on' | 'off' | 'writes-off' {
+    if (!this.store.isToolEnabled(svc.name, verb)) return 'off';
+    if (this.store.cfg.allowWrites === false && WRITE_VERBS.has(verb)) {
+      return 'writes-off';
+    }
+    return 'on';
+  }
+
+  cellTip(svc: McpBackendService, verb: string): string {
+    const state = this.cellState(svc, verb);
+    const what =
+      state === 'on'
+        ? 'served'
+        : state === 'off'
+          ? 'turned off'
+          : 'blocked: writes are off for this server';
+    return `${this.emittedName(svc, verb)} (${svc.name}): ${what}. Click to turn ${
+      this.store.isToolEnabled(svc.name, verb) ? 'off' : 'on'
+    }.`;
+  }
+
+  toggleCell(svc: McpBackendService, verb: string): void {
+    this.store.setTool(
+      svc.name,
+      verb,
+      !this.store.isToolEnabled(svc.name, verb)
+    );
+  }
+
+  private exposedOfKind(kind: McpServiceKind): McpBackendService[] {
+    return this.serviceRows()
+      .filter(r => r.svc.kind === kind)
+      .map(r => r.svc);
+  }
+
+  /** on / off / mixed over every exposed service of the kind. */
+  columnState(
+    kind: McpServiceKind,
+    verbs: readonly McpToolDef[]
+  ): 'on' | 'off' | 'mixed' {
+    let on = 0;
+    let total = 0;
+    for (const svc of this.exposedOfKind(kind)) {
+      for (const v of verbs) {
+        total++;
+        if (this.store.isToolEnabled(svc.name, v.verb)) on++;
+      }
+    }
+    if (total === 0 || on === 0) return 'off';
+    return on === total ? 'on' : 'mixed';
+  }
+
+  toggleColumn(kind: McpServiceKind, verbs: readonly McpToolDef[]): void {
+    const enable = this.columnState(kind, verbs) !== 'on';
+    for (const svc of this.exposedOfKind(kind)) {
+      for (const v of verbs) this.store.setTool(svc.name, v.verb, enable);
+    }
+  }
+
+  columnTip(
+    kind: McpServiceKind,
+    label: string,
+    verbs: readonly McpToolDef[]
+  ): string {
+    const n = this.exposedOfKind(kind).length;
+    const where = `${n} exposed ${kind === 'db' ? 'database' : 'file service'}${n === 1 ? '' : 's'}`;
+    return this.columnState(kind, verbs) === 'on'
+      ? `Turn ${label} off in all ${where}`
+      : `Turn ${label} on in all ${where}`;
   }
 
   /* ---------------------------- drill-ins ---------------------------- */

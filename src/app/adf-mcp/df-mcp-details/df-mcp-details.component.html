@@ -58,65 +58,82 @@
         Streamable HTTP
       </span>
     </div>
-    <p
-      class="mcp-head-appurl"
-      *ngIf="healthLevel && healthLevel !== 'ok' && healthText"
+    <df-alert
+      *ngIf="appUrlIssue as a"
+      class="mcp-head-alert"
+      alertType="warning"
+      [showAlert]="true"
+      [dismissible]="false"
       data-testid="mcp-health-message">
-      {{ healthText }}
-    </p>
-    <p
-      class="mcp-head-appurl"
-      *ngIf="appUrlDiffers"
-      data-testid="mcp-appurl-note">
-      Endpoint uses APP_URL; this page is open at a different address.
-    </p>
-    <nav class="mcp-tabs" role="tablist">
-      <button
-        type="button"
-        role="tab"
-        class="mcp-tab"
-        [class.on]="tab === 'connect'"
-        [attr.aria-selected]="tab === 'connect'"
+      <ng-container *ngIf="a.appUrl; else noAppUrl">
+        <strong>MCP sign-in redirects to APP_URL.</strong> APP_URL is
+        <code>{{ a.appUrl }}</code> but this page is open at
+        <code>{{ a.seen }}</code
+        >, so clients must connect through APP_URL (the endpoint shown here
+        already uses it). If clients cannot reach that address, set APP_URL to
+        the one they use and run <code>php artisan config:clear</code>.
+      </ng-container>
+      <ng-template #noAppUrl>
+        <strong>APP_URL is not set.</strong> MCP sign-in redirects to APP_URL,
+        so set it to the address clients use (for example
+        <code>{{ a.seen }}</code
+        >) and run <code>php artisan config:clear</code>.
+      </ng-template>
+    </df-alert>
+    <df-alert
+      *ngIf="otherHealthIssue as o"
+      class="mcp-head-alert"
+      [alertType]="o.level"
+      [showAlert]="true"
+      [dismissible]="false"
+      data-testid="mcp-health-issue">
+      {{ o.text }}
+    </df-alert>
+    <nav
+      mat-tab-nav-bar
+      class="mcp-tabs"
+      mat-stretch-tabs="false"
+      mat-align-tabs="start"
+      [tabPanel]="mcpTabPanel">
+      <a
+        mat-tab-link
+        [active]="tab === 'connect'"
         (click)="setTab('connect')"
         data-testid="mcp-tab-connect">
         Connect
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="mcp-tab"
-        [class.on]="tab === 'tools'"
-        [attr.aria-selected]="tab === 'tools'"
+      </a>
+      <a
+        mat-tab-link
+        [active]="tab === 'tools'"
         (click)="setTab('tools')"
         data-testid="mcp-tab-tools">
         Tools · {{ store.totalTools() }}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="mcp-tab"
-        [class.on]="tab === 'settings'"
-        [attr.aria-selected]="tab === 'settings'"
+      </a>
+      <a
+        mat-tab-link
+        [active]="tab === 'settings'"
         (click)="setTab('settings')"
         data-testid="mcp-tab-settings">
         Settings
-      </button>
+      </a>
     </nav>
   </header>
 
-  <df-mcp-connect
-    *ngIf="tab === 'connect'"
-    [store]="store"
-    [mcpUrl]="mcpUrl"
-    (goToTab)="setTab($event)"></df-mcp-connect>
-  <df-mcp-tools
-    *ngIf="tab === 'tools'"
-    [store]="store"
-    [loading]="loading"></df-mcp-tools>
-  <df-mcp-settings
-    *ngIf="tab === 'settings'"
-    [store]="store"
-    (requestDelete)="deleteServer()"></df-mcp-settings>
+  <mat-tab-nav-panel #mcpTabPanel>
+    <df-mcp-connect
+      *ngIf="tab === 'connect'"
+      [store]="store"
+      [mcpUrl]="mcpUrl"
+      (goToTab)="setTab($event)"></df-mcp-connect>
+    <df-mcp-tools
+      *ngIf="tab === 'tools'"
+      [store]="store"
+      [loading]="loading"></df-mcp-tools>
+    <df-mcp-settings
+      *ngIf="tab === 'settings'"
+      [store]="store"
+      (requestDelete)="deleteServer()"></df-mcp-settings>
+  </mat-tab-nav-panel>
 
   <!-- Sticky dirty bar: the delta is the save button's caption -->
   <div class="mcp-dirty-bar" *ngIf="store.dirty()" data-testid="mcp-dirty-bar">

@@ -10,8 +10,8 @@
 
 /* ---------------------------------------------------------------- cards */
 .mcp-card {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--df-surface);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 10px;
   padding: 16px 18px;
 
@@ -50,16 +50,16 @@
   margin: 2px 0 12px;
 
   &.warn {
-    color: #9a6700;
+    color: var(--df-warning);
     opacity: 1;
     font-weight: 500;
   }
 }
 
 .mcp-inline-warning {
-  background: #fdf3dc;
-  border: 1px solid rgba(154, 103, 0, 0.4);
-  color: #9a6700;
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
+  color: var(--df-warning);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;
@@ -84,8 +84,8 @@
 
   code {
     font-size: 12.5px;
-    background: rgba(0, 0, 0, 0.035);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
     border-radius: 6px;
     padding: 3px 8px;
     word-break: break-all;
@@ -111,7 +111,7 @@
 
   &:hover {
     opacity: 1;
-    background: rgba(0, 0, 0, 0.05);
+    background: color-mix(in srgb, var(--df-text) 5%, transparent);
   }
 }
 
@@ -159,7 +159,7 @@
     display: block;
     font-size: 12px;
     font-weight: 600;
-    color: var(--df-accent, #5c5699);
+    color: var(--df-accent);
     margin-top: 2px;
   }
 }
@@ -186,8 +186,8 @@
 /* ------------------------------------------------------ full configuration */
 .mcp-fullconfig {
   margin: 0;
-  background: rgba(0, 0, 0, 0.035);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   border-radius: 8px;
   padding: 12px 14px;
   font-size: 12px;
@@ -198,8 +198,8 @@
 
 /* ------------------------------------------------------------ danger zone */
 .mcp-danger {
-  background: #fdf0ef;
-  border-color: rgba(211, 47, 47, 0.35);
+  background: var(--df-danger-soft);
+  border-color: color-mix(in srgb, var(--df-danger) 35%, transparent);
 
   .mcp-danger-copy {
     font-size: 13.5px;

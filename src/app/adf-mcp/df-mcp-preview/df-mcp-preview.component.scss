@@ -7,7 +7,7 @@
   font-family: Inter, 'Helvetica Neue', sans-serif;
   padding: 18px 20px 14px;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--df-surface);
 }
 
 .mcp-preview-head {
@@ -76,8 +76,8 @@
 
   code {
     font-size: 12.5px;
-    background: rgba(0, 0, 0, 0.035);
-    border: 1px solid rgba(0, 0, 0, 0.08);
+    background: color-mix(in srgb, var(--df-text) 3.5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
     border-radius: 6px;
     padding: 1px 7px;
     flex-shrink: 0;
@@ -86,7 +86,7 @@
 
   .mcp-preview-meta {
     font-size: 12px;
-    color: var(--df-accent, #5c5699);
+    color: var(--df-accent);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
     white-space: nowrap;
@@ -104,14 +104,14 @@
 
   .mcp-preview-reason {
     font-size: 12px;
-    color: #9a6700;
+    color: var(--df-warning);
     flex-shrink: 0;
     white-space: nowrap;
   }
 }
 
 .mcp-preview-excluded {
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   padding-top: 12px;
 
   /* Here the reason is the fact — let long name lists truncate instead. */
@@ -136,7 +136,7 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
   padding-top: 10px;
 
   .mcp-preview-foot-facts {
