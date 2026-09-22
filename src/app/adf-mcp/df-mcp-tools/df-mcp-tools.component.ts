@@ -497,8 +497,7 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   emittedName(svc: McpBackendService, verb: string): string {
-    const style = svc.kind === 'db' ? this.eff().effectiveStyle : 'prefixed';
-    return emittedDbToolName(style, svc.name, verb);
+    return emittedDbToolName(this.eff().effectiveStyle, svc.name, verb);
   }
 
   verbCount(svc: McpBackendService): number {
@@ -506,15 +505,17 @@ export class DfMcpToolsComponent implements OnChanges {
   }
 
   mergedCaption(svc: McpBackendService): string {
+    const kind = svc.kind === 'db' ? 'databases' : 'file services';
+    const one = svc.kind === 'db' ? 'database' : 'file service';
     return (
-      'Tools are shared across your databases. Turning one off here removes ' +
+      `Tools are shared across your ${kind}. Turning one off here removes ` +
       `${svc.name} from that tool's allowed services; turning it off in ` +
-      'every database removes the tool.'
+      `every ${one} removes the tool.`
     );
   }
 
   showMergedCaption(svc: McpBackendService): boolean {
-    return svc.kind === 'db' && this.store.cfg.toolStyle === 'merged';
+    return this.store.cfg.toolStyle === 'merged';
   }
 
   /** Other exposed databases a db curation pattern can be copied to. */

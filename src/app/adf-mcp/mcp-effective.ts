@@ -472,7 +472,16 @@ export function effectiveTools(
       dbTools = dbs.reduce((a, d) => a + served(d), 0);
     }
   }
-  const fileTools = files.reduce((a, f) => a + served(f), 0);
+  let fileTools = 0;
+  if (files.length) {
+    if (style === 'merged') {
+      for (const v of verbsFor('file')) {
+        if (files.some(f => isVerbServed(cfg, f.name, v.verb))) fileTools++;
+      }
+    } else {
+      fileTools = files.reduce((a, f) => a + served(f), 0);
+    }
+  }
   // Global tools disable by their bare name in the same disabled_tools list.
   const globalTools = GLOBAL_TOOLS.filter(t => !disabled.has(t.verb)).length;
   const aggregators = aggregatorsFor(dbs.length, files.length).filter(
@@ -486,10 +495,11 @@ export function effectiveTools(
     isWriteCapableCustomTool
   ).length;
 
-  // Write math mirrors the served-tool math above: merged db verbs are one
-  // shared tool each; everything else (prefixed dbs, files in both styles)
-  // is a per-service instance.
+  // Write math mirrors the served-tool math above: in merged style a verb is
+  // one shared tool for databases and one for file services; in prefixed style
+  // every service contributes its own instance.
   const dbWriteVerbSet = new Set<string>();
+  const fileWriteVerbSet = new Set<string>();
   let dbWriteInstances = 0;
   let fileWriteInstances = 0;
   let writeReach = 0;
@@ -509,12 +519,15 @@ export function effectiveTools(
         on.forEach(v => dbWriteVerbSet.add(v.verb));
       } else {
         fileWriteInstances += on.length;
+        on.forEach(v => fileWriteVerbSet.add(v.verb));
       }
     }
   }
   const dbWriteTools =
     style === 'merged' ? dbWriteVerbSet.size : dbWriteInstances;
-  const writeVerbs = dbWriteTools + fileWriteInstances + writeCapableCustoms;
+  const fileWriteTools =
+    style === 'merged' ? fileWriteVerbSet.size : fileWriteInstances;
+  const writeVerbs = dbWriteTools + fileWriteTools + writeCapableCustoms;
 
   const total = dbTools + fileTools + globalTools + aggregators + customTools;
   const est = estimateCatalog(total, cfg.lazyMode);
@@ -581,7 +594,7 @@ export function orphanedKeys(
   return [...cfg.disabledTools].filter(k => !owned(k));
 }
 
-/** Emitted tool name a client sees for a db verb in the given style. */
+/** Emitted tool name a client sees for a db or file verb in the given style. */
 export function emittedDbToolName(
   style: ToolStyle,
   serviceName: string,
