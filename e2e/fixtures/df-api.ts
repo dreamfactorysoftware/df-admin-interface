@@ -72,6 +72,27 @@ export class DfApi {
     return out;
   }
 
+  /** POST services; returns the new ids in request order. */
+  async createServices(resources: any[]): Promise<number[]> {
+    const resp = await this.ctx.post('/api/v2/system/service', {
+      headers: this.headers(),
+      data: { resource: resources },
+    });
+    expect(
+      resp.ok(),
+      `POST service -> HTTP ${resp.status()}: ${await resp.text()}`
+    ).toBe(true);
+    return ((await resp.json())?.resource ?? []).map((r: any) => r.id);
+  }
+
+  /** Admin MCP health report; null on backends that predate it. */
+  async getMcpHealth(): Promise<any | null> {
+    const resp = await this.ctx.get('/_internal/ai/mcp-health', {
+      headers: this.headers(),
+    });
+    return resp.ok() ? resp.json() : null;
+  }
+
   async putService(id: number, body: any): Promise<void> {
     const resp = await this.ctx.put(`/api/v2/system/service/${id}`, {
       headers: this.headers(),
@@ -105,14 +126,16 @@ export class DfApi {
 
   /**
    * Assert the live config is byte-equivalent to the snapshot's. Identity
-   * fields must match too; only the server-side bookkeeping columns
-   * (last_modified_*) may differ on the service row itself.
+   * fields must match too; only server-side bookkeeping may differ: the
+   * service row's last_modified_* and each custom tool's created_at /
+   * updated_at (re-stamped on every save of the service).
    */
   async expectConfigRestored(snapshot: any): Promise<void> {
     const live = await this.getService(snapshot.id);
-    expect(live.config, 'config must be byte-equivalent after restore').toEqual(
-      snapshot.config
-    );
+    expect(
+      withoutToolTimestamps(live.config),
+      'config must be byte-equivalent after restore'
+    ).toEqual(withoutToolTimestamps(snapshot.config));
     for (const f of ['name', 'label', 'description', 'is_active', 'type']) {
       expect(live[f], `service.${f} must be restored`).toEqual(snapshot[f]);
     }
@@ -127,4 +150,14 @@ export class DfApi {
       }
     }
   }
+}
+
+function withoutToolTimestamps(config: any): any {
+  if (!Array.isArray(config?.custom_tools)) return config;
+  return {
+    ...config,
+    custom_tools: config.custom_tools.map(
+      ({ created_at, updated_at, ...tool }: any) => tool
+    ),
+  };
 }

@@ -8,6 +8,11 @@ import {
 import { loginAsAdmin, waitForAppReady } from './fixtures/admin-login';
 import { DfApi, E2E_SERVICE_PREFIX } from './fixtures/df-api';
 import {
+  createMcpFixtures,
+  destroyMcpFixtures,
+  McpFixtures,
+} from './fixtures/mcp-fixtures';
+import {
   dbWriteDataKeys,
   dbWriteExecKeys,
   effectiveTools,
@@ -23,40 +28,39 @@ import {
  * Every flow here performs REAL saves and verifies the outcome through both
  * the UI and a direct API GET of the stored config.
  *
- * Instance discipline:
- *  - mcp_full's full record is snapshotted in beforeAll and restored
- *    byte-equivalent in afterAll (verified by a GET diff).
- *  - Services created by tests use the `e2e_mcp_` prefix and are deleted in
- *    afterAll.
- *  - db/db2/files/logs/sysmcp_demo configs are never written.
+ * Instance discipline: runs on any instance.
+ *  - Its services are created in beforeAll (fixtures/mcp-fixtures, prefix
+ *    e2e_fxflow_) and deleted in afterAll; nothing pre-existing is written.
+ *  - The fixture MCP server is snapshotted after creation and restored
+ *    byte-equivalent between tests (verified by a GET diff).
+ *  - Services created through the UI use the `e2e_mcp_` prefix and are
+ *    deleted in afterAll.
  */
 
-const MCP_FULL_ID = 9;
+const PREFIX = 'e2e_fxflow_';
 
 let api: DfApi;
 let apiCtx: APIRequestContext;
-let snapshot: any; // mcp_full pristine record
+let fx: McpFixtures;
+let snapshot: any; // fixture MCP server's pristine record
 let catalog: McpBackendService[];
 
 test.beforeAll(async ({ playwright }, testInfo) => {
   const baseURL = testInfo.project.use.baseURL;
   apiCtx = await playwright.request.newContext({ baseURL });
   api = await DfApi.login(apiCtx);
-  snapshot = await api.snapshotService(MCP_FULL_ID);
-  expect(snapshot.name).toBe('mcp_full');
-  // Preconditions the flows rely on (also documents the fixture instance).
-  expect(snapshot.config.exposed_services).toEqual(['db']);
+  fx = await createMcpFixtures(api, PREFIX);
+  snapshot = await api.snapshotService(fx.mcpId);
+  // Preconditions the flows rely on.
+  expect(snapshot.config.exposed_services).toEqual([fx.db]);
   expect(snapshot.config.disabled_tools ?? []).toEqual([]);
   catalog = await fetchBackendCatalog(api);
 });
 
 test.afterAll(async () => {
   if (api) {
-    if (snapshot) {
-      await api.restoreService(snapshot);
-      await api.expectConfigRestored(snapshot);
-    }
     await api.deleteByNamePrefix(E2E_SERVICE_PREFIX);
+    await destroyMcpFixtures(api, PREFIX);
   }
   await apiCtx?.dispose();
 });
@@ -96,12 +100,12 @@ async function numberFrom(locator: Locator, re: RegExp): Promise<number> {
   return parseInt(m![1], 10);
 }
 
-test.describe('curation round-trip on mcp_full', () => {
+test.describe('curation round-trip on the fixture MCP server', () => {
   test.beforeEach(async ({ page }) => {
     test.setTimeout(90_000);
     await loginAsAdmin(page);
     await waitForAppReady(page);
-    await gotoTools(page, MCP_FULL_ID);
+    await gotoTools(page, fx.mcpId);
   });
 
   test('unchecking Write data persists exact keys, then re-enable restores', async ({
@@ -110,7 +114,7 @@ test.describe('curation round-trip on mcp_full', () => {
     const was = expectedTotal();
 
     // Drill into the db row.
-    const row = page.getByTestId('mcp-svc-row-db');
+    const row = page.getByTestId(`mcp-svc-row-${fx.db}`);
     await row.locator('.mcp-row-main').click();
     const drill = row.locator('.mcp-drill');
     await expect(drill).toBeVisible();
@@ -130,48 +134,50 @@ test.describe('curation round-trip on mcp_full', () => {
     await expect(dirtyBar).toContainText(`${was} → ${was - 3} tools`);
 
     // Access chip: partial write-off is Custom (procedures stay on).
-    await expect(page.getByTestId('mcp-svc-access-db')).toHaveText(
+    await expect(page.getByTestId(`mcp-svc-access-${fx.db}`)).toHaveText(
       /Custom ◐ 13 of 16/
     );
-    await expect(page.getByTestId('mcp-svc-fraction-db')).toHaveText(
+    await expect(page.getByTestId(`mcp-svc-fraction-${fx.db}`)).toHaveText(
       '13 of 16'
     );
 
     // Save — stays in place, snackbar carries the delta.
-    await saveAndWait(page, MCP_FULL_ID);
+    await saveAndWait(page, fx.mcpId);
     await expect(
       page.getByText(`Saved — ${was - 3} tools live (was ${was}).`)
     ).toBeVisible();
     await expect(dirtyBar).toHaveCount(0);
 
     // API truth: exactly the three Write-data keys, nothing else.
-    const mid = await api.getService(MCP_FULL_ID);
+    const mid = await api.getService(fx.mcpId);
     expect([...(mid.config.disabled_tools ?? [])].sort()).toEqual(
-      dbWriteDataKeys('db')
+      dbWriteDataKeys(fx.db)
     );
-    expect(mid.config.exposed_services).toEqual(['db']);
+    expect(mid.config.exposed_services).toEqual([fx.db]);
 
     // Re-enable the group and save back to the pristine state.
     await writeGroup.check();
     await expect(dirtyBar).toBeVisible();
     await expect(dirtyBar).toContainText(`${was - 3} → ${was} tools`);
-    await saveAndWait(page, MCP_FULL_ID);
+    await saveAndWait(page, fx.mcpId);
     await expect(
       page.getByText(`Saved — ${was} tools live (was ${was - 3}).`)
     ).toBeVisible();
 
-    const after = await api.getService(MCP_FULL_ID);
+    const after = await api.getService(fx.mcpId);
     expect(after.config.disabled_tools ?? []).toEqual([]);
-    await expect(page.getByTestId('mcp-svc-access-db')).toHaveText('Full');
+    await expect(page.getByTestId(`mcp-svc-access-${fx.db}`)).toHaveText(
+      'Full'
+    );
   });
 });
 
-test.describe('picker exposure round-trip on mcp_full', () => {
+test.describe('picker exposure round-trip on the fixture MCP server', () => {
   test.beforeEach(async ({ page }) => {
     test.setTimeout(90_000);
     await loginAsAdmin(page);
     await waitForAppReady(page);
-    await gotoTools(page, MCP_FULL_ID);
+    await gotoTools(page, fx.mcpId);
   });
 
   test.afterEach(async () => {
@@ -180,7 +186,7 @@ test.describe('picker exposure round-trip on mcp_full', () => {
     await api.expectConfigRestored(snapshot);
   });
 
-  test('exposing db2 read-only writes exposure + compiled curation once', async ({
+  test('exposing a second db read-only writes exposure + compiled curation once', async ({
     page,
   }) => {
     const was = expectedTotal();
@@ -189,17 +195,17 @@ test.describe('picker exposure round-trip on mcp_full', () => {
     const dialog = page.getByTestId('mcp-picker-dialog');
     await expect(dialog).toBeVisible();
 
-    // Only not-yet-exposed services are listed: db2/files/logs, never db.
-    for (const name of ['db2', 'files', 'logs']) {
+    // Only not-yet-exposed services are listed: db2 and files, never db.
+    for (const name of [fx.db2, fx.files]) {
       await expect(
         dialog.locator('.mcp-picker-row', {
           has: page.locator('.mcp-chip', { hasText: new RegExp(`^${name}$`) }),
         })
       ).toBeVisible();
     }
-    await expect(dialog.locator('.mcp-chip', { hasText: /^db$/ })).toHaveCount(
-      0
-    );
+    await expect(
+      dialog.locator('.mcp-chip', { hasText: new RegExp(`^${fx.db}$`) })
+    ).toHaveCount(0);
 
     // Read-only is the pre-selected default.
     await expect(
@@ -209,12 +215,14 @@ test.describe('picker exposure round-trip on mcp_full', () => {
     // Select db2; the consequence line simulates the real result.
     await dialog
       .locator('.mcp-picker-row', {
-        has: page.locator('.mcp-chip', { hasText: /^db2$/ }),
+        has: page.locator('.mcp-chip', {
+          hasText: new RegExp(`^${fx.db2}$`),
+        }),
       })
       .click();
     const cfg = parseMcpConfig(snapshot.config);
-    cfg.exposedServices = [...cfg.exposedServices, 'db2'];
-    dbWriteExecKeys('db2').forEach(k => cfg.disabledTools.add(k));
+    cfg.exposedServices = [...cfg.exposedServices, fx.db2];
+    dbWriteExecKeys(fx.db2).forEach(k => cfg.disabledTools.add(k));
     const next = effectiveTools(cfg, catalog).total;
     await expect(page.getByTestId('mcp-picker-consequence')).toHaveText(
       `1 selected · read-only → server will serve ${next} tools (was ${was})`
@@ -223,32 +231,32 @@ test.describe('picker exposure round-trip on mcp_full', () => {
     // Expose → the row appears, read-only, and the page is dirty.
     await page.getByTestId('mcp-picker-confirm').click();
     await expect(dialog).toHaveCount(0);
-    const newRow = page.getByTestId('mcp-svc-row-db2');
+    const newRow = page.getByTestId(`mcp-svc-row-${fx.db2}`);
     await expect(newRow).toBeVisible();
-    await expect(page.getByTestId('mcp-svc-access-db2')).toHaveText(
+    await expect(page.getByTestId(`mcp-svc-access-${fx.db2}`)).toHaveText(
       'Read-only'
     );
-    await expect(page.getByTestId('mcp-svc-fraction-db2')).toHaveText(
+    await expect(page.getByTestId(`mcp-svc-fraction-${fx.db2}`)).toHaveText(
       '9 of 16'
     );
     const dirtyBar = page.getByTestId('mcp-dirty-bar');
     await expect(dirtyBar).toContainText(`${was} → ${next} tools`);
 
     // Save, then verify the stored contract via the API.
-    await saveAndWait(page, MCP_FULL_ID);
+    await saveAndWait(page, fx.mcpId);
     await expect(
       page.getByText(`Saved — ${next} tools live (was ${was}).`)
     ).toBeVisible();
 
-    const stored = await api.getService(MCP_FULL_ID);
-    expect(stored.config.exposed_services).toEqual(['db', 'db2']);
+    const stored = await api.getService(fx.mcpId);
+    expect(stored.config.exposed_services).toEqual([fx.db, fx.db2]);
     expect([...(stored.config.disabled_tools ?? [])].sort()).toEqual(
-      dbWriteExecKeys('db2')
+      dbWriteExecKeys(fx.db2)
     );
     // db's own curation was never touched (migration-safety rule 3).
     expect(
       (stored.config.disabled_tools ?? []).filter((k: string) =>
-        k.startsWith('db_')
+        k.startsWith(`${fx.db}_`)
       )
     ).toEqual([]);
   });
@@ -279,7 +287,7 @@ test.describe('create flow', () => {
       timeout: 15_000,
     });
 
-    // Fill the name; keep the Read-only default; expose db.
+    // Fill the name; keep the Read-only default; expose the fixture db.
     await page.getByTestId('mcp-create-name').fill(NAME);
     await expect(page.getByTestId('mcp-create-url-preview')).toContainText(
       `/mcp/${NAME}`
@@ -289,12 +297,12 @@ test.describe('create flow', () => {
         .getByTestId('mcp-create-access-ro')
         .and(page.locator('[aria-checked="true"]'))
     ).toBeVisible();
-    await page.getByTestId('mcp-create-svc-db').click();
+    await page.getByTestId(`mcp-create-svc-${fx.db}`).click();
 
     // Consequence line: a real simulated number (merged style, db read-only).
     const draft = parseMcpConfig({});
-    draft.exposedServices = ['db'];
-    dbWriteExecKeys('db').forEach(k => draft.disabledTools.add(k));
+    draft.exposedServices = [fx.db];
+    dbWriteExecKeys(fx.db).forEach(k => draft.disabledTools.add(k));
     draft.toolStyle = 'merged';
     const expected = effectiveTools(draft, catalog).total;
     await expect(page.getByTestId('mcp-create-consequence')).toContainText(
@@ -337,9 +345,9 @@ test.describe('create flow', () => {
     expect(full.type).toBe('mcp');
     expect(full.is_active).toBe(true);
     expect(full.config.tool_style).toBe('merged');
-    expect(full.config.exposed_services).toEqual(['db']);
+    expect(full.config.exposed_services).toEqual([fx.db]);
     expect([...(full.config.disabled_tools ?? [])].sort()).toEqual(
-      dbWriteExecKeys('db')
+      dbWriteExecKeys(fx.db)
     );
     expect(!!full.config.allow_api_key_auth).toBe(false);
     // OAuth was provisioned silently.

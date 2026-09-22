@@ -8,6 +8,11 @@ import {
 import { loginAsAdmin, waitForAppReady } from './fixtures/admin-login';
 import { DfApi } from './fixtures/df-api';
 import {
+  createMcpFixtures,
+  destroyMcpFixtures,
+  McpFixtures,
+} from './fixtures/mcp-fixtures';
+import {
   effectiveTotalOf,
   fetchBackendCatalog,
   McpBackendService,
@@ -25,35 +30,41 @@ import {
  * is saved here), the system_mcp variant, and the legacy-editor guard for
  * non-MCP services.
  *
- * Instance discipline: this file saves NOTHING. mcp_full's record is
- * snapshotted in beforeAll anyway and afterAll asserts it is byte-identical
- * — a tripwire against accidental saves. Mutating round-trips live in
- * mcp-redesign-flows.spec.ts.
+ * Instance discipline: runs on any instance. The services it reads are
+ * created in beforeAll (fixtures/mcp-fixtures, prefix e2e_fxsvc_) and deleted
+ * in afterAll. The UI saves nothing here: the MCP server's record is
+ * snapshotted and afterAll asserts it is byte-identical — a tripwire against
+ * accidental saves. Mutating round-trips live in mcp-redesign-flows.spec.ts.
  */
 
-const MCP_FULL_ID = 9;
-const SYS_MCP_ID = 21; // sysmcp_demo — read-only assertions only
-const DB_SERVICE_ID = 6; // db (sqlite) — legacy-editor guard
+const PREFIX = 'e2e_fxsvc_';
 
 let api: DfApi;
 let apiCtx: APIRequestContext;
-let snapshot: any; // mcp_full full service record
+let fx: McpFixtures;
+let snapshot: any; // fixture MCP server's full service record
 let catalog: McpBackendService[];
 
 test.beforeAll(async ({ playwright }, testInfo) => {
   const baseURL = testInfo.project.use.baseURL;
   apiCtx = await playwright.request.newContext({ baseURL });
   api = await DfApi.login(apiCtx);
-  snapshot = await api.snapshotService(MCP_FULL_ID);
-  expect(snapshot.name).toBe('mcp_full');
+  fx = await createMcpFixtures(api, PREFIX);
+  snapshot = await api.snapshotService(fx.mcpId);
   catalog = await fetchBackendCatalog(api);
 });
 
 test.afterAll(async () => {
   // Tripwire: nothing in this file may have changed the service.
   if (api && snapshot) await api.expectConfigRestored(snapshot);
+  if (api) await destroyMcpFixtures(api, PREFIX);
   await apiCtx?.dispose();
 });
+
+/** Endpoint URL the editor shows for a service (APP_URL-based when set). */
+function endpointOf(page: Page, name: string): string {
+  return `${fx.endpointOrigin(new URL(page.url()).origin)}/mcp/${name}`;
+}
 
 /** The effective tool total the UI must display for the stored config. */
 function expectedTotal(): number {
@@ -93,12 +104,12 @@ test.describe('MCP editor — Connect tab', () => {
     await waitForAppReady(page);
   });
 
-  test('list -> open mcp_full lands on Connect with URL, probe and live count', async ({
+  test('list -> open the MCP server lands on Connect with URL, probe and live count', async ({
     page,
   }) => {
     // AI → MCP list.
     await page.goto('/dreamfactory/dist/#/ai/mcp');
-    const row = page.getByRole('row', { name: /mcp_full/ });
+    const row = page.getByRole('row', { name: new RegExp(fx.mcp) });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await row.click();
 
@@ -111,14 +122,12 @@ test.describe('MCP editor — Connect tab', () => {
       'true'
     );
 
-    // Endpoint URL = {origin}/mcp/mcp_full, in header and endpoint card.
-    const origin = new URL(page.url()).origin;
-    await expect(page.getByTestId('mcp-endpoint-url')).toHaveText(
-      `${origin}/mcp/mcp_full`
-    );
+    // Endpoint URL = {APP_URL or origin}/mcp/{name}, in header and endpoint card.
+    const url = endpointOf(page, fx.mcp);
+    await expect(page.getByTestId('mcp-endpoint-url')).toHaveText(url);
     await expect(
       page.getByTestId('mcp-endpoint-card').locator('code.mcp-endpoint-url')
-    ).toHaveText(`${origin}/mcp/mcp_full`);
+    ).toHaveText(url);
 
     // Probe: live 401 renders as the positive reachability state.
     await expect(page.getByTestId('mcp-probe-chip')).toHaveText(
@@ -135,17 +144,17 @@ test.describe('MCP editor — Connect tab', () => {
   test('client panels are auth-aware and never leak a real credential', async ({
     page,
   }) => {
-    await gotoMcpEditor(page, MCP_FULL_ID);
-    const origin = new URL(page.url()).origin;
+    await gotoMcpEditor(page, fx.mcpId);
+    const url = endpointOf(page, fx.mcp);
     const panel = page.getByTestId('mcp-client-panel');
 
     // Claude Code panel: the documented one-liner.
     await page.getByTestId('mcp-client-chip-claude-code').click();
     await expect(panel).toContainText(
-      `claude mcp add --transport http mcp_full ${origin}/mcp/mcp_full`
+      `claude mcp add --transport http ${fx.mcp} ${url}`
     );
 
-    // mcp_full has allow_api_key_auth=true → the sub-toggle exists and the
+    // The fixture server has allow_api_key_auth=true → the sub-toggle exists and the
     // API-key variant adds the header with the YOUR_API_KEY placeholder.
     expect(snapshot.config.allow_api_key_auth).toBe(true);
     const authToggle = page.locator('.mcp-auth-toggle');
@@ -163,7 +172,7 @@ test.describe('MCP editor — Connect tab', () => {
       '"X-DreamFactory-API-Key": "YOUR_API_KEY"'
     );
     await expect(panel).toContainText(
-      `Legacy alias (same server): ${origin}/api/v2/mcp_full/_mcp`
+      `Legacy alias (same server): ${url.replace(/\/mcp\/[^/]+$/, '')}/api/v2/${fx.mcp}/_mcp`
     );
     expect(await panel.textContent()).not.toMatch(/[0-9a-f]{32}/);
 
@@ -184,19 +193,19 @@ test.describe('MCP editor — Tools tab (read view)', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
     await waitForAppReady(page);
-    await gotoMcpEditor(page, MCP_FULL_ID);
+    await gotoMcpEditor(page, fx.mcpId);
     await openToolsTab(page);
   });
 
-  test('exposure is the only gate: one row for db, none for the unexposed', async ({
+  test('exposure is the only gate: one row for the exposed db, none for the unexposed', async ({
     page,
   }) => {
-    expect(snapshot.config.exposed_services).toEqual(['db']);
+    expect(snapshot.config.exposed_services).toEqual([fx.db]);
 
-    // Exactly one exposed-service row — db.
-    await expect(page.getByTestId('mcp-svc-row-db')).toBeVisible();
+    // Exactly one exposed-service row — the fixture db.
+    await expect(page.getByTestId(`mcp-svc-row-${fx.db}`)).toBeVisible();
     await expect(page.locator('[data-testid^="mcp-svc-row-"]')).toHaveCount(1);
-    for (const name of ['db2', 'files', 'logs']) {
+    for (const name of [fx.db2, fx.files]) {
       await expect(page.getByTestId(`mcp-svc-row-${name}`)).toHaveCount(0);
     }
 
@@ -273,7 +282,7 @@ test.describe('MCP editor — Settings tab (discard only)', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
     await waitForAppReady(page);
-    await gotoMcpEditor(page, MCP_FULL_ID);
+    await gotoMcpEditor(page, fx.mcpId);
     await page.getByTestId('mcp-tab-settings').click();
     await expect(page.getByTestId('mcp-settings-tab')).toBeVisible();
   });
@@ -356,14 +365,14 @@ test.describe('system_mcp variant', () => {
     await waitForAppReady(page);
   });
 
-  test('sysmcp_demo renders the redesigned editor with the fixed catalog', async ({
+  test('a system_mcp server renders the redesigned editor with the fixed catalog', async ({
     page,
   }) => {
-    const sys = await api.getService(SYS_MCP_ID);
+    const sys = await api.getService(fx.sysId);
     expect(sys.type).toBe('system_mcp');
     const enabled = systemMcpEnabledCount(sys.config);
 
-    await gotoMcpEditor(page, SYS_MCP_ID);
+    await gotoMcpEditor(page, fx.sysId);
     // The redesigned editor, not the legacy page.
     await expect(page.locator('df-service-details')).toHaveCount(0);
 
@@ -420,19 +429,18 @@ test.describe('same-route navigation', () => {
   test('in-app :id -> :id navigation re-initializes the editor', async ({
     page,
   }) => {
-    // Full load of mcp_full first.
-    await gotoMcpEditor(page, MCP_FULL_ID);
-    const origin = new URL(page.url()).origin;
+    // Full load of the MCP server first.
+    await gotoMcpEditor(page, fx.mcpId);
     await expect(page.getByTestId('mcp-endpoint-url')).toHaveText(
-      `${origin}/mcp/mcp_full`
+      endpointOf(page, fx.mcp)
     );
 
     // Hash-only navigation to another service reuses the routed component;
     // the editor must re-initialize from the new resolve, not keep showing
     // the previous service.
-    await page.goto(`/dreamfactory/dist/#/ai/mcp/${SYS_MCP_ID}`);
+    await page.goto(`/dreamfactory/dist/#/ai/mcp/${fx.sysId}`);
     await expect(page.getByTestId('mcp-endpoint-url')).toHaveText(
-      `${origin}/mcp/sysmcp_demo`,
+      endpointOf(page, fx.sys),
       { timeout: 15_000 }
     );
     await openToolsTab(page);
@@ -440,7 +448,7 @@ test.describe('same-route navigation', () => {
     await expect(page.getByTestId('mcp-expose-btn')).toHaveCount(0);
 
     // And on to a non-MCP service: the shim must swap to the legacy editor.
-    await page.goto(`/dreamfactory/dist/#/ai/mcp/${DB_SERVICE_ID}`);
+    await page.goto(`/dreamfactory/dist/#/ai/mcp/${fx.dbId}`);
     await expect(page.locator('df-service-details')).toBeVisible({
       timeout: 15_000,
     });
@@ -456,7 +464,7 @@ test.describe('legacy regression guard', () => {
 
   test('a non-MCP service still gets the legacy editor', async ({ page }) => {
     await page.goto(
-      `/dreamfactory/dist/#/api-connections/api-types/database/${DB_SERVICE_ID}`
+      `/dreamfactory/dist/#/api-connections/api-types/database/${fx.dbId}`
     );
     const legacy = page.locator('df-service-details');
     await expect(legacy).toBeVisible({ timeout: 15_000 });
@@ -466,6 +474,6 @@ test.describe('legacy regression guard', () => {
     // Its normal controls render, populated from the service.
     await expect(
       legacy.locator('input[formcontrolname="name"]').first()
-    ).toHaveValue('db', { timeout: 15_000 });
+    ).toHaveValue(fx.db, { timeout: 15_000 });
   });
 });
