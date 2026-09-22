@@ -1,0 +1,356 @@
+/**
+ * Shell for the redesigned MCP service page: persistent endpoint header,
+ * Connect / Tools / Settings tabs, dirty bar with the tool-count delta, and
+ * the save pipeline (auto cache flush, stay-in-place, delta snackbar,
+ * reconnect banner arming). Tabs receive the McpEditorStore and mutate it.
+ */
+import { CommonModule } from '@angular/common';
+import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
+import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.component';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription, forkJoin } from 'rxjs';
+import { UntilDestroy } from '@ngneat/until-destroy';
+import {
+  CACHE_SERVICE_TOKEN,
+  SERVICES_SERVICE_TOKEN,
+  SERVICE_TYPE_SERVICE_TOKEN,
+} from 'src/app/shared/constants/tokens';
+import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { GenericListResponse } from 'src/app/shared/types/generic-http';
+import {
+  HealthLevel,
+  appUrlOrigin,
+  healthLevel,
+  healthMessage,
+  serializeMcpConfig,
+  toBackendServices,
+} from '../mcp-effective';
+import { McpEditorStore, McpServiceType } from '../mcp-store';
+import { McpServerApiService } from '../mcp-server-api.service';
+import { DfMcpConnectComponent } from '../df-mcp-connect/df-mcp-connect.component';
+import { DfMcpToolsComponent } from '../df-mcp-tools/df-mcp-tools.component';
+import { DfMcpSettingsComponent } from '../df-mcp-settings/df-mcp-settings.component';
+
+export type McpTab = 'connect' | 'tools' | 'settings';
+
+@UntilDestroy({ checkProperties: true })
+@Component({
+  selector: 'df-mcp-details',
+  templateUrl: './df-mcp-details.component.html',
+  styleUrls: ['./df-mcp-details.component.scss'],
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+    MatTabsModule,
+    DfAlertComponent,
+    DfMcpConnectComponent,
+    DfMcpToolsComponent,
+    DfMcpSettingsComponent,
+  ],
+})
+export class DfMcpDetailsComponent implements OnInit, OnDestroy {
+  store = new McpEditorStore();
+  tab: McpTab = 'connect';
+  loading = true;
+  saving = false;
+  private sub?: Subscription;
+  private routeSub?: Subscription;
+
+  constructor(
+    private activatedRoute: ActivatedRoute,
+    private router: Router,
+    @Inject(SERVICES_SERVICE_TOKEN) private servicesService: DfBaseCrudService,
+    @Inject(SERVICE_TYPE_SERVICE_TOKEN)
+    private serviceTypeService: DfBaseCrudService,
+    @Inject(CACHE_SERVICE_TOKEN) private cacheService: DfBaseCrudService,
+    private snackbarService: DfSnackbarService,
+    private mcpApi: McpServerApiService
+  ) {}
+
+  ngOnInit(): void {
+    // Same-route navigations (/ai/mcp/9 -> /ai/mcp/21) reuse this component
+    // instance; the resolver re-emits, and the whole editor re-initializes
+    // from the newly resolved service instead of showing the old one.
+    this.routeSub = this.activatedRoute.data.subscribe(() =>
+      this.initFromRoute()
+    );
+  }
+
+  private initFromRoute(): void {
+    const data = this.activatedRoute.snapshot.data['data'];
+    const qp = this.activatedRoute.snapshot.queryParamMap;
+    const type: McpServiceType =
+      data?.type === 'system_mcp' ? 'system_mcp' : 'mcp';
+    // A fresh store per service: the tabs receive a new @Input reference
+    // and drop their own per-service UI state via ngOnChanges.
+    this.sub?.unsubscribe();
+    this.store = new McpEditorStore();
+    this.sub = this.store.changes.subscribe(() => undefined);
+    this.store.init(
+      {
+        id: data?.id,
+        name: data?.name ?? '',
+        label: data?.label || data?.name || '',
+        description: data?.description ?? '',
+        isActive: data?.isActive ?? true,
+        type,
+        raw: data,
+      },
+      data?.config ?? {}
+    );
+    this.store.created = qp.get('created') === '1';
+    this.saving = false;
+    this.tab = 'connect';
+    const requestedTab = qp.get('tab') as McpTab | null;
+    if (
+      requestedTab &&
+      ['connect', 'tools', 'settings'].includes(requestedTab)
+    ) {
+      this.tab = requestedTab;
+    }
+    // The shell H1 falls back to the raw :id URL segment on detail pages;
+    // publish the human label keyed to this URL, like the legacy editor.
+    this.snackbarService.setPageLabel(
+      this.router.url,
+      this.store.service.label || this.store.service.name
+    );
+    this.loading = true;
+    this.loadBackendServices();
+    const store = this.store;
+    store.reloadServerCatalog = () => this.loadServerCatalog(store);
+    this.loadServerCatalog(store);
+    this.mcpApi.health().subscribe(h => {
+      if (this.store !== store) return;
+      store.health = h;
+      store.healthChecked = true;
+      store.touch();
+    });
+  }
+
+  /** The saved server's real catalog numbers, for the current preview identity. */
+  private loadServerCatalog(store: McpEditorStore): void {
+    const identity = store.previewIdentity;
+    this.mcpApi.catalog(store.service.name, identity).subscribe(c => {
+      // Drop late answers for another service or another identity.
+      if (this.store !== store || store.previewIdentity !== identity) return;
+      store.setServerCatalog(c);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+    this.routeSub?.unsubscribe();
+  }
+
+  private loadBackendServices(): void {
+    // The daemon serves tools for Database-group services and local file
+    // storage. Fetch types (for the group map) + services in one go.
+    forkJoin({
+      types: this.serviceTypeService.getAll<GenericListResponse<any>>({
+        fields: 'name,group',
+        limit: 1000,
+      }),
+      services: this.servicesService.getAll<GenericListResponse<any>>({
+        limit: 1000,
+        fields: 'id,name,label,type,is_active',
+        sort: 'name',
+      }),
+    }).subscribe({
+      next: ({ types, services }) => {
+        const groupMap: Record<string, string> = {};
+        for (const t of types?.resource ?? []) groupMap[t.name] = t.group;
+        this.store.backendServices = toBackendServices(
+          services?.resource ?? [],
+          groupMap
+        );
+        this.store.backendLoaded = true;
+        this.loading = false;
+        this.store.touch();
+      },
+      error: () => {
+        this.store.backendLoaded = true;
+        this.loading = false;
+        this.store.touch();
+      },
+    });
+  }
+
+  /* ------------------------------ header ------------------------------ */
+  /**
+   * Endpoint clients should use: APP_URL-based when the health report has
+   * it (OAuth redirects go to APP_URL), else this page's origin.
+   */
+  get mcpUrl(): string {
+    const origin = appUrlOrigin(this.store.health) ?? window.location.origin;
+    return `${origin}/mcp/${this.store.service.name}`;
+  }
+
+  /** APP_URL differs from the address this page is open at. */
+  /** The APP_URL check when it is not ok, with the two addresses it compared. */
+  get appUrlIssue(): { appUrl: string; seen: string } | null {
+    const c = this.store.health?.checks?.find(
+      x => x.id === 'app_url' && (x.status || '').toLowerCase() !== 'ok'
+    );
+    if (!c) return null;
+    const d: Record<string, any> = c.details ?? {};
+    return {
+      appUrl: typeof d['app_url'] === 'string' ? d['app_url'] : '',
+      seen:
+        d['forwarded_origin'] || d['request_origin'] || window.location.origin,
+    };
+  }
+
+  /** First failing check other than APP_URL (daemon down, key unreadable...). */
+  get otherHealthIssue(): { level: 'error' | 'warning'; text: string } | null {
+    const c = this.store.health?.checks?.find(
+      x => x.id !== 'app_url' && (x.status || '').toLowerCase() !== 'ok'
+    );
+    if (!c) return null;
+    return {
+      level: (c.status || '').toLowerCase() === 'error' ? 'error' : 'warning',
+      text: c.message ?? '',
+    };
+  }
+
+  get healthLevel(): HealthLevel | null {
+    return this.store.health ? healthLevel(this.store.health) : null;
+  }
+
+  get healthText(): string {
+    const h = this.store.health;
+    if (!h) return '';
+    const msg = healthMessage(h);
+    if (msg) return msg;
+    return this.healthLevel === 'ok'
+      ? 'MCP health: all checks pass'
+      : 'MCP health: check failed';
+  }
+
+  get healthChip(): string {
+    const level = this.healthLevel;
+    if (level === 'ok') return '● Healthy';
+    const bad = this.store.health?.checks?.find(
+      c => (c.status || '').toLowerCase() !== 'ok'
+    );
+    const what =
+      bad?.id === 'app_url'
+        ? 'APP_URL mismatch'
+        : level === 'warn'
+          ? 'Health warning'
+          : 'Health error';
+    return `⚠ ${what}`;
+  }
+
+  copyUrl(): void {
+    navigator.clipboard?.writeText(this.mcpUrl).catch(() => undefined);
+    this.store.copiedUrl = true;
+    this.snackbarService.openSnackBar('Endpoint URL copied.', 'success');
+  }
+
+  setTab(tab: McpTab): void {
+    this.tab = tab;
+  }
+
+  /** Dirty-navigation check, reached via the route shim + mcpDirtyGuard. */
+  canDeactivate(): boolean {
+    if (!this.store?.service || !this.store.dirty()) return true;
+    return window.confirm(
+      'You have unsaved changes. Leave this page and discard them?'
+    );
+  }
+
+  /* ------------------------------- save ------------------------------- */
+  save(): void {
+    if (this.saving || !this.store.dirty()) return;
+    const s = this.store;
+    const wasTools = s.savedTotalTools();
+    const renamed = s.draftName !== s.service.name;
+    const connectionAffecting = s.connectionAffecting();
+    if (renamed) {
+      const ok = window.confirm(
+        `Renaming changes your endpoint URL to …/mcp/${s.draftName}. ` +
+          'Connected clients will break until they update. Rename?'
+      );
+      if (!ok) return;
+    }
+    this.saving = true;
+    const payload: any = {
+      ...s.service.raw,
+      id: s.service.id,
+      name: s.draftName,
+      label: s.draftLabel,
+      description: s.draftDescription,
+      isActive: s.draftIsActive,
+      type: s.service.type,
+      config: serializeMcpConfig(s.cfg, s.service.type),
+    };
+    delete payload.serviceDocByServiceId;
+    this.servicesService.update(s.service.id, payload).subscribe({
+      next: () => {
+        this.saving = false;
+        s.markSaved();
+        // MCP saves always flush the service cache — no button for it.
+        this.cacheService.delete(s.service.name).subscribe({
+          next: () => undefined,
+          error: () => undefined,
+        });
+        // The saved config is what the server now serves: re-read it.
+        this.loadServerCatalog(s);
+        const now = s.totalTools();
+        if (now === 0) {
+          this.snackbarService.openSnackBar(
+            'Saved — this server serves no tools. Agents can connect but can call nothing.',
+            'warning'
+          );
+        } else if (now !== wasTools) {
+          this.snackbarService.openSnackBar(
+            `Saved — ${now} tools live (was ${wasTools}).`,
+            'success'
+          );
+        } else {
+          this.snackbarService.openSnackBar('Saved.', 'success');
+        }
+        if (connectionAffecting) {
+          s.reconnectBanner = true;
+        }
+        s.touch();
+      },
+      error: err => {
+        this.saving = false;
+        this.snackbarService.openSnackBar(
+          err?.error?.error?.message ?? 'Save failed.',
+          'error'
+        );
+      },
+    });
+  }
+
+  discard(): void {
+    this.store.discard();
+  }
+
+  /** Delete server (Settings danger zone calls this). */
+  deleteServer(): void {
+    const s = this.store;
+    const typed = window.prompt(
+      `Delete this MCP server? Clients lose access immediately.\n` +
+        `Type the server name (${s.service.name}) to confirm:`
+    );
+    if (typed !== s.service.name) return;
+    this.servicesService.delete(s.service.id).subscribe({
+      next: () => {
+        this.snackbarService.openSnackBar('Server deleted.', 'success');
+        this.router.navigate(['../'], { relativeTo: this.activatedRoute });
+      },
+      error: () => this.snackbarService.openSnackBar('Delete failed.', 'error'),
+    });
+  }
+}

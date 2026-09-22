@@ -86,8 +86,11 @@ export function calibrate(
   }
 
   // Dominant model = most requests in the window.
-  let top: { model: string; provider?: string; requests: number | string } | null =
-    null;
+  let top: {
+    model: string;
+    provider?: string;
+    requests: number | string;
+  } | null = null;
   for (const m of bundle.by_model ?? []) {
     if (!top || num(m.requests) > num(top.requests)) {
       top = m;
@@ -204,7 +207,8 @@ export function compareActual(
   if (actual > costHigh) {
     return {
       kind: 'above',
-      pct: costHigh > 0 ? Math.round(((actual - costHigh) / costHigh) * 100) : 0,
+      pct:
+        costHigh > 0 ? Math.round(((actual - costHigh) / costHigh) * 100) : 0,
     };
   }
   return {

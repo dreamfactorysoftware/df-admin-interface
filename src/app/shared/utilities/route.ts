@@ -212,7 +212,12 @@ export function generateBreadcrumb(
   currentURL: string
 ): Breadcrumb[] {
   const breadcrumbs: Breadcrumb[] = [];
+  // Router URLs carry query params and fragments (/ai/mcp/26?created=1);
+  // they are not path segments, so strip them or the last crumb renders
+  // "26?created=1" and nameLastCrumb can never match it to a route param.
   const urlSegments = decodeURIComponent(currentURL)
+    .split('?')[0]
+    .split('#')[0]
     .replace(/\/$/, '')
     .split('/')
     .filter(segment => segment);

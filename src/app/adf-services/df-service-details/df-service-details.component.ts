@@ -2208,6 +2208,22 @@ export class DfServiceDetailsComponent implements OnInit {
                   `/api-connections/api-docs/${formattedName}`,
                 ]);
               }
+            } else if (this.isMcp) {
+              // A new MCP server lands on its own editor's Connect tab with
+              // the endpoint URL and first-run checklist — never API Docs,
+              // which has nothing an MCP admin needs. `../{id}` is the
+              // sibling :id route (the MCP shim renders the new editor).
+              const newId = response?.resource?.[0]?.id;
+              if (newId != null) {
+                this.router.navigate(['../', newId], {
+                  relativeTo: this.activatedRoute,
+                  queryParams: { created: 1 },
+                });
+              } else {
+                this.router.navigate(['../'], {
+                  relativeTo: this.activatedRoute,
+                });
+              }
             } else {
               this.router.navigate([
                 `/api-connections/api-docs/${formattedName}`,

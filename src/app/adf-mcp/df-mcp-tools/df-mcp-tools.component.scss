@@ -1,0 +1,784 @@
+/* Tools tab: exposure + curation surface, peer sections, and the rail. */
+.mcp-tools {
+  font-family: Inter, 'Helvetica Neue', sans-serif;
+}
+
+.mcp-tools-loading {
+  padding: 32px 0;
+  font-size: 13.5px;
+  opacity: 0.65;
+}
+
+.mcp-tools-warnbanner {
+  background: var(--df-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
+  color: var(--df-warning);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+/* Two-column layout: content + sticky rail at ≥1120px; stacked below. */
+.mcp-tools-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+}
+
+.mcp-tools-main {
+  min-width: 0;
+}
+
+@media (max-width: 1119px) {
+  .mcp-tools-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cards */
+.mcp-card {
+  background: var(--df-surface);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.mcp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 4px 0 10px;
+
+  h2 {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin: 0;
+  }
+}
+
+.mcp-empty {
+  padding: 18px 16px;
+
+  p {
+    margin: 0 0 10px;
+    font-size: 13.5px;
+  }
+}
+
+/* Needs attention */
+.mcp-orphans {
+  margin-bottom: 16px;
+
+  .mcp-orphans-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--df-warning);
+    margin: 0 0 8px;
+  }
+}
+
+.mcp-orphan-row {
+  border-color: color-mix(in srgb, var(--df-warning) 40%, transparent);
+  background: var(--df-warning-soft);
+  padding: 12px 16px;
+
+  p {
+    margin: 0 0 10px;
+    font-size: 13.5px;
+  }
+
+  .mcp-orphan-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+/* Filter strip */
+.mcp-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+
+  .mcp-filter-input {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid color-mix(in srgb, var(--df-text) 18%, transparent);
+    border-radius: 8px;
+    min-width: 200px;
+    flex: 1;
+    max-width: 320px;
+
+    &:focus {
+      outline: 2px solid var(--df-accent);
+      outline-offset: -1px;
+    }
+  }
+}
+
+/* Rows */
+.mcp-rows {
+  overflow: visible;
+}
+
+.mcp-row {
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 6%, transparent);
+  padding: 6px 12px;
+
+  &:first-child {
+    border-top: none;
+  }
+
+  &.inactive .mcp-row-head {
+    opacity: 0.55;
+  }
+}
+
+.mcp-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap; /* cells must stay on the name's line to align */
+}
+
+.mcp-row-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  min-width: 0;
+
+  .mcp-row-icon {
+    font-size: 15px;
+    opacity: 0.7;
+  }
+
+  .mcp-row-label {
+    font-weight: 600;
+    font-size: 13.5px;
+  }
+}
+
+.mcp-type-badge {
+  opacity: 0.8;
+}
+
+.mcp-fraction {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mcp-access-chip {
+  cursor: pointer;
+}
+
+/* Tool grid: rows double as a grid, one cell per tool; columns line up
+   across rows because the cells sit in fixed-width tracks at the row's end. */
+$cell: 26px;
+$group-gap: 8px;
+$tail: 76px;
+
+/* The kind header already says Databases / File storage. */
+.mcp-rows .mcp-type-badge {
+  display: none;
+}
+
+.mcp-row-left {
+  display: flex;
+  align-items: center;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mcp-cells {
+  display: flex;
+  gap: $group-gap;
+  flex: none;
+}
+
+.mcp-cellgroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  & + & {
+    border-left: 1px solid var(--df-border-2);
+    padding-left: $group-gap;
+    margin-left: -1px;
+  }
+}
+
+.mcp-cellgroup-cols {
+  display: flex;
+}
+
+.mcp-row-tail {
+  width: $tail;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.mcp-cell {
+  width: $cell;
+  height: $cell;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--df-radius-sm, 4px);
+  background: transparent;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--df-hover);
+    border-color: var(--df-border);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--df-accent);
+    outline-offset: 1px;
+  }
+}
+
+.mcp-cell i,
+.mcp-cell-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  box-sizing: border-box;
+  background: var(--df-success);
+}
+
+.mcp-cell.write i,
+.mcp-cell-dot.write {
+  background: var(--df-warning);
+}
+
+.mcp-cell[data-state='off'] i,
+.mcp-cell-dot[data-state='off'] {
+  background: transparent;
+  border: 1.5px solid var(--df-text-faint);
+}
+
+.mcp-cell[data-state='writes-off'] i,
+.mcp-cell-dot[data-state='writes-off'] {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--df-border) 0 2px,
+    transparent 2px 4px
+  );
+  border: 1px solid var(--df-border);
+}
+
+/* Header above each kind: rotated tool names over their columns. */
+.mcp-grid-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--df-border);
+  background: var(--df-surface-2);
+
+  .mcp-row + & {
+    border-top: 1px solid var(--df-border);
+  }
+}
+
+.mcp-grid-head-left {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: flex-end;
+  padding-bottom: 4px;
+
+  .mcp-grid-head-title {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .mcp-grid-head-hint {
+    font-size: 12px;
+    color: var(--df-text-muted);
+  }
+}
+
+.mcp-cellgroup-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--df-text-muted);
+  white-space: nowrap;
+
+  .write > & {
+    color: var(--df-warning);
+  }
+}
+
+.mcp-colhead {
+  width: $cell;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  height: 172px;
+
+  .mcp-colhead-name {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--df-text-2);
+    white-space: nowrap;
+  }
+}
+
+/* Mini switch for columns and groups: on = filled, mixed = half. */
+.mcp-sw {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid var(--df-border);
+  border-radius: 999px;
+  background: var(--df-surface-2);
+  cursor: pointer;
+
+  i {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--df-text-faint);
+    transition: left 120ms ease;
+  }
+
+  &[data-state='on'] {
+    background: var(--df-accent);
+    border-color: var(--df-accent);
+    i {
+      left: 9px;
+      background: var(--df-accent-contrast);
+    }
+  }
+  &[data-state='mixed'] {
+    background: linear-gradient(
+      90deg,
+      var(--df-accent) 50%,
+      var(--df-surface-2) 50%
+    );
+    border-color: var(--df-accent);
+    i {
+      left: 5px;
+      background: var(--df-accent-contrast);
+    }
+  }
+  &:hover {
+    box-shadow: 0 0 0 3px var(--df-accent-soft);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--df-accent);
+    outline-offset: 1px;
+  }
+}
+
+.mcp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 8px 2px 0;
+  font-size: 12px;
+  color: var(--df-text-muted);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.mcp-row-menu-btn {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.mcp-row-caret {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  opacity: 0.7;
+  padding: 4px 6px;
+}
+
+.mcp-menu-danger {
+  color: var(--df-danger);
+}
+
+/* Drill-in */
+.mcp-drill {
+  padding: 4px 8px 10px 30px;
+
+  .mcp-drill-alloff {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--df-warning);
+    background: var(--df-warning-soft);
+    border: 1px solid color-mix(in srgb, var(--df-warning) 40%, transparent);
+    border-radius: 8px;
+    padding: 7px 11px;
+    margin: 4px 0 8px;
+  }
+
+  .mcp-drill-caption {
+    font-size: 12.5px;
+    opacity: 0.7;
+    margin: 4px 0 8px;
+  }
+}
+
+.mcp-group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 1px 0;
+
+  .mcp-group-count {
+    font-size: 12px;
+    opacity: 0.6;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.mcp-warn-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--df-warning);
+}
+
+.mcp-linklike {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--df-accent);
+  padding: 6px 0 2px;
+  text-align: left;
+}
+
+.mcp-tool-list {
+  padding: 2px 0 4px 8px;
+}
+
+.mcp-tool-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 1px 0;
+
+  code {
+    font-size: 12.5px;
+  }
+}
+
+.mcp-tool-desc {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.mcp-drill-foot {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+
+.mcp-rows-nomatch {
+  padding: 14px 16px;
+  font-size: 13px;
+  opacity: 0.65;
+  margin: 0;
+}
+
+/* Bulk bar */
+.mcp-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: color-mix(in srgb, var(--df-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--df-accent) 35%, transparent);
+  border-radius: 10px;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Peer sections (Global / Custom) */
+.mcp-peer-section {
+  padding: 10px 14px;
+}
+
+.mcp-peer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font: inherit;
+  text-align: left;
+
+  .mcp-peer-title {
+    font-weight: 700;
+    font-size: 13.5px;
+  }
+
+  .mcp-peer-caption {
+    font-size: 12px;
+    opacity: 0.6;
+  }
+
+  .mcp-fraction {
+    margin-left: auto;
+  }
+}
+
+button.mcp-peer-head {
+  cursor: pointer;
+}
+
+.mcp-custom-list {
+  margin-top: 6px;
+}
+
+.mcp-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 6%, transparent);
+  padding: 5px 0;
+
+  code {
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  .mcp-custom-actions {
+    margin-left: auto;
+    display: inline-flex;
+    gap: 2px;
+  }
+}
+
+.mcp-custom-empty {
+  margin: 8px 0 2px;
+}
+
+/* System groups */
+.mcp-sys-group {
+  padding: 10px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--df-text) 6%, transparent);
+
+  &:first-child {
+    border-top: none;
+  }
+}
+
+/* ─────────────────────────── The rail ─────────────────────────── */
+.mcp-rail {
+  background: var(--df-surface);
+  border: 1px solid color-mix(in srgb, var(--df-text) 8%, transparent);
+  border-radius: 10px;
+  padding: 14px 16px;
+  position: sticky;
+  top: 12px;
+}
+
+@media (max-width: 1119px) {
+  .mcp-rail {
+    position: static;
+  }
+}
+
+.mcp-rail-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin: 0 0 6px;
+}
+
+.mcp-rail-total {
+  font-size: 15px;
+  margin: 0 0 6px;
+
+  b {
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.mcp-rail-breakdown {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  opacity: 0.85;
+
+  li {
+    padding: 1px 0;
+  }
+}
+
+.mcp-rail-ro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+
+  .mcp-rail-note {
+    font-size: 12.5px;
+  }
+}
+
+.mcp-rail-serving {
+  font-size: 12px;
+  opacity: 0.75;
+  background: color-mix(in srgb, var(--df-text) 3%, transparent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 12px;
+
+  .mcp-info {
+    cursor: help;
+    font-weight: 600;
+    color: var(--df-accent);
+    white-space: nowrap;
+  }
+}
+
+.mcp-rail-preview-btn {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.mcp-rail-reach {
+  margin-bottom: 8px;
+
+  ul {
+    list-style: none;
+    padding: 2px 0 0 14px;
+    margin: 0;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+
+    code {
+      font-size: 11.5px;
+    }
+  }
+}
+
+/* Chip primitive (copied from the shell — component styles don't cascade). */
+.mcp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--df-text) 14%, transparent);
+  background: color-mix(in srgb, var(--df-text) 2%, transparent);
+  white-space: nowrap;
+
+  &.good {
+    background: var(--df-success-soft);
+    border-color: color-mix(in srgb, var(--df-success) 35%, transparent);
+    color: var(--df-success);
+  }
+  &.warn {
+    background: var(--df-warning-soft);
+    border-color: color-mix(in srgb, var(--df-warning) 40%, transparent);
+    color: var(--df-warning);
+  }
+  &.primary {
+    background: color-mix(in srgb, var(--df-accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--df-accent) 38%, transparent);
+    color: var(--df-accent);
+  }
+}
+
+.mcp-chip-btn {
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Phone width: stack row internals, keep the 16px gutter breathing room. */
+@media (max-width: 1100px) {
+  .mcp-row-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .mcp-drill {
+    padding-left: 12px;
+  }
+
+  /* Too narrow for aligned columns: drop the header, let cells wrap. */
+  .mcp-grid-head {
+    display: none;
+  }
+  .mcp-row-tail {
+    width: auto;
+  }
+}
