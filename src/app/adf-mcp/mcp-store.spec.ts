@@ -296,6 +296,10 @@ describe('connectionAffecting', () => {
     ['tool style', (s: McpEditorStore) => (s.cfg.toolStyle = 'merged')],
     ['secret', (s: McpEditorStore) => (s.cfg.oauthClientSecret = 'new')],
     [
+      'writes switch',
+      (s: McpEditorStore) => (s.cfg.allowWrites = !s.cfg.allowWrites),
+    ],
+    [
       'redirect uris',
       (s: McpEditorStore) => s.cfg.redirectUris.push('https://claude.ai/cb'),
     ],

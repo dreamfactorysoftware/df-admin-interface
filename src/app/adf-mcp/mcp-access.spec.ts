@@ -103,6 +103,24 @@ describe('mcp-access: model (ported)', () => {
     }
   });
 
+  it('keeps an existing row requestor_mask when changing its level', () => {
+    const rows = accessRowsForChanges(
+      [{ serviceId: 50, label: 'a', before: 'read', after: 'rw' }],
+      [
+        {
+          id: 7,
+          serviceId: 50,
+          component: '*',
+          verbMask: 1,
+          requestorMask: 1,
+        } as never,
+      ]
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({ id: 7, verb_mask: 31, requestor_mask: 1 }),
+    ]);
+  });
+
   it('writes table-limited grants as per-table rows plus a listing row, no *', () => {
     const rows = accessRowsForChanges(
       [

@@ -303,7 +303,8 @@ export function accessRowsForChanges(
       service_id: serviceId,
       component,
       verb_mask: mask,
-      requestor_mask: 3,
+      // Keep an existing row's requestor restriction (e.g. API-only); new rows get API+script.
+      requestor_mask: r?.requestorMask ?? 3,
       filters: [],
       filter_op: 'AND',
     });
