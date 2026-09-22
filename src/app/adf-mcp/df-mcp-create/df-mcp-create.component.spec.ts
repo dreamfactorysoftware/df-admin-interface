@@ -160,7 +160,7 @@ describe('DfMcpCreateComponent', () => {
       expect(b.dbTools).toBe(9);
       expect(b.fileTools).toBe(3);
       expect(b.globalTools).toBe(5);
-      expect(b.total).toBe(23);
+      expect(b.total).toBe(22);
       expect(consequence()).toBe(
         `Agents will get ${b.total} tools: ${b.dbTools} database (shared) ` +
           `· ${b.fileTools} file · ${b.globalTools} global. ` +
@@ -176,7 +176,7 @@ describe('DfMcpCreateComponent', () => {
       fixture.detectChanges();
 
       const b = expectedBreakdown(['billing', 'hr', 'reports'], 'rw');
-      expect(b.total).toBe(33);
+      expect(b.total).toBe(32);
       expect(consequence()).toBe(
         `Agents will get ${b.total} tools: ${b.dbTools} database (shared) ` +
           `· ${b.fileTools} file · ${b.globalTools} global.`

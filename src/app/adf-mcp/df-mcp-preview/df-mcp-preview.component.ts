@@ -22,7 +22,7 @@ import { FormsModule } from '@angular/forms';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { SYSTEM_MCP_TOOLS } from 'src/app/adf-services/df-service-details/system-mcp-tools';
 import {
-  AGGREGATOR_TOOLS,
+  aggregatorsFor,
   GLOBAL_TOOLS,
   LAZY_FACADE_TOOLS,
   LAZY_THRESHOLD_BYTES,
@@ -128,15 +128,14 @@ export class DfMcpPreviewComponent implements OnInit {
       .map(r => r.svc)
       .filter(v => v.active && v.kind === 'file');
 
-    // Global group: always-served globals + aggregators when 2+ active dbs.
+    // Global group: always-served globals + the aggregators the daemon registers.
+    const aggregators = aggregatorsFor(activeDbs.length, activeFiles.length);
     const globalItems: PreviewItem[] = GLOBAL_TOOLS.filter(
       t => !disabled.has(t.verb)
     ).map(t => ({ name: t.verb, description: t.description }));
-    if (activeDbs.length >= 2) {
-      for (const t of AGGREGATOR_TOOLS) {
-        if (!disabled.has(t.verb)) {
-          globalItems.push({ name: t.verb, description: t.description });
-        }
+    for (const t of aggregators) {
+      if (!disabled.has(t.verb)) {
+        globalItems.push({ name: t.verb, description: t.description });
       }
     }
     this.groups.push({
@@ -303,11 +302,9 @@ export class DfMcpPreviewComponent implements OnInit {
         this.excluded.push({ name: t.verb, reason: 'turned off by you' });
       }
     }
-    if (activeDbs.length >= 2) {
-      for (const t of AGGREGATOR_TOOLS) {
-        if (disabled.has(t.verb)) {
-          this.excluded.push({ name: t.verb, reason: 'turned off by you' });
-        }
+    for (const t of aggregators) {
+      if (disabled.has(t.verb)) {
+        this.excluded.push({ name: t.verb, reason: 'turned off by you' });
       }
     }
     // 8. Disabled custom tools.

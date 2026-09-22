@@ -24,7 +24,7 @@ import {
 } from 'src/app/adf-services/df-service-details/system-mcp-tools';
 import { FormsModule } from '@angular/forms';
 import {
-  AGGREGATOR_TOOLS,
+  aggregatorsFor,
   GLOBAL_TOOLS,
   LAZY_FACADE_TOOLS,
   LAZY_THRESHOLD_BYTES,
@@ -586,16 +586,16 @@ export class DfMcpToolsComponent implements OnChanges {
 
   /* --------------------------- global tools --------------------------- */
   aggregatorsShown(): boolean {
-    return this.eff().dbServices >= 2;
+    const e = this.eff();
+    return aggregatorsFor(e.dbServices, e.fileServices).length > 0;
   }
 
   globalToolList(): Array<{ tool: McpToolDef; aggregator: boolean }> {
     return this.memoized('globalToolList', String(this.store.version), () => {
       const out = GLOBAL_TOOLS.map(tool => ({ tool, aggregator: false }));
-      if (this.aggregatorsShown()) {
-        for (const tool of AGGREGATOR_TOOLS)
-          out.push({ tool, aggregator: true });
-      }
+      const e = this.eff();
+      for (const tool of aggregatorsFor(e.dbServices, e.fileServices))
+        out.push({ tool, aggregator: true });
       return out;
     });
   }
@@ -779,10 +779,8 @@ export class DfMcpToolsComponent implements OnChanges {
     for (const t of GLOBAL_TOOLS) {
       if (!disabled.has(t.verb)) names.push(t.verb);
     }
-    if (dbs.length >= 2) {
-      for (const t of AGGREGATOR_TOOLS) {
-        if (!disabled.has(t.verb)) names.push(t.verb);
-      }
+    for (const t of aggregatorsFor(dbs.length, files.length)) {
+      if (!disabled.has(t.verb)) names.push(t.verb);
     }
     if (style === 'merged') {
       for (const v of verbsFor('db')) {

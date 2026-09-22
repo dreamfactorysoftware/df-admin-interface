@@ -211,7 +211,7 @@ describe('DfMcpToolsComponent', () => {
       svc('hr'),
     ]);
     render(two);
-    expect(q('mcp-global-section')!.textContent).toContain('11 of 11');
+    expect(q('mcp-global-section')!.textContent).toContain('10 of 10');
   });
 
   it('renders custom tools with enable toggles feeding the math', () => {
@@ -524,8 +524,8 @@ describe('DfMcpPickerComponent — consequence simulation', () => {
     const old = effectiveTools(store.cfg, store.backendServices).total; // 16+5
     const p = picker(store);
     p.toggle('hr');
-    // read-only hr: +9 read/schema verbs, aggregators unlock (+6).
-    const expected = old + 9 + 6;
+    // read-only hr: +9 read/schema verbs, db aggregators unlock (+5).
+    const expected = old + 9 + 5;
     expect(simulateExposeTotal(store, ['hr'], 'ro', false)).toBe(expected);
     expect(p.consequenceText()).toBe(
       `1 selected · read-only → server will serve ${expected} tools (was ${old})`

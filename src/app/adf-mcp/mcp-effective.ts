@@ -8,6 +8,7 @@
  */
 import {
   AGGREGATOR_TOOLS,
+  aggregatorsFor,
   DEFAULT_BYTES_PER_TOOL,
   GLOBAL_TOOLS,
   LAZY_FACADE_TOOLS,
@@ -474,10 +475,9 @@ export function effectiveTools(
   const fileTools = files.reduce((a, f) => a + served(f), 0);
   // Global tools disable by their bare name in the same disabled_tools list.
   const globalTools = GLOBAL_TOOLS.filter(t => !disabled.has(t.verb)).length;
-  const aggregators =
-    dbs.length >= 2
-      ? AGGREGATOR_TOOLS.filter(t => !disabled.has(t.verb)).length
-      : 0;
+  const aggregators = aggregatorsFor(dbs.length, files.length).filter(
+    t => !disabled.has(t.verb)
+  ).length;
   const enabledCustoms = (cfg.customTools ?? []).filter(t =>
     isCustomToolServed(cfg, t)
   );

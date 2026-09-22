@@ -92,7 +92,7 @@ describe('DfMcpConnectComponent', () => {
       expect(checklist).toBeTruthy();
       const text = checklist!.textContent ?? '';
       // 2 dbs, merged, nothing disabled: 16 shared db + 5 global + 6 aggregators
-      expect(text).toContain('2 services exposed (27 tools)');
+      expect(text).toContain('2 services exposed (26 tools)');
       expect(text).toContain('refine in Tools');
       expect(text).not.toContain('Empty never means every service');
     });

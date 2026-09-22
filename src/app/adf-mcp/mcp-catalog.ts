@@ -253,6 +253,20 @@ export const AGGREGATOR_TOOLS: readonly McpToolDef[] = [
 ];
 
 /**
+ * Aggregators the daemon actually registers: the database ones need 2+
+ * databases (tools.service), `all_list_files` needs 2+ file services
+ * (file-api.tools).
+ */
+export function aggregatorsFor(
+  dbCount: number,
+  fileCount: number
+): McpToolDef[] {
+  return AGGREGATOR_TOOLS.filter(t =>
+    t.verb === 'all_list_files' ? fileCount >= 2 : dbCount >= 2
+  );
+}
+
+/**
  * Discovery facade served INSTEAD of the catalog when lazy delivery engages
  * (daemon lazy.service FACADE): search → describe → call, paged by fetch_more.
  */

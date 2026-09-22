@@ -288,8 +288,8 @@ describe('effectiveTools', () => {
     expect(e.dbTools).toBe(15 + 16);
     expect(e.fileTools).toBe(5);
     expect(e.globalTools).toBe(GLOBAL_TOOLS.length);
-    expect(e.aggregators).toBe(AGGREGATOR_TOOLS.length); // 2 dbs
-    expect(e.total).toBe(31 + 5 + 5 + 6);
+    expect(e.aggregators).toBe(AGGREGATOR_TOOLS.length - 1); // 2 dbs, 1 file: no all_list_files
+    expect(e.total).toBe(31 + 5 + 5 + 5);
   });
 
   it('merged: counts distinct verbs enabled in at least one exposed db', () => {
@@ -318,12 +318,20 @@ describe('effectiveTools', () => {
     const one = cfgWith({ exposedServices: ['crm'] });
     const two = cfgWith({ exposedServices: ['crm', 'hr'] });
     expect(effectiveTools(one, services).aggregators).toBe(0);
+    // Daemon: db aggregators need 2+ dbs; all_list_files needs 2+ file services.
     expect(effectiveTools(two, services).aggregators).toBe(
-      AGGREGATOR_TOOLS.length
+      AGGREGATOR_TOOLS.length - 1
     );
-    // A file service does not count toward the gate.
+    // A file service does not count toward the db gate.
     const dbPlusFile = cfgWith({ exposedServices: ['crm', 's3'] });
     expect(effectiveTools(dbPlusFile, services).aggregators).toBe(0);
+    const twoFiles = [...services, svc('gcs', 'file')];
+    const filesOnly = cfgWith({ exposedServices: ['s3', 'gcs'] });
+    expect(effectiveTools(filesOnly, twoFiles).aggregators).toBe(1);
+    const all = cfgWith({ exposedServices: ['crm', 'hr', 's3', 'gcs'] });
+    expect(effectiveTools(all, twoFiles).aggregators).toBe(
+      AGGREGATOR_TOOLS.length
+    );
   });
 
   it('disables globals and aggregators by bare name', () => {
@@ -333,7 +341,7 @@ describe('effectiveTools', () => {
     });
     const e = effectiveTools(cfg, services);
     expect(e.globalTools).toBe(GLOBAL_TOOLS.length - 1);
-    expect(e.aggregators).toBe(AGGREGATOR_TOOLS.length - 1);
+    expect(e.aggregators).toBe(AGGREGATOR_TOOLS.length - 2);
   });
 
   it('excludes inactive services from every number', () => {
@@ -377,11 +385,11 @@ describe('effectiveTools', () => {
         services
       ).lazyEngaged
     ).toBe(true);
-    // 7 dbs × 16 + 5 globals + 6 aggregators = 123 tools × 540 B > 32 KiB.
+    // 7 dbs × 16 + 5 globals + 5 db aggregators = 122 tools × 540 B > 32 KiB.
     const many = Array.from({ length: 7 }, (_, i) => svc(`db${i}`));
     const big = cfgWith({ exposedServices: many.map(m => m.name) });
     const e = effectiveTools(big, many);
-    expect(e.total).toBe(7 * 16 + 5 + 6);
+    expect(e.total).toBe(7 * 16 + 5 + 5);
     // Lazy: the client carries the facade, not the catalog.
     expect(e.tokenEstimate).toBe(
       Math.round((LAZY_FACADE_TOOLS.length * DEFAULT_BYTES_PER_TOOL) / 4)
