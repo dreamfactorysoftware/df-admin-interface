@@ -1,11 +1,12 @@
 .left-panel {
   display: block;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 16px;
+  width: 100%;
+  max-width: 445px;
+  margin: 16px auto 0;
 }
 
 .left-panel img {
-  min-width: 300px;
-  max-width: 445px;
+  display: block;
+  width: 100%;
+  height: auto;
 }

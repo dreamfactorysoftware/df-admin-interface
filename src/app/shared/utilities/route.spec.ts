@@ -61,6 +61,16 @@ describe('Route Utilities', () => {
     expect(result[1]).toEqual({ label: 'my-mysql-db' });
   });
 
+  it('should strip query params and fragments from the URL', () => {
+    // The post-create MCP landing navigates to /ai/mcp/{id}?created=1; the
+    // query is not part of the :id segment and must not leak into the crumb.
+    const routes: Routes = [{ path: 'test', children: [{ path: ':id' }] }];
+
+    const result = generateBreadcrumb(routes, '/test/26?created=1');
+
+    expect(result[1]).toEqual({ label: '26' });
+  });
+
   describe('recordLabelFromRouteData', () => {
     it('should read the record name resolved under `data`', () => {
       expect(

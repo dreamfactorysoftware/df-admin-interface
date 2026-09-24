@@ -170,6 +170,10 @@ export class DfManageAppsTableComponent extends DfManageTableComponent<VirtualKe
     }
 
     this.loadMetrics();
+    this.enableAccessUsage('app', {
+      header: 'accessUsage.lastUsed',
+      before: 'tokens',
+    });
   }
 
   override columns = [

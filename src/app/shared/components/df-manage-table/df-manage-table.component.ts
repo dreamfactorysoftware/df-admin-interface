@@ -59,11 +59,21 @@ import {
 import { AppError, normalizeError } from 'src/app/shared/utilities/app-error';
 import { DfErrorDetailComponent } from '../df-error-detail/df-error-detail.component';
 import { DfBadgeComponent } from '../df-badge/df-badge.component';
+import { DfAccessUsageCellComponent } from '../df-access-usage-cell/df-access-usage-cell.component';
+import { MatSelectModule } from '@angular/material/select';
+import { DfAccessUsageService } from 'src/app/shared/services/df-access-usage.service';
+import { AccessUsageSubject } from 'src/app/shared/types/access-usage';
+import {
+  ACCESS_USAGE_COLUMN,
+  AccessUsageTableState,
+  withAccessUsageColumn,
+} from './access-usage-table-state';
 
 // Re-export: subclasses consume these through the DfManageTableModules
 // array, so they must be exported from this module (NG3004).
 export { DfErrorDetailComponent };
 export { DfBadgeComponent };
+export { DfAccessUsageCellComponent };
 
 export type TableState = 'loading' | 'loaded' | 'empty' | 'error';
 
@@ -85,6 +95,8 @@ export const DfManageTableModules = [
   MatProgressBarModule,
   DfErrorDetailComponent,
   DfBadgeComponent,
+  DfAccessUsageCellComponent,
+  MatSelectModule,
   RouterLink,
 ];
 
@@ -375,8 +387,58 @@ export abstract class DfManageTableComponent<T>
     this.refreshTable();
   }
 
+  /**
+   * Opt-in access-usage join (GET system/access_usage). Stays null for tables
+   * that never call enableAccessUsage().
+   */
+  accessUsage: AccessUsageTableState | null = null;
+
+  /**
+   * Adds a "Last used"-style column plus a client-side "Not used in" filter,
+   * joined by row id. Call from a subclass constructor (injection context).
+   * Nothing changes until the endpoint answers: on 404/403/any error the
+   * column and filter stay hidden and the table renders exactly as before.
+   * The filter runs over the rows currently loaded in the data source.
+   */
+  protected enableAccessUsage(
+    subject: AccessUsageSubject,
+    options: { header: string; before?: string }
+  ): void {
+    const state = new AccessUsageTableState();
+    this.accessUsage = state;
+    const rowId = (row: T) => (row as { id?: number }).id;
+    const defaultAccessor = this.dataSource.sortingDataAccessor;
+    this.dataSource.sortingDataAccessor = (row, columnDef) =>
+      columnDef === ACCESS_USAGE_COLUMN
+        ? state.sortValue(rowId(row))
+        : defaultAccessor(row, columnDef);
+    this.dataSource.filterPredicate = row => state.matches(rowId(row));
+    state.filter.valueChanges.subscribe(value => {
+      this.dataSource.filter = value === 'any' ? '' : value;
+    });
+    inject(DfAccessUsageService)
+      .load(subject)
+      .subscribe(result => {
+        state.apply(result);
+        if (result.available) {
+          this.columns = withAccessUsageColumn(
+            this.columns,
+            options.header,
+            options.before
+          );
+        }
+      });
+  }
+
   clearFilter(): void {
-    this.currentFilter.setValue('');
+    if (this.accessUsage?.filterActive) {
+      this.accessUsage.filter.setValue('any');
+    }
+    // Only touch the search box when it holds text (or on tables without the
+    // usage filter), so clearing just the usage filter doesn't refetch.
+    if (this.currentFilter.value || !this.accessUsage) {
+      this.currentFilter.setValue('');
+    }
   }
 
   confirmDelete(row: T): void {

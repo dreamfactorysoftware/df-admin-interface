@@ -53,9 +53,9 @@ test('cURL import populates HTTP service config', async ({ page }) => {
   const dialog = page.locator('df-curl-import-dialog');
   await expect(dialog).toBeVisible();
   await dialog.locator('textarea').fill(CURL_CMD);
-  await expect(dialog.getByText('https://api.example.com/v1/users')).toBeVisible(
-    { timeout: 10_000 }
-  );
+  await expect(
+    dialog.getByText('https://api.example.com/v1/users')
+  ).toBeVisible({ timeout: 10_000 });
   await dialog
     .getByRole('button', { name: /import/i })
     .last()

@@ -96,6 +96,7 @@ export class DfManageRolesTableComponent extends DfManageTableComponent<RoleRow>
         duplicateAction
       );
     }
+    this.enableAccessUsage('role', { header: 'accessUsage.lastUsed' });
   }
 
   filterQuery = getFilterQuery('roles');

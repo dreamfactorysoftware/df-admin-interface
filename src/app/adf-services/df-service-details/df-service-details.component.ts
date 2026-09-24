@@ -34,6 +34,11 @@ import { DfAiTestConnectionComponent } from 'src/app/shared/components/df-ai-tes
 import { DfAiModelPickerComponent } from 'src/app/shared/components/df-ai-model-picker/df-ai-model-picker.component';
 import { DfAiAllowedRolesComponent } from 'src/app/shared/components/df-ai-allowed-roles/df-ai-allowed-roles.component';
 import { DfAiMcpServersComponent } from 'src/app/shared/components/df-ai-mcp-servers/df-ai-mcp-servers.component';
+import {
+  SYSTEM_MCP_TOOLS,
+  SystemMcpTool,
+  isSystemMcpType,
+} from './system-mcp-tools';
 import { DfAiDataServicesComponent } from 'src/app/shared/components/df-ai-data-services/df-ai-data-services.component';
 import { DfAceEditorComponent } from 'src/app/shared/components/df-ace-editor/df-ace-editor.component';
 import { DfSecurityConfigComponent } from 'src/app/shared/components/df-security-config/df-security-config.component';
@@ -218,6 +223,11 @@ export class DfServiceDetailsComponent implements OnInit {
   isFile = false;
   isAuth = false;
   isMcp = false;
+  // True when the selected/loaded service type is `system_mcp` (System API
+  // MCP Server). Such services expose a fixed tool catalogue and run no
+  // custom tools, so the data-plane MCP panels are replaced by one panel.
+  isSystemMcp = false;
+  systemMcpTools: ReadonlyArray<SystemMcpTool> = SYSTEM_MCP_TOOLS;
   serviceTypes: Array<ServiceType>;
   notIncludedServices: Array<ServiceType>;
   serviceForm: FormGroup;
@@ -672,28 +682,46 @@ export class DfServiceDetailsComponent implements OnInit {
 
         // If editing an MCP service, load available services and custom tools
         if (this.edit && this.isMcp) {
+          this.isSystemMcp = isSystemMcpType(data?.type);
           const disabled: string[] = data?.config?.disabledTools ?? [];
           this.disabledTools = new Set(disabled);
-          this.customTools = (data?.config?.customTools ?? []).map(
-            (t: any) => ({
-              id: t.id,
-              toolType: t.toolType || 'api',
-              name: t.name,
-              description: t.description,
-              httpMethod: t.httpMethod,
-              url: t.url,
-              parameters: t.parameters || [],
-              headers: t.headers || {},
-              function: t.function || '',
-              enabled: t.enabled !== false && t.enabled !== 0,
-              storageServiceId: t.storageServiceId || null,
-              scmRepository: t.scmRepository || '',
-              scmReference: t.scmReference || '',
-              storagePath: t.storagePath || '',
-            })
-          );
-          this.loadMcpServices();
-          this.loadAvailableScmServices();
+          this.toolStyle =
+            data?.config?.toolStyle === 'merged' ? 'merged' : 'prefixed';
+          if (this.isSystemMcp) {
+            // System API MCP server: fixed tool catalogue, no custom tools,
+            // no per-service (database/file) tool discovery.
+            this.customTools = [];
+            this.mcpServicesLoaded = true;
+          } else {
+            this.customTools = (data?.config?.customTools ?? []).map(
+              (t: any) => ({
+                id: t.id,
+                toolType: t.toolType || 'api',
+                name: t.name,
+                description: t.description,
+                httpMethod: t.httpMethod,
+                url: t.url,
+                parameters: t.parameters || [],
+                headers: t.headers || {},
+                function: t.function || '',
+                enabled: t.enabled !== false && t.enabled !== 0,
+                storageServiceId: t.storageServiceId || null,
+                scmRepository: t.scmRepository || '',
+                scmReference: t.scmReference || '',
+                storagePath: t.storagePath || '',
+              })
+            );
+            this.loadMcpServices();
+            // Flipping Database Tool Style must re-render the tool panel
+            // straight away; until the service is saved the config control
+            // is the only source of truth for the style.
+            this.getConfigControl('toolStyle')?.valueChanges.subscribe(
+              (value: string) => {
+                this.toolStyle = value === 'merged' ? 'merged' : 'prefixed';
+              }
+            );
+            this.loadAvailableScmServices();
+          }
         }
 
         // Meridian Phase 1: on the service Overview (viewing an existing
@@ -1101,6 +1129,20 @@ export class DfServiceDetailsComponent implements OnInit {
     }
   }
 
+  isAllSystemToolsEnabled(): boolean {
+    return this.systemMcpTools.some(t => !this.disabledTools.has(t.name));
+  }
+
+  toggleAllSystemTools(enabled: boolean) {
+    for (const tool of this.systemMcpTools) {
+      if (enabled) {
+        this.disabledTools.delete(tool.name);
+      } else {
+        this.disabledTools.add(tool.name);
+      }
+    }
+  }
+
   isAllGlobalToolsEnabled(): boolean {
     return this.mcpGlobalTools.some(t => !this.disabledTools.has(t.name));
   }
@@ -1112,6 +1154,75 @@ export class DfServiceDetailsComponent implements OnInit {
       } else {
         this.disabledTools.add(tool.name);
       }
+    }
+  }
+
+  /** tool_style from the service config: 'prefixed' (default) or 'merged'. */
+  toolStyle: 'prefixed' | 'merged' = 'prefixed';
+
+  get isMergedStyle(): boolean {
+    return this.toolStyle === 'merged';
+  }
+
+  /** Merged mode merges database tools only; file tools stay per-service. */
+  get dbServices() {
+    return this.mcpServices.filter(s => s.category === 'Database');
+  }
+
+  /** Services that still get their own panel: all, or files only when merged. */
+  get visibleServices() {
+    return this.isMergedStyle
+      ? this.mcpServices.filter(s => s.category !== 'Database')
+      : this.mcpServices;
+  }
+
+  /**
+   * The bare verbs a merged catalog exposes (get_tables, delete_records, ...).
+   * Derived by stripping the prefix off the same list the prefixed panels
+   * render, so the two views can never drift apart.
+   */
+  get mergedDbVerbs(): { name: string; title: string; description: string }[] {
+    const sample = this.dbServices[0];
+    if (!sample) return [];
+    const prefix = this.sanitizeApiName(sample.name) + '_';
+    return sample.tools.map(tool => ({
+      ...tool,
+      name: tool.name.startsWith(prefix)
+        ? tool.name.slice(prefix.length)
+        : tool.name,
+    }));
+  }
+
+  /**
+   * Disable keys stay PREFIXED even in merged mode. The daemon reads
+   * `<service>_<verb>` entries and enforces them per service: it drops that
+   * service from the merged tool's `service` enum and refuses it at call
+   * time. Writing bare verbs here would disable the tool for every database.
+   */
+  private verbKey(verb: string, serviceName: string): string {
+    return `${this.sanitizeApiName(serviceName)}_${verb}`;
+  }
+
+  isVerbEnabledFor(verb: string, serviceName: string): boolean {
+    return !this.disabledTools.has(this.verbKey(verb, serviceName));
+  }
+
+  toggleVerbFor(verb: string, serviceName: string, enabled: boolean) {
+    const key = this.verbKey(verb, serviceName);
+    if (enabled) {
+      this.disabledTools.delete(key);
+    } else {
+      this.disabledTools.add(key);
+    }
+  }
+
+  isVerbEnabledAnywhere(verb: string): boolean {
+    return this.dbServices.some(svc => this.isVerbEnabledFor(verb, svc.name));
+  }
+
+  toggleVerbEverywhere(verb: string, enabled: boolean) {
+    for (const svc of this.dbServices) {
+      this.toggleVerbFor(verb, svc.name, enabled);
     }
   }
 
@@ -1385,6 +1496,7 @@ export class DfServiceDetailsComponent implements OnInit {
     this.isNetworkService = false;
     this.isScriptService = false;
     this.isFile = false;
+    this.isSystemMcp = isSystemMcpType(type);
 
     // Find the service type to get its group
     const serviceType = this.serviceTypes.find(st => st.name === type);
@@ -2008,6 +2120,11 @@ export class DfServiceDetailsComponent implements OnInit {
           scmReference: tool.scmReference || '',
           storagePath: tool.storagePath || '',
         }));
+        if (this.isSystemMcp) {
+          // The System API MCP server runs no custom tools; the backend
+          // config model drops them, so do not send them at all.
+          delete editPayload.config.customTools;
+        }
       }
       this.servicesService
         .update(this.serviceData.id, editPayload, {
@@ -2090,6 +2207,22 @@ export class DfServiceDetailsComponent implements OnInit {
                 this.router.navigate([
                   `/api-connections/api-docs/${formattedName}`,
                 ]);
+              }
+            } else if (this.isMcp) {
+              // A new MCP server lands on its own editor's Connect tab with
+              // the endpoint URL and first-run checklist — never API Docs,
+              // which has nothing an MCP admin needs. `../{id}` is the
+              // sibling :id route (the MCP shim renders the new editor).
+              const newId = response?.resource?.[0]?.id;
+              if (newId != null) {
+                this.router.navigate(['../', newId], {
+                  relativeTo: this.activatedRoute,
+                  queryParams: { created: 1 },
+                });
+              } else {
+                this.router.navigate(['../'], {
+                  relativeTo: this.activatedRoute,
+                });
               }
             } else {
               this.router.navigate([

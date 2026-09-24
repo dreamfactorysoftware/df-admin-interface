@@ -852,8 +852,11 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   // identity) rather than a re-derived one. This component only supplies the
   // service base URL the console builds on.
 
+  // Absolute on purpose: df-try-it uses this verbatim in its curl / Python /
+  // JS snippets and the resolved-URL line, and a host-less '/api/v2/...' is
+  // not copy-pasteable (#519).
   get serviceBaseUrl(): string {
-    return `${BASE_URL}/${this.serviceName ?? ''}`;
+    return `${window.location.origin}${BASE_URL}/${this.serviceName ?? ''}`;
   }
 
   // ---- df-try-it host log --------------------------------------------------
@@ -987,7 +990,7 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
     }
     this.swaggerRendered = true;
     SwaggerUI({
-      spec: this.apiDocJson,
+      spec: absolutizeServers(this.apiDocJson),
       domNode: this.apiDocElement.nativeElement,
       requestInterceptor: (req: SwaggerUI.Request) => {
         req['headers'][SESSION_TOKEN_HEADER] = this.userDataService.token;
@@ -1014,4 +1017,21 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   trackByParam = (_: number, p: DocParameter): string =>
     `${p.location}:${p.name}`;
   trackByResponse = (_: number, r: DocResponse): string => r.code;
+}
+
+// The backend emits a relative servers[0].url ('/api/v2/<service>'), which is
+// correct for the exported spec but leaves Swagger UI (fed inline, no document
+// URL) printing a host-less curl / Request URL. Resolve against the page origin.
+export function absolutizeServers(spec: ApiDocJson): ApiDocJson {
+  if (!Array.isArray(spec?.['servers'])) {
+    return spec;
+  }
+  return {
+    ...spec,
+    servers: spec['servers'].map((s: { url?: string }) =>
+      typeof s?.url === 'string' && s.url.startsWith('/')
+        ? { ...s, url: `${window.location.origin}${s.url}` }
+        : s
+    ),
+  };
 }

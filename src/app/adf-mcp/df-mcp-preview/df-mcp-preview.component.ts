@@ -1,0 +1,419 @@
+/**
+ * "What an agent sees" preview drawer (§3.7) — the exact final list a
+ * client's tools/list returns, grouped by origin, with an always-present
+ * Excluded section that names WHY every absent thing is absent, a
+ * First response / Full catalog switch when lazy delivery engages, and a
+ * Copy tools/list JSON audit export. Read-only: it never mutates the store.
+ *
+ * Opened as a right-side sheet (MatDialog positioned right, full height).
+ * Handles both service types: `mcp` derives from the shared effective math,
+ * `system_mcp` applies the same math to the fixed System API catalog.
+ */
+import { CommonModule } from '@angular/common';
+import { Component, Inject, OnInit } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
+import { MatRadioModule } from '@angular/material/radio';
+import { FormsModule } from '@angular/forms';
+import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { SYSTEM_MCP_TOOLS } from 'src/app/adf-services/df-service-details/system-mcp-tools';
+import {
+  aggregatorsFor,
+  GLOBAL_TOOLS,
+  LAZY_FACADE_TOOLS,
+  LAZY_THRESHOLD_BYTES,
+  WRITE_GROUP_KEYS,
+  WRITE_VERBS,
+  verbGroupsFor,
+  verbsFor,
+} from '../mcp-catalog';
+import {
+  CatalogStats,
+  McpBackendService,
+  emittedDbToolName,
+  formatKb,
+  formatTokens,
+  groupState,
+  isCustomToolServed,
+  isVerbServed,
+  isWriteCapableCustomTool,
+  toolKey,
+  verbReach,
+} from '../mcp-effective';
+import { McpEditorStore } from '../mcp-store';
+
+export interface McpPreviewData {
+  store: McpEditorStore;
+}
+
+interface PreviewItem {
+  name: string;
+  description: string;
+  /** e.g. the merged enum line "service: crm, hr (2 of 3)". */
+  meta?: string;
+}
+
+interface PreviewGroup {
+  label: string;
+  items: PreviewItem[];
+}
+
+interface ExcludedItem {
+  name: string;
+  reason: string;
+}
+
+@Component({
+  selector: 'df-mcp-preview',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatRadioModule,
+  ],
+  templateUrl: './df-mcp-preview.component.html',
+  styleUrls: ['./df-mcp-preview.component.scss'],
+})
+export class DfMcpPreviewComponent implements OnInit {
+  groups: PreviewGroup[] = [];
+  excluded: ExcludedItem[] = [];
+  total = 0;
+  /** Size / lazy / tokens: the server's numbers when saved, else simulated. */
+  stats!: CatalogStats;
+  lazyEngaged = false;
+  lazyAuto = true;
+  /** 'first' = the lazy discovery facade; 'full' = the whole catalog. */
+  view: 'first' | 'full' = 'full';
+
+  constructor(
+    public dialogRef: MatDialogRef<DfMcpPreviewComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: McpPreviewData,
+    private snackbar: DfSnackbarService
+  ) {}
+
+  get store(): McpEditorStore {
+    return this.data.store;
+  }
+
+  ngOnInit(): void {
+    this.store.isSystemMcp ? this.buildSystem() : this.buildMcp();
+    this.stats = this.store.catalogStats();
+    this.lazyEngaged = this.stats.lazy;
+    // lazy_mode contract is 'auto'|'on'|'off' (parseMcpConfig normalizes).
+    this.lazyAuto = this.store.cfg.lazyMode === 'auto';
+    if (this.lazyEngaged) this.view = 'first';
+  }
+
+  /* ------------------------------ mcp ------------------------------ */
+  private buildMcp(): void {
+    const s = this.store;
+    const cfg = s.cfg;
+    const disabled = cfg.disabledTools;
+    const eff = s.effective();
+    const style = eff.effectiveStyle;
+    const rows = s.rows();
+    const liveRows = rows.filter(
+      (r): r is { name: string; svc: McpBackendService } => !!r.svc
+    );
+    const activeDbs = liveRows
+      .map(r => r.svc)
+      .filter(v => v.active && v.kind === 'db');
+    const activeFiles = liveRows
+      .map(r => r.svc)
+      .filter(v => v.active && v.kind === 'file');
+
+    // Global group: always-served globals + the aggregators the daemon registers.
+    const aggregators = aggregatorsFor(activeDbs.length, activeFiles.length);
+    const globalItems: PreviewItem[] = GLOBAL_TOOLS.filter(
+      t => !disabled.has(t.verb)
+    ).map(t => ({ name: t.verb, description: t.description }));
+    for (const t of aggregators) {
+      if (!disabled.has(t.verb)) {
+        globalItems.push({ name: t.verb, description: t.description });
+      }
+    }
+    this.groups.push({
+      label: `Global (${globalItems.length})`,
+      items: globalItems,
+    });
+
+    // Database group.
+    const dbItems: PreviewItem[] = [];
+    if (activeDbs.length > 0) {
+      if (style === 'merged') {
+        for (const v of verbsFor('db')) {
+          const reach = verbReach(v.verb, cfg, s.backendServices);
+          if (reach.on.length === 0) continue;
+          dbItems.push({
+            name: v.verb,
+            description: v.description,
+            meta: `service: ${reach.on.join(', ')} (${reach.on.length} of ${reach.total})`,
+          });
+        }
+        this.groups.push({
+          label: `Database — consolidated, service argument (${dbItems.length})`,
+          items: dbItems,
+        });
+      } else {
+        for (const db of activeDbs) {
+          for (const v of verbsFor('db')) {
+            if (isVerbServed(cfg, db.name, v.verb)) {
+              dbItems.push({
+                name: emittedDbToolName('prefixed', db.name, v.verb),
+                description: v.description,
+              });
+            }
+          }
+        }
+        this.groups.push({
+          label: `Database (${dbItems.length})`,
+          items: dbItems,
+        });
+      }
+    }
+
+    // File group: merged style shares one verb across the file services, the
+    // same way databases do, so the names lose their service prefix.
+    const fileItems: PreviewItem[] = [];
+    if (activeFiles.length > 0) {
+      if (style === 'merged') {
+        for (const v of verbsFor('file')) {
+          const on = activeFiles
+            .filter(f => isVerbServed(cfg, f.name, v.verb))
+            .map(f => f.name);
+          if (on.length === 0) continue;
+          fileItems.push({
+            name: v.verb,
+            description: v.description,
+            meta: `service: ${on.join(', ')} (${on.length} of ${activeFiles.length})`,
+          });
+        }
+        this.groups.push({
+          label: `File — consolidated, service argument (${fileItems.length})`,
+          items: fileItems,
+        });
+      } else {
+        for (const f of activeFiles) {
+          for (const v of verbsFor('file')) {
+            if (isVerbServed(cfg, f.name, v.verb)) {
+              fileItems.push({
+                name: toolKey(f.name, v.verb),
+                description: v.description,
+              });
+            }
+          }
+        }
+        this.groups.push({
+          label: `File (${fileItems.length})`,
+          items: fileItems,
+        });
+      }
+    }
+
+    // Custom group.
+    const customItems: PreviewItem[] = (cfg.customTools ?? [])
+      .filter((t: any) => isCustomToolServed(cfg, t))
+      .map((t: any) => ({
+        name: t.name ?? '',
+        description: t.description ?? '',
+      }));
+    if (customItems.length > 0) {
+      this.groups.push({
+        label: `Custom (${customItems.length})`,
+        items: customItems,
+      });
+    }
+
+    /* ----------------------- Excluded — always present ----------------------- */
+    // 1. Not exposed (aggregate).
+    const unexposed = s.backendServices.filter(
+      b => !cfg.exposedServices.includes(b.name)
+    );
+    if (unexposed.length > 0) {
+      const names = unexposed.map(u => u.name);
+      const shown = names.slice(0, 3).join(', ');
+      const more = names.length > 3 ? `, +${names.length - 3} more` : '';
+      this.excluded.push({ name: shown + more, reason: 'not exposed' });
+    }
+    // 1b. Server-wide read-only switch.
+    if (cfg.allowWrites === false) {
+      const hidden = (cfg.customTools ?? []).filter(
+        (t: any) =>
+          t?.enabled !== false &&
+          t?.enabled !== 0 &&
+          isWriteCapableCustomTool(t)
+      ).length;
+      this.excluded.push({
+        name: 'write & execute tools' + (hidden ? ` + ${hidden} custom` : ''),
+        reason: 'writes are off for this server',
+      });
+    }
+    // 2. Inactive exposed services.
+    for (const r of liveRows) {
+      if (!r.svc.active) {
+        this.excluded.push({ name: r.name, reason: 'service inactive' });
+      }
+    }
+    // 3. Orphans — exposed entries matching no live service.
+    for (const r of rows) {
+      if (!r.svc) {
+        this.excluded.push({
+          name: r.name,
+          reason: 'no service with this name exists',
+        });
+      }
+    }
+    // 4. Curation: whole groups off per service; loose per-tool offs (prefixed).
+    for (const r of liveRows) {
+      if (!r.svc.active) continue;
+      for (const g of verbGroupsFor(r.svc.kind)) {
+        const st = groupState(r.svc, g, disabled);
+        if (st === 'off') {
+          this.excluded.push({
+            name: `${r.name} · ${g.label.toLowerCase()}`,
+            reason: 'turned off by you',
+          });
+        } else if (
+          st === 'part' &&
+          (style === 'prefixed' || r.svc.kind === 'file')
+        ) {
+          for (const v of g.verbs) {
+            if (disabled.has(toolKey(r.name, v.verb))) {
+              this.excluded.push({
+                name: toolKey(r.name, v.verb),
+                reason: 'turned off by you',
+              });
+            }
+          }
+        }
+      }
+    }
+    // 5. Merged: verbs off in every exposed database.
+    if (style === 'merged' && activeDbs.length > 0) {
+      for (const v of verbsFor('db')) {
+        // Already covered by the server-wide "writes are off" entry.
+        if (cfg.allowWrites === false && WRITE_VERBS.has(v.verb)) continue;
+        const reach = verbReach(v.verb, cfg, s.backendServices);
+        if (reach.on.length === 0) {
+          this.excluded.push({
+            name: v.verb,
+            reason: 'turned off in every exposed database',
+          });
+        }
+      }
+    }
+    // 6. Aggregators absent below two databases.
+    if (activeDbs.length < 2) {
+      this.excluded.push({
+        name: 'cross-database aggregators',
+        reason: 'served only with two or more databases',
+      });
+    }
+    // 7. Disabled globals / aggregators (bare names).
+    for (const t of GLOBAL_TOOLS) {
+      if (disabled.has(t.verb)) {
+        this.excluded.push({ name: t.verb, reason: 'turned off by you' });
+      }
+    }
+    for (const t of aggregators) {
+      if (disabled.has(t.verb)) {
+        this.excluded.push({ name: t.verb, reason: 'turned off by you' });
+      }
+    }
+    // 8. Disabled custom tools.
+    for (const t of cfg.customTools ?? []) {
+      if (t?.enabled === false || t?.enabled === 0) {
+        this.excluded.push({
+          name: t.name ?? '',
+          reason: 'turned off by you',
+        });
+      }
+    }
+
+    this.total = eff.total;
+  }
+
+  /* --------------------------- system_mcp --------------------------- */
+  private buildSystem(): void {
+    const s = this.store;
+    const disabled = s.cfg.disabledTools;
+    const served = SYSTEM_MCP_TOOLS.filter(t => !disabled.has(t.name));
+    this.groups.push({
+      label: `System API (${served.length})`,
+      items: served.map(t => ({ name: t.name, description: t.description })),
+    });
+    for (const t of SYSTEM_MCP_TOOLS) {
+      if (disabled.has(t.name)) {
+        this.excluded.push({ name: t.name, reason: 'turned off by you' });
+      }
+    }
+    this.total = served.length;
+  }
+
+  /* ------------------------------ view ------------------------------ */
+  firstResponseItems(): PreviewItem[] {
+    return LAZY_FACADE_TOOLS.map(t => ({
+      name: t.verb,
+      description: t.description,
+    }));
+  }
+
+  /** Built once: *ngFor needs identity-stable arrays between CD passes. */
+  private readonly firstResponseGroups: PreviewGroup[] = [
+    {
+      label: `First response — discovery tools (${LAZY_FACADE_TOOLS.length})`,
+      items: this.firstResponseItems(),
+    },
+  ];
+
+  visibleGroups(): PreviewGroup[] {
+    if (this.lazyEngaged && this.view === 'first') {
+      return this.firstResponseGroups;
+    }
+    return this.groups;
+  }
+
+  /* trackBy on stable keys, so open tooltips/DOM survive CD passes. */
+  readonly trackByLabel = (_: number, g: PreviewGroup): string => g.label;
+  readonly trackByItemName = (_: number, i: PreviewItem): string => i.name;
+  readonly trackByExcluded = (_: number, i: ExcludedItem): string =>
+    `${i.name}|${i.reason}`;
+
+  tokenLabel(): string {
+    const src = this.stats.source === 'server' ? '' : ' (estimate)';
+    return `${formatTokens(this.stats.tokens)} tokens per turn${src}`;
+  }
+
+  lazyLabel(): string {
+    if (!this.lazyEngaged) {
+      return `Lazy loading: not engaged (${formatKb(this.stats.bytes)} of ${formatKb(LAZY_THRESHOLD_BYTES)})`;
+    }
+    // Engaged + not auto means lazy_mode 'on' (always on-demand).
+    const how = this.lazyAuto ? 'auto' : 'always on';
+    return `Lazy loading: engaged (${how}) — ${formatKb(this.stats.facadeBytes)} facade instead of ${formatKb(this.stats.bytes)}`;
+  }
+
+  /** How an agent reaches the full catalog through the facade. */
+  readonly lazyFlow =
+    'Agents call search_tools to find a tool, describe_tool for its schema, ' +
+    'then call_tool to run it; fetch_more pages long results.';
+
+  copyJson(): void {
+    const list = this.visibleGroups()
+      .flatMap(g => g.items)
+      .map(i => ({ name: i.name, description: i.description }));
+    const json = JSON.stringify(list, null, 2);
+    navigator.clipboard?.writeText(json).catch(() => undefined);
+    this.snackbar.openSnackBar('tools/list JSON copied.', 'success');
+  }
+
+  close(): void {
+    this.dialogRef.close();
+  }
+}

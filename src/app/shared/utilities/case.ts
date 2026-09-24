@@ -12,6 +12,11 @@ const OPAQUE_VALUE_KEYS = new Set([
   'executionPlan',
   'response_mapping',
   'responseMapping',
+  // MCP custom-tool header maps are user-authored {"X-Api-Version": "1"}
+  // blobs; camelCasing strips the hyphens ("XApiVersion") and the daemon
+  // then sends the wrong header. Other configs using a `headers` key store
+  // arrays of single-word snake_case objects, which this leaves untouched.
+  'headers',
 ]);
 
 export function mapSnakeToCamel<T>(obj: T): T {

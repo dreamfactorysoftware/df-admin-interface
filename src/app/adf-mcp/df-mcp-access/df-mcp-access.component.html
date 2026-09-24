@@ -1,0 +1,134 @@
+<section class="mcp-access" data-testid="mcp-access">
+  <h2 class="mcp-rail-title">Access</h2>
+  <p class="mcp-access-note">
+    Roles filter further per caller — a role also needs access to each exposed
+    service it should reach.
+  </p>
+
+  <p
+    class="mcp-access-warn"
+    *ngIf="!requireRoleAccess"
+    data-testid="mcp-access-open">
+    ⚠ Require role access is off: any logged-in user can connect. Roles below
+    only limit what data calls may touch.
+  </p>
+
+  <p class="mcp-access-note" *ngIf="loading">Loading roles…</p>
+
+  <ng-container *ngIf="!loading">
+    <p class="mcp-access-note" *ngIf="!access">
+      Request counts unavailable; roles shown from their grants.
+    </p>
+
+    <ul class="mcp-access-list" *ngIf="granted.length > 0">
+      <li
+        *ngFor="let row of granted; trackBy: trackByRole"
+        [attr.data-role]="row.name"
+        data-testid="mcp-access-granted">
+        <div class="mcp-access-line">
+          <a class="mcp-access-name" [routerLink]="[roleRoute, row.roleId]">{{
+            row.name
+          }}</a>
+          <span class="mcp-chip good">granted</span>
+          <button
+            *ngIf="row.exists"
+            type="button"
+            class="mcp-linklike"
+            data-testid="mcp-access-edit"
+            (click)="open('edit', row)">
+            Edit
+          </button>
+        </div>
+        <div class="mcp-access-stats">
+          <span
+            >{{ row.requests }}
+            {{ row.requests === 1 ? 'request' : 'requests' }}</span
+          >
+          <span [class.mcp-access-denied]="row.denied > 0"
+            >{{ row.denied }} denied</span
+          >
+          <span *ngIf="row.lastSeen"
+            >last seen {{ row.lastSeen | slice: 0 : 16 }}</span
+          >
+          <span
+            *ngIf="row.keyName"
+            [matTooltip]="'API key (app) bound to this role'"
+            >🔑 {{ row.keyName }}</span
+          >
+        </div>
+      </li>
+    </ul>
+    <p class="mcp-access-note" *ngIf="granted.length === 0">
+      {{
+        requireRoleAccess
+          ? 'No role can connect yet. Add a role or create one.'
+          : 'No role holds a grant on this server.'
+      }}
+    </p>
+
+    <ng-container *ngIf="seen.length > 0">
+      <h3 class="mcp-access-sub">Seen in the last 30 days without a grant</h3>
+      <ul class="mcp-access-list">
+        <li
+          *ngFor="let row of seen; trackBy: trackByRole"
+          [attr.data-role]="row.name"
+          data-testid="mcp-access-seen">
+          <div class="mcp-access-line">
+            <a
+              *ngIf="row.exists"
+              class="mcp-access-name"
+              [routerLink]="[roleRoute, row.roleId]"
+              >{{ row.name }}</a
+            >
+            <span
+              *ngIf="!row.exists"
+              class="mcp-access-name"
+              matTooltip="This role no longer exists"
+              >{{ row.name }} (deleted)</span
+            >
+            <button
+              *ngIf="row.exists"
+              mat-stroked-button
+              type="button"
+              class="mcp-access-grant"
+              data-testid="mcp-access-grant"
+              [disabled]="granting === row.roleId"
+              (click)="grant(row)">
+              Grant
+            </button>
+          </div>
+          <div class="mcp-access-stats">
+            <span
+              >{{ row.requests }}
+              {{ row.requests === 1 ? 'request' : 'requests' }}</span
+            >
+            <span [class.mcp-access-denied]="row.denied > 0"
+              >{{ row.denied }} denied</span
+            >
+            <span *ngIf="row.lastSeen"
+              >last seen {{ row.lastSeen | slice: 0 : 16 }}</span
+            >
+          </div>
+        </li>
+      </ul>
+    </ng-container>
+  </ng-container>
+
+  <div class="mcp-access-actions">
+    <button
+      mat-stroked-button
+      type="button"
+      data-testid="mcp-access-add"
+      (click)="open('add')">
+      Add existing role
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      data-testid="mcp-access-create"
+      (click)="open('create')">
+      Create role
+    </button>
+  </div>
+</section>

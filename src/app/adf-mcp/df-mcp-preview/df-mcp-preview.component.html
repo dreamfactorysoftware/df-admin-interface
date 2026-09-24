@@ -1,0 +1,63 @@
+<div class="mcp-preview" data-testid="mcp-preview-drawer">
+  <div class="mcp-preview-head">
+    <h2>What an agent sees — as served at /mcp/{{ store.service.name }}</h2>
+    <button mat-icon-button type="button" aria-label="Close" (click)="close()">
+      ✕
+    </button>
+  </div>
+
+  <div class="mcp-preview-controls" *ngIf="lazyEngaged">
+    <span class="mcp-preview-controls-label">Catalog:</span>
+    <mat-radio-group [(ngModel)]="view">
+      <mat-radio-button value="first">First response</mat-radio-button>
+      <mat-radio-button value="full">Full catalog</mat-radio-button>
+    </mat-radio-group>
+    <p class="mcp-preview-flow" data-testid="mcp-preview-lazy-flow">
+      {{ lazyFlow }}
+    </p>
+  </div>
+
+  <div class="mcp-preview-body">
+    <section
+      class="mcp-preview-group"
+      *ngFor="let group of visibleGroups(); trackBy: trackByLabel">
+      <h3>{{ group.label }}</h3>
+      <p class="mcp-preview-none" *ngIf="group.items.length === 0">
+        None served.
+      </p>
+      <div
+        class="mcp-preview-item"
+        *ngFor="let item of group.items; trackBy: trackByItemName">
+        <code>{{ item.name }}</code>
+        <span class="mcp-preview-meta" *ngIf="item.meta">{{ item.meta }}</span>
+        <span class="mcp-preview-desc" [attr.title]="item.description">
+          {{ item.description }}
+        </span>
+      </div>
+    </section>
+
+    <section
+      class="mcp-preview-group mcp-preview-excluded"
+      data-testid="mcp-preview-excluded">
+      <h3>Excluded (not served)</h3>
+      <p class="mcp-preview-none" *ngIf="excluded.length === 0">
+        Nothing is excluded — every catalog tool is served.
+      </p>
+      <div
+        class="mcp-preview-item"
+        *ngFor="let item of excluded; trackBy: trackByExcluded">
+        <code>{{ item.name }}</code>
+        <span class="mcp-preview-reason">{{ item.reason }}</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="mcp-preview-foot">
+    <span class="mcp-preview-foot-facts">
+      {{ total }} tools · {{ tokenLabel() }} · {{ lazyLabel() }}
+    </span>
+    <button mat-stroked-button type="button" (click)="copyJson()">
+      Copy tools/list JSON
+    </button>
+  </div>
+</div>

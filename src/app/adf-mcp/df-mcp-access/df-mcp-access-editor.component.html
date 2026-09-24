@@ -1,0 +1,230 @@
+<div
+  class="mcp-acc-editor"
+  data-testid="mcp-access-editor"
+  [attr.data-mode]="mode">
+  <h2>{{ title }}</h2>
+  <p class="mcp-acc-hint">{{ hint }}</p>
+
+  <!-- Key shown once, after a create with key -->
+  <ng-container *ngIf="done">
+    <p class="mcp-acc-created">
+      Role {{ name }} created and granted this MCP server.
+    </p>
+    <div class="mcp-acc-keybox" *ngIf="apiKey">
+      <span>API key created. Copy it now — it is shown once.</span>
+      <code data-testid="mcp-access-key">{{ apiKey }}</code>
+      <button mat-stroked-button type="button" (click)="copyKey()">
+        Copy key
+      </button>
+      <span class="mcp-acc-hint"
+        >The Connect tab’s API-key snippets now use this key.</span
+      >
+      <span class="mcp-acc-hint" *ngIf="!data.store.cfg.allowApiKeyAuth">
+        API-key auth is off on this server — turn it on in Settings →
+        Authentication before clients use the key.
+      </span>
+    </div>
+    <p class="mcp-acc-hint" *ngIf="!apiKey">
+      The API key could not be created; add one under API Keys.
+    </p>
+    <div class="mcp-acc-actions">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="dialogRef.close(true)">
+        Done
+      </button>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="!done">
+    <div class="mcp-acc-top">
+      <mat-form-field
+        *ngIf="mode === 'add'"
+        appearance="outline"
+        subscriptSizing="dynamic">
+        <mat-label>Role</mat-label>
+        <mat-select
+          [value]="roleId"
+          (selectionChange)="onRolePicked($event.value)"
+          data-testid="mcp-access-role">
+          <mat-option *ngFor="let r of addableRoles" [value]="r.id">{{
+            r.name
+          }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field
+        *ngIf="mode === 'create'"
+        appearance="outline"
+        subscriptSizing="dynamic">
+        <mat-label>Role name</mat-label>
+        <input
+          matInput
+          [(ngModel)]="name"
+          name="name"
+          data-testid="mcp-access-name" />
+      </mat-form-field>
+
+      <mat-checkbox
+        *ngIf="mode === 'create'"
+        color="primary"
+        [(ngModel)]="createKey"
+        name="createKey"
+        data-testid="mcp-access-createkey">
+        Also create an API key
+      </mat-checkbox>
+
+      <span class="mcp-acc-role" *ngIf="mode === 'edit' && data.role">
+        <code>{{ data.role.name }}</code>
+        <a [routerLink]="[roleRoute, data.role.id]" (click)="dialogRef.close()"
+          >Role page ↗</a
+        >
+      </span>
+
+      <input
+        *ngIf="showFilter"
+        type="search"
+        class="mcp-acc-filter"
+        [(ngModel)]="filter"
+        name="filter"
+        placeholder="Filter services…"
+        aria-label="Filter services" />
+    </div>
+
+    <p class="mcp-acc-hint" *ngIf="data.backends.length === 0">
+      Nothing is exposed yet; the role will only be granted the MCP server.
+    </p>
+    <p class="mcp-acc-warn" *ngIf="!data.allowWrites">
+      Writes are blocked on this server — Read and write is unavailable.
+    </p>
+
+    <ng-container *ngFor="let group of groups; trackBy: trackByKind">
+      <div class="mcp-acc-group" *ngIf="group.rows.length > 0">
+        <div class="mcp-acc-group-hd">
+          <span>{{ group.label }}</span>
+          <button
+            mat-button
+            type="button"
+            [disabled]="mode === 'add' && !roleId"
+            (click)="readOnAll(group.kind)">
+            Read on all
+          </button>
+        </div>
+        <ng-container *ngFor="let row of group.rows; trackBy: trackByRow">
+          <div class="mcp-acc-row" [attr.data-backend]="row.svc.name">
+            <div class="mcp-acc-name">
+              <span>{{ row.svc.label }}</span>
+              <code>{{ row.svc.name }}</code>
+            </div>
+            <span class="mcp-acc-why" *ngIf="!row.spec.editable">
+              limited on the role page
+            </span>
+            <span
+              class="mcp-acc-why"
+              *ngIf="row.spec.editable && mode === 'add' && !roleId">
+              pick a role first
+            </span>
+            <div class="mcp-acc-ctl" *ngIf="!locked(row)">
+              <button
+                *ngIf="canLimit(row)"
+                type="button"
+                class="mcp-linklike"
+                [attr.aria-expanded]="expanded.has(row.id)"
+                data-testid="mcp-limit-tables"
+                (click)="toggleExpanded(row)">
+                {{ expanded.has(row.id) ? '▾' : '▸' }} {{ limitLabel(row) }}
+              </button>
+              <div
+                class="mcp-acc-seg"
+                role="radiogroup"
+                [attr.aria-label]="row.svc.label">
+                <button
+                  *ngFor="let level of levelsList"
+                  type="button"
+                  role="radio"
+                  class="mcp-acc-opt"
+                  [class.on]="levels[row.id] === level"
+                  [attr.aria-checked]="levels[row.id] === level"
+                  [attr.data-level]="level"
+                  [disabled]="level === 'rw' && !data.allowWrites"
+                  [matTooltip]="
+                    level === 'rw' && !data.allowWrites
+                      ? 'Writes are blocked on this server'
+                      : ''
+                  "
+                  (click)="setLevel(row, level)">
+                  {{ levelText[level] }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="mcp-acc-tables"
+            *ngIf="canLimit(row) && expanded.has(row.id)"
+            [attr.data-tables-for]="row.svc.name">
+            <p class="mcp-acc-hint" *ngIf="loadingTables.has(row.svc.name)">
+              Loading tables…
+            </p>
+            <ng-container *ngIf="tablesOf(row) as all">
+              <p class="mcp-acc-hint" *ngIf="all.length === 0">
+                No tables found (or the admin cannot list them).
+              </p>
+              <input
+                *ngIf="all.length > 12"
+                type="search"
+                class="mcp-acc-filter"
+                [(ngModel)]="tableFilter[row.id]"
+                [name]="'tf_' + row.svc.name"
+                placeholder="Filter tables…"
+                aria-label="Filter tables" />
+              <div class="mcp-acc-tlist">
+                <mat-checkbox
+                  *ngFor="let table of visibleTables(row)"
+                  color="primary"
+                  [checked]="ticked(row, table)"
+                  (change)="toggleTable(row, table)"
+                  [attr.data-table]="table">
+                  {{ table }}
+                </mat-checkbox>
+              </div>
+              <p class="mcp-acc-hint">
+                {{
+                  tickedCount(row) === 0
+                    ? 'Nothing ticked: whole service.'
+                    : limitLabel(row)
+                }}
+              </p>
+            </ng-container>
+          </div>
+        </ng-container>
+      </div>
+    </ng-container>
+
+    <!-- Live summary = the diff -->
+    <p class="mcp-acc-summary" data-testid="mcp-access-summary">
+      {{ summaryText }}
+    </p>
+    <p class="mcp-acc-error" *ngIf="error">{{ error }}</p>
+
+    <div class="mcp-acc-actions">
+      <span class="mcp-acc-hint" *ngIf="touchesApis">
+        This changes what the role can do everywhere, not only through MCP.
+      </span>
+      <button mat-button type="button" (click)="dialogRef.close()">
+        Cancel
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        data-testid="mcp-access-save"
+        [disabled]="!canSave"
+        (click)="save()">
+        {{ saving ? 'Saving…' : mode === 'create' ? 'Create role' : 'Save' }}
+      </button>
+    </div>
+  </ng-container>
+</div>

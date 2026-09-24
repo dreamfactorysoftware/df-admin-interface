@@ -63,7 +63,10 @@ describe('task-estimate', () => {
 
     it('returns null below the minimum metered history', () => {
       expect(
-        calibrate(bundle({ total_requests: MIN_CALIBRATION_REQUESTS - 1 }), 'app')
+        calibrate(
+          bundle({ total_requests: MIN_CALIBRATION_REQUESTS - 1 }),
+          'app'
+        )
       ).toBeNull();
       expect(calibrate(bundle({ total_requests: 0 }), 'app')).toBeNull();
     });
