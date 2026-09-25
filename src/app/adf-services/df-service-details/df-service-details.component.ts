@@ -124,6 +124,7 @@ import { DfServiceHealthPanelComponent } from '../df-service-health-panel/df-ser
 import { DfPipelineStripComponent } from 'src/app/shared/components/df-pipeline-strip/df-pipeline-strip.component';
 import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
 import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
+import { DfSemanticCatalogComponent } from '../df-semantic-catalog/df-semantic-catalog.component';
 import { DfCurlImportDialogComponent } from 'src/app/shared/components/df-curl-import-dialog/df-curl-import-dialog.component';
 import { ParsedCurl } from 'src/app/shared/utilities/curl-parser';
 
@@ -207,6 +208,7 @@ interface ServiceResponse {
     DfScopeMatrixComponent,
     DfPipelineStripComponent,
     DfServiceHealthPanelComponent,
+    DfSemanticCatalogComponent,
   ],
 })
 export class DfServiceDetailsComponent implements OnInit {
@@ -2264,6 +2266,12 @@ export class DfServiceDetailsComponent implements OnInit {
   gotoSchema() {
     const data = this.serviceForm.getRawValue();
     this.router.navigate([`/admin-settings/schema/${data.name}`]);
+  }
+
+  gotoSemanticCatalog() {
+    document
+      .getElementById('semantic-catalog')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   gotoAPIDocs() {

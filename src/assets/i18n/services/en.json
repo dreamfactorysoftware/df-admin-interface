@@ -125,5 +125,148 @@
     "headers": "Headers",
     "curlOptions": "CURL Options",
     "import": "Import"
+  },
+  "semantic": {
+    "eyebrow": "Semantic catalog",
+    "title": "What agents should know about this data",
+    "description": "Business terms, metrics and verified questions for this service. Approved entries reach AI agents inside the MCP data model; drafts and stale entries never do.",
+    "jump": "Semantic catalog",
+    "loading": "Loading…",
+    "kinds": {
+      "term": {
+        "one": "Term",
+        "many": "Glossary"
+      },
+      "metric": {
+        "one": "Metric",
+        "many": "Metrics"
+      },
+      "query": {
+        "one": "Verified query",
+        "many": "Verified queries"
+      }
+    },
+    "status": {
+      "draft": "Draft",
+      "approved": "Approved",
+      "stale": "Stale"
+    },
+    "filters": {
+      "kind": "Filter by kind",
+      "status": "Filter by status",
+      "all": "All",
+      "anyStatus": "Any status"
+    },
+    "groupEmpty": {
+      "term": "No glossary terms match.",
+      "metric": "No metrics match.",
+      "query": "No verified queries match."
+    },
+    "empty": {
+      "title": "Teach agents what this data means",
+      "description": "Add glossary terms, metrics and verified questions so AI agents read your business language instead of guessing from column names. Only entries you approve are sent to agents, inside the data model they request over MCP."
+    },
+    "actions": {
+      "new": {
+        "term": "New term",
+        "metric": "New metric",
+        "query": "New query"
+      },
+      "validate": "Check against schema",
+      "preview": "Preview what agents see",
+      "approve": "Approve",
+      "reapprove": "Re-approve",
+      "unapprove": "Back to draft",
+      "edit": "Edit",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create",
+      "close": "Close",
+      "retry": "Retry"
+    },
+    "delete": {
+      "title": "Delete entry",
+      "message": "Delete \"{{name}}\"? Agents stop receiving it immediately if it was approved."
+    },
+    "validate": {
+      "ok": "Checked {{checked}} approved entries against the live schema. All still match.",
+      "stale": "Checked {{checked}} approved entries. {{count}} no longer match the schema and are now stale:"
+    },
+    "editor": {
+      "newTitle": {
+        "term": "New term",
+        "metric": "New metric",
+        "query": "New verified query"
+      },
+      "editTitle": {
+        "term": "Edit term",
+        "metric": "Edit metric",
+        "query": "Edit verified query"
+      },
+      "hint": {
+        "term": "A glossary entry: what a business word means here, and optionally which table, column or value it refers to.",
+        "metric": "A named aggregate. Agents run it with the aggregate_data tool using exactly these arguments.",
+        "query": "A question you have checked, with the request that answers it. Agents run it with the get_table_data tool."
+      },
+      "backToDraftNote": "Changing the definition sends this entry back to draft; a name or description change keeps its status.",
+      "name": "Name",
+      "description": "Description",
+      "descriptionHint": "Optional note for admins and agents.",
+      "meaning": "Meaning",
+      "synonyms": "Synonyms",
+      "synonymsHint": "Press Enter or comma after each synonym.",
+      "mapsTo": "Maps to a table or column",
+      "table": "Table",
+      "field": "Field",
+      "fieldOptional": "Field (optional)",
+      "mapNone": "Whole column",
+      "mapValue": "A value",
+      "mapFilter": "A filter",
+      "valueNeedsField": "Pick a field first",
+      "value": "Value",
+      "valueHint": "The stored value this term stands for, e.g. shipped.",
+      "termFilterHint": "DreamFactory filter, e.g. status in ('pending','processing').",
+      "question": "Question",
+      "questionHint": "Phrase it the way a user would ask it.",
+      "aggregates": "Aggregates",
+      "addAggregate": "Add aggregate",
+      "function": "Function",
+      "alias": "Alias (optional)",
+      "fields": "Fields",
+      "fieldsHint": "Leave empty to return every field.",
+      "filter": "Filter",
+      "filterHint": "DreamFactory filter syntax. Use {name} for a value the agent supplies, and declare it below.",
+      "groupBy": "Group by",
+      "unit": "Unit",
+      "order": "Order",
+      "orderHint": "e.g. order_date DESC",
+      "limit": "Limit",
+      "related": "Related",
+      "relatedHint": "Relationships to include with each row.",
+      "params": "Parameters",
+      "addParam": "Add parameter",
+      "paramsHint": "None. Add one for each {placeholder} in the filter.",
+      "paramName": "Name",
+      "paramType": "Type",
+      "paramRequired": "Required",
+      "remove": "Remove",
+      "undeclared": "The filter uses {{names}} but no parameter declares it.",
+      "unused": "Declared but not used in the filter: {{names}}.",
+      "declare": "Declare"
+    },
+    "preview": {
+      "eyebrow": "Preview",
+      "title": "What agents see for {{service}}",
+      "hint": "This is the semantics block MCP get_data_model returns for this service. Only approved entries are included.",
+      "empty": "Nothing yet. Approve an entry and it appears here.",
+      "guidance": "Guidance",
+      "synonyms": "Synonyms",
+      "mapsTo": "Maps to",
+      "params": "Parameters",
+      "runWith": "Run with",
+      "omitted": "Omitted",
+      "raw": "Raw JSON"
+    }
   }
 }

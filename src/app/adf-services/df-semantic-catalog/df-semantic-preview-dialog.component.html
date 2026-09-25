@@ -1,0 +1,158 @@
+<header mat-dialog-title class="sem-preview__head">
+  <div class="sem-preview__heading">
+    <p class="sem-preview__eyebrow">
+      {{ 'services.semantic.preview.eyebrow' | transloco }}
+    </p>
+    <h2 class="sem-preview__title">
+      {{
+        'services.semantic.preview.title'
+          | transloco: { service: data.serviceLabel }
+      }}
+    </h2>
+  </div>
+  <button
+    mat-icon-button
+    type="button"
+    mat-dialog-close
+    class="sem-preview__close"
+    [attr.aria-label]="'services.semantic.actions.close' | transloco">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<mat-dialog-content class="sem-preview__content" data-testid="semantic-preview">
+  <p class="sem-preview__hint">
+    {{ 'services.semantic.preview.hint' | transloco }}
+  </p>
+
+  <p *ngIf="loading" class="sem-preview__hint">
+    {{ 'services.semantic.loading' | transloco }}
+  </p>
+  <div class="sem-preview__error" role="alert" *ngIf="error">
+    <mat-icon>error_outline</mat-icon><span>{{ error }}</span>
+  </div>
+
+  <div
+    class="sem-preview__empty"
+    data-testid="semantic-preview-empty"
+    *ngIf="!loading && !error && !block">
+    {{ 'services.semantic.preview.empty' | transloco }}
+  </div>
+
+  <ng-container *ngIf="block">
+    <section class="sem-preview__section" *ngIf="block.guidance">
+      <h3>{{ 'services.semantic.preview.guidance' | transloco }}</h3>
+      <p class="sem-preview__guidance">{{ block.guidance }}</p>
+    </section>
+
+    <section
+      class="sem-preview__section"
+      data-testid="semantic-preview-glossary"
+      *ngIf="block.glossary?.length">
+      <h3>
+        {{ 'services.semantic.kinds.term.many' | transloco }}
+        <span class="sem-preview__count">{{ block.glossary?.length }}</span>
+      </h3>
+      <dl class="sem-preview__list">
+        <div class="sem-preview__item" *ngFor="let g of block.glossary">
+          <dt>{{ g.term }}</dt>
+          <dd>
+            {{ g.meaning }}
+            <div class="sem-preview__meta" *ngIf="g.synonyms?.length">
+              {{ 'services.semantic.preview.synonyms' | transloco }}:
+              {{ g.synonyms?.join(', ') }}
+            </div>
+            <div class="sem-preview__meta" *ngIf="g.maps_to">
+              {{ 'services.semantic.preview.mapsTo' | transloco }}:
+              <code
+                >{{ g.maps_to.table
+                }}{{ g.maps_to.field ? '.' + g.maps_to.field : ''
+                }}{{ g.maps_to.value ? ' = ' + g.maps_to.value : ''
+                }}{{
+                  g.maps_to.filter ? ' where ' + g.maps_to.filter : ''
+                }}</code
+              >
+            </div>
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section
+      class="sem-preview__section"
+      data-testid="semantic-preview-metrics"
+      *ngIf="block.metrics?.length">
+      <h3>
+        {{ 'services.semantic.kinds.metric.many' | transloco }}
+        <span class="sem-preview__count">{{ block.metrics?.length }}</span>
+      </h3>
+      <div class="sem-preview__card" *ngFor="let m of block.metrics">
+        <div class="sem-preview__card-head">
+          <strong>{{ m.name }}</strong>
+          <span class="sem-preview__meta" *ngIf="m.unit">{{ m.unit }}</span>
+        </div>
+        <div class="sem-preview__meta" *ngIf="m.description">
+          {{ m.description }}
+        </div>
+        <div class="sem-preview__meta" *ngIf="m.params?.length">
+          {{ 'services.semantic.preview.params' | transloco }}:
+          {{ paramList(m.params) }}
+        </div>
+        <div class="sem-preview__run">
+          {{ 'services.semantic.preview.runWith' | transloco }}
+          <code class="sem-preview__tool">{{ m.run_with.tool }}</code>
+        </div>
+        <pre class="sem-preview__code">{{ pretty(m.run_with.arguments) }}</pre>
+      </div>
+    </section>
+
+    <section
+      class="sem-preview__section"
+      data-testid="semantic-preview-queries"
+      *ngIf="block.verified_queries?.length">
+      <h3>
+        {{ 'services.semantic.kinds.query.many' | transloco }}
+        <span class="sem-preview__count">{{
+          block.verified_queries?.length
+        }}</span>
+      </h3>
+      <div class="sem-preview__card" *ngFor="let q of block.verified_queries">
+        <div class="sem-preview__card-head">
+          <strong>{{ q.question }}</strong>
+          <span class="sem-preview__meta">{{ q.name }}</span>
+        </div>
+        <div class="sem-preview__meta" *ngIf="q.description">
+          {{ q.description }}
+        </div>
+        <div class="sem-preview__meta" *ngIf="q.params?.length">
+          {{ 'services.semantic.preview.params' | transloco }}:
+          {{ paramList(q.params) }}
+        </div>
+        <div class="sem-preview__run">
+          {{ 'services.semantic.preview.runWith' | transloco }}
+          <code class="sem-preview__tool">{{ q.run_with.tool }}</code>
+        </div>
+        <pre class="sem-preview__code">{{ pretty(q.run_with.arguments) }}</pre>
+      </div>
+    </section>
+
+    <section class="sem-preview__section" *ngIf="hasOmitted">
+      <h3>{{ 'services.semantic.preview.omitted' | transloco }}</h3>
+      <pre class="sem-preview__code">{{ pretty(block.omitted) }}</pre>
+    </section>
+  </ng-container>
+
+  <details
+    class="sem-preview__raw"
+    data-testid="semantic-preview-raw"
+    *ngIf="!loading && !error">
+    <summary>{{ 'services.semantic.preview.raw' | transloco }}</summary>
+    <pre class="sem-preview__code">{{ raw }}</pre>
+  </details>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button type="button" mat-dialog-close>
+    {{ 'services.semantic.actions.close' | transloco }}
+  </button>
+</mat-dialog-actions>

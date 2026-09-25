@@ -42,7 +42,17 @@ export const caseInterceptor: HttpInterceptorFn = (
     /^\/api\/v2\/[^/]+\/session(\/\d+)?(\?|$)/.test(req.url) &&
     !/^\/api\/v2\/user\/session/.test(req.url);
 
+  // Skip both directions for the semantic catalog (/system/semantic). Its
+  // definitions are the verbatim arguments agents receive (maps_to, group_by,
+  // verified_queries, run_with.arguments.table_name), so the editor reads and
+  // writes them in the backend's snake_case and the preview shows exactly
+  // what an agent sees.
+  const isSemanticCatalog = /^\/api\/v2\/system\/semantic(\/|\?|$)/.test(
+    req.url
+  );
+
   const skipResponseTransform =
+    isSemanticCatalog ||
     isApiDocsRequest ||
     isSystemEventRequest ||
     isApiBuilderTest ||
@@ -50,7 +60,10 @@ export const caseInterceptor: HttpInterceptorFn = (
 
   if (req.url.startsWith('/api') && !(req.body instanceof FormData)) {
     const transformedRequest = req.clone({
-      body: isApiDocsRequest ? req.body : mapCamelToSnake(req.body),
+      body:
+        isApiDocsRequest || isSemanticCatalog
+          ? req.body
+          : mapCamelToSnake(req.body),
     });
     return next(transformedRequest).pipe(
       map(event => {

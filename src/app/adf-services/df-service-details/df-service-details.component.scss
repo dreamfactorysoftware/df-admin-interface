@@ -23,7 +23,8 @@
 // ---- Meridian Phase 5: Pipeline section (request chain under the overview) ---
 // ---- Meridian Phase 3: Access section (scope matrix under the overview) ----
 .service-pipeline,
-.service-access {
+.service-access,
+.service-semantic {
   margin-top: 3.2rem;
   padding-top: 3.2rem;
   border-top: 1px solid var(--df-border-2);
@@ -1021,4 +1022,8 @@ mat-icon {
     font-size: 0.85rem;
     opacity: 0.7;
   }
+}
+
+.semantic-jump-btn {
+  margin-left: var(--df-space-2);
 }

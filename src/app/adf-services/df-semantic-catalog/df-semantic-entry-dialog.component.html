@@ -1,0 +1,546 @@
+<header mat-dialog-title class="sem-editor__head">
+  <div class="sem-editor__heading">
+    <p class="sem-editor__eyebrow">
+      {{ 'services.semantic.eyebrow' | transloco }} · {{ data.service }}
+    </p>
+    <h2 class="sem-editor__title" data-testid="semantic-editor-title">
+      {{
+        'services.semantic.editor.' +
+          (isEdit ? 'editTitle.' : 'newTitle.') +
+          kind | transloco
+      }}
+    </h2>
+  </div>
+  <button
+    mat-icon-button
+    type="button"
+    mat-dialog-close
+    class="sem-editor__close"
+    [attr.aria-label]="'services.semantic.actions.cancel' | transloco">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<mat-dialog-content class="sem-editor__content">
+  <p class="sem-editor__hint">
+    {{ 'services.semantic.editor.hint.' + kind | transloco }}
+  </p>
+  <p class="sem-editor__note" *ngIf="wasApproved">
+    <mat-icon inline>info</mat-icon>
+    {{ 'services.semantic.editor.backToDraftNote' | transloco }}
+  </p>
+
+  <div class="sem-editor__row">
+    <mat-form-field appearance="outline" class="sem-editor__grow">
+      <mat-label>{{ 'services.semantic.editor.name' | transloco }}</mat-label>
+      <input
+        matInput
+        required
+        name="name"
+        data-testid="semantic-editor-name"
+        [(ngModel)]="name" />
+    </mat-form-field>
+  </div>
+  <mat-form-field appearance="outline" class="sem-editor__full">
+    <mat-label>{{
+      'services.semantic.editor.description' | transloco
+    }}</mat-label>
+    <input
+      matInput
+      name="description"
+      data-testid="semantic-editor-description"
+      [(ngModel)]="description" />
+    <mat-hint>{{
+      'services.semantic.editor.descriptionHint' | transloco
+    }}</mat-hint>
+  </mat-form-field>
+
+  <!-- ================= term ================= -->
+  <ng-container *ngIf="kind === 'term'">
+    <mat-form-field appearance="outline" class="sem-editor__full">
+      <mat-label>{{
+        'services.semantic.editor.meaning' | transloco
+      }}</mat-label>
+      <textarea
+        matInput
+        required
+        rows="2"
+        name="meaning"
+        data-testid="semantic-editor-meaning"
+        [(ngModel)]="meaning"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="sem-editor__full">
+      <mat-label>{{
+        'services.semantic.editor.synonyms' | transloco
+      }}</mat-label>
+      <mat-chip-grid #synonymGrid>
+        <mat-chip-row *ngFor="let s of synonyms" (removed)="removeSynonym(s)">
+          {{ s }}
+          <button matChipRemove type="button" [attr.aria-label]="s">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+        <input
+          data-testid="semantic-editor-synonyms"
+          [matChipInputFor]="synonymGrid"
+          [matChipInputSeparatorKeyCodes]="separatorKeys"
+          [matChipInputAddOnBlur]="true"
+          (matChipInputTokenEnd)="addSynonym($event)" />
+      </mat-chip-grid>
+      <mat-hint>{{
+        'services.semantic.editor.synonymsHint' | transloco
+      }}</mat-hint>
+    </mat-form-field>
+
+    <mat-checkbox
+      name="mapEnabled"
+      data-testid="semantic-editor-map-enabled"
+      [(ngModel)]="mapEnabled">
+      {{ 'services.semantic.editor.mapsTo' | transloco }}
+    </mat-checkbox>
+
+    <div class="sem-editor__group" *ngIf="mapEnabled">
+      <div class="sem-editor__row">
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.table' | transloco
+          }}</mat-label>
+          <mat-select
+            name="mapTable"
+            data-testid="semantic-editor-map-table"
+            [ngModel]="mapTable"
+            (ngModelChange)="onMapTableChange($event)">
+            <mat-option *ngFor="let t of tables" [value]="t">{{
+              t
+            }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.fieldOptional' | transloco
+          }}</mat-label>
+          <mat-select
+            name="mapField"
+            data-testid="semantic-editor-map-field"
+            [disabled]="!mapTable"
+            [ngModel]="mapField"
+            (ngModelChange)="onMapFieldChange($event)">
+            <mat-option value="">—</mat-option>
+            <mat-option
+              *ngFor="let f of fieldOptions(mapTable, [mapField])"
+              [value]="f"
+              >{{ f }}</mat-option
+            >
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <mat-radio-group
+        class="sem-editor__radios"
+        name="mapMode"
+        [(ngModel)]="mapMode">
+        <mat-radio-button value="none">
+          {{ 'services.semantic.editor.mapNone' | transloco }}
+        </mat-radio-button>
+        <mat-radio-button
+          value="value"
+          [disabled]="!mapField"
+          [matTooltip]="
+            mapField
+              ? ''
+              : ('services.semantic.editor.valueNeedsField' | transloco)
+          ">
+          {{ 'services.semantic.editor.mapValue' | transloco }}
+        </mat-radio-button>
+        <mat-radio-button value="filter">
+          {{ 'services.semantic.editor.mapFilter' | transloco }}
+        </mat-radio-button>
+      </mat-radio-group>
+      <mat-form-field
+        appearance="outline"
+        class="sem-editor__full"
+        *ngIf="mapMode === 'value'">
+        <mat-label>{{
+          'services.semantic.editor.value' | transloco
+        }}</mat-label>
+        <input
+          matInput
+          name="mapValue"
+          data-testid="semantic-editor-map-value"
+          [(ngModel)]="mapValue" />
+        <mat-hint>{{
+          'services.semantic.editor.valueHint' | transloco
+        }}</mat-hint>
+      </mat-form-field>
+      <mat-form-field
+        appearance="outline"
+        class="sem-editor__full"
+        *ngIf="mapMode === 'filter'">
+        <mat-label>{{
+          'services.semantic.editor.filter' | transloco
+        }}</mat-label>
+        <input
+          matInput
+          class="sem-editor__mono"
+          name="mapFilter"
+          data-testid="semantic-editor-map-filter"
+          [(ngModel)]="mapFilter" />
+        <mat-hint>{{
+          'services.semantic.editor.termFilterHint' | transloco
+        }}</mat-hint>
+      </mat-form-field>
+    </div>
+  </ng-container>
+
+  <!-- ================= query: question ================= -->
+  <mat-form-field
+    appearance="outline"
+    class="sem-editor__full"
+    *ngIf="kind === 'query'">
+    <mat-label>{{ 'services.semantic.editor.question' | transloco }}</mat-label>
+    <input
+      matInput
+      required
+      name="question"
+      data-testid="semantic-editor-question"
+      [(ngModel)]="question" />
+    <mat-hint>{{
+      'services.semantic.editor.questionHint' | transloco
+    }}</mat-hint>
+  </mat-form-field>
+
+  <!-- ================= metric + query ================= -->
+  <ng-container *ngIf="kind !== 'term'">
+    <mat-form-field appearance="outline" class="sem-editor__full">
+      <mat-label>{{ 'services.semantic.editor.table' | transloco }}</mat-label>
+      <mat-select
+        required
+        name="table"
+        data-testid="semantic-editor-table"
+        [ngModel]="table"
+        (ngModelChange)="onTableChange($event)">
+        <mat-option *ngFor="let t of tables" [value]="t">{{ t }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- metric aggregates -->
+    <div class="sem-editor__group" *ngIf="kind === 'metric'">
+      <div class="sem-editor__group-head">
+        <span>{{ 'services.semantic.editor.aggregates' | transloco }}</span>
+        <button
+          mat-button
+          type="button"
+          color="primary"
+          data-testid="semantic-editor-add-aggregate"
+          (click)="addAggregate()">
+          <mat-icon>add</mat-icon>
+          {{ 'services.semantic.editor.addAggregate' | transloco }}
+        </button>
+      </div>
+      <div
+        class="sem-editor__row sem-editor__agg"
+        *ngFor="let a of aggregates; let i = index; trackBy: trackByIndex"
+        [attr.data-testid]="'semantic-editor-aggregate-' + i">
+        <mat-form-field appearance="outline" class="sem-editor__fn">
+          <mat-label>{{
+            'services.semantic.editor.function' | transloco
+          }}</mat-label>
+          <mat-select
+            [name]="'aggFn' + i"
+            data-testid="semantic-editor-agg-function"
+            [ngModel]="a.function"
+            (ngModelChange)="onFunctionChange(a, $event)">
+            <mat-option *ngFor="let f of functions" [value]="f">{{
+              f
+            }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.field' | transloco
+          }}</mat-label>
+          <mat-select
+            [name]="'aggField' + i"
+            data-testid="semantic-editor-agg-field"
+            [disabled]="!table"
+            [(ngModel)]="a.field">
+            <mat-option
+              *ngFor="let f of aggregateFieldOptions(a)"
+              [value]="f"
+              >{{ f }}</mat-option
+            >
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.alias' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            [name]="'aggAlias' + i"
+            data-testid="semantic-editor-agg-alias"
+            [(ngModel)]="a.alias" />
+        </mat-form-field>
+        <button
+          mat-icon-button
+          type="button"
+          class="sem-editor__remove"
+          [disabled]="aggregates.length === 1"
+          [attr.aria-label]="'services.semantic.editor.remove' | transloco"
+          (click)="removeAggregate(i)">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- query fields -->
+    <mat-form-field
+      appearance="outline"
+      class="sem-editor__full"
+      *ngIf="kind === 'query'">
+      <mat-label>{{ 'services.semantic.editor.fields' | transloco }}</mat-label>
+      <mat-select
+        multiple
+        name="fields"
+        data-testid="semantic-editor-fields"
+        [disabled]="!table"
+        [(ngModel)]="fields">
+        <mat-option *ngFor="let f of fieldOptions(table, fields)" [value]="f">{{
+          f
+        }}</mat-option>
+      </mat-select>
+      <mat-hint>{{
+        'services.semantic.editor.fieldsHint' | transloco
+      }}</mat-hint>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="sem-editor__full">
+      <mat-label>{{ 'services.semantic.editor.filter' | transloco }}</mat-label>
+      <input
+        matInput
+        class="sem-editor__mono"
+        name="filter"
+        data-testid="semantic-editor-filter"
+        [(ngModel)]="filter" />
+      <mat-hint>{{
+        'services.semantic.editor.filterHint' | transloco
+      }}</mat-hint>
+    </mat-form-field>
+
+    <div class="sem-editor__row" *ngIf="kind === 'metric'">
+      <mat-form-field appearance="outline" class="sem-editor__grow">
+        <mat-label>{{
+          'services.semantic.editor.groupBy' | transloco
+        }}</mat-label>
+        <mat-select
+          multiple
+          name="groupBy"
+          data-testid="semantic-editor-group-by"
+          [disabled]="!table"
+          [(ngModel)]="groupBy">
+          <mat-option
+            *ngFor="let f of fieldOptions(table, groupBy)"
+            [value]="f"
+            >{{ f }}</mat-option
+          >
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="sem-editor__unit">
+        <mat-label>{{ 'services.semantic.editor.unit' | transloco }}</mat-label>
+        <input
+          matInput
+          name="unit"
+          data-testid="semantic-editor-unit"
+          [(ngModel)]="unit" />
+      </mat-form-field>
+    </div>
+
+    <ng-container *ngIf="kind === 'query'">
+      <div class="sem-editor__row">
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.order' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            class="sem-editor__mono"
+            name="order"
+            data-testid="semantic-editor-order"
+            [(ngModel)]="order" />
+          <mat-hint>{{
+            'services.semantic.editor.orderHint' | transloco
+          }}</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sem-editor__unit">
+          <mat-label>{{
+            'services.semantic.editor.limit' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            type="number"
+            min="1"
+            max="1000"
+            name="limit"
+            data-testid="semantic-editor-limit"
+            [(ngModel)]="limit" />
+        </mat-form-field>
+      </div>
+      <mat-form-field appearance="outline" class="sem-editor__full">
+        <mat-label>{{
+          'services.semantic.editor.related' | transloco
+        }}</mat-label>
+        <mat-select
+          multiple
+          name="related"
+          data-testid="semantic-editor-related"
+          [disabled]="!table || !relatedOptions().length"
+          [(ngModel)]="related">
+          <mat-option *ngFor="let r of relatedOptions()" [value]="r">{{
+            r
+          }}</mat-option>
+        </mat-select>
+        <mat-hint>{{
+          'services.semantic.editor.relatedHint' | transloco
+        }}</mat-hint>
+      </mat-form-field>
+    </ng-container>
+
+    <!-- params -->
+    <div class="sem-editor__group" data-testid="semantic-editor-params">
+      <div class="sem-editor__group-head">
+        <span>{{ 'services.semantic.editor.params' | transloco }}</span>
+        <button
+          mat-button
+          type="button"
+          color="primary"
+          data-testid="semantic-editor-add-param"
+          (click)="addParam()">
+          <mat-icon>add</mat-icon>
+          {{ 'services.semantic.editor.addParam' | transloco }}
+        </button>
+      </div>
+      <p class="sem-editor__sub" *ngIf="!params.length">
+        {{ 'services.semantic.editor.paramsHint' | transloco }}
+      </p>
+      <div
+        class="sem-editor__row sem-editor__param"
+        *ngFor="let p of params; let i = index; trackBy: trackByIndex">
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.paramName' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            class="sem-editor__mono"
+            [name]="'paramName' + i"
+            data-testid="semantic-editor-param-name"
+            [(ngModel)]="p.name" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sem-editor__fn">
+          <mat-label>{{
+            'services.semantic.editor.paramType' | transloco
+          }}</mat-label>
+          <mat-select
+            [name]="'paramType' + i"
+            data-testid="semantic-editor-param-type"
+            [(ngModel)]="p.type">
+            <mat-option *ngFor="let t of paramTypes" [value]="t">{{
+              t
+            }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-checkbox [name]="'paramReq' + i" [(ngModel)]="p.required">
+          {{ 'services.semantic.editor.paramRequired' | transloco }}
+        </mat-checkbox>
+        <mat-form-field appearance="outline" class="sem-editor__grow">
+          <mat-label>{{
+            'services.semantic.editor.description' | transloco
+          }}</mat-label>
+          <input
+            matInput
+            [name]="'paramDesc' + i"
+            [(ngModel)]="p.description" />
+        </mat-form-field>
+        <button
+          mat-icon-button
+          type="button"
+          class="sem-editor__remove"
+          [attr.aria-label]="'services.semantic.editor.remove' | transloco"
+          (click)="removeParam(i)">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div
+      class="sem-editor__warn"
+      role="status"
+      data-testid="semantic-editor-param-warning"
+      *ngIf="hasMismatch">
+      <mat-icon>warning_amber</mat-icon>
+      <div>
+        <div *ngIf="mismatch.undeclared.length">
+          {{
+            'services.semantic.editor.undeclared'
+              | transloco: { names: mismatch.undeclared.join(', ') }
+          }}
+          <button
+            mat-button
+            type="button"
+            class="sem-editor__inline-btn"
+            (click)="declareMissing()">
+            {{ 'services.semantic.editor.declare' | transloco }}
+          </button>
+        </div>
+        <div *ngIf="mismatch.unused.length">
+          {{
+            'services.semantic.editor.unused'
+              | transloco: { names: mismatch.unused.join(', ') }
+          }}
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</mat-dialog-content>
+
+<!-- Outside the scrolling content so a failed save is always in view. -->
+<div class="sem-editor__errors" *ngIf="clientErrors.length || serverError">
+  <div
+    class="sem-editor__error"
+    role="alert"
+    data-testid="semantic-editor-client-errors"
+    *ngIf="clientErrors.length">
+    <mat-icon>error_outline</mat-icon>
+    <ul>
+      <li *ngFor="let e of clientErrors">{{ e }}</li>
+    </ul>
+  </div>
+  <div
+    class="sem-editor__error"
+    role="alert"
+    data-testid="semantic-editor-error"
+    *ngIf="serverError">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ serverError }}</span>
+  </div>
+</div>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button type="button" mat-dialog-close>
+    {{ 'services.semantic.actions.cancel' | transloco }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    data-testid="semantic-editor-save"
+    [disabled]="saving"
+    (click)="save()">
+    {{
+      (isEdit
+        ? 'services.semantic.actions.save'
+        : 'services.semantic.actions.create'
+      ) | transloco
+    }}
+  </button>
+</mat-dialog-actions>

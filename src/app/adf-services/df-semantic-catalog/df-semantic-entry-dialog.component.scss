@@ -1,0 +1,185 @@
+@use '../../shared/components/df-dialog-surface' as *;
+@include df-dialog-surface;
+
+.sem-editor__head {
+  display: flex;
+  padding-top: var(--df-space-4);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--df-space-4);
+  margin: 0;
+}
+
+.sem-editor__heading {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+.sem-editor__eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: var(--df-tracking-eyebrow, 0.04em);
+  text-transform: uppercase;
+  color: var(--df-text-muted);
+}
+
+.sem-editor__title {
+  margin: 0;
+  text-transform: none;
+  font-size: 1.8rem;
+  line-height: 1.3;
+  color: var(--df-text);
+}
+
+.sem-editor__close {
+  flex: 0 0 auto;
+  color: var(--df-text-muted);
+}
+
+.sem-editor__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-2);
+  min-width: min(680px, 86vw);
+}
+
+.sem-editor__hint,
+.sem-editor__sub {
+  margin: 0 0 var(--df-space-2);
+  color: var(--df-text-muted);
+  font-size: 1.3rem;
+  line-height: 1.5;
+}
+
+.sem-editor__sub {
+  margin: 0;
+}
+
+.sem-editor__note {
+  display: flex;
+  align-items: center;
+  gap: var(--df-space-2);
+  margin: 0 0 var(--df-space-2);
+  padding: var(--df-space-2) var(--df-space-3);
+  border-radius: var(--df-radius-sm);
+  background: var(--df-accent-soft);
+  color: var(--df-text);
+  font-size: 1.3rem;
+}
+
+.sem-editor__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--df-space-3);
+}
+
+.sem-editor__full {
+  width: 100%;
+}
+
+.sem-editor__grow {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.sem-editor__fn {
+  flex: 0 0 130px;
+}
+
+.sem-editor__unit {
+  flex: 0 0 140px;
+}
+
+.sem-editor__remove {
+  margin-top: var(--df-space-1);
+  color: var(--df-text-muted);
+}
+
+.sem-editor__param mat-checkbox {
+  margin-top: var(--df-space-2);
+}
+
+.sem-editor__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-2);
+  padding: var(--df-space-3);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  background: var(--df-surface-2);
+}
+
+.sem-editor__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  color: var(--df-text);
+}
+
+.sem-editor__radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-3);
+}
+
+.sem-editor__mono {
+  font-family: var(--df-font-mono);
+}
+
+.sem-editor__warn,
+.sem-editor__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--df-space-2);
+  padding: var(--df-space-2) var(--df-space-3);
+  border-radius: var(--df-radius-sm);
+  font-size: 1.3rem;
+  line-height: 1.5;
+
+  mat-icon {
+    flex: 0 0 auto;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: var(--df-space-4);
+  }
+}
+
+.sem-editor__warn {
+  background: var(--df-warning-soft);
+  border: 1px solid var(--df-warning-border);
+  color: var(--df-text);
+
+  mat-icon {
+    color: var(--df-warning);
+  }
+}
+
+.sem-editor__error {
+  background: var(--df-danger-soft);
+  border: 1px solid var(--df-danger-border);
+  color: var(--df-text);
+  white-space: pre-wrap;
+
+  mat-icon {
+    color: var(--df-danger);
+  }
+}
+
+.sem-editor__inline-btn {
+  margin-left: var(--df-space-1);
+}
+
+.sem-editor__errors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-2);
+  padding: var(--df-space-2) var(--df-space-5) var(--df-space-3);
+  max-height: 30vh;
+  overflow: auto;
+}

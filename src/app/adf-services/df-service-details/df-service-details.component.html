@@ -553,6 +553,22 @@
           (cellClick)="onScopeCellClick($event)">
         </df-scope-matrix>
       </section>
+
+      <!-- Semantic catalog (df-semantic): business terms, metrics and
+           verified queries that agents receive in the MCP data model. Sits
+           after Access, beside the Schema / API Docs entry points, because it
+           curates meaning on top of this service's schema.
+      -->
+      <section
+        class="service-semantic"
+        id="semantic-catalog"
+        data-testid="service-semantic-section"
+        *ngIf="serviceData.id">
+        <df-semantic-catalog
+          [serviceName]="serviceData.name"
+          [serviceLabel]="serviceData.label || serviceData.name">
+        </df-semantic-catalog>
+      </section>
     </ng-container>
 
     <mat-form-field
@@ -652,6 +668,14 @@
             class="save-btn"
             (click)="gotoSchema()">
             {{ 'schema' | transloco }}
+          </button>
+          <button
+            type="button"
+            mat-stroked-button
+            class="semantic-jump-btn"
+            data-testid="semantic-jump"
+            (click)="gotoSemanticCatalog()">
+            {{ 'services.semantic.jump' | transloco }}
           </button>
         </ng-container>
         <ng-template #notDatabase>

@@ -1,0 +1,251 @@
+<div class="sem-catalog" data-testid="semantic-catalog">
+  <df-page-header
+    [eyebrow]="'services.semantic.eyebrow' | transloco"
+    [title]="'services.semantic.title' | transloco"
+    [description]="'services.semantic.description' | transloco">
+  </df-page-header>
+
+  <div class="sem-catalog__toolbar">
+    <div class="sem-catalog__new">
+      <button
+        *ngFor="let k of kinds"
+        mat-stroked-button
+        type="button"
+        [attr.data-testid]="'semantic-new-' + k"
+        (click)="openEditor(k)">
+        <mat-icon>add</mat-icon>
+        {{ 'services.semantic.actions.new.' + k | transloco }}
+      </button>
+    </div>
+    <div class="sem-catalog__tools">
+      <button
+        mat-stroked-button
+        type="button"
+        data-testid="semantic-validate"
+        [disabled]="validating() || !entries().length"
+        (click)="checkSchema()">
+        <mat-icon>fact_check</mat-icon>
+        {{ 'services.semantic.actions.validate' | transloco }}
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        data-testid="semantic-preview-open"
+        (click)="openPreview()">
+        <mat-icon>visibility</mat-icon>
+        {{ 'services.semantic.actions.preview' | transloco }}
+      </button>
+    </div>
+  </div>
+
+  <div
+    class="sem-catalog__banner sem-catalog__banner--error"
+    role="alert"
+    *ngIf="actionError()">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ actionError() }}</span>
+  </div>
+
+  <div
+    class="sem-catalog__banner"
+    role="status"
+    data-testid="semantic-validate-result"
+    [class.sem-catalog__banner--warn]="validateResult()!.stale.length"
+    *ngIf="validateResult()">
+    <mat-icon>{{
+      validateResult()!.stale.length ? 'warning_amber' : 'check_circle'
+    }}</mat-icon>
+    <div class="sem-catalog__banner-body">
+      <div>
+        {{
+          (validateResult()!.stale.length
+            ? 'services.semantic.validate.stale'
+            : 'services.semantic.validate.ok'
+          )
+            | transloco
+              : {
+                  checked: validateResult()!.checked,
+                  count: validateResult()!.stale.length,
+                }
+        }}
+      </div>
+      <ul *ngIf="validateResult()!.stale.length">
+        <li *ngFor="let s of validateResult()!.stale">
+          <strong>{{ s.name }}</strong>
+          ({{ 'services.semantic.kinds.' + s.kind + '.one' | transloco }}):
+          {{ s.reason }}
+        </li>
+      </ul>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      class="sem-catalog__banner-close"
+      [attr.aria-label]="'services.semantic.actions.close' | transloco"
+      (click)="dismissValidate()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <p class="sem-catalog__muted" *ngIf="loading() && !entries().length">
+    {{ 'services.semantic.loading' | transloco }}
+  </p>
+  <div
+    class="sem-catalog__banner sem-catalog__banner--error"
+    role="alert"
+    *ngIf="loadError()">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ loadError() }}</span>
+    <button mat-button type="button" (click)="reload()">
+      {{ 'services.semantic.actions.retry' | transloco }}
+    </button>
+  </div>
+
+  <df-empty-state
+    *ngIf="!loading() && !loadError() && !entries().length"
+    data-testid="semantic-empty"
+    icon="menu_book"
+    [title]="'services.semantic.empty.title' | transloco"
+    [description]="'services.semantic.empty.description' | transloco"
+    [actionLabel]="'services.semantic.actions.new.term' | transloco"
+    actionIcon="add"
+    (action)="openEditor('term')">
+  </df-empty-state>
+
+  <ng-container *ngIf="entries().length">
+    <div class="sem-catalog__filters">
+      <mat-button-toggle-group
+        [value]="kindFilter()"
+        (change)="kindFilter.set($event.value)"
+        data-testid="semantic-kind-filter"
+        [attr.aria-label]="'services.semantic.filters.kind' | transloco">
+        <mat-button-toggle value="all">
+          {{ 'services.semantic.filters.all' | transloco }}
+          <span class="sem-catalog__count">{{ entries().length }}</span>
+        </mat-button-toggle>
+        <mat-button-toggle *ngFor="let k of kinds" [value]="k">
+          {{ 'services.semantic.kinds.' + k + '.many' | transloco }}
+          <span class="sem-catalog__count">{{ counts()[k] }}</span>
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+      <mat-button-toggle-group
+        [value]="statusFilter()"
+        (change)="statusFilter.set($event.value)"
+        data-testid="semantic-status-filter"
+        [attr.aria-label]="'services.semantic.filters.status' | transloco">
+        <mat-button-toggle value="all">
+          {{ 'services.semantic.filters.anyStatus' | transloco }}
+        </mat-button-toggle>
+        <mat-button-toggle value="draft">
+          {{ 'services.semantic.status.draft' | transloco }}
+          <span class="sem-catalog__count">{{ counts().draft }}</span>
+        </mat-button-toggle>
+        <mat-button-toggle value="approved">
+          {{ 'services.semantic.status.approved' | transloco }}
+          <span class="sem-catalog__count">{{ counts().approved }}</span>
+        </mat-button-toggle>
+        <mat-button-toggle value="stale">
+          {{ 'services.semantic.status.stale' | transloco }}
+          <span class="sem-catalog__count">{{ counts().stale }}</span>
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <section
+      class="sem-catalog__group"
+      *ngFor="let g of groups()"
+      [attr.data-testid]="'semantic-group-' + g.kind">
+      <h3 class="sem-catalog__group-title">
+        {{ 'services.semantic.kinds.' + g.kind + '.many' | transloco }}
+        <span class="sem-catalog__count">{{ g.entries.length }}</span>
+      </h3>
+      <p
+        class="sem-catalog__muted sem-catalog__group-empty"
+        *ngIf="!g.entries.length">
+        {{ 'services.semantic.groupEmpty.' + g.kind | transloco }}
+      </p>
+      <div
+        class="sem-row"
+        *ngFor="let e of g.entries; trackBy: trackById"
+        data-testid="semantic-row"
+        [attr.data-name]="e.name"
+        [attr.data-status]="e.status">
+        <div class="sem-row__main">
+          <div class="sem-row__head">
+            <span class="sem-row__name">{{ e.name }}</span>
+            <df-badge
+              data-testid="semantic-status"
+              [variant]="statusVariant[e.status]"
+              [label]="'services.semantic.status.' + e.status | transloco"
+              [matTooltip]="e.stale_reason || ''"></df-badge>
+          </div>
+          <div class="sem-row__summary">{{ summary(e) }}</div>
+          <div class="sem-row__desc" *ngIf="e.description">
+            {{ e.description }}
+          </div>
+          <div
+            class="sem-row__stale"
+            data-testid="semantic-stale-reason"
+            *ngIf="e.status === 'stale' && e.stale_reason">
+            <mat-icon inline>warning_amber</mat-icon>
+            {{ e.stale_reason }}
+          </div>
+          <div
+            class="sem-row__error"
+            role="alert"
+            data-testid="semantic-row-error"
+            *ngIf="rowErrors()[e.id]">
+            <mat-icon inline>error_outline</mat-icon>
+            {{ rowErrors()[e.id] }}
+          </div>
+        </div>
+        <div class="sem-row__actions">
+          <button
+            *ngIf="e.status !== 'approved'"
+            mat-stroked-button
+            type="button"
+            data-testid="semantic-approve"
+            [disabled]="busyId() === e.id"
+            (click)="approve(e)">
+            {{
+              (e.status === 'stale'
+                ? 'services.semantic.actions.reapprove'
+                : 'services.semantic.actions.approve'
+              ) | transloco
+            }}
+          </button>
+          <button
+            *ngIf="e.status === 'approved'"
+            mat-stroked-button
+            type="button"
+            data-testid="semantic-unapprove"
+            [disabled]="busyId() === e.id"
+            (click)="unapprove(e)">
+            {{ 'services.semantic.actions.unapprove' | transloco }}
+          </button>
+          <button
+            mat-icon-button
+            type="button"
+            data-testid="semantic-edit"
+            [matTooltip]="'services.semantic.actions.edit' | transloco"
+            [attr.aria-label]="'services.semantic.actions.edit' | transloco"
+            (click)="openEditor(e.kind, e)">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            type="button"
+            class="sem-row__delete"
+            data-testid="semantic-delete"
+            [disabled]="busyId() === e.id"
+            [matTooltip]="'services.semantic.actions.delete' | transloco"
+            [attr.aria-label]="'services.semantic.actions.delete' | transloco"
+            (click)="confirmDelete(e)">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+      </div>
+    </section>
+  </ng-container>
+</div>
