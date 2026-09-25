@@ -292,7 +292,14 @@ test.describe.serial('semantic catalog', () => {
     const dialog = page.locator('mat-dialog-container');
     await section.getByTestId('semantic-new-metric').click();
     await dialog.getByTestId('semantic-editor-name').fill(BAD);
+    // Picking the table fetches its columns; wait for that (patched) response
+    // before opening the column picker, which can otherwise open on the list
+    // from before the columns arrived.
+    const columns = page.waitForResponse(r =>
+      r.url().includes(`/api/v2/${SERVICE}/_schema/orders`)
+    );
     await pick(page, 'semantic-editor-table', 'orders');
+    await columns;
     await pick(page, 'semantic-editor-agg-field', 'amount');
     await dialog.getByTestId('semantic-editor-save').click();
     const err = dialog.getByTestId('semantic-editor-error');
@@ -345,7 +352,14 @@ test.describe.serial('semantic catalog', () => {
 
     await section.getByTestId('semantic-new-metric').click();
     await dialog.getByTestId('semantic-editor-name').fill(BAD);
+    // Picking the table fetches its columns; wait for that (patched) response
+    // before opening the column picker, which can otherwise open on the list
+    // from before the columns arrived.
+    const columns = page.waitForResponse(r =>
+      r.url().includes(`/api/v2/${SERVICE}/_schema/orders`)
+    );
     await pick(page, 'semantic-editor-table', 'orders');
+    await columns;
     await pick(page, 'semantic-editor-agg-field', 'amount');
     await dialog.getByTestId('semantic-editor-save').click();
     await expect(dialog.getByTestId('semantic-editor-error')).toBeVisible();
