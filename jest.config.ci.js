@@ -60,5 +60,9 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-trial-banner/df-trial-banner.component.spec.ts',
     '<rootDir>/src/app/shared/components/df-trial-expired/df-trial-expired.component.spec.ts',
     '<rootDir>/src/app/shared/components/df-engagement-banner/df-engagement-banner.component.spec.ts',
+    // 2026-09-29 presentation mode: mask API keys and tokens for screensharing.
+    '<rootDir>/src/app/shared/utilities/mask.spec.ts',
+    '<rootDir>/src/app/shared/services/df-presentation.service.spec.ts',
+    '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
   ],
 };

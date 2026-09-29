@@ -129,13 +129,17 @@
               </a>
               <ng-template #plainRole>{{ row.role }}</ng-template>
             </ng-container>
+            <df-secret
+              *ngIf="column.columnDef === 'apiKey'"
+              [value]="column?.cell(row)"></df-secret>
             <ng-container
               *ngIf="
                 column.columnDef !== 'active' &&
                 column.columnDef !== 'tokens' &&
                 column.columnDef !== 'spend' &&
                 column.columnDef !== 'role' &&
-                column.columnDef !== 'lastUsed'
+                column.columnDef !== 'lastUsed' &&
+                column.columnDef !== 'apiKey'
               ">
               {{ column?.cell(row) }}
             </ng-container>
