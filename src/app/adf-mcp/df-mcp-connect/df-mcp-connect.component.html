@@ -303,7 +303,7 @@
       <h3 class="mcp-card-title">Claude Code</h3>
       <p>Run in your terminal:</p>
       <div class="mcp-snippet-block">
-        <pre><code>{{ claudeCodeSnippet }}</code></pre>
+        <pre><code>{{ maskIfPresenting(claudeCodeSnippet) }}</code></pre>
         <button
           mat-stroked-button
           type="button"
@@ -327,7 +327,7 @@
         or <code class="mcp-inline-code">~/.cursor/mcp.json</code> (global):
       </p>
       <div class="mcp-snippet-block">
-        <pre><code>{{ cursorSnippet }}</code></pre>
+        <pre><code>{{ maskIfPresenting(cursorSnippet) }}</code></pre>
         <button
           mat-stroked-button
           type="button"
@@ -348,7 +348,7 @@
       <h3 class="mcp-card-title">VS Code</h3>
       <p>One-liner:</p>
       <div class="mcp-snippet-block">
-        <pre><code>{{ vscodeSnippet }}</code></pre>
+        <pre><code>{{ maskIfPresenting(vscodeSnippet) }}</code></pre>
         <button
           mat-stroked-button
           type="button"
@@ -398,7 +398,7 @@
         <code class="mcp-inline-code">mcpServers</code> block:
       </p>
       <div class="mcp-snippet-block">
-        <pre><code>{{ genericSnippet }}</code></pre>
+        <pre><code>{{ maskIfPresenting(genericSnippet) }}</code></pre>
         <button
           mat-stroked-button
           type="button"
@@ -408,7 +408,7 @@
       </div>
       <p class="mcp-caption">
         Check reachability:
-        <code class="mcp-inline-code">{{ genericCurl }}</code>
+        <code class="mcp-inline-code">{{ maskIfPresenting(genericCurl) }}</code>
         <button mat-button type="button" (click)="copyForClient(genericCurl)">
           Copy
         </button>

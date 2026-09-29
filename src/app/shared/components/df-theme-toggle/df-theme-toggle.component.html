@@ -10,3 +10,14 @@
   aria-label="Toggle phosphor mode">
   &gt;_
 </button>
+<button
+  class="presentation-toggle"
+  type="button"
+  [class.on]="presentation.on$ | async"
+  [attr.aria-pressed]="presentation.on$ | async"
+  (click)="togglePresentation()"
+  title="Presentation mode — mask API keys and tokens for screensharing"
+  aria-label="Toggle presentation mode"
+  data-testid="presentation-toggle">
+  <fa-icon [icon]="faEyeSlash"></fa-icon>
+</button>

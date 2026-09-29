@@ -31,6 +31,8 @@ import {
   API_KEY_HEADER,
   SESSION_TOKEN_HEADER,
 } from 'src/app/shared/constants/http-headers';
+import { maskSecretsIn } from 'src/app/shared/utilities/mask';
+import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
 
 export type TryItMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -201,7 +203,8 @@ export class DfTryItComponent implements OnInit {
   constructor(
     private http: HttpClient,
     private userData: DfUserDataService,
-    private zone: NgZone
+    private zone: NgZone,
+    public presentation: DfPresentationService
   ) {}
 
   ngOnInit(): void {
@@ -738,6 +741,20 @@ export class DfTryItComponent implements OnInit {
       '});',
       'console.log(resp.status, await resp.text());',
     ].join('\n');
+  }
+
+  /** What the snippet looks like on screen. The command stays readable; only
+   *  the credentials are covered, so a screenshare can still show the shape of
+   *  the call. copySnippet() deliberately copies `snippet`, not this — the
+   *  clipboard must carry the real key for Postman. */
+  get displaySnippet(): string {
+    if (!this.presentation.on) {
+      return this.snippet;
+    }
+    return maskSecretsIn(this.snippet, [
+      this.selectedIdentity?.apiKey,
+      this.userData.token,
+    ]);
   }
 
   copySnippet(): void {
