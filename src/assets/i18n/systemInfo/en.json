@@ -13,7 +13,19 @@
     "logLevel": "Log Level",
     "cacheDriver": "Cache Driver",
     "demo": "Demo",
-    "instanceId": "Instance ID"
+    "instanceId": "Instance ID",
+    "installType": "Install Type",
+    "trialStatus": "Trial Status",
+    "trialStatusValue": {
+      "active": "Active",
+      "expired": "Expired",
+      "invalid": "Invalid token",
+      "missing": "No trial token"
+    },
+    "trialStarted": "Trial Started",
+    "trialExpires": "Trial Expires",
+    "trialDaysRemaining": "Trial Days Remaining",
+    "trialId": "Trial ID"
   },
   "packages": "Installed Packages",
   "server": {

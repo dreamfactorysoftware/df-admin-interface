@@ -44,6 +44,36 @@ describe('normalizeError', () => {
     });
   });
 
+  it('preserves an object envelope context untouched (snake_case) and drops non-objects', () => {
+    const context = {
+      reason: 'TRIAL_EXPIRED',
+      expired_at: '2026-11-02T20:00:00+00:00',
+    };
+    const e = normalizeError(
+      httpError(402, {
+        error: {
+          code: 402,
+          message: 'Trial expired.',
+          context,
+          status_code: 402,
+        },
+      })
+    );
+    expect(e.context).toEqual(context);
+    expect(e.fields).toEqual([]);
+
+    const stringCtx = normalizeError(
+      httpError(500, {
+        error: { code: 500, message: 'x', context: 'raw string' },
+      })
+    );
+    expect(stringCtx.context).toBeUndefined();
+    const nullCtx = normalizeError(
+      httpError(500, { error: { code: 500, message: 'x', context: null } })
+    );
+    expect(nullCtx.context).toBeUndefined();
+  });
+
   it('reads the canonical DF envelope in snake_case', () => {
     const err = httpError(404, {
       error: { code: 404, message: 'Record not found.', status_code: 404 },

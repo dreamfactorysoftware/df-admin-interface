@@ -1,0 +1,74 @@
+<section
+  class="trial-expired"
+  *ngIf="vm$ | async as vm"
+  [class.trial-expired--invalid]="vm.invalid"
+  [attr.data-reason]="vm.reason"
+  data-testid="trial-expired">
+  <div class="trial-expired__card">
+    <p class="trial-expired__eyebrow" data-testid="trial-expired-eyebrow">
+      {{
+        (vm.invalid ? 'trial.expired.eyebrowInvalid' : 'trial.expired.eyebrow')
+          | transloco
+      }}
+    </p>
+
+    <ng-container *ngIf="!vm.invalid; else invalidCopy">
+      <h1 class="trial-expired__title" data-testid="trial-expired-title">
+        {{ 'trial.expired.header' | transloco }}
+      </h1>
+      <p class="trial-expired__lead" data-testid="trial-expired-lead">
+        {{ 'trial.expired.subHeader' | transloco }}
+      </p>
+      <p
+        class="trial-expired__meta"
+        *ngIf="vm.endedAt"
+        data-testid="trial-expired-ended-on">
+        {{
+          'trial.expired.endedOn'
+            | transloco: { date: (vm.endedAt | date: 'longDate') }
+        }}
+      </p>
+    </ng-container>
+
+    <ng-template #invalidCopy>
+      <h1 class="trial-expired__title" data-testid="trial-expired-title">
+        {{ 'trial.invalid.header' | transloco }}
+      </h1>
+      <p class="trial-expired__lead" data-testid="trial-expired-lead">
+        {{ 'trial.invalid.subHeader' | transloco }}
+      </p>
+    </ng-template>
+
+    <div class="trial-expired__actions">
+      <a
+        class="trial-expired__cta trial-expired__cta--primary"
+        data-testid="trial-expired-contact-cta"
+        [href]="vm.contactHref">
+        {{
+          'trial.expired.contactSales' | transloco: { email: vm.contactEmail }
+        }}
+      </a>
+      <a
+        class="trial-expired__cta trial-expired__cta--demo"
+        data-testid="trial-expired-demo-cta"
+        [href]="vm.demoUrl"
+        target="_blank"
+        rel="noopener">
+        {{ 'trial.expired.bookDemo' | transloco }}
+      </a>
+      <a
+        *ngIf="vm.invalid"
+        class="trial-expired__cta trial-expired__cta--secondary"
+        data-testid="trial-expired-portal-cta"
+        [href]="vm.portalUrl"
+        target="_blank"
+        rel="noopener">
+        {{ 'trial.invalid.openPortal' | transloco }}
+      </a>
+    </div>
+
+    <p class="trial-expired__footnote" *ngIf="vm.trialId">
+      {{ 'trial.expired.trialId' | transloco: { id: vm.trialId } }}
+    </p>
+  </div>
+</section>

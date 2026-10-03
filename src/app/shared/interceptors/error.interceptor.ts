@@ -9,12 +9,19 @@ import { Router } from '@angular/router';
 import { catchError, from, mergeMap, tap, throwError } from 'rxjs';
 import { DfUserDataService } from '../services/df-user-data.service';
 import { DfSnackbarService } from '../services/df-snackbar.service';
+import { DfTrialService } from '../services/df-trial.service';
 import { normalizeError } from '../utilities/app-error';
 import { ERROR_HANDLING, SUCCESS_TOAST } from '../utilities/http-contexts';
+import { trialLockFromError } from '../utilities/trial';
 import { ROUTES } from '../types/routes';
 
 /**
  * Default-on error surfacing, severity-routed:
+ * - trial lock (402 or 403 with context.reason TRIAL_EXPIRED |
+ *   TRIAL_TOKEN_INVALID, from dreamfactory/df-trial) -> record the lock and
+ *   navigate to trial-expired. Checked FIRST and even for 'silent' requests:
+ *   it is never an auth failure (no token clear, no login redirect loop) and
+ *   no toast - the full-screen page is the message.
  * - 401 -> clear token, redirect to login with returnUrl (never when already
  *   on auth/*, so background polls can't yank the login page around).
  * - validation (422 / 400-with-fields) -> rethrow only; forms consume via
@@ -38,6 +45,7 @@ export const errorInterceptor: HttpInterceptorFn = (
   const router = inject(Router);
   const userDataService = inject(DfUserDataService);
   const snackbarService = inject(DfSnackbarService);
+  const trialService = inject(DfTrialService);
 
   return next(req).pipe(
     tap(event => {
@@ -48,7 +56,26 @@ export const errorInterceptor: HttpInterceptorFn = (
       }
     }),
     catchError((error: unknown) => {
-      if (!inScope || handling === 'silent') {
+      if (!inScope) {
+        return throwError(() => error);
+      }
+      const trialLock = trialLockFromError(error);
+      if (trialLock) {
+        trialService.markLocked(trialLock.reason, trialLock.context);
+        // 'silent' callers get the raw error (their contract); everyone else
+        // the normalized AppError, context preserved for the expired page.
+        const rethrown =
+          handling === 'silent'
+            ? error
+            : normalizeError(error, { url: req.url, method: req.method });
+        if (!router.url.includes(ROUTES.TRIAL_EXPIRED)) {
+          return from(router.navigate([ROUTES.TRIAL_EXPIRED])).pipe(
+            mergeMap(() => throwError(() => rethrown))
+          );
+        }
+        return throwError(() => rethrown);
+      }
+      if (handling === 'silent') {
         return throwError(() => error);
       }
       // normalizeError never throws; this interceptor can no longer crash on

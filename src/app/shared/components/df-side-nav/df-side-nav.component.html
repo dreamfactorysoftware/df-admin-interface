@@ -80,8 +80,9 @@
     <div
       class="license-expired"
       *ngIf="
-        (licenseCheck$ | async)?.msg === 'Expired' ||
-        (licenseCheck$ | async)?.msg === 'Unknown'
+        ((licenseCheck$ | async)?.msg === 'Expired' ||
+          (licenseCheck$ | async)?.msg === 'Unknown') &&
+        (trial$ | async) === null
       ">
       <span
         >{{ 'licenseExpired.header' | transloco }}
