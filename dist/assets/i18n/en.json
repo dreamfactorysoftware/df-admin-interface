@@ -841,6 +841,36 @@
     "message": "Testing DreamFactory? Let's show you what's possible. Book your free walkthrough",
     "ctaButton": "Schedule Now"
   },
+  "trial": {
+    "banner": {
+      "label": "Trial license",
+      "remaining": "{{days}} {{daysUnit}}, {{hours}} {{hoursUnit}} remaining",
+      "needMoreTime": "Need more time? Contact sales@dreamfactory.com or book time at dreamfactory.com/demo.",
+      "contactSales": "Contact sales",
+      "bookDemo": "Book a demo"
+    },
+    "units": {
+      "day": "day",
+      "days": "days",
+      "hour": "hour",
+      "hours": "hours"
+    },
+    "expired": {
+      "eyebrow": "Trial ended",
+      "eyebrowInvalid": "Trial token required",
+      "header": "Thank you for testing DreamFactory.",
+      "subHeader": "Your 30-day trial has ended. To continue using the platform, contact us at sales@dreamfactory.com or book a time at dreamfactory.com/demo.",
+      "endedOn": "Your 30-day trial ended on {{date}}.",
+      "contactSales": "Email {{email}}",
+      "bookDemo": "Book a demo",
+      "trialId": "Trial ID {{id}}"
+    },
+    "invalid": {
+      "header": "This DreamFactory trial instance needs a valid trial token.",
+      "subHeader": "Copy DF_TRIAL_TOKEN from your dashboard at https://portal.dreamfactory.com, restart the container, or contact sales@dreamfactory.com.",
+      "openPortal": "Open your trial dashboard"
+    }
+  },
   "phosphor": {
     "boot": "SHALL WE PLAY A GAME?"
   },
