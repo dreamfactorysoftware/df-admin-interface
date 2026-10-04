@@ -218,8 +218,12 @@ export abstract class DfManageTableComponent<T>
     this.currentFilter.valueChanges
       .pipe(debounceTime(1000), distinctUntilChanged())
       .subscribe(filter => {
+        // No page-size limit: the paginator pages client-side over the
+        // matches, so limiting to one page hid every match past the first.
+        // New results start on page one, not the page the user was on.
+        this.paginator?.firstPage();
         filter
-          ? this.refreshTable(this.currentPageSize, 0, this.filterQuery(filter))
+          ? this.refreshTable(undefined, 0, this.filterQuery(filter))
           : this.refreshTable();
       });
 

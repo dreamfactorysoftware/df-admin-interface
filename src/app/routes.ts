@@ -313,7 +313,7 @@ export const routes: Routes = [
                 m => m.DfApiDocsTableComponent
               ),
             resolve: {
-              data: servicesResolver(100, '(type not like "%swagger%")'),
+              data: servicesResolver(0, '(type not like "%swagger%")'),
               serviceTypes: serviceTypesResolver,
             },
           },

@@ -113,10 +113,8 @@ export class DfApiDocsTableComponent extends DfManageTableComponent<ApiDocsRowDa
     offset?: number,
     filter?: string
   ): void {
-    // ponytail: `100 || limit` predates this sweep (always 100, likely meant
-    // `limit || 100`); preserved verbatim so the sweep stays behavior-neutral.
     this.fetchTable(this.servicesService, {
-      limit: 100 || limit,
+      limit,
       offset,
       filter: `(type not like "%swagger%")${filter ? ` and ${filter}` : ''}`,
     });
