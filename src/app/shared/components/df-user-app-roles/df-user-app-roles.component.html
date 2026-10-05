@@ -26,13 +26,16 @@
                   <mat-label>{{ 'roles.app' | transloco }}</mat-label>
                   <input
                     matInput
+                    #appInput
                     formControlName="app"
                     [matAutocomplete]="auto" />
+                  <!-- requireSelection keeps typed text out of the form control
+                       until an option is picked, so filter on the input's text. -->
                   <mat-autocomplete requireSelection #auto="matAutocomplete">
                     <mat-option
                       *ngFor="
                         let app of availableApps
-                          | dfSearch: appRoles.at(i).value.app : '' : 'name';
+                          | dfSearch: appInput.value : '' : 'name';
                         trackBy: trackByAppId
                       "
                       [value]="app.name">
@@ -54,13 +57,14 @@
                   <mat-label>{{ 'roles.role' | transloco }}</mat-label>
                   <input
                     matInput
+                    #roleInput
                     formControlName="role"
                     [matAutocomplete]="auto" />
                   <mat-autocomplete requireSelection #auto="matAutocomplete">
                     <mat-option
                       *ngFor="
                         let role of roles
-                          | dfSearch: appRoles.at(i).value.role : '' : 'name';
+                          | dfSearch: roleInput.value : '' : 'name';
                         trackBy: trackByRoleName
                       "
                       [value]="role.name">
