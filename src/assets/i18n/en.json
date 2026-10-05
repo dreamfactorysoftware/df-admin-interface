@@ -46,6 +46,7 @@
   "search": "Search",
   "selectSearch": {
     "all": "All",
+    "type": "Type",
     "schema": "Schema",
     "table": "Table",
     "function": "Function",

@@ -9,30 +9,44 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSelect } from '@angular/material/select';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 
 export interface SelectSearchType {
-  labelKey: string;
+  /** First path segment plus slash, e.g. `_table/`. */
   prefix: string;
+  /** Raw segment, shown when there is no friendly label. */
+  label: string;
+  labelKey?: string;
 }
 
-/** Role-access component prefixes, offered as type filters on endpoint lists. */
-export const ENDPOINT_TYPES: SelectSearchType[] = [
-  { labelKey: 'selectSearch.schema', prefix: '_schema/' },
-  { labelKey: 'selectSearch.table', prefix: '_table/' },
-  { labelKey: 'selectSearch.function', prefix: '_func/' },
-  { labelKey: 'selectSearch.procedure', prefix: '_proc/' },
-];
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  _schema: 'selectSearch.schema',
+  _table: 'selectSearch.table',
+  _func: 'selectSearch.function',
+  _proc: 'selectSearch.procedure',
+};
 
-/** Wildcards (`*`, the service root `''`, `_table/`, `_table/*`) never get filtered out. */
-const WILDCARD = /^([^/]*\/)?\*?$/;
+/**
+ * Types for a component list: one per distinct first path segment
+ * (`_table/orders/` -> `_table/`), so DB, file and system services all work.
+ */
+export function componentTypes(components: string[]): SelectSearchType[] {
+  const segments = new Set(
+    components.filter(c => c.includes('/')).map(c => c.split('/')[0])
+  );
+  return [...segments].map(label => ({
+    prefix: `${label}/`,
+    label,
+    labelKey: TYPE_LABEL_KEYS[label],
+  }));
+}
 
 /**
  * Narrows an option list by a case-insensitive substring and an optional
- * prefix (type). `key` reads a label off object items.
+ * prefix (type). `key` reads a label off object items. Wildcards stay listed
+ * whatever the query: `''` and `*` with no type, `<type>` and `<type>*` within one.
  *   *ngFor="let o of options | dfSearch: search.query : search.type : 'name'"
  */
 @Pipe({ name: 'dfSearch', standalone: true })
@@ -44,16 +58,15 @@ export class DfSearchPipe implements PipeTransform {
       const label = String(
         (key ? (item as Record<string, unknown>)?.[key] : item) ?? ''
       );
-      return (
-        WILDCARD.test(label) ||
-        (label.startsWith(type) && label.toLowerCase().includes(q))
-      );
+      if (!label.startsWith(type)) return false;
+      const rest = label.slice(type.length);
+      return rest === '' || rest === '*' || rest.toLowerCase().includes(q);
     });
   }
 }
 
 /**
- * Search box (plus optional type toggles) for the top of a single-select
+ * Search box (plus optional type dropdown) for the top of a single-select
  * `mat-select` panel. Arrow keys, Enter and Tab fall through to the select;
  * Esc clears the query first, then closes. Pair it with `DfSearchPipe`:
  *
@@ -67,21 +80,23 @@ export class DfSearchPipe implements PipeTransform {
 @Component({
   selector: 'df-select-search',
   standalone: true,
-  imports: [NgIf, NgFor, MatButtonToggleModule, TranslocoPipe],
+  imports: [NgIf, NgFor, TranslocoPipe],
   template: `
     <div class="df-select-search">
-      <mat-button-toggle-group
+      <select
         *ngIf="types?.length"
         [value]="type"
-        (change)="setType($event.value)"
+        [attr.aria-label]="'selectSearch.type' | transloco"
+        (change)="setType($any($event.target).value)"
         (keydown)="$event.stopPropagation()">
-        <mat-button-toggle value="">{{
-          'selectSearch.all' | transloco
-        }}</mat-button-toggle>
-        <mat-button-toggle *ngFor="let t of types" [value]="t.prefix">{{
-          t.labelKey | transloco
-        }}</mat-button-toggle>
-      </mat-button-toggle-group>
+        <option value="">{{ 'selectSearch.all' | transloco }}</option>
+        <option
+          *ngFor="let t of types"
+          [value]="t.prefix"
+          [selected]="t.prefix === type">
+          {{ t.labelKey ? (t.labelKey | transloco) : t.label }}
+        </option>
+      </select>
       <input
         #input
         type="search"
@@ -102,12 +117,12 @@ export class DfSearchPipe implements PipeTransform {
         margin-top: -8px;
         padding: 8px 12px;
         display: flex;
-        flex-direction: column;
         gap: 8px;
         background: var(--mat-select-panel-background-color, inherit);
         border-bottom: 1px solid rgba(127, 127, 127, 0.25);
       }
-      input {
+      input,
+      select {
         font: inherit;
         color: inherit;
         background: transparent;
@@ -115,13 +130,12 @@ export class DfSearchPipe implements PipeTransform {
         border-radius: 4px;
         padding: 6px 8px;
       }
-      mat-button-toggle-group {
-        flex-wrap: wrap;
-        font-size: 12px;
+      input {
+        flex: 1;
+        min-width: 0;
       }
-      :host ::ng-deep .mat-button-toggle-label-content {
-        padding: 0 8px;
-        line-height: 28px;
+      select option {
+        color: initial;
       }
     `,
   ],

@@ -36,7 +36,7 @@ import { CommonModule } from '@angular/common';
 import {
   DfSearchPipe,
   DfSelectSearchComponent,
-  ENDPOINT_TYPES,
+  componentTypes,
   SelectSearchType,
 } from 'src/app/shared/components/df-select-search/df-select-search.component';
 
@@ -216,17 +216,15 @@ export class DfRolesAccessComponent implements OnInit {
 
   /** Type filters for the component picker, only for types this service has.
    *  Memoized per component list so the template binding stays stable. */
-  private componentTypes = new WeakMap<string[], SelectSearchType[]>();
+  private typeCache = new WeakMap<string[], SelectSearchType[]>();
   private noTypes: SelectSearchType[] = [];
   getComponentTypes(index: number): SelectSearchType[] {
     const components = this.getComponentArray(index);
     if (!components.length) return this.noTypes;
-    let types = this.componentTypes.get(components);
+    let types = this.typeCache.get(components);
     if (!types) {
-      types = ENDPOINT_TYPES.filter(t =>
-        components.some(c => c.startsWith(t.prefix))
-      );
-      this.componentTypes.set(components, types);
+      types = componentTypes(components);
+      this.typeCache.set(components, types);
     }
     return types;
   }
