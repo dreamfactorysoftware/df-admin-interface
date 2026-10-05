@@ -12,6 +12,7 @@ import {
 import { MatSelect } from '@angular/material/select';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
+import { fromEvent } from 'rxjs';
 
 export interface SelectSearchType {
   /** First path segment plus slash, e.g. `_table/`. */
@@ -162,6 +163,27 @@ export class DfSelectSearchComponent implements OnInit {
       .subscribe((open: boolean) => {
         if (open) this.input.nativeElement.focus();
         else this.query = ''; // show the chosen value again on the trigger
+      });
+
+    // Typing on the select itself (tabbed in while closed, or in the moment
+    // before the panel opens) would trigger mat-select's jump-to-option
+    // typeahead. Send those keys to the search box instead.
+    fromEvent<KeyboardEvent>(this.select._elementRef.nativeElement, 'keydown', {
+      capture: true,
+    })
+      .pipe(untilDestroyed(this))
+      .subscribe(event => {
+        const printable =
+          event.key.length === 1 &&
+          event.key !== ' ' &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey;
+        if (!printable || this.select.disabled) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.setQuery(this.query + event.key);
+        if (!this.select.panelOpen) this.select.open();
       });
   }
 
