@@ -30,7 +30,11 @@
                     [matAutocomplete]="auto" />
                   <mat-autocomplete requireSelection #auto="matAutocomplete">
                     <mat-option
-                      *ngFor="let app of availableApps; trackBy: trackByAppId"
+                      *ngFor="
+                        let app of availableApps
+                          | dfSearch: appRoles.at(i).value.app : '' : 'name';
+                        trackBy: trackByAppId
+                      "
                       [value]="app.name">
                       {{ app.name }}
                     </mat-option>
@@ -54,7 +58,11 @@
                     [matAutocomplete]="auto" />
                   <mat-autocomplete requireSelection #auto="matAutocomplete">
                     <mat-option
-                      *ngFor="let role of roles; trackBy: trackByRoleName"
+                      *ngFor="
+                        let role of roles
+                          | dfSearch: appRoles.at(i).value.role : '' : 'name';
+                        trackBy: trackByRoleName
+                      "
                       [value]="role.name">
                       {{ role.name }}
                     </mat-option>

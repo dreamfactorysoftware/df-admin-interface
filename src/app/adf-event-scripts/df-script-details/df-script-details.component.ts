@@ -1,3 +1,7 @@
+import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
 import { Component, Inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -39,6 +43,8 @@ import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-servic
   templateUrl: './df-script-details.component.html',
   standalone: true,
   imports: [
+    DfSelectSearchComponent,
+    DfSearchPipe,
     DfAceEditorComponent,
     MatSlideToggleModule,
     TranslocoPipe,

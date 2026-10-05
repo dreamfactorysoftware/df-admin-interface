@@ -8,8 +8,12 @@
       <mat-select
         [(value)]="selectedServiceItem"
         (selectionChange)="selectedServiceItemEvent()">
+        <df-select-search #serviceSearch></df-select-search>
         <mat-option
-          *ngFor="let service of storeServiceArray; trackBy: trackByValue"
+          *ngFor="
+            let service of storeServiceArray | dfSearch: serviceSearch.query;
+            trackBy: trackByValue
+          "
           [value]="service">
           {{ service }}
         </mat-option>
@@ -23,8 +27,12 @@
       <mat-select
         [(value)]="selectedEventItem"
         (selectionChange)="selectedEventItemEvent()">
+        <df-select-search #eventSearch></df-select-search>
         <mat-option
-          *ngFor="let item of ungroupedEventItems; trackBy: trackByValue"
+          *ngFor="
+            let item of ungroupedEventItems | dfSearch: eventSearch.query;
+            trackBy: trackByValue
+          "
           [value]="item">
           {{ item }}
         </mat-option>
@@ -48,8 +56,12 @@
       <mat-select
         [(value)]="selectedRouteItem"
         (selectionChange)="selectedRoute()">
+        <df-select-search #routeSearch></df-select-search>
         <mat-option
-          *ngFor="let item of ungroupedRouteOptions; trackBy: trackByValue"
+          *ngFor="
+            let item of ungroupedRouteOptions | dfSearch: routeSearch.query;
+            trackBy: trackByValue
+          "
           [value]="item">
           {{ item }}
         </mat-option>
@@ -77,8 +89,12 @@
           <ng-template #procedure>Name</ng-template>
         </mat-label>
         <mat-select [(value)]="selectTable" (selectionChange)="selectedTable()">
+          <df-select-search #tableSearch></df-select-search>
           <mat-option
-            *ngFor="let item of tableOptions; trackBy: trackByValue"
+            *ngFor="
+              let item of tableOptions | dfSearch: tableSearch.query;
+              trackBy: trackByValue
+            "
             [value]="item">
             {{ item }}
           </mat-option>

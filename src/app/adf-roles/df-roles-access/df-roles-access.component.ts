@@ -33,6 +33,12 @@ import {
   trigger,
 } from '@angular/animations';
 import { CommonModule } from '@angular/common';
+import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+  ENDPOINT_TYPES,
+  SelectSearchType,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -54,6 +60,8 @@ import { CommonModule } from '@angular/common';
     CommonModule,
     MatButtonToggleModule,
     FormsModule,
+    DfSelectSearchComponent,
+    DfSearchPipe,
   ],
   animations: [
     trigger('detailExpand', [
@@ -204,6 +212,23 @@ export class DfRolesAccessComponent implements OnInit {
       option => option.serviceId === serviceId
     )?.components;
     return components || [];
+  }
+
+  /** Type filters for the component picker, only for types this service has.
+   *  Memoized per component list so the template binding stays stable. */
+  private componentTypes = new WeakMap<string[], SelectSearchType[]>();
+  private noTypes: SelectSearchType[] = [];
+  getComponentTypes(index: number): SelectSearchType[] {
+    const components = this.getComponentArray(index);
+    if (!components.length) return this.noTypes;
+    let types = this.componentTypes.get(components);
+    if (!types) {
+      types = ENDPOINT_TYPES.filter(t =>
+        components.some(c => c.startsWith(t.prefix))
+      );
+      this.componentTypes.set(components, types);
+    }
+    return types;
   }
 
   getFormArrayIndex(visibleIndex: number): number {

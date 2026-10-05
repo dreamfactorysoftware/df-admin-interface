@@ -68,20 +68,34 @@
 <div *ngIf="!loading && hasOperations" class="docs-two-col">
   <!-- LEFT: endpoint list, full names (no truncation) -->
   <nav class="docs-nav" aria-label="API operations">
+    <input
+      #opSearch
+      class="docs-nav__search"
+      type="search"
+      autocomplete="off"
+      [placeholder]="'search' | transloco"
+      [attr.aria-label]="'search' | transloco"
+      (input)="opQuery = opSearch.value"
+      (keydown.escape)="opQuery = opSearch.value = ''" />
     <ng-container *ngFor="let group of groups; trackBy: trackByGroup">
-      <p class="docs-nav__group df-eyebrow">{{ group.tag }}</p>
-      <mat-nav-list dense>
-        <a
-          mat-list-item
-          *ngFor="let op of group.operations; trackBy: trackByOperation"
-          class="docs-op"
-          [class.is-active]="isSelected(op)"
-          [ngClass]="methodClass(op.method)"
-          (click)="selectOperation(op)">
-          <span class="docs-op__method">{{ op.method }}</span>
-          <span class="docs-op__path">{{ op.path }}</span>
-        </a>
-      </mat-nav-list>
+      <ng-container
+        *ngIf="group.operations | dfSearch: opQuery : '' : 'path' as ops">
+        <ng-container *ngIf="ops.length">
+          <p class="docs-nav__group df-eyebrow">{{ group.tag }}</p>
+          <mat-nav-list dense>
+            <a
+              mat-list-item
+              *ngFor="let op of ops; trackBy: trackByOperation"
+              class="docs-op"
+              [class.is-active]="isSelected(op)"
+              [ngClass]="methodClass(op.method)"
+              (click)="selectOperation(op)">
+              <span class="docs-op__method">{{ op.method }}</span>
+              <span class="docs-op__path">{{ op.path }}</span>
+            </a>
+          </mat-nav-list>
+        </ng-container>
+      </ng-container>
     </ng-container>
   </nav>
 

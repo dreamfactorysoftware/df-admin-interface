@@ -44,6 +44,13 @@
   "sortedAsc": "Sorted ascending",
   "sortedDesc": "Sorted descending",
   "search": "Search",
+  "selectSearch": {
+    "all": "All",
+    "schema": "Schema",
+    "table": "Table",
+    "function": "Function",
+    "procedure": "Procedure"
+  },
   "commandPalette": {
     "placeholder": "Search or jump to anything",
     "noResults": "Nothing matches that.",
