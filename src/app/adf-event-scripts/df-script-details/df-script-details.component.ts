@@ -227,7 +227,8 @@ export class DfScriptDetailsComponent implements OnInit {
       ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
     ];
     const param = scriptEventParameter(
-      this.ungroupedEventOptions[this.selectedEventItem].parameter
+      this.ungroupedEventOptions[this.selectedEventItem].parameter,
+      this.selectedEventItem
     );
     this.tableProcedureFlag = param?.kind ?? '';
     this.tableOptions = param?.options as string[];

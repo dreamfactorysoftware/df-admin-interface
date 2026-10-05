@@ -99,6 +99,27 @@
             [value]="item">
             {{ item }}
           </mat-option>
+          <!-- A typed name that is not in the list (nothing to pick yet, or
+               scripting ahead of creating it), and the one already chosen. -->
+          <mat-option
+            *ngIf="selectTable && !tableOptions.includes(selectTable)"
+            [value]="selectTable">
+            {{ selectTable }}
+          </mat-option>
+          <mat-option
+            *ngIf="
+              tableSearch.query.trim() &&
+              tableSearch.query.trim() !== selectTable &&
+              !tableOptions.includes(tableSearch.query.trim())
+            "
+            [value]="tableSearch.query.trim()">
+            Use "{{ tableSearch.query.trim() }}"
+          </mat-option>
+          <mat-option
+            *ngIf="!tableOptions.length && !tableSearch.query.trim()"
+            disabled>
+            No {{ tableProcedureFlag }}s found. Type a name to use one.
+          </mat-option>
         </mat-select>
       </mat-form-field>
     </ng-container>

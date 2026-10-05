@@ -124,3 +124,20 @@ describe('scriptEventParameter', () => {
     expect(scriptEventParameter({})).toBeNull();
   });
 });
+
+describe('scriptEventParameter without a name list', () => {
+  // A service with no stored functions sends `parameter: null`; the picker
+  // must still show (empty) so a name can be typed.
+  it('falls back to the placeholder in the event name', () => {
+    expect(
+      scriptEventParameter(null, 'logistics._func.{function_name}')
+    ).toEqual({ kind: 'function', options: [] });
+    expect(scriptEventParameter(null, 'db._proc.{procedure_name}')?.kind).toBe(
+      'procedure'
+    );
+  });
+
+  it('returns null for events without a name placeholder', () => {
+    expect(scriptEventParameter(null, 'logistics._func')).toBeNull();
+  });
+});
