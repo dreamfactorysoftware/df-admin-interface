@@ -1,0 +1,155 @@
+// Same fixed-top + spacer pattern as df-engagement-banner (the two never
+// render together). Tokens only: the soft wash sits on a solid --df-surface so
+// the translucent tint never blends with content scrolling underneath, and the
+// severity variants swap the token trio so light, dark and phosphor all repaint.
+.trial-banner {
+  --trial-tone: var(--df-accent);
+  --trial-tone-strong: var(--df-accent-strong);
+  --trial-tone-soft: var(--df-accent-soft);
+  --trial-tone-border: var(--df-border);
+
+  background-color: var(--df-surface);
+  background-image: linear-gradient(
+    var(--trial-tone-soft),
+    var(--trial-tone-soft)
+  );
+  color: var(--df-text);
+  border-bottom: 1px solid var(--trial-tone-border);
+  padding: 10px 20px;
+  font-family: inherit;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1100;
+
+  &--warning {
+    --trial-tone: var(--df-warning);
+    --trial-tone-strong: var(--df-warning);
+    --trial-tone-soft: var(--df-warning-soft);
+    --trial-tone-border: var(--df-warning-border);
+  }
+
+  &--critical {
+    --trial-tone: var(--df-danger);
+    --trial-tone-strong: var(--df-danger);
+    --trial-tone-soft: var(--df-danger-soft);
+    --trial-tone-border: var(--df-danger-border);
+  }
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .banner-text {
+    color: var(--df-text);
+    font-size: 1.4rem;
+    font-weight: 500;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0 8px;
+  }
+
+  .banner-label {
+    font-weight: 600;
+    color: var(--trial-tone);
+  }
+
+  .banner-countdown {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .banner-sep {
+    color: var(--df-text-muted);
+  }
+
+  .banner-help {
+    color: var(--df-text-2);
+  }
+
+  .banner-actions {
+    display: inline-flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .cta-button {
+    display: inline-block;
+    text-decoration: none;
+    border: 1px solid transparent;
+    padding: 7px 16px;
+    border-radius: var(--df-radius-sm);
+    font-size: 1.3rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background-color var(--df-duration-fast, 120ms) ease,
+      border-color var(--df-duration-fast, 120ms) ease;
+
+    &:focus-visible {
+      outline: 2px solid var(--trial-tone);
+      outline-offset: 2px;
+    }
+  }
+
+  .cta-button--primary {
+    background-color: var(--trial-tone);
+    color: var(--df-accent-contrast);
+
+    &:hover {
+      background-color: var(--trial-tone-strong);
+      filter: brightness(0.95);
+    }
+  }
+
+  .cta-button--secondary {
+    background-color: transparent;
+    color: var(--df-text);
+    border-color: var(--df-border);
+
+    &:hover {
+      background-color: var(--df-hover);
+      border-color: var(--trial-tone);
+    }
+  }
+}
+
+.banner-spacer {
+  height: 56px;
+}
+
+@media (max-width: 960px) {
+  .banner-spacer {
+    height: 96px;
+  }
+  .trial-banner {
+    padding: 10px 15px;
+
+    .banner-content {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .banner-text {
+      font-size: 1.3rem;
+      text-align: center;
+      justify-content: center;
+    }
+
+    .cta-button {
+      padding: 7px 14px;
+      font-size: 1.3rem;
+    }
+  }
+}

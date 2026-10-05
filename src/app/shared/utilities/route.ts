@@ -12,6 +12,7 @@ const filteredFromNav = [
   ROUTES.VIEW,
   ROUTES.ERROR,
   ROUTES.LICENSE_EXPIRED,
+  ROUTES.TRIAL_EXPIRED,
 ];
 
 const navIcons = [

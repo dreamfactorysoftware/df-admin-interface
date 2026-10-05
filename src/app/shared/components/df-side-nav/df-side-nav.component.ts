@@ -35,6 +35,7 @@ import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
+import { DfTrialService } from '../../services/df-trial.service';
 import { debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
@@ -87,6 +88,8 @@ export class DfSideNavComponent implements OnInit {
   nav: Array<Nav> = [];
   navGroups: Array<{ label: string; items: Array<Nav> }> = [];
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
+  /** Non-null on Docker trial instances; gates the subscription strip. */
+  trial$ = this.trialService.trial$;
   faMagnifyingGlass = faMagnifyingGlass;
   faUser = faUser;
   faLanguage = faLanguage;
@@ -95,7 +98,7 @@ export class DfSideNavComponent implements OnInit {
   smallScreen$ = this.breakpointService.isSmallScreen;
   faPlus = faPlus;
   faRefresh = faRefresh;
-  licenseType: string = 'OPEN SOURCE';
+  licenseType = 'OPEN SOURCE';
 
   constructor(
     private breakpointService: DfBreakpointService,
@@ -111,7 +114,8 @@ export class DfSideNavComponent implements OnInit {
     private snackbarService: DfSnackbarService,
     private paywallService: DfPaywallService,
     private systemConfigDataService: DfSystemConfigDataService,
-    private commandPalette: DfCommandPaletteService
+    private commandPalette: DfCommandPaletteService,
+    private trialService: DfTrialService
   ) {}
 
   ngOnInit(): void {

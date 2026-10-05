@@ -1,0 +1,145 @@
+// Tokenized full-viewport notice (unlike df-license-expired's hardcoded
+// greys) so the lockout page is legible in light, dark and phosphor and
+// needs no remote asset - the instance is offline by design.
+.trial-expired {
+  --trial-tone: var(--df-danger);
+  --trial-tone-soft: var(--df-danger-soft);
+  --trial-tone-border: var(--df-danger-border);
+
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--df-space-6, 32px) var(--df-space-4, 16px);
+  background-color: var(--df-bg);
+  background-image: radial-gradient(
+    circle at 80% 0%,
+    var(--trial-tone-soft),
+    transparent 45%
+  );
+  color: var(--df-text);
+  text-align: center;
+
+  &--invalid {
+    --trial-tone: var(--df-warning);
+    --trial-tone-soft: var(--df-warning-soft);
+    --trial-tone-border: var(--df-warning-border);
+  }
+
+  &__card {
+    max-width: 640px;
+    width: 100%;
+    background: var(--df-surface);
+    border: 1px solid var(--df-border);
+    border-top: 4px solid var(--trial-tone);
+    border-radius: var(--df-radius, 8px);
+    padding: var(--df-space-8, 48px) var(--df-space-6, 32px);
+    box-shadow: var(--df-shadow-overlay, none);
+  }
+
+  &__eyebrow {
+    margin: 0 0 var(--df-space-3, 12px);
+    font-size: var(--df-font-size-xs, 12px);
+    font-weight: var(--df-font-weight-heading, 600);
+    letter-spacing: var(--df-tracking-eyebrow, 0.04em);
+    text-transform: uppercase;
+    color: var(--trial-tone);
+  }
+
+  &__title {
+    margin: 0 0 var(--df-space-4, 16px);
+    font-size: var(--df-font-size-2xl, 28px);
+    line-height: var(--df-lh-tight, 1.2);
+    font-weight: var(--df-font-weight-heading, 600);
+    letter-spacing: var(--df-tracking-tight, -0.011em);
+    color: var(--df-text);
+  }
+
+  &__lead {
+    margin: 0 auto var(--df-space-3, 12px);
+    max-width: 52ch;
+    font-size: var(--df-font-size-lg, 16px);
+    line-height: var(--df-lh-base, 1.45);
+    color: var(--df-text-2);
+  }
+
+  &__meta {
+    margin: 0 0 var(--df-space-5, 24px);
+    font-size: var(--df-font-size-md, 14px);
+    color: var(--df-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--df-space-3, 12px);
+    margin-top: var(--df-space-5, 24px);
+  }
+
+  &__cta {
+    display: inline-block;
+    text-decoration: none;
+    padding: 10px 20px;
+    border-radius: var(--df-radius-sm, 6px);
+    border: 1px solid transparent;
+    font-size: var(--df-font-size-md, 14px);
+    font-weight: var(--df-font-weight-heading, 600);
+    line-height: 1.2;
+    white-space: nowrap;
+    transition: background-color var(--df-duration-fast, 120ms) ease;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--df-focus-ring);
+    }
+
+    &--primary {
+      background: var(--df-accent);
+      color: var(--df-accent-contrast);
+
+      &:hover {
+        background: var(--df-accent-strong);
+      }
+    }
+
+    // Demo CTA is green site-wide (dreamfactory.com design tokens, section 10).
+    &--demo {
+      background: var(--df-success);
+      color: #ffffff;
+
+      &:hover {
+        filter: brightness(0.92);
+      }
+    }
+
+    &--secondary {
+      background: transparent;
+      color: var(--df-text);
+      border-color: var(--df-border);
+
+      &:hover {
+        background: var(--df-hover);
+      }
+    }
+  }
+
+  &__footnote {
+    margin: var(--df-space-5, 24px) 0 0;
+    font-size: var(--df-font-size-xs, 12px);
+    color: var(--df-text-faint);
+    font-family: var(--df-font-mono, monospace);
+    word-break: break-all;
+  }
+}
+
+@media (max-width: 600px) {
+  .trial-expired__card {
+    padding: var(--df-space-6, 32px) var(--df-space-4, 16px);
+  }
+  .trial-expired__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

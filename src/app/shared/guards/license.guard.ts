@@ -4,6 +4,7 @@ import { ROUTES } from '../types/routes';
 import { DfLicenseCheckService } from '../services/df-license-check.service';
 import { catchError, map, of, switchMap, take } from 'rxjs';
 import { DfSystemConfigDataService } from '../services/df-system-config-data.service';
+import { trialFromEnvironment } from '../utilities/trial';
 
 export const licenseGuard = (route: ActivatedRouteSnapshot) => {
   const licenseCheckService = inject(DfLicenseCheckService);
@@ -42,6 +43,17 @@ export const licenseGuard = (route: ActivatedRouteSnapshot) => {
       return of(environment);
     }),
     switchMap(environment => {
+      // Trial instances: the signed trial token (verified on the instance) is
+      // the license. Skip the browser-side updates.dreamfactory.com check so a
+      // firewalled trial never shows "subscription expired"; trialGuard owns
+      // the lockout. license-expired itself is not a trial page: send home.
+      if (trialFromEnvironment(environment)) {
+        return of(
+          route?.routeConfig?.path === ROUTES.LICENSE_EXPIRED
+            ? router.createUrlTree([ROUTES.HOME])
+            : true
+        );
+      }
       if (environment.platform?.license === 'OPEN SOURCE') {
         return of(true);
       }

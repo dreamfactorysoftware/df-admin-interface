@@ -70,4 +70,5 @@ export enum ROUTES {
   FIELDS = 'fields',
   ERROR = 'error',
   LICENSE_EXPIRED = 'license-expired',
+  TRIAL_EXPIRED = 'trial-expired',
 }

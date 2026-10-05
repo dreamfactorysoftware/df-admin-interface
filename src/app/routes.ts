@@ -54,6 +54,7 @@ import { systemEventsResolver } from './adf-services/resolvers/system-events.res
 import { checkStatusResolver } from './adf-config/resolvers/df-check-status.resolver';
 import { licenseGuard } from './shared/guards/license.guard';
 import { globalLicenseGuard } from './shared/guards/global-license.guard';
+import { trialGuard } from './shared/guards/trial.guard';
 import { errorGuard } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
 import { rootAdminGuard } from './shared/guards/admin.guard';
@@ -76,13 +77,13 @@ export const routes: Routes = [
   {
     path: ROUTES.AUTH,
     children: AuthRoutes,
-    canActivate: [notLoggedInGuard],
+    canActivate: [trialGuard, notLoggedInGuard],
     providers: [provideTranslocoScope('userManagement')],
   },
   {
     path: ROUTES.HOME,
     children: HomeRoutes,
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [provideTranslocoScope('home')],
   },
   {
@@ -91,7 +92,18 @@ export const routes: Routes = [
       import('./shared/components/df-license-expired/df-license-expired.component').then(
         m => m.DfLicenseExpiredComponent
       ),
-    canActivate: [licenseGuard],
+    canActivate: [trialGuard, licenseGuard],
+  },
+  {
+    // Self-service Docker trial lockout (402 TRIAL_EXPIRED / 403
+    // TRIAL_TOKEN_INVALID). trialGuard sends every other route here while
+    // locked and sends this one home while active.
+    path: ROUTES.TRIAL_EXPIRED,
+    loadComponent: () =>
+      import('./shared/components/df-trial-expired/df-trial-expired.component').then(
+        m => m.DfTrialExpiredComponent
+      ),
+    canActivate: [trialGuard],
   },
   {
     path: ROUTES.API_BUILDER,
@@ -344,7 +356,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('dataExplorer')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.API_SECURITY,
@@ -427,7 +439,7 @@ export const routes: Routes = [
         },
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.SYSTEM_SETTINGS,
@@ -634,7 +646,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.ADMIN_SETTINGS,
@@ -923,7 +935,7 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('files')],
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
   },
   {
     path: ROUTES.AI,
@@ -996,7 +1008,7 @@ export const routes: Routes = [
         },
       },
     ],
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [provideTranslocoScope('services')],
   },
   {
@@ -1006,7 +1018,7 @@ export const routes: Routes = [
         m => m.DfProfileComponent
       ),
     resolve: { data: profileResolver },
-    canActivate: [loggedInGuard, licenseGuard, globalLicenseGuard],
+    canActivate: [trialGuard, loggedInGuard, licenseGuard, globalLicenseGuard],
     providers: [
       DfProfileService,
       DfPasswordService,

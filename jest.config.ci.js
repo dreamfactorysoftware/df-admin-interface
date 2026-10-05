@@ -48,5 +48,17 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-usage/utils/task-estimate.spec.ts',
     '<rootDir>/src/app/shared/components/df-section-landing/df-section-landing.component.spec.ts',
     '<rootDir>/src/app/adf-home/df-welcome-page/df-generate-api-card/df-generate-api-card.component.spec.ts',
+    // 2026-10-03 self-service Docker trial (TRIAL-DESIGN.md section 5):
+    // lock detection, countdown service, guard, interceptor branch, banner,
+    // expired page, engagement-banner gating, license-check skip.
+    '<rootDir>/src/app/shared/utilities/trial.spec.ts',
+    '<rootDir>/src/app/shared/utilities/app-error.spec.ts',
+    '<rootDir>/src/app/shared/services/df-trial.service.spec.ts',
+    '<rootDir>/src/app/shared/services/df-license-initializer.service.spec.ts',
+    '<rootDir>/src/app/shared/guards/trial.guard.spec.ts',
+    '<rootDir>/src/app/shared/interceptors/error.interceptor.spec.ts',
+    '<rootDir>/src/app/shared/components/df-trial-banner/df-trial-banner.component.spec.ts',
+    '<rootDir>/src/app/shared/components/df-trial-expired/df-trial-expired.component.spec.ts',
+    '<rootDir>/src/app/shared/components/df-engagement-banner/df-engagement-banner.component.spec.ts',
   ],
 };

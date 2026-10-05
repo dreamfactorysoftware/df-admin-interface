@@ -35,6 +35,12 @@ export interface AppError {
   message: string;
   fields: AppErrorField[]; // all context.resource[]/context.error[] messages, not just [0]
   code?: string; // envelope error.code when present
+  /**
+   * envelope error.context when it is an object (snake_case, untouched).
+   * Carries machine-readable reasons such as the df-trial lock
+   * (`context.reason` = TRIAL_EXPIRED | TRIAL_TOKEN_INVALID) to consumers.
+   */
+  context?: Record<string, unknown>;
   url?: string; // failing request URL
   method?: string;
   timestamp: string; // ISO
@@ -204,6 +210,7 @@ export function normalizeError(
   const body: unknown = err.error;
   let message: string | null = null;
   let code: string | undefined;
+  let context: Record<string, unknown> | undefined;
   let fields: AppErrorField[] = [];
   let bridge: unknown;
 
@@ -231,6 +238,13 @@ export function normalizeError(
       if (env.code !== undefined && env.code !== null) {
         code = String(env.code);
       }
+      if (
+        env.context &&
+        typeof env.context === 'object' &&
+        !Array.isArray(env.context)
+      ) {
+        context = env.context as Record<string, unknown>;
+      }
       fields = collectFields(env.context);
     } else if (typeof (body as { message?: unknown }).message === 'string') {
       // Flat variant: { message: '...' }
@@ -251,6 +265,7 @@ export function normalizeError(
     message,
     fields,
     code,
+    context,
     url,
     method,
     timestamp,
