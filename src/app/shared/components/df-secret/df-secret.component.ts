@@ -57,6 +57,11 @@ import { maskSecret } from '../../utilities/mask';
       }
       .df-secret__value {
         overflow-wrap: anywhere;
+        /* Lets a host that sets white-space: nowrap and a max-width (a table
+           column) truncate the key with an ellipsis instead of overflowing. */
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .df-secret__value--masked {
         /* The mask is one token, not text: wrapping it mid-dots reads as a
