@@ -275,6 +275,14 @@
     width: 12rem;
     max-width: 100%;
   }
+
+  // Searchable mat-select picker: size to the chosen value, not the row.
+  &.mat-mdc-select {
+    display: inline-block;
+    width: auto;
+    min-width: 8rem;
+    vertical-align: middle;
+  }
 }
 
 /* Resolved effective path: what the request actually hits. */

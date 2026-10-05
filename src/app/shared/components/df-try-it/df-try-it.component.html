@@ -130,8 +130,13 @@
           [(ngModel)]="selectedIdentityId"
           (selectionChange)="onIdentityChange()"
           data-testid="try-it-identity">
+          <df-select-search #identitySearch></df-select-search>
           <mat-option
-            *ngFor="let i of identities; trackBy: trackByIdentity"
+            *ngFor="
+              let i of identities
+                | dfSearch: identitySearch.query : '' : 'label';
+              trackBy: trackByIdentity
+            "
             [value]="i.id"
             [class.try-it__identity-option--session]="i.type === 'session'">
             <span class="try-it__identity-name">{{ i.label }}</span>

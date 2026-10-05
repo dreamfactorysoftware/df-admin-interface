@@ -64,5 +64,7 @@ module.exports = {
     '<rootDir>/src/app/shared/utilities/mask.spec.ts',
     '<rootDir>/src/app/shared/services/df-presentation.service.spec.ts',
     '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
+    // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
+    '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
   ],
 };

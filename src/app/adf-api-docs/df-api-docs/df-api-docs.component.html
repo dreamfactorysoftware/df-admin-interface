@@ -117,33 +117,34 @@
             *ngFor="let seg of pathSegments; trackBy: trackBySegment">
             <span *ngIf="!seg.token" class="rb-seg">{{ seg.text }}</span>
             <ng-container *ngIf="seg.token as tk">
-              <select
+              <mat-select
                 *ngIf="usePicker(tk); else segText"
                 class="rb-token"
+                panelWidth="null"
                 [class.rb-token--empty]="!tokenValues[tk.token]"
-                [ngModel]="tokenValues[tk.token] || ''"
+                [ngModel]="tokenValues[tk.token] || null"
                 (ngModelChange)="onTokenSelected(tk, $event)"
-                [attr.aria-label]="
+                [placeholder]="
+                  tk.labelKey
+                    ? (tk.labelKey | transloco)
+                    : humanizeToken(tk.token)
+                "
+                [aria-label]="
                   tk.labelKey
                     ? (tk.labelKey | transloco)
                     : humanizeToken(tk.token)
                 ">
-                <option value="" disabled>
-                  {{
-                    tk.labelKey
-                      ? (tk.labelKey | transloco)
-                      : humanizeToken(tk.token)
-                  }}
-                </option>
-                <option
+                <df-select-search #tokenSearch></df-select-search>
+                <mat-option
                   *ngFor="
-                    let opt of tokenOptions[tk.token];
+                    let opt of tokenOptions[tk.token]
+                      | dfSearch: tokenSearch.query;
                     trackBy: trackByOption
                   "
                   [value]="opt">
                   {{ opt }}
-                </option>
-              </select>
+                </mat-option>
+              </mat-select>
               <ng-template #segText>
                 <input
                   class="rb-token rb-token--text"

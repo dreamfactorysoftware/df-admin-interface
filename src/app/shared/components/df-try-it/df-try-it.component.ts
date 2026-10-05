@@ -1,4 +1,8 @@
 import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
+import {
   Component,
   EventEmitter,
   Input,
@@ -125,6 +129,8 @@ const VERB_GET = 1;
   templateUrl: './df-try-it.component.html',
   styleUrls: ['./df-try-it.component.scss'],
   imports: [
+    DfSelectSearchComponent,
+    DfSearchPipe,
     CommonModule,
     FormsModule,
     MatFormFieldModule,

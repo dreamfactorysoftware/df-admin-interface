@@ -1,4 +1,7 @@
-import { DfSearchPipe } from 'src/app/shared/components/df-select-search/df-select-search.component';
+import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
 import {
   Component,
   ElementRef,
@@ -131,6 +134,7 @@ const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   standalone: true,
   imports: [
     DfSearchPipe,
+    DfSelectSearchComponent,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
