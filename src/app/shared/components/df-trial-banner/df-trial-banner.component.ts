@@ -194,8 +194,9 @@ export class DfTrialBannerComponent implements OnDestroy {
     if (!this.bannerEl) {
       return;
     }
-    const height = this.bannerEl.getBoundingClientRect().height;
-    this.publishHeight(Math.round(height * 100) / 100);
+    // Publish the exact fractional box (e.g. 67.6875px): rounding to 2 dp
+    // leaves banner + shell a hair short of or over 100% of the viewport.
+    this.publishHeight(this.bannerEl.getBoundingClientRect().height);
   }
 
   private publishHeight(height: number): void {

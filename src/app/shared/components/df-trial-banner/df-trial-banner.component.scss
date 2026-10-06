@@ -4,13 +4,16 @@
 // width, the toolbar and page content start below it. The rendered height is
 // also mirrored into --df-trial-banner-height on <html> (ResizeObserver) so
 // the 100%-tall app shell can shrink by the same amount - one scrollbar, no
-// gap, no overlap. z-index matches df-engagement-banner (the two never
-// render together) so the strip stays above the shell while pinned.
+// gap, no overlap. The strip must stay above the in-flow shell while pinned
+// but BELOW the CDK overlay container (z-index 1000): dialogs, menus, select
+// panels, tooltips and snackbars are modal/transient chrome and must paint
+// over the banner, and a dialog backdrop must cover it. 900 clears every
+// shell z-index (mat-drawer-container is 1) and stays under the overlay.
 :host {
   display: block;
   position: sticky;
   top: 0;
-  z-index: 1100;
+  z-index: 900;
 }
 
 // Tokens only: the soft wash sits on a solid --df-surface so the translucent
