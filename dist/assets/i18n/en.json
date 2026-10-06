@@ -866,6 +866,12 @@
       "bookDemo": "Book a demo",
       "trialId": "Trial ID {{id}}"
     },
+    "revoked": {
+      "eyebrow": "Trial deactivated",
+      "header": "This trial instance has been deactivated.",
+      "subHeader": "This trial instance of DreamFactory has been deactivated. To continue using the platform, contact us at {{email}} or book a time at dreamfactory.com/demo.",
+      "revokedOn": "Deactivated on {{date}}."
+    },
     "invalid": {
       "header": "This DreamFactory trial instance needs a valid trial token.",
       "subHeader": "Copy DF_TRIAL_TOKEN from your dashboard at https://portal.dreamfactory.com, restart the container, or contact sales@dreamfactory.com.",

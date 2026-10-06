@@ -98,6 +98,46 @@ describe('DfTrialExpiredComponent', () => {
     expect(href('trial-expired-portal-cta')).toBeUndefined();
   });
 
+  it('renders the TRIAL_REVOKED variant with the exact deactivation copy, the date and both CTAs', async () => {
+    lock$.next({
+      reason: 'TRIAL_REVOKED',
+      context: {
+        reason: 'TRIAL_REVOKED',
+        trial_id: 'trl_01TEST',
+        revoked_at: '2026-10-06T17:56:18+00:00',
+        contact_email: 'sales@dreamfactory.com',
+        demo_url: 'https://www.dreamfactory.com/demo',
+        portal_url: 'https://portal.dreamfactory.com',
+      },
+    });
+    await render();
+
+    const root = fixture.debugElement.query(
+      By.css('[data-testid="trial-expired"]')
+    );
+    expect(root.attributes['data-reason']).toBe('TRIAL_REVOKED');
+    expect(root.classes['trial-expired--revoked']).toBe(true);
+    expect(root.classes['trial-expired--invalid']).toBeFalsy();
+    expect(text('trial-expired-eyebrow')).toBe('Trial deactivated');
+    expect(text('trial-expired-title')).toBe(
+      'This trial instance has been deactivated.'
+    );
+    expect(text('trial-expired-lead')).toBe(
+      'This trial instance of DreamFactory has been deactivated. To continue using the platform, contact us at sales@dreamfactory.com or book a time at dreamfactory.com/demo.'
+    );
+    expect(text('trial-expired-revoked-on')).toBe(
+      'Deactivated on October 6, 2026.'
+    );
+    expect(text('trial-expired-ended-on')).toBeUndefined();
+    expect(href('trial-expired-contact-cta')).toBe(
+      'mailto:sales@dreamfactory.com'
+    );
+    expect(href('trial-expired-demo-cta')).toBe(
+      'https://www.dreamfactory.com/demo'
+    );
+    expect(href('trial-expired-portal-cta')).toBeUndefined();
+  });
+
   it('renders the TRIAL_TOKEN_INVALID variant with the portal CTA and no ended-on line', async () => {
     lock$.next({
       reason: 'TRIAL_TOKEN_INVALID',
