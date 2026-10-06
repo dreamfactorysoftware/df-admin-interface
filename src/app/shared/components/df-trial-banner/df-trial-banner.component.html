@@ -1,10 +1,14 @@
 <ng-container *ngIf="vm$ | async as vm">
   <div
+    #bannerEl
     class="trial-banner"
     [class.trial-banner--info]="vm.remaining.severity === 'info'"
     [class.trial-banner--warning]="vm.remaining.severity === 'warning'"
     [class.trial-banner--critical]="vm.remaining.severity === 'critical'"
+    [class.trial-banner--row]="vm.layout === 'row'"
+    [class.trial-banner--stack]="vm.layout === 'stack'"
     [attr.data-severity]="vm.remaining.severity"
+    [attr.data-layout]="vm.layout"
     data-testid="trial-banner"
     role="status"
     aria-live="polite">
@@ -13,7 +17,6 @@
         <strong class="banner-label">{{
           'trial.banner.label' | transloco
         }}</strong>
-        <span class="banner-sep" aria-hidden="true"> · </span>
         <span class="banner-countdown" data-testid="trial-countdown">
           {{
             'trial.banner.remaining'
@@ -27,9 +30,16 @@
           }}
         </span>
         <span class="banner-sep" aria-hidden="true"> · </span>
-        <span class="banner-help">{{
-          'trial.banner.needMoreTime' | transloco
-        }}</span>
+        <!--
+          Short prompt on the strip (the CTAs carry the contact details);
+          the full section-9 sentence stays available as the tooltip.
+        -->
+        <span
+          class="banner-help"
+          data-testid="trial-help"
+          [title]="'trial.banner.needMoreTime' | transloco"
+          >{{ 'trial.banner.needMoreTimeShort' | transloco }}</span
+        >
       </span>
       <span class="banner-actions">
         <a
@@ -49,5 +59,4 @@
       </span>
     </div>
   </div>
-  <div class="banner-spacer"></div>
 </ng-container>

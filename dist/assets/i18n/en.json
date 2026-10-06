@@ -846,6 +846,7 @@
       "label": "Trial license",
       "remaining": "{{days}} {{daysUnit}}, {{hours}} {{hoursUnit}} remaining",
       "needMoreTime": "Need more time? Contact sales@dreamfactory.com or book time at dreamfactory.com/demo.",
+      "needMoreTimeShort": "Need more time?",
       "contactSales": "Contact sales",
       "bookDemo": "Book a demo"
     },

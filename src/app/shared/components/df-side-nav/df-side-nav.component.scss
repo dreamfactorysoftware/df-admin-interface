@@ -11,7 +11,11 @@ $red-palette: mat.define-palette(mat.$red-palette);
 // ============================================================
 
 .app-container {
-  height: 100%;
+  // 100% of <body>. When the sticky trial banner is on screen it publishes
+  // its rendered height as --df-trial-banner-height on <html>; subtract it
+  // so banner + shell fit the viewport exactly (no second scrollbar, no
+  // clipped bottom row). Falls back to the plain 100% on non-trial installs.
+  height: calc(100% - var(--df-trial-banner-height, 0px));
   width: 100%;
   display: flex;
   flex-direction: column;
