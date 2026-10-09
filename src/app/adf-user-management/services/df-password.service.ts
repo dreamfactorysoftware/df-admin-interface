@@ -54,7 +54,12 @@ export class DfPasswordService {
       .pipe(
         tap({
           next: data => {
-            this.userDataService.token = data.sessionToken;
+            // DF blacklists the old token on a password change; keep the old
+            // cookie only if no replacement came back (the error interceptor
+            // then recovers on the next request).
+            if (data.sessionToken) {
+              this.userDataService.token = data.sessionToken;
+            }
           },
         })
       );
