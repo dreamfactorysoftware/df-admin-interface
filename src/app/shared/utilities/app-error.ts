@@ -66,6 +66,17 @@ const DUPLICATE_EMAIL_REGEX =
   /Duplicate entry '[^']+' for key '[^']*user_email_unique'/;
 const DB_INTERNALS_REGEX = /SQLSTATE|Duplicate entry|ORA-\d|constraint/i;
 
+// DF reports a session that can no longer be used (blacklisted on logout or
+// password change, expired, or signed with a rotated secret) as 401 or as
+// 403 "The token has been blacklisted: Session terminated. Please re-login".
+const DEAD_SESSION_REGEX =
+  /token has been blacklisted|session terminated|token has expired|token signature could not be verified|could not decode token/i;
+
+/** True when the server message says the session token itself is dead. */
+export function isDeadSessionMessage(message: string): boolean {
+  return DEAD_SESSION_REGEX.test(message);
+}
+
 /** Stop leaking database driver internals; the raw text stays in `raw`. */
 function friendlyMessage(message: string): string {
   if (DUPLICATE_EMAIL_REGEX.test(message)) {
@@ -260,7 +271,11 @@ export function normalizeError(
 
   return {
     __appError: true,
-    kind: kindFromStatus(err.status, fields.length > 0),
+    // A dead session is an authentication failure even when DF sends 403.
+    kind:
+      err.status === 403 && isDeadSessionMessage(message)
+        ? 'auth'
+        : kindFromStatus(err.status, fields.length > 0),
     status: err.status,
     message,
     fields,
