@@ -8,8 +8,12 @@
       <mat-select
         [(value)]="selectedServiceItem"
         (selectionChange)="selectedServiceItemEvent()">
+        <df-select-search #serviceSearch></df-select-search>
         <mat-option
-          *ngFor="let service of storeServiceArray; trackBy: trackByValue"
+          *ngFor="
+            let service of storeServiceArray | dfSearch: serviceSearch.query;
+            trackBy: trackByValue
+          "
           [value]="service">
           {{ service }}
         </mat-option>
@@ -23,8 +27,12 @@
       <mat-select
         [(value)]="selectedEventItem"
         (selectionChange)="selectedEventItemEvent()">
+        <df-select-search #eventSearch></df-select-search>
         <mat-option
-          *ngFor="let item of ungroupedEventItems; trackBy: trackByValue"
+          *ngFor="
+            let item of ungroupedEventItems | dfSearch: eventSearch.query;
+            trackBy: trackByValue
+          "
           [value]="item">
           {{ item }}
         </mat-option>
@@ -48,8 +56,12 @@
       <mat-select
         [(value)]="selectedRouteItem"
         (selectionChange)="selectedRoute()">
+        <df-select-search #routeSearch></df-select-search>
         <mat-option
-          *ngFor="let item of ungroupedRouteOptions; trackBy: trackByValue"
+          *ngFor="
+            let item of ungroupedRouteOptions | dfSearch: routeSearch.query;
+            trackBy: trackByValue
+          "
           [value]="item">
           {{ item }}
         </mat-option>
@@ -70,17 +82,43 @@
         appearance="outline"
         class="full-width"
         subscriptSizing="dynamic">
-        <mat-label
-          ><ng-container *ngIf="tableProcedureFlag === 'table'; else procedure"
-            >Table Name</ng-container
-          >
-          <ng-template #procedure>Name</ng-template>
-        </mat-label>
+        <mat-label>{{
+          tableProcedureFlag === 'procedure'
+            ? 'Procedure Name'
+            : tableProcedureFlag === 'function'
+              ? 'Function Name'
+              : 'Table Name'
+        }}</mat-label>
         <mat-select [(value)]="selectTable" (selectionChange)="selectedTable()">
+          <df-select-search #tableSearch></df-select-search>
           <mat-option
-            *ngFor="let item of tableOptions; trackBy: trackByValue"
+            *ngFor="
+              let item of tableOptions | dfSearch: tableSearch.query;
+              trackBy: trackByValue
+            "
             [value]="item">
             {{ item }}
+          </mat-option>
+          <!-- A typed name that is not in the list (nothing to pick yet, or
+               scripting ahead of creating it), and the one already chosen. -->
+          <mat-option
+            *ngIf="selectTable && !tableOptions.includes(selectTable)"
+            [value]="selectTable">
+            {{ selectTable }}
+          </mat-option>
+          <mat-option
+            *ngIf="
+              tableSearch.query.trim() &&
+              tableSearch.query.trim() !== selectTable &&
+              !tableOptions.includes(tableSearch.query.trim())
+            "
+            [value]="tableSearch.query.trim()">
+            Use "{{ tableSearch.query.trim() }}"
+          </mat-option>
+          <mat-option
+            *ngIf="!tableOptions.length && !tableSearch.query.trim()"
+            disabled>
+            No {{ tableProcedureFlag }}s found. Type a name to use one.
           </mat-option>
         </mat-select>
       </mat-form-field>

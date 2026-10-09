@@ -60,6 +60,34 @@
           {{ 'systemInfo.instance.demo' | transloco }}:
           {{ environment.platform?.isTrial }}
         </li>
+        <li
+          *ngIf="environment.platform?.installType"
+          data-testid="system-info-install-type">
+          {{ 'systemInfo.instance.installType' | transloco }}:
+          {{ environment.platform?.installType }}
+        </li>
+        <ng-container *ngIf="trial as t">
+          <li data-testid="system-info-trial-status">
+            {{ 'systemInfo.instance.trialStatus' | transloco }}:
+            {{ 'systemInfo.instance.trialStatusValue.' + t.status | transloco }}
+          </li>
+          <li *ngIf="t.startedAt" data-testid="system-info-trial-started">
+            {{ 'systemInfo.instance.trialStarted' | transloco }}:
+            {{ t.startedAt | date: 'medium' }}
+          </li>
+          <li *ngIf="t.expiresAt" data-testid="system-info-trial-expires">
+            {{ 'systemInfo.instance.trialExpires' | transloco }}:
+            {{ t.expiresAt | date: 'medium' }}
+          </li>
+          <li data-testid="system-info-trial-days-remaining">
+            {{ 'systemInfo.instance.trialDaysRemaining' | transloco }}:
+            {{ t.daysRemaining }}
+          </li>
+          <li *ngIf="t.trialId" data-testid="system-info-trial-id">
+            {{ 'systemInfo.instance.trialId' | transloco }}:
+            {{ t.trialId }}
+          </li>
+        </ng-container>
         <li *ngIf="environment.platform?.dfInstanceId">
           DreamFactory
           {{ 'systemInfo.instance.instanceId' | transloco }}:

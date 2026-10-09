@@ -86,7 +86,7 @@
           {{ 'services.celebration.yourApiKey' | transloco }}
         </div>
         <div class="api-key-display">
-          <code>{{ data.apiKey }}</code>
+          <df-secret [value]="data.apiKey"></df-secret>
           <button
             mat-icon-button
             (click)="copyApiKey()"

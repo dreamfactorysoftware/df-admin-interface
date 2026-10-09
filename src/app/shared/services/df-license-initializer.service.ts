@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { DfLicenseCheckService } from './df-license-check.service';
 import { DfSystemConfigDataService } from './df-system-config-data.service';
 import { catchError, map, of, switchMap, take } from 'rxjs';
+import { trialFromEnvironment } from '../utilities/trial';
 
 @Injectable({
   providedIn: 'root',
@@ -17,6 +18,12 @@ export class DfLicenseInitializerService {
     return this.systemConfigDataService.environment$.pipe(
       take(1),
       switchMap(environment => {
+        // Trial instances are licensed by the signed trial token verified on
+        // the instance itself (offline). Never call updates.dreamfactory.com
+        // from the browser for them; trialGuard owns the lockout.
+        if (trialFromEnvironment(environment)) {
+          return of(true);
+        }
         if (
           environment.platform?.license &&
           environment.platform?.license !== 'OPEN SOURCE' &&

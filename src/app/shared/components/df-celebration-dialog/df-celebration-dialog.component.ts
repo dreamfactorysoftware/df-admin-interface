@@ -24,6 +24,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { Router } from '@angular/router';
 import { interval, Subject, takeUntil } from 'rxjs';
+import { DfSecretComponent } from '../df-secret/df-secret.component';
 
 export interface CelebrationDialogData {
   serviceName: string;
@@ -37,6 +38,7 @@ export interface CelebrationDialogData {
   styleUrls: ['./df-celebration-dialog.component.scss'],
   standalone: true,
   imports: [
+    DfSecretComponent,
     CommonModule,
     MatDialogModule,
     MatButtonModule,

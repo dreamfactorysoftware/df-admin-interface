@@ -4,6 +4,7 @@ import {
   BehaviorSubject,
   Observable,
   catchError,
+  of,
   retry,
   tap,
   throwError,
@@ -12,6 +13,7 @@ import { URLS } from '../constants/urls';
 import { SHOW_LOADING_HEADER } from '../constants/http-headers';
 import { normalizeError } from '../utilities/app-error';
 import { silent } from '../utilities/http-contexts';
+import { trialLockFromError } from '../utilities/trial';
 import { Environment, System } from 'src/app/shared/types/system';
 
 @Injectable({
@@ -67,7 +69,13 @@ export class DfSystemConfigDataService {
       })
       .pipe(
         tap(environment => (this.environment = environment)),
-        retry(1),
+        // One retry for transient failures, but a locked trial (402/403 with
+        // context.reason) is deterministic: retrying only repeats the lock.
+        retry({
+          count: 1,
+          delay: err =>
+            trialLockFromError(err) ? throwError(() => err) : of(0),
+        }),
         catchError(err => throwError(() => normalizeError(err)))
       );
   }

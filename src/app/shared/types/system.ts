@@ -1,4 +1,5 @@
 import { AuthService, LdapService, Service, ServiceType } from './service';
+import { TrialInfo } from './trial';
 
 export interface Environment {
   authentication: {
@@ -31,7 +32,16 @@ export interface Environment {
     }>;
     dfInstanceId: string;
     rootAdminExists: boolean;
+    /** DF_INSTALL (e.g. Docker, docker_trial) - sent as install_type. */
+    installType?: string;
+    /** Injected by dreamfactory/df-trial on trial instances (logged in). */
+    trial?: TrialInfo;
   };
+  /**
+   * Injected by dreamfactory/df-trial BEFORE login, when the backend omits
+   * the `platform` block for unauthenticated requests.
+   */
+  trial?: TrialInfo;
   server: {
     host: string;
     machine: string;

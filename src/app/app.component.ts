@@ -12,7 +12,9 @@ import {
 } from '@angular/router';
 import { DfSideNavComponent } from './shared/components/df-side-nav/df-side-nav.component';
 import { DfEngagementBannerComponent } from './shared/components/df-engagement-banner/df-engagement-banner.component';
+import { DfTrialBannerComponent } from './shared/components/df-trial-banner/df-trial-banner.component';
 import { DfLicenseCheckService } from './shared/services/df-license-check.service';
+import { DfTrialService } from './shared/services/df-trial.service';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { AuthService } from './shared/services/auth.service';
 import { LoggingService } from './shared/services/logging.service';
@@ -32,6 +34,7 @@ import { filter } from 'rxjs';
   imports: [
     DfSideNavComponent,
     DfEngagementBannerComponent,
+    DfTrialBannerComponent,
     RouterOutlet,
     NgIf,
     AsyncPipe,
@@ -41,10 +44,17 @@ export class AppComponent implements OnInit {
   title = 'df-admin-interface';
   activeSpinner$ = this.loadingSpinnerService.active;
   licenseCheck$ = this.licenseCheckService.licenseCheck$;
+  /**
+   * True once the instance answered 402 TRIAL_EXPIRED / 403 TRIAL_TOKEN_INVALID
+   * (or environment reports a locked status). The shell drops side-nav and
+   * toolbar exactly like the license disableUi branch.
+   */
+  trialLocked$ = this.trialService.expired$;
 
   constructor(
     private loadingSpinnerService: DfLoadingSpinnerService,
     private licenseCheckService: DfLicenseCheckService,
+    private trialService: DfTrialService,
     private authService: AuthService,
     private router: Router,
     private route: ActivatedRoute,
@@ -99,6 +109,16 @@ export class AppComponent implements OnInit {
         if (!this.router.url.includes(ROUTES.LICENSE_EXPIRED)) {
           this.router.navigate([ROUTES.LICENSE_EXPIRED]);
         }
+      }
+    });
+
+    // Docker trial lockout (402 TRIAL_EXPIRED / 403 TRIAL_TOKEN_INVALID):
+    // errorInterceptor and trialGuard already route there; this covers the
+    // fresh-load case where the lock was recorded during APP_INITIALIZER,
+    // before the router had anything to navigate.
+    this.trialLocked$.pipe(untilDestroyed(this)).subscribe(locked => {
+      if (locked && !this.router.url.includes(ROUTES.TRIAL_EXPIRED)) {
+        this.router.navigate([ROUTES.TRIAL_EXPIRED]);
       }
     });
   }

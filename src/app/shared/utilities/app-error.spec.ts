@@ -44,6 +44,36 @@ describe('normalizeError', () => {
     });
   });
 
+  it('preserves an object envelope context untouched (snake_case) and drops non-objects', () => {
+    const context = {
+      reason: 'TRIAL_EXPIRED',
+      expired_at: '2026-11-02T20:00:00+00:00',
+    };
+    const e = normalizeError(
+      httpError(402, {
+        error: {
+          code: 402,
+          message: 'Trial expired.',
+          context,
+          status_code: 402,
+        },
+      })
+    );
+    expect(e.context).toEqual(context);
+    expect(e.fields).toEqual([]);
+
+    const stringCtx = normalizeError(
+      httpError(500, {
+        error: { code: 500, message: 'x', context: 'raw string' },
+      })
+    );
+    expect(stringCtx.context).toBeUndefined();
+    const nullCtx = normalizeError(
+      httpError(500, { error: { code: 500, message: 'x', context: null } })
+    );
+    expect(nullCtx.context).toBeUndefined();
+  });
+
   it('reads the canonical DF envelope in snake_case', () => {
     const err = httpError(404, {
       error: { code: 404, message: 'Record not found.', status_code: 404 },
@@ -109,6 +139,21 @@ describe('normalizeError', () => {
   it('falls back by status class on empty bodies', () => {
     expect(normalizeError(httpError(403, null)).message).toBe('errors.http4xx');
     expect(normalizeError(httpError(403, null)).kind).toBe('forbidden');
+  });
+
+  it('treats a blacklisted-session 403 as auth, other 403s as forbidden', () => {
+    const dead = httpError(403, {
+      error: {
+        code: 403,
+        message:
+          'The token has been blacklisted: Session terminated. Please re-login',
+      },
+    });
+    expect(normalizeError(dead).kind).toBe('auth');
+    const denied = httpError(403, {
+      error: { code: 403, message: 'GET access to system/role denied.' },
+    });
+    expect(normalizeError(denied).kind).toBe('forbidden');
   });
 
   it('reads the flat body variant', () => {

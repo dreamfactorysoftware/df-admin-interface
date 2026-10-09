@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { DfSystemConfigDataService } from '../../services/df-system-config-data.service';
 import { UntilDestroy, untilDestroyed } from '@ngneat/until-destroy';
 import { TranslocoModule } from '@ngneat/transloco';
+import { trialFromEnvironment } from '../../utilities/trial';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -25,8 +26,12 @@ export class DfEngagementBannerComponent implements OnInit {
       .subscribe(environment => {
         const license = environment.platform?.license?.toUpperCase();
         const isTrial = environment.platform?.isTrial ?? false;
+        // Docker trial instances render <df-trial-banner> instead; both are
+        // position:fixed top:0, so never show the two together.
+        const hasTrialInfo = trialFromEnvironment(environment) !== null;
 
-        this.showBanner = license === 'OPEN SOURCE' || isTrial;
+        this.showBanner =
+          (license === 'OPEN SOURCE' || isTrial) && !hasTrialInfo;
       });
   }
 

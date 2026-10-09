@@ -104,7 +104,7 @@
         }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        {{ editApp.apiKey }}
+        <df-secret [value]="editApp.apiKey"></df-secret>
       </mat-card-content>
       <mat-card-actions>
         <button

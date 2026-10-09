@@ -35,6 +35,12 @@ export interface AppError {
   message: string;
   fields: AppErrorField[]; // all context.resource[]/context.error[] messages, not just [0]
   code?: string; // envelope error.code when present
+  /**
+   * envelope error.context when it is an object (snake_case, untouched).
+   * Carries machine-readable reasons such as the df-trial lock
+   * (`context.reason` = TRIAL_EXPIRED | TRIAL_TOKEN_INVALID) to consumers.
+   */
+  context?: Record<string, unknown>;
   url?: string; // failing request URL
   method?: string;
   timestamp: string; // ISO
@@ -59,6 +65,17 @@ export function isAppError(x: unknown): x is AppError {
 const DUPLICATE_EMAIL_REGEX =
   /Duplicate entry '[^']+' for key '[^']*user_email_unique'/;
 const DB_INTERNALS_REGEX = /SQLSTATE|Duplicate entry|ORA-\d|constraint/i;
+
+// DF reports a session that can no longer be used (blacklisted on logout or
+// password change, expired, or signed with a rotated secret) as 401 or as
+// 403 "The token has been blacklisted: Session terminated. Please re-login".
+const DEAD_SESSION_REGEX =
+  /token has been blacklisted|session terminated|token has expired|token signature could not be verified|could not decode token/i;
+
+/** True when the server message says the session token itself is dead. */
+export function isDeadSessionMessage(message: string): boolean {
+  return DEAD_SESSION_REGEX.test(message);
+}
 
 /** Stop leaking database driver internals; the raw text stays in `raw`. */
 function friendlyMessage(message: string): string {
@@ -204,6 +221,7 @@ export function normalizeError(
   const body: unknown = err.error;
   let message: string | null = null;
   let code: string | undefined;
+  let context: Record<string, unknown> | undefined;
   let fields: AppErrorField[] = [];
   let bridge: unknown;
 
@@ -231,6 +249,13 @@ export function normalizeError(
       if (env.code !== undefined && env.code !== null) {
         code = String(env.code);
       }
+      if (
+        env.context &&
+        typeof env.context === 'object' &&
+        !Array.isArray(env.context)
+      ) {
+        context = env.context as Record<string, unknown>;
+      }
       fields = collectFields(env.context);
     } else if (typeof (body as { message?: unknown }).message === 'string') {
       // Flat variant: { message: '...' }
@@ -246,11 +271,16 @@ export function normalizeError(
 
   return {
     __appError: true,
-    kind: kindFromStatus(err.status, fields.length > 0),
+    // A dead session is an authentication failure even when DF sends 403.
+    kind:
+      err.status === 403 && isDeadSessionMessage(message)
+        ? 'auth'
+        : kindFromStatus(err.status, fields.length > 0),
     status: err.status,
     message,
     fields,
     code,
+    context,
     url,
     method,
     timestamp,

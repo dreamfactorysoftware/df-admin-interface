@@ -1,6 +1,10 @@
+<df-trial-banner></df-trial-banner>
 <df-engagement-banner></df-engagement-banner>
 <ng-container
-  *ngIf="(licenseCheck$ | async)?.disableUi === 'true'; else enabled">
+  *ngIf="
+    (licenseCheck$ | async)?.disableUi === 'true' || (trialLocked$ | async);
+    else enabled
+  ">
   <router-outlet />
 </ng-container>
 <ng-template #enabled>

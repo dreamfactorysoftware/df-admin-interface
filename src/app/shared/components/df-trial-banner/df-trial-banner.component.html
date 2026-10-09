@@ -1,0 +1,53 @@
+<ng-container *ngIf="vm$ | async as vm">
+  <div
+    class="trial-banner"
+    [class.trial-banner--info]="vm.remaining.severity === 'info'"
+    [class.trial-banner--warning]="vm.remaining.severity === 'warning'"
+    [class.trial-banner--critical]="vm.remaining.severity === 'critical'"
+    [attr.data-severity]="vm.remaining.severity"
+    data-testid="trial-banner"
+    role="status"
+    aria-live="polite">
+    <div class="banner-content">
+      <span class="banner-text">
+        <strong class="banner-label">{{
+          'trial.banner.label' | transloco
+        }}</strong>
+        <span class="banner-sep" aria-hidden="true"> · </span>
+        <span class="banner-countdown" data-testid="trial-countdown">
+          {{
+            'trial.banner.remaining'
+              | transloco
+                : {
+                    days: vm.remaining.days,
+                    daysUnit: vm.daysUnitKey | transloco,
+                    hours: vm.remaining.hours,
+                    hoursUnit: vm.hoursUnitKey | transloco,
+                  }
+          }}
+        </span>
+        <span class="banner-sep" aria-hidden="true"> · </span>
+        <span class="banner-help">{{
+          'trial.banner.needMoreTime' | transloco
+        }}</span>
+      </span>
+      <span class="banner-actions">
+        <a
+          class="cta-button cta-button--primary"
+          data-testid="trial-contact-cta"
+          [href]="vm.contactHref">
+          {{ 'trial.banner.contactSales' | transloco }}
+        </a>
+        <a
+          class="cta-button cta-button--secondary"
+          data-testid="trial-demo-cta"
+          [href]="vm.demoUrl"
+          target="_blank"
+          rel="noopener">
+          {{ 'trial.banner.bookDemo' | transloco }}
+        </a>
+      </span>
+    </div>
+  </div>
+  <div class="banner-spacer"></div>
+</ng-container>

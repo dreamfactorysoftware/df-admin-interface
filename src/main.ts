@@ -22,9 +22,33 @@ import { errorInterceptor } from './app/shared/interceptors/error.interceptor';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { SUPPORTED_LANGUAGES } from './app/shared/constants/languages';
 import { detectUserLanguage } from './app/shared/utilities/language';
+import { DfTrialService } from './app/shared/services/df-trial.service';
+import { trialLockFromError } from './app/shared/utilities/trial';
+import { catchError, of, throwError } from 'rxjs';
 
-function initEnvironment(systemConfigService: DfSystemConfigDataService) {
-  return () => systemConfigService.fetchEnvironmentData();
+function initEnvironment(
+  systemConfigService: DfSystemConfigDataService,
+  trialService: DfTrialService
+) {
+  return () =>
+    systemConfigService.fetchEnvironmentData().pipe(
+      catchError(err => {
+        // A locked trial instance answers 402 TRIAL_EXPIRED / 403
+        // TRIAL_TOKEN_INVALID here (design addendum 5). errorInterceptor has
+        // already recorded the lock; resolve so the shell boots and shows the
+        // trial-expired page instead of a blank app. Every other failure keeps
+        // the historic behaviour (bootstrap rejects).
+        const lock = trialLockFromError(err);
+        if (lock) {
+          trialService.markLocked(lock.reason, lock.context);
+          return of(null);
+        }
+        if (trialService.isLocked) {
+          return of(null);
+        }
+        return throwError(() => err);
+      })
+    );
 }
 
 function initLicenseCheck(licenseInitializer: DfLicenseInitializerService) {
@@ -39,7 +63,7 @@ bootstrapApplication(AppComponent, {
     {
       provide: APP_INITIALIZER,
       useFactory: initEnvironment,
-      deps: [DfSystemConfigDataService],
+      deps: [DfSystemConfigDataService, DfTrialService],
       multi: true,
     },
     {
