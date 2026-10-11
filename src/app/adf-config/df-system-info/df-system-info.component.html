@@ -8,9 +8,14 @@
     [class.x-small]="breakpointService.isXSmallScreen | async">
     <div class="system-info-platform">
       <ul>
-        <li>
+        <li data-testid="system-info-license-level">
           {{ 'systemInfo.instance.licenseLevel' | transloco }}:
-          {{ environment.platform?.license }}
+          <ng-container *ngIf="trial; else rawLicense">{{
+            'systemInfo.instance.licenseLevelTrial' | transloco
+          }}</ng-container>
+          <ng-template #rawLicense>{{
+            environment.platform?.license
+          }}</ng-template>
         </li>
         <li *ngIf="environment.platform?.licenseKey">
           {{ 'systemInfo.instance.licenseKey' | transloco }}:

@@ -874,7 +874,7 @@
     },
     "invalid": {
       "header": "This DreamFactory trial instance needs a valid trial token.",
-      "subHeader": "Copy DF_TRIAL_TOKEN from your dashboard at https://portal.dreamfactory.com, restart the container, or contact sales@dreamfactory.com.",
+      "subHeader": "Copy DF_TRIAL_TOKEN from your dashboard at https://portal.dreamfactory.com and re-create the container with it (a plain restart keeps the old token): with Compose, update the file and run docker compose up -d; with docker run, run docker rm -f dreamfactory-trial, then the docker run from your dashboard. Your data stays in the volume. Or contact sales@dreamfactory.com.",
       "openPortal": "Open your trial dashboard"
     }
   },
