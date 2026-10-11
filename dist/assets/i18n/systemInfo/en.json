@@ -3,6 +3,7 @@
   "instance": {
     "instance": "Instance",
     "licenseLevel": "License Level",
+    "licenseLevelTrial": "Trial — all features",
     "licenseKey": "License Key",
     "subscriptionStatus": "Subscription Status",
     "subscriptionExpirationDate": "Subscription Expiration Date",
