@@ -433,7 +433,7 @@ export class UsageService {
         params: {
           fields: 'id,name,label,type',
           filter:
-            '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp")',
+            '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp") or (type = "system_mcp")',
         },
         context: silent(),
       })
@@ -448,25 +448,30 @@ export class UsageService {
   }
 
   private listUsers(): Observable<Map<number, string>> {
-    // /api/v2/system/admin requires root-admin and is gated by df-compliance
-    // (returns 500/403 for restricted admins). We only fetch /system/user
-    // here — admin names not appearing in the dashboard is acceptable; the
-    // by_user breakdown falls back to "user #N".
-    return this.http
-      .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/user`, {
-        params: { fields: 'id,name,username,email' },
-        context: silent(),
-      })
-      .pipe(
-        map(res => {
-          const m = new Map<number, string>();
-          (res.resource ?? []).forEach(u =>
-            m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
-          );
-          return m;
-        }),
-        catchError(() => of(new Map<number, string>()))
+    // MCP traffic is mostly admins (OAuth sign-in from Claude Desktop etc.),
+    // and admins are not in /system/user. /system/admin needs root-admin and
+    // is gated by df-compliance (500/403 for restricted admins), so fetch both
+    // and treat a failed admin lookup as "no names" rather than an error.
+    const toMap = (rows: UserLookupRow[] | undefined) => {
+      const m = new Map<number, string>();
+      (rows ?? []).forEach(u =>
+        m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
       );
+      return m;
+    };
+    const fetch = (path: 'user' | 'admin') =>
+      this.http
+        .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/${path}`, {
+          params: { fields: 'id,name,username,email' },
+          context: silent(),
+        })
+        .pipe(
+          map(res => toMap(res.resource)),
+          catchError(() => of(new Map<number, string>()))
+        );
+    return forkJoin([fetch('user'), fetch('admin')]).pipe(
+      map(([users, admins]) => new Map([...users, ...admins]))
+    );
   }
 
   private listRoles(): Observable<Map<number, string>> {
