@@ -30,5 +30,7 @@
   "recordDetail": "Record Detail",
   "nullValue": "NULL",
   "showApiCall": "Show API Call",
-  "quickSearch": "Search rows..."
+  "quickSearch": "Search rows...",
+  "searchDatabases": "Search databases",
+  "noMatches": "No databases match"
 }
