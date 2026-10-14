@@ -322,7 +322,26 @@
       </header>
 
       <div class="metering-block">
-        <h3>{{ 'apps.metering.reachTitle' | transloco }}</h3>
+        <div class="metering-block-head">
+          <h3>{{ 'apps.metering.reachTitle' | transloco }}</h3>
+          <span class="metering-count" *ngIf="reachSummary">
+            {{ 'apps.metering.reachCount' | transloco: reachSummary }}
+          </span>
+          <button
+            mat-button
+            type="button"
+            class="metering-toggle"
+            [attr.aria-expanded]="reachOpen"
+            aria-controls="metering-reach"
+            (click)="reachOpen = !reachOpen">
+            {{
+              (reachOpen
+                ? 'apps.metering.reachHide'
+                : 'apps.metering.reachShow'
+              ) | transloco
+            }}
+          </button>
+        </div>
         <p
           class="metering-hint"
           *ngIf="selectedRoleId !== null; else noRoleHint">
@@ -336,7 +355,14 @@
             {{ 'apps.metering.reachHintPending' | transloco }}
           </p>
         </ng-template>
-        <df-scope-map [roleId]="selectedRoleId"></df-scope-map>
+        <!-- Collapsed by default: a role that spans many services makes this
+             the longest thing on the page. Keep the map in the DOM so the
+             summary above resolves without opening it. -->
+        <div id="metering-reach" class="metering-reach" [hidden]="!reachOpen">
+          <df-scope-map
+            [roleId]="selectedRoleId"
+            (loaded)="reachSummary = $event"></df-scope-map>
+        </div>
       </div>
 
       <div class="metering-block">
