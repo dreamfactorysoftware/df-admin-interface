@@ -7,6 +7,7 @@ import {
   OnInit,
   TemplateRef,
   ViewChild,
+  inject,
 } from '@angular/core';
 import {
   FormArray,
@@ -25,7 +26,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslocoPipe } from '@ngneat/transloco';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
@@ -114,12 +115,13 @@ import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
 import { DfArtifactResolverService } from 'src/app/shared/services/df-artifact-resolver.service';
-import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
+import { DfDisclosureComponent } from 'src/app/shared/components/df-disclosure/df-disclosure.component';
 import {
   DfArtifactCardComponent,
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 import { DfScopeMatrixComponent } from 'src/app/shared/components/df-scope-matrix/df-scope-matrix.component';
+import { DfScopeService } from 'src/app/shared/services/df-scope.service';
 import { DfServiceHealthPanelComponent } from '../df-service-health-panel/df-service-health-panel.component';
 import { DfPipelineStripComponent } from 'src/app/shared/components/df-pipeline-strip/df-pipeline-strip.component';
 import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
@@ -202,7 +204,7 @@ interface ServiceResponse {
     DfSecurityConfigComponent,
     MatMenuModule,
     MatDialogModule,
-    DfPageHeaderComponent,
+    DfDisclosureComponent,
     DfArtifactCardComponent,
     DfScopeMatrixComponent,
     DfPipelineStripComponent,
@@ -212,6 +214,10 @@ interface ServiceResponse {
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
+  /** Header line for the closed Access section: "12 of 313 roles ...". */
+  accessSummary: string | null = null;
+  private readonly scope = inject(DfScopeService);
+  private readonly transloco = inject(TranslocoService);
   /** DreamFactory Platform APIs route (data.system). Those services are not
    * role-governed the way a user service is, so they are not health-scored. */
   isPlatformService = false;
@@ -591,6 +597,7 @@ export class DfServiceDetailsComponent implements OnInit {
           }
         }
         this.serviceData = data;
+        this.loadAccessSummary();
         if (data) {
           // For script services, use script content, not service definition
           if (this.isScriptService) {
@@ -2292,6 +2299,23 @@ export class DfServiceDetailsComponent implements OnInit {
   // Meridian Phase 3: a granted scope-matrix cell opens the role's resolved
   // scope in a dialog. df-scope-matrix only emits for non-'none' cells, so
   // there is always a real grant to inspect here.
+  private loadAccessSummary(): void {
+    this.accessSummary = null;
+    const id = this.serviceData?.id;
+    if (!this.edit || !this.isDatabase || !id) {
+      return;
+    }
+    this.scope.matrixForService(id).subscribe(matrix => {
+      const granted = matrix.roles.filter(row =>
+        Object.values(row.verbs).some(state => state !== 'none')
+      ).length;
+      this.accessSummary = this.transloco.translate('services.access.summary', {
+        granted,
+        total: matrix.roles.length,
+      });
+    });
+  }
+
   onScopeCellClick(event: { roleId: number; verb: ScopeVerb }): void {
     this.dialog.open(DfServiceRoleScopeDialogComponent, {
       width: '640px',

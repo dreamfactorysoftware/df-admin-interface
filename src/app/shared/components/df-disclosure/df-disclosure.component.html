@@ -1,0 +1,23 @@
+<section class="disclosure" [class.disclosure--open]="open">
+  <button
+    type="button"
+    class="disclosure__header"
+    [attr.aria-expanded]="open"
+    [attr.aria-controls]="panelId"
+    (click)="toggle()">
+    <span class="disclosure__heading">
+      <span class="disclosure__eyebrow" *ngIf="eyebrow">{{ eyebrow }}</span>
+      <span class="disclosure__title">{{ title }}</span>
+    </span>
+    <span class="disclosure__summary" *ngIf="summary">{{ summary }}</span>
+    <mat-icon class="disclosure__chevron" aria-hidden="true"
+      >expand_more</mat-icon
+    >
+  </button>
+  <div class="disclosure__body" [id]="panelId" *ngIf="open">
+    <p class="disclosure__description" *ngIf="description">
+      {{ description }}
+    </p>
+    <ng-content></ng-content>
+  </div>
+</section>
