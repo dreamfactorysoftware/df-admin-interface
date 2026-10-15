@@ -302,7 +302,7 @@ export class DfRolesAccessComponent implements OnInit {
       new FormGroup({
         service: new FormControl(0, Validators.required),
         component: new FormControl('', Validators.required),
-        access: new FormControl('', Validators.required),
+        access: new FormControl([], Validators.required),
         requester: new FormControl([1], Validators.required),
         advancedFilters: advancedFilters,
         id: new FormControl(null),
