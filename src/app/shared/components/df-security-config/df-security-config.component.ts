@@ -454,8 +454,15 @@ export class DfSecurityConfigComponent implements OnInit {
             });
 
             // Dialog will handle navigation to API docs when closed
+          } else if (this.isDatabase) {
+            // A secured database API lands on Data Explorer with that API
+            // selected: the rows it just exposed, not its documentation.
+            this.router.navigate(['/api-connections/data-explorer'], {
+              queryParams: { service: result.formattedName },
+              replaceUrl: true,
+            });
           } else {
-            // Navigate to API docs directly for experienced users
+            // Other service types keep landing on API docs
             this.router
               .navigateByUrl(
                 `/api-connections/api-docs/${result.formattedName}`,
