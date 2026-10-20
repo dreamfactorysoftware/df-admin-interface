@@ -46,6 +46,7 @@ import {
   DataExplorerService,
   TableSchemaResponse,
   FieldInfo,
+  TableKey,
 } from './services/data-explorer.service';
 import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
@@ -302,13 +303,14 @@ interface ColumnFilter {
             <ng-container *ngIf="!readKey; else keyReady">
               <mat-icon>vpn_key</mat-icon>
               <span class="api-key-text"
-                >Your app calls this URL with an API key. The key's role decides
-                which tables and verbs it can reach.</span
+                >No API key can read this table yet. Your app calls this URL
+                with an API key, and the key's role decides which tables and
+                verbs it can reach.</span
               >
               <button
                 mat-stroked-button
                 class="api-key-btn"
-                [disabled]="keyBusy"
+                [disabled]="keyBusy || keysLoading"
                 (click)="createReadKey()"
                 matTooltip="Creates a role that can only GET this table, plus an API key bound to it. Edit either one later.">
                 Create read-only key for {{ tableName }}
@@ -324,9 +326,18 @@ interface ColumnFilter {
             </ng-container>
             <ng-template #keyReady>
               <mat-icon class="ok">check_circle</mat-icon>
-              <span class="api-key-text"
-                >Key ready. Role <strong>{{ readKey!.roleName }}</strong> can
-                GET this table only.</span
+              <span class="api-key-text">Key with read access:</span>
+              <select
+                *ngIf="tableKeys.length > 1; else oneKey"
+                class="api-key-select"
+                [value]="readKey!.appName"
+                (change)="selectKey($event)">
+                <option *ngFor="let k of tableKeys" [value]="k.appName">
+                  {{ k.appName }}
+                </option>
+              </select>
+              <ng-template #oneKey
+                ><strong>{{ readKey!.appName }}</strong></ng-template
               >
               <code class="api-key-value">{{
                 presentation.on ? maskSecret(readKey!.apiKey) : readKey!.apiKey
@@ -341,8 +352,11 @@ interface ColumnFilter {
               </button>
               <a
                 class="api-key-link"
-                routerLink="/api-connections/role-based-access"
-                >Edit role</a
+                [routerLink]="[
+                  '/api-connections/role-based-access',
+                  readKey!.roleId,
+                ]"
+                >Edit role {{ readKey!.roleName }}</a
               >
             </ng-template>
             <span class="api-key-error" *ngIf="keyError">{{ keyError }}</span>
@@ -1188,6 +1202,11 @@ interface ColumnFilter {
             }
           }
 
+          .api-key-select {
+            font-size: 12px;
+            max-width: 220px;
+          }
+
           .api-key-value {
             font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
             color: var(--df-text-2);
@@ -1479,7 +1498,9 @@ export class DfDataGridComponent
 
   resetAndLoad(): void {
     this.readKey = null;
+    this.tableKeys = [];
     this.keyError = '';
+    this.loadKeys();
     this.allColumns = [];
     this.columns = [];
     this.filterColumns = [];
@@ -2017,11 +2038,40 @@ export class DfDataGridComponent
 
   // --- Starter API key ---
 
-  readKey: { roleName: string; apiKey: string } | null = null;
+  tableKeys: TableKey[] = [];
+  readKey: TableKey | null = null;
+  keysLoading = false;
   keyBusy = false;
   keyError = '';
   curlCopied = false;
   maskSecret = maskSecret;
+
+  /** Show a key that can already read this table, so a reload keeps it. */
+  loadKeys(): void {
+    if (!this.serviceName || !this.tableName) return;
+    this.keysLoading = true;
+    this.dataExplorerService
+      .findReadKeys(this.serviceName, this.tableName)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: keys => {
+          this.tableKeys = keys;
+          this.readKey = keys[0] ?? null;
+          this.keysLoading = false;
+          this.cdr.markForCheck();
+        },
+        // Listing roles is a convenience; on failure, fall back to Create.
+        error: () => {
+          this.keysLoading = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  selectKey(event: Event): void {
+    const name = (event.target as HTMLSelectElement).value;
+    this.readKey = this.tableKeys.find(k => k.appName === name) ?? null;
+  }
 
   createReadKey(): void {
     this.keyBusy = true;
@@ -2030,6 +2080,7 @@ export class DfDataGridComponent
       .createReadOnlyKey(this.serviceName, this.tableName)
       .subscribe({
         next: key => {
+          this.tableKeys = [key];
           this.readKey = key;
           this.keyBusy = false;
           this.cdr.markForCheck();
