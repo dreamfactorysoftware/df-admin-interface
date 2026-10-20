@@ -2,17 +2,40 @@
   class="trial-expired"
   *ngIf="vm$ | async as vm"
   [class.trial-expired--invalid]="vm.invalid"
+  [class.trial-expired--revoked]="vm.revoked"
   [attr.data-reason]="vm.reason"
   data-testid="trial-expired">
   <div class="trial-expired__card">
     <p class="trial-expired__eyebrow" data-testid="trial-expired-eyebrow">
       {{
-        (vm.invalid ? 'trial.expired.eyebrowInvalid' : 'trial.expired.eyebrow')
-          | transloco
+        (vm.invalid
+          ? 'trial.expired.eyebrowInvalid'
+          : vm.revoked
+            ? 'trial.revoked.eyebrow'
+            : 'trial.expired.eyebrow'
+        ) | transloco
       }}
     </p>
 
-    <ng-container *ngIf="!vm.invalid; else invalidCopy">
+    <ng-container *ngIf="vm.revoked">
+      <h1 class="trial-expired__title" data-testid="trial-expired-title">
+        {{ 'trial.revoked.header' | transloco }}
+      </h1>
+      <p class="trial-expired__lead" data-testid="trial-expired-lead">
+        {{ 'trial.revoked.subHeader' | transloco: { email: vm.contactEmail } }}
+      </p>
+      <p
+        class="trial-expired__meta"
+        *ngIf="vm.revokedAt"
+        data-testid="trial-expired-revoked-on">
+        {{
+          'trial.revoked.revokedOn'
+            | transloco: { date: (vm.revokedAt | date: 'longDate') }
+        }}
+      </p>
+    </ng-container>
+
+    <ng-container *ngIf="!vm.invalid && !vm.revoked">
       <h1 class="trial-expired__title" data-testid="trial-expired-title">
         {{ 'trial.expired.header' | transloco }}
       </h1>
@@ -30,14 +53,14 @@
       </p>
     </ng-container>
 
-    <ng-template #invalidCopy>
+    <ng-container *ngIf="vm.invalid">
       <h1 class="trial-expired__title" data-testid="trial-expired-title">
         {{ 'trial.invalid.header' | transloco }}
       </h1>
       <p class="trial-expired__lead" data-testid="trial-expired-lead">
         {{ 'trial.invalid.subHeader' | transloco }}
       </p>
-    </ng-template>
+    </ng-container>
 
     <div class="trial-expired__actions">
       <a

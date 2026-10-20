@@ -32,6 +32,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import {
   faCircleInfo,
+  faMagnifyingGlass,
   faCopy,
   faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
@@ -117,6 +118,7 @@ export class DfAppDetailsComponent implements OnInit {
   urlOrigin: string;
   faCopy = faCopy;
   faCircleInfo = faCircleInfo;
+  faMagnifyingGlass = faMagnifyingGlass;
   faRefresh = faRefresh;
   alertMsg = '';
   showAlert = false;

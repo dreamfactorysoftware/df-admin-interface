@@ -40,12 +40,13 @@
       <input
         #rolesInput
         type="text"
-        placeholder="Pick one"
+        placeholder="Type to search roles"
         matInput
         formControlName="defaultRole"
         [matAutocomplete]="auto"
         (input)="filter()"
         (focus)="filter()" />
+      <fa-icon class="role-search-icon" matPrefix [icon]="faMagnifyingGlass" />
       <fa-icon
         class="tool-tip-trigger"
         matSuffix

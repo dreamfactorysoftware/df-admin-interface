@@ -10,7 +10,12 @@
  * Error bodies are NEVER case-transformed, so the lock context (error.context
  * of the 402/403 envelope) keeps its snake_case keys.
  */
-export type TrialStatus = 'active' | 'expired' | 'invalid' | 'missing';
+export type TrialStatus =
+  | 'active'
+  | 'expired'
+  | 'revoked'
+  | 'invalid'
+  | 'missing';
 
 export interface TrialInfo {
   status: TrialStatus;
@@ -32,14 +37,22 @@ export interface TrialInfo {
   version: string;
 }
 
-/** error.context.reason of a locked instance (402 expired / 403 invalid). */
-export type TrialLockReason = 'TRIAL_EXPIRED' | 'TRIAL_TOKEN_INVALID';
+/**
+ * error.context.reason of a locked instance: 402 expired, 402 revoked (df-trial >= 0.1.3, remote revocation by
+ * DreamFactory, CONTRACT-REVOCATION.md section 5), 403 invalid.
+ */
+export type TrialLockReason =
+  | 'TRIAL_EXPIRED'
+  | 'TRIAL_REVOKED'
+  | 'TRIAL_TOKEN_INVALID';
 
 /** error.context of the locked envelope; snake_case because error bodies are raw. */
 export interface TrialLockContext {
   reason: TrialLockReason;
   trial_id?: string | null;
   expired_at?: string | null;
+  /** TRIAL_REVOKED only: ISO date DreamFactory deactivated the trial. */
+  revoked_at?: string | null;
   detail?: string;
   contact_email?: string;
   demo_url?: string;
@@ -72,7 +85,8 @@ export const TRIAL_DEFAULT_CRITICAL_DAYS = 3;
 
 export const TRIAL_LOCK_REASONS: ReadonlyArray<TrialLockReason> = [
   'TRIAL_EXPIRED',
+  'TRIAL_REVOKED',
   'TRIAL_TOKEN_INVALID',
 ];
-/** HTTP statuses the instance uses for a locked trial (402 expired, 403 invalid). */
+/** HTTP statuses the instance uses for a locked trial (402 expired/revoked, 403 invalid). */
 export const TRIAL_LOCK_HTTP_STATUSES: ReadonlyArray<number> = [402, 403];
