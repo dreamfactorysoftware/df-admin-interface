@@ -58,6 +58,23 @@ const INVALID_ENVELOPE = {
   },
 };
 
+const REVOKED_ENVELOPE = {
+  error: {
+    code: 402,
+    status_code: 402,
+    context: {
+      reason: 'TRIAL_REVOKED',
+      trial_id: 'trl_01TEST',
+      revoked_at: '2026-10-06T17:56:18+00:00',
+      contact_email: 'sales@dreamfactory.com',
+      demo_url: 'https://www.dreamfactory.com/demo',
+      portal_url: 'https://portal.dreamfactory.com',
+    },
+    message:
+      'This trial instance of DreamFactory has been deactivated. To continue using the platform, contact us at sales@dreamfactory.com',
+  },
+};
+
 function httpError(status: number, body: unknown) {
   return new HttpErrorResponse({
     status,
@@ -73,6 +90,18 @@ describe('trialLockFromError', () => {
       reason: 'TRIAL_EXPIRED',
       context: EXPIRED_ENVELOPE.error.context,
     });
+  });
+
+  it('detects 402 TRIAL_REVOKED (df-trial >= 0.1.3 remote revocation)', () => {
+    const lock = trialLockFromError(httpError(402, REVOKED_ENVELOPE));
+    expect(lock).toEqual({
+      reason: 'TRIAL_REVOKED',
+      context: REVOKED_ENVELOPE.error.context,
+    });
+    expect(
+      trialLockFromError(normalizeError(httpError(402, REVOKED_ENVELOPE)))
+        ?.reason
+    ).toBe('TRIAL_REVOKED');
   });
 
   it('detects 403 TRIAL_TOKEN_INVALID on a raw HttpErrorResponse', () => {
@@ -169,6 +198,12 @@ describe('trialLockFromStatus', () => {
     const lock = trialLockFromStatus({ ...ACTIVE_TRIAL, status: 'expired' });
     expect(lock?.reason).toBe('TRIAL_EXPIRED');
     expect(lock?.context.expired_at).toBe(ACTIVE_TRIAL.expiresAt);
+  });
+
+  it('maps revoked -> TRIAL_REVOKED', () => {
+    const lock = trialLockFromStatus({ ...ACTIVE_TRIAL, status: 'revoked' });
+    expect(lock?.reason).toBe('TRIAL_REVOKED');
+    expect(lock?.context.trial_id).toBe('trl_01TEST');
   });
 
   it('maps invalid and missing -> TRIAL_TOKEN_INVALID', () => {

@@ -13,6 +13,10 @@ import {
 export interface TrialExpiredViewModel {
   reason: TrialLockReason;
   invalid: boolean;
+  /** TRIAL_REVOKED: deactivated by DreamFactory (remote revocation). */
+  revoked: boolean;
+  /** ISO date the trial was deactivated (TRIAL_REVOKED only; null when unknown). */
+  revokedAt: string | null;
   /** ISO date the trial ended (TRIAL_EXPIRED only; null when unknown). */
   endedAt: string | null;
   trialId: string | null;
@@ -31,6 +35,7 @@ export interface TrialExpiredViewModel {
  *
  * Two variants keyed on the lock reason:
  * - TRIAL_EXPIRED (402):       thank-you + "ended on <date>" + both CTAs
+ * - TRIAL_REVOKED (402):       deactivated copy (exact df-trial message) + "deactivated on <date>" + both CTAs
  * - TRIAL_TOKEN_INVALID (403): needs-a-valid-token copy + portal link + CTAs
  */
 @Component({
@@ -57,6 +62,9 @@ export class DfTrialExpiredComponent {
       return {
         reason,
         invalid: reason === 'TRIAL_TOKEN_INVALID',
+        revoked: reason === 'TRIAL_REVOKED',
+        revokedAt:
+          reason === 'TRIAL_REVOKED' ? (context?.revoked_at ?? null) : null,
         endedAt,
         trialId: context?.trial_id ?? trial?.trialId ?? null,
         contactEmail,

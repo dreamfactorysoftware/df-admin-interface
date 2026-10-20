@@ -36,7 +36,7 @@ export function trialFromEnvironment(
  * Detects the df-trial locked envelope on any error shape the app handles:
  * the raw HttpErrorResponse (inside interceptors / retry), a normalized
  * AppError, or a bare body. Locked means HTTP 402 or 403 AND
- * error.context.reason in {TRIAL_EXPIRED, TRIAL_TOKEN_INVALID}; a plain 403
+ * error.context.reason in {TRIAL_EXPIRED, TRIAL_REVOKED, TRIAL_TOKEN_INVALID}; a plain 403
  * (role denied) or 402 without the reason is NOT a trial lock.
  */
 export function trialLockFromError(err: unknown): TrialLock | null {
@@ -92,7 +92,8 @@ export function trialLockFromError(err: unknown): TrialLock | null {
 /**
  * A trial block that reports a locked status (e.g. the `/status`-shaped block
  * or a future environment payload) maps onto the same lock reasons the error
- * envelope uses: expired -> TRIAL_EXPIRED, invalid/missing -> TRIAL_TOKEN_INVALID.
+ * envelope uses: expired -> TRIAL_EXPIRED, revoked -> TRIAL_REVOKED,
+ * invalid/missing -> TRIAL_TOKEN_INVALID.
  */
 export function trialLockFromStatus(trial: TrialInfo | null): TrialLock | null {
   if (!trial) {
@@ -106,6 +107,17 @@ export function trialLockFromStatus(trial: TrialInfo | null): TrialLock | null {
           reason: 'TRIAL_EXPIRED',
           trial_id: trial.trialId,
           expired_at: trial.expiresAt,
+          contact_email: trial.contactEmail,
+          demo_url: trial.demoUrl,
+          portal_url: trial.portalUrl,
+        },
+      };
+    case 'revoked':
+      return {
+        reason: 'TRIAL_REVOKED',
+        context: {
+          reason: 'TRIAL_REVOKED',
+          trial_id: trial.trialId,
           contact_email: trial.contactEmail,
           demo_url: trial.demoUrl,
           portal_url: trial.portalUrl,

@@ -6,6 +6,9 @@
   --trial-tone-soft: var(--df-danger-soft);
   --trial-tone-border: var(--df-danger-border);
 
+  // border-box: the 32px vertical padding must live inside the 100vh, or the
+  // lockout page overflows <body> by 64px and shows a scrollbar.
+  box-sizing: border-box;
   min-height: 100vh;
   display: flex;
   align-items: center;
