@@ -20,6 +20,8 @@ import { RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
+import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
+import { maskSecretsIn } from 'src/app/shared/utilities/mask';
 import { McpEditorStore } from '../mcp-store';
 import { McpTab } from '../df-mcp-details/df-mcp-details.component';
 
@@ -93,7 +95,19 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
 
   private autoDismissTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private snackbarService: DfSnackbarService) {}
+  constructor(
+    private snackbarService: DfSnackbarService,
+    public presentation: DfPresentationService
+  ) {}
+
+  /** Display-only masking for the client snippets. The copy buttons are wired
+   *  to the raw getters on purpose, so what lands in Claude Code / Cursor /
+   *  Postman is still the real key. */
+  maskIfPresenting(text: string): string {
+    return this.presentation.on
+      ? maskSecretsIn(text, [this.store.createdApiKey])
+      : text;
+  }
 
   ngOnInit(): void {
     this.restoreClientChoice();
@@ -224,7 +238,9 @@ export class DfMcpConnectComponent implements OnInit, OnChanges, OnDestroy {
 
   /* -------------------------------- OAuth -------------------------------- */
   get secretDisplay(): string {
-    if (this.secretRevealed) return this.store.cfg.oauthClientSecret || '—';
+    if (this.secretRevealed && !this.presentation.on) {
+      return this.store.cfg.oauthClientSecret || '—';
+    }
     return this.store.cfg.oauthClientSecret ? '••••••••••••••••' : '—';
   }
 

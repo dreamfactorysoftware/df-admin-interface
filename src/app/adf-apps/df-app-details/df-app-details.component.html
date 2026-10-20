@@ -40,12 +40,13 @@
       <input
         #rolesInput
         type="text"
-        placeholder="Pick one"
+        placeholder="Type to search roles"
         matInput
         formControlName="defaultRole"
         [matAutocomplete]="auto"
         (input)="filter()"
         (focus)="filter()" />
+      <fa-icon class="role-search-icon" matPrefix [icon]="faMagnifyingGlass" />
       <fa-icon
         class="tool-tip-trigger"
         matSuffix
@@ -104,7 +105,7 @@
         }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
-        {{ editApp.apiKey }}
+        <df-secret [value]="editApp.apiKey"></df-secret>
       </mat-card-content>
       <mat-card-actions>
         <button
