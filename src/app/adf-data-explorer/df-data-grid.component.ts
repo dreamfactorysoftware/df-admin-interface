@@ -417,6 +417,13 @@ interface ColumnFilter {
           <button mat-stroked-button color="primary" (click)="loadData()">
             {{ t('dataExplorer.retry') }}
           </button>
+          <!-- The error hides the filter row, so a bad filter needs a way out here. -->
+          <button
+            mat-stroked-button
+            *ngIf="activeFilterCount > 0"
+            (click)="clearAllFilters()">
+            Clear filters
+          </button>
         </div>
 
         <!-- Empty -->
@@ -1720,10 +1727,14 @@ export class DfDataGridComponent
   getOperatorsForColumn(col: string): FilterOp[] {
     const fieldInfo = this.getFieldInfo(col);
     if (!fieldInfo) return this.textOperators;
-    const type = (fieldInfo.type || fieldInfo.dbType).toLowerCase();
-    if (this.isNumericType(type)) return this.numericOperators;
-    if (this.isDateType(type)) return this.dateOperators;
-    if (this.isBooleanType(type)) return this.booleanOperators;
+    // DF types foreign keys as `reference` (and PKs as `id`), so check the
+    // real column type too: a reference to an int column is numeric.
+    const types = [fieldInfo.type, fieldInfo.dbType]
+      .filter(Boolean)
+      .map(t => t.toLowerCase());
+    if (types.some(t => this.isNumericType(t))) return this.numericOperators;
+    if (types.some(t => this.isDateType(t))) return this.dateOperators;
+    if (types.some(t => this.isBooleanType(t))) return this.booleanOperators;
     return this.textOperators;
   }
 
