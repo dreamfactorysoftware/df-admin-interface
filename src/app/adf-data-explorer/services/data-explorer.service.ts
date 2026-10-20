@@ -185,4 +185,63 @@ export class DataExplorerService {
       }
     );
   }
+
+  /**
+   * One-click starter key: a role that can only GET this one table, and an
+   * app (API key) bound to it. Returns the role name and the new key.
+   */
+  createReadOnlyKey(
+    serviceName: string,
+    tableName: string
+  ): Observable<{ roleName: string; apiKey: string }> {
+    const roleName = `${serviceName}_${tableName}_read`;
+    return this.http
+      .get<{ resource: { id: number }[] }>(`${BASE_URL}/system/service`, {
+        params: { filter: `name="${serviceName}"`, fields: 'id' },
+        context: toastOff(),
+      })
+      .pipe(
+        switchMap(res =>
+          this.http.post<{ resource: { id: number }[] }>(
+            `${BASE_URL}/system/role`,
+            {
+              resource: [
+                {
+                  name: roleName,
+                  description: `Read-only access to ${serviceName}/_table/${tableName}. Created from Data Explorer.`,
+                  isActive: true,
+                  roleServiceAccessByRoleId: [
+                    {
+                      serviceId: res.resource[0].id,
+                      component: `_table/${tableName}`,
+                      verbMask: 1, // GET
+                      requestorMask: 1, // API
+                    },
+                  ],
+                },
+              ],
+            },
+            { context: toastOff() }
+          )
+        ),
+        switchMap(role =>
+          this.http.post<{ resource: { apiKey: string }[] }>(
+            `${BASE_URL}/system/app`,
+            {
+              resource: [
+                {
+                  name: roleName,
+                  description: `API key for role ${roleName}. Created from Data Explorer.`,
+                  type: 0,
+                  isActive: true,
+                  roleId: role.resource[0].id,
+                },
+              ],
+            },
+            { params: { fields: 'api_key' }, context: toastOff() }
+          )
+        ),
+        map(app => ({ roleName, apiKey: app.resource[0].apiKey }))
+      );
+  }
 }

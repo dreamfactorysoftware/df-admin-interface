@@ -50,6 +50,9 @@ import {
 import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { RouterLink } from '@angular/router';
+import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
+import { maskSecret } from 'src/app/shared/utilities/mask';
 
 interface FilterOp {
   value: string;
@@ -89,6 +92,7 @@ interface ColumnFilter {
     FontAwesomeModule,
     DfSchemaInfoComponent,
     DfRowDetailComponent,
+    RouterLink,
   ],
   template: `
     <div class="data-grid-container" *transloco="let t; scope: 'dataExplorer'">
@@ -293,6 +297,55 @@ interface ColumnFilter {
               matTooltip="Copy URL to clipboard">
               <mat-icon>{{ apiCopied ? 'check' : 'content_copy' }}</mat-icon>
             </button>
+          </div>
+          <div class="api-key-prompt">
+            <ng-container *ngIf="!readKey; else keyReady">
+              <mat-icon>vpn_key</mat-icon>
+              <span class="api-key-text"
+                >Your app calls this URL with an API key. The key's role decides
+                which tables and verbs it can reach.</span
+              >
+              <button
+                mat-stroked-button
+                class="api-key-btn"
+                [disabled]="keyBusy"
+                (click)="createReadKey()"
+                matTooltip="Creates a role that can only GET this table, plus an API key bound to it. Edit either one later.">
+                Create read-only key for {{ tableName }}
+              </button>
+              <a
+                class="api-key-link"
+                routerLink="/api-connections/role-based-access"
+                >Roles</a
+              >
+              <a class="api-key-link" routerLink="/api-connections/api-keys"
+                >API keys</a
+              >
+            </ng-container>
+            <ng-template #keyReady>
+              <mat-icon class="ok">check_circle</mat-icon>
+              <span class="api-key-text"
+                >Key ready. Role <strong>{{ readKey!.roleName }}</strong> can
+                GET this table only.</span
+              >
+              <code class="api-key-value">{{
+                presentation.on ? maskSecret(readKey!.apiKey) : readKey!.apiKey
+              }}</code>
+              <button
+                mat-stroked-button
+                class="api-key-btn"
+                (click)="copyCurl()"
+                matTooltip="Copy a curl command with this key in the X-DreamFactory-API-Key header">
+                <mat-icon>{{ curlCopied ? 'check' : 'content_copy' }}</mat-icon>
+                Copy curl
+              </button>
+              <a
+                class="api-key-link"
+                routerLink="/api-connections/role-based-access"
+                >Edit role</a
+              >
+            </ng-template>
+            <span class="api-key-error" *ngIf="keyError">{{ keyError }}</span>
           </div>
           <div class="api-call-options">
             <span class="options-label">Include:</span>
@@ -1099,6 +1152,54 @@ interface ColumnFilter {
           }
         }
 
+        .api-key-prompt {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 0;
+          font-size: 11px;
+          color: var(--df-text-muted);
+
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            color: var(--df-accent);
+            &.ok {
+              color: var(--df-success);
+            }
+          }
+
+          .api-key-btn {
+            height: 26px;
+            line-height: 26px;
+            font-size: 12px;
+            padding: 0 10px;
+            mat-icon {
+              color: inherit;
+            }
+          }
+
+          .api-key-value {
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+            color: var(--df-text-2);
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .api-key-link {
+            color: var(--df-accent-strong);
+          }
+
+          .api-key-error {
+            flex-basis: 100%;
+            color: var(--df-danger);
+          }
+        }
+
         .api-call-options,
         .api-call-related {
           display: flex;
@@ -1271,7 +1372,9 @@ export class DfDataGridComponent
 
   // Panel state
   showSchemaPanel = false;
-  showApiCall = false;
+  // On by default: Data Explorer is the landing page, and the matching API
+  // call is the point of it.
+  showApiCall = true;
   apiCopied = false;
   apiIncludeLimit = true;
   apiIncludeOffset = true;
@@ -1335,7 +1438,8 @@ export class DfDataGridComponent
   constructor(
     private dataExplorerService: DataExplorerService,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    public presentation: DfPresentationService
   ) {
     this.filterSubject$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
@@ -1367,6 +1471,8 @@ export class DfDataGridComponent
   }
 
   resetAndLoad(): void {
+    this.readKey = null;
+    this.keyError = '';
     this.allColumns = [];
     this.columns = [];
     this.filterColumns = [];
@@ -1895,6 +2001,42 @@ export class DfDataGridComponent
     navigator.clipboard.writeText(url).then(() => {
       this.apiCopied = true;
       setTimeout(() => (this.apiCopied = false), 2000);
+    });
+  }
+
+  // --- Starter API key ---
+
+  readKey: { roleName: string; apiKey: string } | null = null;
+  keyBusy = false;
+  keyError = '';
+  curlCopied = false;
+  maskSecret = maskSecret;
+
+  createReadKey(): void {
+    this.keyBusy = true;
+    this.keyError = '';
+    this.dataExplorerService
+      .createReadOnlyKey(this.serviceName, this.tableName)
+      .subscribe({
+        next: key => {
+          this.readKey = key;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.keyError = normalizeError(err).message;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  copyCurl(): void {
+    if (!this.readKey) return;
+    const cmd = `curl -H "X-DreamFactory-API-Key: ${this.readKey.apiKey}" "${this.buildApiUrl()}"`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      this.curlCopied = true;
+      setTimeout(() => (this.curlCopied = false), 2000);
     });
   }
 
