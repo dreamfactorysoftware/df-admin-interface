@@ -31,9 +31,14 @@
                   panelWidth="null"
                   (selectionChange)="getComponents(getFormArrayIndex(i))"
                   required>
+                  <df-select-search #serviceSearch></df-select-search>
                   <mat-option [value]="0">All</mat-option>
                   <mat-option
-                    *ngFor="let option of serviceOptions; trackBy: trackById"
+                    *ngFor="
+                      let option of serviceOptions
+                        | dfSearch: serviceSearch.query : '' : 'name';
+                      trackBy: trackById
+                    "
                     [value]="option.id"
                     >{{ option.name }}</mat-option
                   >
@@ -64,11 +69,17 @@
                 }}</mat-label>
                 <mat-select
                   formControlName="component"
-                  panelWdith="null"
+                  panelWidth="null"
                   required>
+                  <df-select-search
+                    #componentSearch
+                    [types]="
+                      getComponentTypes(getFormArrayIndex(i))
+                    "></df-select-search>
                   <mat-option
                     *ngFor="
                       let option of getComponentArray(getFormArrayIndex(i))
+                        | dfSearch: componentSearch.query : componentSearch.type
                     "
                     [value]="option"
                     >{{ option }}</mat-option
