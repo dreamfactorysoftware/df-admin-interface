@@ -80,7 +80,8 @@ export interface TableSchemaResponse {
 
 const DB_GROUPS = ['Database', 'Big Data'];
 
-/** An API key whose role can GET a given table. */
+/** A role that can GET a given table, with one of its API keys. A role
+ *  with no key yet appears once with empty appName/apiKey. */
 export interface TableKey {
   appName: string;
   roleId: number;
@@ -208,7 +209,8 @@ export class DataExplorerService {
   }
 
   /**
-   * Active API keys whose role can GET this table from the API: service row
+   * Active roles that can GET this table from the API, one entry per active
+   * key (or one keyless entry when the role has none): service row
    * for this service (or all services), component covering the table, GET
    * verb, API requestor. Row-level filters on the access row are ignored.
    */
@@ -240,28 +242,35 @@ export class DataExplorerService {
     ]).pipe(
       map(([service, roles]) => {
         const serviceId = service.resource[0]?.id;
-        return roles.resource
-          .filter(
-            role =>
-              role.isActive &&
-              role.roleServiceAccessByRoleId.some(
-                a =>
-                  (a.serviceId === serviceId || a.serviceId === null) &&
-                  covers.includes(a.component) &&
-                  (a.verbMask & 1) === 1 &&
-                  (a.requestorMask & 1) === 1
-              )
-          )
-          .flatMap(role =>
-            role.appByRoleId
-              .filter(app => app.isActive && app.apiKey)
-              .map(app => ({
-                appName: app.name,
-                roleId: role.id,
-                roleName: role.name,
-                apiKey: app.apiKey,
-              }))
-          );
+        return (
+          roles.resource
+            .filter(
+              role =>
+                role.isActive &&
+                role.roleServiceAccessByRoleId.some(
+                  a =>
+                    (a.serviceId === serviceId || a.serviceId === null) &&
+                    covers.includes(a.component) &&
+                    (a.verbMask & 1) === 1 &&
+                    (a.requestorMask & 1) === 1
+                )
+            )
+            .flatMap(role => {
+              const keys = role.appByRoleId.filter(
+                app => app.isActive && app.apiKey
+              );
+              const base = { roleId: role.id, roleName: role.name };
+              return keys.length
+                ? keys.map(app => ({
+                    ...base,
+                    appName: app.name,
+                    apiKey: app.apiKey,
+                  }))
+                : [{ ...base, appName: '', apiKey: '' }];
+            })
+            // Roles that already have a key first: those are ready to use.
+            .sort((a, b) => Number(!a.apiKey) - Number(!b.apiKey))
+        );
       })
     );
   }
@@ -318,6 +327,35 @@ export class DataExplorerService {
                 )
               )
         )
+      );
+  }
+
+  /** Add an API key to an existing role. */
+  createKeyForRole(roleId: number, roleName: string): Observable<TableKey> {
+    const appName = `${roleName}_key`;
+    return this.http
+      .post<{ resource: { apiKey: string }[] }>(
+        `${BASE_URL}/system/app`,
+        {
+          resource: [
+            {
+              name: appName,
+              description: `API key for role ${roleName}. Created from Data Explorer.`,
+              type: 0,
+              isActive: true,
+              roleId,
+            },
+          ],
+        },
+        { params: { fields: 'api_key' }, context: toastOff() }
+      )
+      .pipe(
+        map(created => ({
+          appName,
+          roleId,
+          roleName,
+          apiKey: created.resource[0].apiKey,
+        }))
       );
   }
 

@@ -303,9 +303,9 @@ interface ColumnFilter {
             <ng-container *ngIf="!readKey; else keyReady">
               <mat-icon>vpn_key</mat-icon>
               <span class="api-key-text"
-                >No API key can read this table yet. Your app calls this URL
-                with an API key, and the key's role decides which tables and
-                verbs it can reach.</span
+                >No role can read this table yet. Your app calls this URL with
+                an API key, and the key's role decides which tables and verbs it
+                can reach.</span
               >
               <button
                 mat-stroked-button
@@ -325,38 +325,58 @@ interface ColumnFilter {
               >
             </ng-container>
             <ng-template #keyReady>
-              <mat-icon class="ok">check_circle</mat-icon>
-              <span class="api-key-text">Key with read access:</span>
+              <mat-icon [class.ok]="readKey!.apiKey">{{
+                readKey!.apiKey ? 'check_circle' : 'vpn_key'
+              }}</mat-icon>
+              <span class="api-key-text">Roles with read access:</span>
               <select
                 *ngIf="tableKeys.length > 1; else oneKey"
                 class="api-key-select"
-                [value]="readKey!.appName"
+                [value]="keyOptionId(readKey!)"
                 (change)="selectKey($event)">
-                <option *ngFor="let k of tableKeys" [value]="k.appName">
-                  {{ k.appName }}
+                <option *ngFor="let k of tableKeys" [value]="keyOptionId(k)">
+                  {{ k.roleName
+                  }}{{ k.apiKey ? ' / ' + k.appName : ' (no key)' }}
                 </option>
               </select>
               <ng-template #oneKey
-                ><strong>{{ readKey!.appName }}</strong></ng-template
+                ><strong>{{ readKey!.roleName }}</strong></ng-template
               >
-              <code class="api-key-value">{{
-                presentation.on ? maskSecret(readKey!.apiKey) : readKey!.apiKey
-              }}</code>
-              <button
-                mat-stroked-button
-                class="api-key-btn"
-                (click)="copyCurl()"
-                matTooltip="Copy a curl command with this key in the X-DreamFactory-API-Key header">
-                <mat-icon>{{ curlCopied ? 'check' : 'content_copy' }}</mat-icon>
-                Copy curl
-              </button>
+              <ng-container *ngIf="readKey!.apiKey; else noKey">
+                <code class="api-key-value">{{
+                  presentation.on
+                    ? maskSecret(readKey!.apiKey)
+                    : readKey!.apiKey
+                }}</code>
+                <button
+                  mat-stroked-button
+                  class="api-key-btn"
+                  (click)="copyCurl()"
+                  matTooltip="Copy a curl command with this key in the X-DreamFactory-API-Key header">
+                  <mat-icon>{{
+                    curlCopied ? 'check' : 'content_copy'
+                  }}</mat-icon>
+                  Copy curl
+                </button>
+              </ng-container>
+              <ng-template #noKey>
+                <span class="api-key-text">has no API key.</span>
+                <button
+                  mat-stroked-button
+                  class="api-key-btn"
+                  [disabled]="keyBusy"
+                  (click)="createKeyForRole()"
+                  matTooltip="Creates an API key bound to this role">
+                  Create key
+                </button>
+              </ng-template>
               <a
                 class="api-key-link"
                 [routerLink]="[
                   '/api-connections/role-based-access',
                   readKey!.roleId,
                 ]"
-                >Edit role {{ readKey!.roleName }}</a
+                >Edit role</a
               >
             </ng-template>
             <span class="api-key-error" *ngIf="keyError">{{ keyError }}</span>
@@ -2068,9 +2088,35 @@ export class DfDataGridComponent
       });
   }
 
+  keyOptionId(k: TableKey): string {
+    return `${k.roleId}:${k.appName}`;
+  }
+
   selectKey(event: Event): void {
-    const name = (event.target as HTMLSelectElement).value;
-    this.readKey = this.tableKeys.find(k => k.appName === name) ?? null;
+    const id = (event.target as HTMLSelectElement).value;
+    this.readKey = this.tableKeys.find(k => this.keyOptionId(k) === id) ?? null;
+  }
+
+  createKeyForRole(): void {
+    const role = this.readKey;
+    if (!role) return;
+    this.keyBusy = true;
+    this.keyError = '';
+    this.dataExplorerService
+      .createKeyForRole(role.roleId, role.roleName)
+      .subscribe({
+        next: key => {
+          this.tableKeys = this.tableKeys.map(k => (k === role ? key : k));
+          this.readKey = key;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.keyError = normalizeError(err).message;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+      });
   }
 
   createReadKey(): void {
