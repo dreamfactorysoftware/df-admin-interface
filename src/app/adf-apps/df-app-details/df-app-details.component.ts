@@ -51,7 +51,10 @@ import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.co
 import { RoleType } from 'src/app/shared/types/role';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
-import { DfScopeMapComponent } from 'src/app/shared/components/df-scope-map/df-scope-map.component';
+import {
+  DfScopeMapComponent,
+  ScopeMapSummary,
+} from 'src/app/shared/components/df-scope-map/df-scope-map.component';
 import { DecimalPipe, CurrencyPipe } from '@angular/common';
 import { LimitType } from 'src/app/shared/types/limit';
 import { UsageService, n } from 'src/app/adf-ai-usage/services/usage.service';
@@ -128,6 +131,9 @@ export class DfAppDetailsComponent implements OnInit {
   /** Role currently selected in the form. Drives the scope-map preview and the
    *  rate-limit read-out, updating live as the user picks a different role. */
   selectedRoleId: number | null = null;
+  /** "What this key can reach" starts closed; the header carries its size. */
+  reachOpen = false;
+  reachSummary: ScopeMapSummary | null = null;
   /** Rate limits that govern the selected role, resolved to live meters. */
   roleLimits: RoleLimitMeter[] = [];
   /** This key's 30-day usage, or null when it has driven no traffic. */
@@ -169,8 +175,8 @@ export class DfAppDetailsComponent implements OnInit {
       this.filteredRoles = roles.resource || [];
       this.editApp = appData || null;
     });
-    this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
     if (this.editApp) {
+      this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
       this.appForm.patchValue({
         name: this.editApp.name,
         description: this.editApp.description,

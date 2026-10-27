@@ -123,7 +123,10 @@
     "tokensLabel": "Tokens",
     "spendLabel": "Spend",
     "requestsLabel": "Requests",
-    "perPeriod": "per {{period}}"
+    "perPeriod": "per {{period}}",
+    "reachCount": "{{services}} services, {{entries}} grants",
+    "reachShow": "Show",
+    "reachHide": "Hide"
   },
   "importApp": {
     "title": "Import Application",
