@@ -16,7 +16,7 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
+import { MatSelectModule, MAT_SELECT_CONFIG } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -43,6 +43,12 @@ import {
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-roles-access',
+  // panelWidth null lets each select panel size to its content instead of
+  // the trigger width (the endpoint and verb lists are long). This replaces
+  // an unscoped ::ng-deep .cdk-overlay-pane rule that leaked onto every
+  // overlay in the app for the rest of the session once this screen had
+  // rendered.
+  providers: [{ provide: MAT_SELECT_CONFIG, useValue: { panelWidth: null } }],
   templateUrl: './df-roles-access.component.html',
   styleUrls: ['./df-roles-access.component.scss'],
   standalone: true,

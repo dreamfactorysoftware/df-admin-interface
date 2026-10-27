@@ -183,7 +183,13 @@
   }
 }
 
-::ng-deep [mat-sort-header].cdk-keyboard-focused .mat-sort-header-container,
-[mat-sort-header].cdk-program-focused .mat-sort-header-container {
+:host
+  ::ng-deep
+  [mat-sort-header].cdk-keyboard-focused
+  .mat-sort-header-container,
+:host
+  ::ng-deep
+  [mat-sort-header].cdk-program-focused
+  .mat-sort-header-container {
   border-bottom: unset !important;
 }
