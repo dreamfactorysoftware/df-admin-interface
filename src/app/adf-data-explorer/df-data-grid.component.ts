@@ -46,10 +46,14 @@ import {
   DataExplorerService,
   TableSchemaResponse,
   FieldInfo,
+  TableKey,
 } from './services/data-explorer.service';
 import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { RouterLink } from '@angular/router';
+import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
+import { maskSecret } from 'src/app/shared/utilities/mask';
 
 interface FilterOp {
   value: string;
@@ -89,6 +93,7 @@ interface ColumnFilter {
     FontAwesomeModule,
     DfSchemaInfoComponent,
     DfRowDetailComponent,
+    RouterLink,
   ],
   template: `
     <div class="data-grid-container" *transloco="let t; scope: 'dataExplorer'">
@@ -294,6 +299,88 @@ interface ColumnFilter {
               <mat-icon>{{ apiCopied ? 'check' : 'content_copy' }}</mat-icon>
             </button>
           </div>
+          <div class="api-key-prompt">
+            <ng-container *ngIf="!readKey; else keyReady">
+              <mat-icon>vpn_key</mat-icon>
+              <span class="api-key-text"
+                >No role can read this table yet. Your app calls this URL with
+                an API key, and the key's role decides which tables and verbs it
+                can reach.</span
+              >
+              <button
+                mat-stroked-button
+                class="api-key-btn"
+                [disabled]="keyBusy || keysLoading"
+                (click)="createReadKey()"
+                matTooltip="Creates a role that can only GET this table, plus an API key bound to it. Edit either one later.">
+                Create read-only key for {{ tableName }}
+              </button>
+              <a
+                class="api-key-link"
+                routerLink="/api-connections/role-based-access"
+                >Roles</a
+              >
+              <a class="api-key-link" routerLink="/api-connections/api-keys"
+                >API keys</a
+              >
+            </ng-container>
+            <ng-template #keyReady>
+              <mat-icon [class.ok]="readKey!.apiKey">{{
+                readKey!.apiKey ? 'check_circle' : 'vpn_key'
+              }}</mat-icon>
+              <span class="api-key-text">Roles with read access:</span>
+              <select
+                *ngIf="tableKeys.length > 1; else oneKey"
+                class="api-key-select"
+                [value]="keyOptionId(readKey!)"
+                (change)="selectKey($event)">
+                <option *ngFor="let k of tableKeys" [value]="keyOptionId(k)">
+                  {{ k.roleName
+                  }}{{ k.apiKey ? ' / ' + k.appName : ' (no key)' }}
+                </option>
+              </select>
+              <ng-template #oneKey
+                ><strong>{{ readKey!.roleName }}</strong></ng-template
+              >
+              <ng-container *ngIf="readKey!.apiKey; else noKey">
+                <code class="api-key-value">{{
+                  presentation.on
+                    ? maskSecret(readKey!.apiKey)
+                    : readKey!.apiKey
+                }}</code>
+                <button
+                  mat-stroked-button
+                  class="api-key-btn"
+                  (click)="copyCurl()"
+                  matTooltip="Copy a curl command with this key in the X-DreamFactory-API-Key header">
+                  <mat-icon>{{
+                    curlCopied ? 'check' : 'content_copy'
+                  }}</mat-icon>
+                  Copy curl
+                </button>
+              </ng-container>
+              <ng-template #noKey>
+                <span class="api-key-text">has no API key.</span>
+                <button
+                  mat-stroked-button
+                  class="api-key-btn"
+                  [disabled]="keyBusy"
+                  (click)="createKeyForRole()"
+                  matTooltip="Creates an API key bound to this role">
+                  Create key
+                </button>
+              </ng-template>
+              <a
+                class="api-key-link"
+                [routerLink]="[
+                  '/api-connections/role-based-access',
+                  readKey!.roleId,
+                ]"
+                >Edit role</a
+              >
+            </ng-template>
+            <span class="api-key-error" *ngIf="keyError">{{ keyError }}</span>
+          </div>
           <div class="api-call-options">
             <span class="options-label">Include:</span>
             <label
@@ -363,6 +450,13 @@ interface ColumnFilter {
           <span>{{ error | transloco }}</span>
           <button mat-stroked-button color="primary" (click)="loadData()">
             {{ t('dataExplorer.retry') }}
+          </button>
+          <!-- The error hides the filter row, so a bad filter needs a way out here. -->
+          <button
+            mat-stroked-button
+            *ngIf="activeFilterCount > 0"
+            (click)="clearAllFilters()">
+            Clear filters
           </button>
         </div>
 
@@ -1099,6 +1193,59 @@ interface ColumnFilter {
           }
         }
 
+        .api-key-prompt {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 0;
+          font-size: 11px;
+          color: var(--df-text-muted);
+
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            color: var(--df-accent);
+            &.ok {
+              color: var(--df-success);
+            }
+          }
+
+          .api-key-btn {
+            height: 26px;
+            line-height: 26px;
+            font-size: 12px;
+            padding: 0 10px;
+            mat-icon {
+              color: inherit;
+            }
+          }
+
+          .api-key-select {
+            font-size: 12px;
+            max-width: 220px;
+          }
+
+          .api-key-value {
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+            color: var(--df-text-2);
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .api-key-link {
+            color: var(--df-accent-strong);
+          }
+
+          .api-key-error {
+            flex-basis: 100%;
+            color: var(--df-danger);
+          }
+        }
+
         .api-call-options,
         .api-call-related {
           display: flex;
@@ -1271,7 +1418,9 @@ export class DfDataGridComponent
 
   // Panel state
   showSchemaPanel = false;
-  showApiCall = false;
+  // On by default: Data Explorer is the landing page, and the matching API
+  // call is the point of it.
+  showApiCall = true;
   apiCopied = false;
   apiIncludeLimit = true;
   apiIncludeOffset = true;
@@ -1335,7 +1484,8 @@ export class DfDataGridComponent
   constructor(
     private dataExplorerService: DataExplorerService,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    public presentation: DfPresentationService
   ) {
     this.filterSubject$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
@@ -1367,6 +1517,10 @@ export class DfDataGridComponent
   }
 
   resetAndLoad(): void {
+    this.readKey = null;
+    this.tableKeys = [];
+    this.keyError = '';
+    this.loadKeys();
     this.allColumns = [];
     this.columns = [];
     this.filterColumns = [];
@@ -1614,10 +1768,14 @@ export class DfDataGridComponent
   getOperatorsForColumn(col: string): FilterOp[] {
     const fieldInfo = this.getFieldInfo(col);
     if (!fieldInfo) return this.textOperators;
-    const type = (fieldInfo.type || fieldInfo.dbType).toLowerCase();
-    if (this.isNumericType(type)) return this.numericOperators;
-    if (this.isDateType(type)) return this.dateOperators;
-    if (this.isBooleanType(type)) return this.booleanOperators;
+    // DF types foreign keys as `reference` (and PKs as `id`), so check the
+    // real column type too: a reference to an int column is numeric.
+    const types = [fieldInfo.type, fieldInfo.dbType]
+      .filter(Boolean)
+      .map(t => t.toLowerCase());
+    if (types.some(t => this.isNumericType(t))) return this.numericOperators;
+    if (types.some(t => this.isDateType(t))) return this.dateOperators;
+    if (types.some(t => this.isBooleanType(t))) return this.booleanOperators;
     return this.textOperators;
   }
 
@@ -1895,6 +2053,98 @@ export class DfDataGridComponent
     navigator.clipboard.writeText(url).then(() => {
       this.apiCopied = true;
       setTimeout(() => (this.apiCopied = false), 2000);
+    });
+  }
+
+  // --- Starter API key ---
+
+  tableKeys: TableKey[] = [];
+  readKey: TableKey | null = null;
+  keysLoading = false;
+  keyBusy = false;
+  keyError = '';
+  curlCopied = false;
+  maskSecret = maskSecret;
+
+  /** Show a key that can already read this table, so a reload keeps it. */
+  loadKeys(): void {
+    if (!this.serviceName || !this.tableName) return;
+    this.keysLoading = true;
+    this.dataExplorerService
+      .findReadKeys(this.serviceName, this.tableName)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: keys => {
+          this.tableKeys = keys;
+          this.readKey = keys[0] ?? null;
+          this.keysLoading = false;
+          this.cdr.markForCheck();
+        },
+        // Listing roles is a convenience; on failure, fall back to Create.
+        error: () => {
+          this.keysLoading = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  keyOptionId(k: TableKey): string {
+    return `${k.roleId}:${k.appName}`;
+  }
+
+  selectKey(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    this.readKey = this.tableKeys.find(k => this.keyOptionId(k) === id) ?? null;
+  }
+
+  createKeyForRole(): void {
+    const role = this.readKey;
+    if (!role) return;
+    this.keyBusy = true;
+    this.keyError = '';
+    this.dataExplorerService
+      .createKeyForRole(role.roleId, role.roleName)
+      .subscribe({
+        next: key => {
+          this.tableKeys = this.tableKeys.map(k => (k === role ? key : k));
+          this.readKey = key;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.keyError = normalizeError(err).message;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  createReadKey(): void {
+    this.keyBusy = true;
+    this.keyError = '';
+    this.dataExplorerService
+      .createReadOnlyKey(this.serviceName, this.tableName)
+      .subscribe({
+        next: key => {
+          this.tableKeys = [key];
+          this.readKey = key;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.keyError = normalizeError(err).message;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  copyCurl(): void {
+    if (!this.readKey) return;
+    const cmd = `curl -H "X-DreamFactory-API-Key: ${this.readKey.apiKey}" "${this.buildApiUrl()}"`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      this.curlCopied = true;
+      setTimeout(() => (this.curlCopied = false), 2000);
     });
   }
 
