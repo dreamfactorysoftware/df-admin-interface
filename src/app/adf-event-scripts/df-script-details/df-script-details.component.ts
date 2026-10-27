@@ -1,3 +1,8 @@
+import { scriptEventParameter } from './script-event-parameter';
+import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
 import { Component, Inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { UntilDestroy } from '@ngneat/until-destroy';
@@ -39,6 +44,8 @@ import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-servic
   templateUrl: './df-script-details.component.html',
   standalone: true,
   imports: [
+    DfSelectSearchComponent,
+    DfSearchPipe,
     DfAceEditorComponent,
     MatSlideToggleModule,
     TranslocoPipe,
@@ -219,28 +226,12 @@ export class DfScriptDetailsComponent implements OnInit {
     this.ungroupedRouteOptions = [
       ...this.ungroupedEventOptions[this.selectedEventItem].endpoints,
     ];
-    const data = this.ungroupedEventOptions[this.selectedEventItem].parameter;
-    if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-      if (Object.keys(data)[0] === 'tableName') {
-        this.tableProcedureFlag = 'table';
-        this.tableOptions = [
-          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
-            .tableName,
-        ];
-      } else if (Object.keys(data)[0] === 'procedureName') {
-        this.tableProcedureFlag = 'procedure';
-        this.tableOptions = [
-          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
-            .procedureName,
-        ];
-      } else if (Object.keys(data)[0] === 'functionName') {
-        this.tableProcedureFlag = 'function';
-        this.tableOptions = [
-          ...this.ungroupedEventOptions[this.selectedEventItem].parameter
-            .functionName,
-        ];
-      }
-    }
+    const param = scriptEventParameter(
+      this.ungroupedEventOptions[this.selectedEventItem].parameter,
+      this.selectedEventItem
+    );
+    this.tableProcedureFlag = param?.kind ?? '';
+    this.tableOptions = param?.options as string[];
   }
 
   selectedTable() {

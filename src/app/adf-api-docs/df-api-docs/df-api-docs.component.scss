@@ -72,6 +72,17 @@
   max-height: calc(100vh - var(--df-space-8));
   overflow-y: auto;
 
+  &__search {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid rgba(127, 127, 127, 0.4);
+    border-radius: 4px;
+    padding: var(--df-space-1) var(--df-space-2);
+  }
+
   &__group {
     margin: var(--df-space-3) 0 var(--df-space-1);
     padding: 0 var(--df-space-2);
@@ -263,6 +274,14 @@
   &--text {
     width: 12rem;
     max-width: 100%;
+  }
+
+  // Searchable mat-select picker: size to the chosen value, not the row.
+  &.mat-mdc-select {
+    display: inline-block;
+    width: auto;
+    min-width: 8rem;
+    vertical-align: middle;
   }
 }
 

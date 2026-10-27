@@ -1,4 +1,8 @@
 import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
+import {
   Component,
   ElementRef,
   OnInit,
@@ -129,6 +133,8 @@ const KNOWN_METHODS: TryItMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   styleUrls: ['./df-api-docs.component.scss'],
   standalone: true,
   imports: [
+    DfSearchPipe,
+    DfSelectSearchComponent,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -181,6 +187,8 @@ export class DfApiDocsComponent implements OnInit, OnDestroy {
   // Three-column model.
   loading = true;
   groups: DocGroup[] = [];
+  /** Left-nav filter text (matches operation paths). */
+  opQuery = '';
   selectedOp: DocOperation | null = null;
 
   // Request builder (right column), computed once per selected operation so the

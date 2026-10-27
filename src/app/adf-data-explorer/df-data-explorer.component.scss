@@ -26,7 +26,7 @@
 }
 
 // Also target via ::ng-deep to override Angular Material's own host styles
-::ng-deep mat-sidenav-container.explorer-sidenav-container {
+:host ::ng-deep mat-sidenav-container.explorer-sidenav-container {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -47,9 +47,13 @@
   background: var(--df-surface);
 }
 
-// Force mat-sidenav-content to have bounded height and act as positioned parent
-::ng-deep .mat-sidenav-content,
-::ng-deep .mat-drawer-content {
+// Force the explorer's own mat-sidenav-content to a bounded height and make
+// it the positioned parent. Scoped to :host on purpose: Angular 16 keeps a
+// component's <style> in the document for the rest of the session once the
+// component has rendered, and an unscoped ::ng-deep here used to match the
+// app shell's mat-sidenav-content too, leaving every page visited after the
+// Data Explorer with overflow: hidden and no scrollbar until a reload.
+:host ::ng-deep .explorer-sidenav-container > .mat-drawer-content {
   height: 100% !important;
   overflow: hidden !important;
   position: relative !important;
