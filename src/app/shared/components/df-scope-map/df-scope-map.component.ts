@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  EventEmitter,
   Input,
   OnChanges,
   OnDestroy,
+  Output,
   SimpleChanges,
 } from '@angular/core';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -27,6 +29,11 @@ interface ScopeMapGroup {
   /** All entries in the group came in via a wildcard the role inherited. */
   allInherited: boolean;
   allow: boolean;
+}
+
+export interface ScopeMapSummary {
+  services: number;
+  entries: number;
 }
 
 /**
@@ -60,6 +67,8 @@ export class DfScopeMapComponent implements OnChanges, OnDestroy {
   @Input() keyId?: number | null;
   /** Resolve reach from an AI agent's attached role. */
   @Input() agentId?: number | null;
+  /** Fires once reach is resolved: how many services and grants it spans. */
+  @Output() loaded = new EventEmitter<ScopeMapSummary>();
 
   groups: ScopeMapGroup[] = [];
   loading = false;
@@ -100,6 +109,10 @@ export class DfScopeMapComponent implements OnChanges, OnDestroy {
     source.pipe(takeUntil(this.destroy$)).subscribe(entries => {
       this.loading = false;
       this.groups = this.group(entries);
+      this.loaded.emit({
+        services: this.groups.length,
+        entries: entries.length,
+      });
     });
   }
 

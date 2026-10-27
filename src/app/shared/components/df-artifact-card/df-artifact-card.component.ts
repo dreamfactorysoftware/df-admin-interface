@@ -13,6 +13,7 @@ import { faCheck, faCopy, faPlus } from '@fortawesome/free-solid-svg-icons';
 import { DfBadgeComponent } from '../df-badge/df-badge.component';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { API_KEY_HEADER } from 'src/app/shared/constants/http-headers';
+import { DfSecretComponent } from '../df-secret/df-secret.component';
 
 /**
  * A selectable identity the request can run as. Lets the card switch which key
@@ -79,6 +80,7 @@ export type ArtifactFormat = 'json' | 'xml';
   styleUrls: ['./df-artifact-card.component.scss'],
   standalone: true,
   imports: [
+    DfSecretComponent,
     NgIf,
     NgFor,
     NgTemplateOutlet,

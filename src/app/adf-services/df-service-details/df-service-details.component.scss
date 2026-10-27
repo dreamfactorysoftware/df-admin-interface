@@ -223,10 +223,10 @@ mat-icon {
   }
 }
 
-::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
+:host ::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
   color: unset !important;
 }
-::ng-deep .mat-mdc-select-arrow {
+:host ::ng-deep .mat-mdc-select-arrow {
   color: unset !important;
 }
 

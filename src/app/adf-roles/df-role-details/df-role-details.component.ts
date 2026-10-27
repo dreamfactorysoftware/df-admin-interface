@@ -242,8 +242,12 @@ export class DfRoleDetailsComponent implements OnInit {
       name: formValue.name,
       description: formValue.description,
       isActive: formValue.active,
-      roleServiceAccessByRoleId: formValue.serviceAccess.map(
-        (val: AccessForm, index: number) => {
+      roleServiceAccessByRoleId: formValue.serviceAccess
+        .map((val: AccessForm, index: number) => {
+          // A row added and removed before saving never reached the
+          // server, so there is nothing to delete; its empty fields would
+          // also break the mask reduce below.
+          if (!this.visibilityArray[index] && !val.id) return null;
           const filtersArray = val.advancedFilters.map((filter: any) => ({
             name: filter.expandField,
             operator: filter.expandOperator,
@@ -263,8 +267,8 @@ export class DfRoleDetailsComponent implements OnInit {
             filters: filtersArray,
             filterOp: filterOp[0],
           };
-        }
-      ),
+        })
+        .filter(Boolean),
       lookupByRoleId: this.getLookupKeysWithDeletions(formValue),
     };
     const createPayload = {
