@@ -14,11 +14,14 @@ export interface DatabaseService {
   label: string;
   description: string;
   type: string;
+  /** Human name of the service type, e.g. "MySQL" for type "mysql". */
+  typeLabel?: string;
   isActive: boolean;
 }
 
 export interface ServiceType {
   name: string;
+  label?: string;
 }
 
 export interface TableInfo {
@@ -107,12 +110,14 @@ export class DataExplorerService {
   private http = inject(HttpClient);
 
   getDatabaseServices(): Observable<DatabaseService[]> {
-    // Step 1: Get service type names for Database and Big Data groups
+    // Step 1: service types in the Database and Big Data groups. The label
+    // ("MySQL", "PostgreSQL") is what the selector shows under the service
+    // name; the raw type name is only used to filter services.
     const typeRequests = DB_GROUPS.map(group =>
       this.http.get<{ resource: ServiceType[] }>(
         `${BASE_URL}/system/service_type`,
         {
-          params: { fields: 'name', group },
+          params: { fields: 'name,label', group },
           headers: { 'show-loading': '', 'Cache-Control': 'no-cache, private' },
           context: toastOff(),
         }
@@ -120,23 +125,24 @@ export class DataExplorerService {
     );
 
     return forkJoin(typeRequests).pipe(
-      map(responses =>
-        responses.flatMap(r => r.resource || []).map(t => t.name)
-      ),
-      switchMap(typeNames => {
-        if (typeNames.length === 0) {
+      map(responses => responses.flatMap(r => r.resource || [])),
+      switchMap(types => {
+        if (types.length === 0) {
           return new Observable<DatabaseService[]>(sub => {
             sub.next([]);
             sub.complete();
           });
         }
-        const typeFilter = `(type in ("${typeNames.join('","')}"))`;
+        const labelByType = new Map(types.map(t => [t.name, t.label]));
+        const typeFilter = `(type in ("${types.map(t => t.name).join('","')}"))`;
+        // Step 2: every active database service. No client-side row cap: an
+        // instance with hundreds of connections must list all of them, so
+        // leave the page size to the server's max_records_returned.
         return this.http
           .get<{ resource: DatabaseService[] }>(`${BASE_URL}/system/service`, {
             params: {
               filter: typeFilter,
-              fields: 'id,name,label,description,type',
-              limit: '100',
+              fields: 'id,name,label,description,type,is_active',
               sort: 'name',
             },
             headers: {
@@ -146,7 +152,11 @@ export class DataExplorerService {
             context: toastOff(),
           })
           .pipe(
-            map(res => (res.resource || []).filter(s => s.isActive !== false))
+            map(res =>
+              (res.resource || [])
+                .filter(s => s.isActive !== false)
+                .map(s => ({ ...s, typeLabel: labelByType.get(s.type) }))
+            )
           );
       })
     );
