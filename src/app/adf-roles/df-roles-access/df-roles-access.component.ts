@@ -33,6 +33,12 @@ import {
   trigger,
 } from '@angular/animations';
 import { CommonModule } from '@angular/common';
+import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+  componentTypes,
+  SelectSearchType,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -60,6 +66,8 @@ import { CommonModule } from '@angular/common';
     CommonModule,
     MatButtonToggleModule,
     FormsModule,
+    DfSelectSearchComponent,
+    DfSearchPipe,
   ],
   animations: [
     trigger('detailExpand', [
@@ -212,6 +220,21 @@ export class DfRolesAccessComponent implements OnInit {
     return components || [];
   }
 
+  /** Type filters for the component picker, only for types this service has.
+   *  Memoized per component list so the template binding stays stable. */
+  private typeCache = new WeakMap<string[], SelectSearchType[]>();
+  private noTypes: SelectSearchType[] = [];
+  getComponentTypes(index: number): SelectSearchType[] {
+    const components = this.getComponentArray(index);
+    if (!components.length) return this.noTypes;
+    let types = this.typeCache.get(components);
+    if (!types) {
+      types = componentTypes(components);
+      this.typeCache.set(components, types);
+    }
+    return types;
+  }
+
   getFormArrayIndex(visibleIndex: number): number {
     let visibleCount = 0;
     for (let i = 0; i < this.visible.length; i++) {
@@ -308,7 +331,7 @@ export class DfRolesAccessComponent implements OnInit {
       new FormGroup({
         service: new FormControl(0, Validators.required),
         component: new FormControl('', Validators.required),
-        access: new FormControl('', Validators.required),
+        access: new FormControl([], Validators.required),
         requester: new FormControl([1], Validators.required),
         advancedFilters: advancedFilters,
         id: new FormControl(null),
