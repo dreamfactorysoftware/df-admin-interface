@@ -495,15 +495,16 @@
       [deprecated]="serviceData.deprecated">
     </df-service-health-panel>
 
-    <!-- Meridian Phase 1: service Overview. Viewing an existing database
-         service opens on the Live API Card — a real base URL, a scoped key,
-         and a runnable curl — before the config form. -->
-    <ng-container *ngIf="edit && isDatabase && serviceData">
-      <df-page-header
-        [eyebrow]="'services.overview.eyebrow' | transloco"
-        [title]="serviceData.label || serviceData.name"
-        [description]="'services.overview.description' | transloco">
-      </df-page-header>
+    <!-- Live API first, closed: the base URL rides in the header so the
+         card is one click away without pushing the connection form down.
+         Pipeline and Access follow the form (see the end of this template). -->
+    <df-disclosure
+      *ngIf="edit && isDatabase && serviceData"
+      class="service-section"
+      [eyebrow]="'services.overview.eyebrow' | transloco"
+      [title]="'services.overview.title' | transloco"
+      [description]="'services.overview.description' | transloco"
+      [summary]="artifactBaseUrl">
       <df-artifact-card
         class="service-overview-card"
         [serviceName]="serviceData.name"
@@ -512,48 +513,7 @@
         [keys]="artifactKeys"
         (createKey)="onCreateApiKey()">
       </df-artifact-card>
-
-      <!-- Meridian Phase 5: Pipeline. The effective request chain for this
-           service as hairline cards (key -> role gate -> rate limit -> field
-           filter -> generated handler), each node deep-linked to the config
-           that governs it. Sits above Access so the chain reads before the
-           roles x verbs detail.
-      -->
-      <section class="service-pipeline" *ngIf="serviceData.id">
-        <df-page-header
-          [eyebrow]="'services.pipeline.eyebrow' | transloco"
-          [title]="'services.pipeline.title' | transloco"
-          [description]="'services.pipeline.description' | transloco">
-        </df-page-header>
-        <p class="service-pipeline__hint">
-          {{ 'services.pipeline.hint' | transloco }}
-        </p>
-        <df-pipeline-strip
-          [serviceId]="serviceData.id"
-          [serviceName]="serviceData.name"
-          [serviceType]="serviceData.type">
-        </df-pipeline-strip>
-      </section>
-
-      <!-- Meridian Phase 3: Access. Governance made legible where you build
-           the API. The roles x verbs matrix is derived client-side from the
-           role graph; clicking a granted cell opens the role's resolved scope.
-      -->
-      <section class="service-access" *ngIf="serviceData.id">
-        <df-page-header
-          [eyebrow]="'services.access.eyebrow' | transloco"
-          [title]="'services.access.title' | transloco"
-          [description]="'services.access.description' | transloco">
-        </df-page-header>
-        <p class="service-access__hint">
-          {{ 'services.access.hint' | transloco }}
-        </p>
-        <df-scope-matrix
-          [serviceId]="serviceData.id"
-          (cellClick)="onScopeCellClick($event)">
-        </df-scope-matrix>
-      </section>
-    </ng-container>
+    </df-disclosure>
 
     <mat-form-field
       subscriptSizing="dynamic"
@@ -1778,6 +1738,41 @@
           </div>
         </mat-expansion-panel>
       </mat-accordion>
+    </ng-container>
+
+    <!-- Pipeline and Access after the form, closed. Access can be hundreds
+         of role rows on a real instance; its header says how many of them
+         reach this service so the matrix only renders on request. -->
+    <ng-container *ngIf="edit && isDatabase && serviceData?.id">
+      <df-disclosure
+        class="service-section"
+        [eyebrow]="'services.pipeline.eyebrow' | transloco"
+        [title]="'services.pipeline.title' | transloco"
+        [description]="'services.pipeline.description' | transloco">
+        <p class="service-section__hint">
+          {{ 'services.pipeline.hint' | transloco }}
+        </p>
+        <df-pipeline-strip
+          [serviceId]="serviceData.id"
+          [serviceName]="serviceData.name"
+          [serviceType]="serviceData.type">
+        </df-pipeline-strip>
+      </df-disclosure>
+
+      <df-disclosure
+        class="service-section"
+        [eyebrow]="'services.access.eyebrow' | transloco"
+        [title]="'services.access.title' | transloco"
+        [description]="'services.access.description' | transloco"
+        [summary]="accessSummary">
+        <p class="service-section__hint">
+          {{ 'services.access.hint' | transloco }}
+        </p>
+        <df-scope-matrix
+          [serviceId]="serviceData.id"
+          (cellClick)="onScopeCellClick($event)">
+        </df-scope-matrix>
+      </df-disclosure>
     </ng-container>
 
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">
