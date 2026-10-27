@@ -2202,19 +2202,13 @@ export class DfServiceDetailsComponent implements OnInit {
                 relativeTo: this.activatedRoute,
               });
             } else if (this.isDatabase) {
-              // Meridian Phase 1 proof-of-life: a new database API lands on its
-              // Overview (the Live API Card with a runnable curl), not the
-              // api-docs scavenger hunt. `../{id}` is the sibling :id route.
-              const newId = response?.resource?.[0]?.id;
-              if (newId != null) {
-                this.router.navigate(['../', newId], {
-                  relativeTo: this.activatedRoute,
-                });
-              } else {
-                this.router.navigate([
-                  `/api-connections/api-docs/${formattedName}`,
-                ]);
-              }
+              // A new database API lands on Data Explorer with that API
+              // selected: live rows from the connection just entered, not
+              // the config form it was created from (2026-07 landed on the
+              // service Overview; before that, API Docs).
+              this.router.navigate(['/api-connections/data-explorer'], {
+                queryParams: { service: data.name },
+              });
             } else if (this.isMcp) {
               // A new MCP server lands on its own editor's Connect tab with
               // the endpoint URL and first-run checklist — never API Docs,
