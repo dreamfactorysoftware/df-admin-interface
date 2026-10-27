@@ -8,6 +8,7 @@
  */
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { scriptEventParameter } from './script-event-parameter';
 
 const HTML_SRC = readFileSync(
   join(__dirname, 'df-script-details.component.html'),
@@ -95,5 +96,48 @@ describe('DfScriptDetailsComponent service lookup key', () => {
 
   it('looks up events using the raw serviceName', () => {
     expect(TS_SRC).toMatch(/response\[serviceName\]/);
+  });
+});
+
+describe('scriptEventParameter', () => {
+  // /system/event skips the case interceptor, so parameters arrive with the
+  // API's snake_case keys. Matching only `tableName` hid the Table Name
+  // picker, leaving no way to script one table (e.g. `driver`).
+  it('reads the raw snake_case table_name key', () => {
+    expect(
+      scriptEventParameter({ table_name: ['customer', 'driver'] })
+    ).toEqual({ kind: 'table', options: ['customer', 'driver'] });
+  });
+
+  it('still reads camelCase and procedure/function keys', () => {
+    expect(scriptEventParameter({ tableName: ['a'] })?.kind).toBe('table');
+    expect(scriptEventParameter({ procedure_name: ['p'] })?.kind).toBe(
+      'procedure'
+    );
+    expect(scriptEventParameter({ functionName: ['f'] })?.kind).toBe(
+      'function'
+    );
+  });
+
+  it('returns null when the event takes no parameter', () => {
+    expect(scriptEventParameter(null)).toBeNull();
+    expect(scriptEventParameter({})).toBeNull();
+  });
+});
+
+describe('scriptEventParameter without a name list', () => {
+  // A service with no stored functions sends `parameter: null`; the picker
+  // must still show (empty) so a name can be typed.
+  it('falls back to the placeholder in the event name', () => {
+    expect(
+      scriptEventParameter(null, 'logistics._func.{function_name}')
+    ).toEqual({ kind: 'function', options: [] });
+    expect(scriptEventParameter(null, 'db._proc.{procedure_name}')?.kind).toBe(
+      'procedure'
+    );
+  });
+
+  it('returns null for events without a name placeholder', () => {
+    expect(scriptEventParameter(null, 'logistics._func')).toBeNull();
   });
 });

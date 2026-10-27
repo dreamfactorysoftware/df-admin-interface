@@ -68,20 +68,34 @@
 <div *ngIf="!loading && hasOperations" class="docs-two-col">
   <!-- LEFT: endpoint list, full names (no truncation) -->
   <nav class="docs-nav" aria-label="API operations">
+    <input
+      #opSearch
+      class="docs-nav__search"
+      type="search"
+      autocomplete="off"
+      [placeholder]="'search' | transloco"
+      [attr.aria-label]="'search' | transloco"
+      (input)="opQuery = opSearch.value"
+      (keydown.escape)="opQuery = opSearch.value = ''" />
     <ng-container *ngFor="let group of groups; trackBy: trackByGroup">
-      <p class="docs-nav__group df-eyebrow">{{ group.tag }}</p>
-      <mat-nav-list dense>
-        <a
-          mat-list-item
-          *ngFor="let op of group.operations; trackBy: trackByOperation"
-          class="docs-op"
-          [class.is-active]="isSelected(op)"
-          [ngClass]="methodClass(op.method)"
-          (click)="selectOperation(op)">
-          <span class="docs-op__method">{{ op.method }}</span>
-          <span class="docs-op__path">{{ op.path }}</span>
-        </a>
-      </mat-nav-list>
+      <ng-container
+        *ngIf="group.operations | dfSearch: opQuery : '' : 'path' as ops">
+        <ng-container *ngIf="ops.length">
+          <p class="docs-nav__group df-eyebrow">{{ group.tag }}</p>
+          <mat-nav-list dense>
+            <a
+              mat-list-item
+              *ngFor="let op of ops; trackBy: trackByOperation"
+              class="docs-op"
+              [class.is-active]="isSelected(op)"
+              [ngClass]="methodClass(op.method)"
+              (click)="selectOperation(op)">
+              <span class="docs-op__method">{{ op.method }}</span>
+              <span class="docs-op__path">{{ op.path }}</span>
+            </a>
+          </mat-nav-list>
+        </ng-container>
+      </ng-container>
     </ng-container>
   </nav>
 
@@ -103,33 +117,34 @@
             *ngFor="let seg of pathSegments; trackBy: trackBySegment">
             <span *ngIf="!seg.token" class="rb-seg">{{ seg.text }}</span>
             <ng-container *ngIf="seg.token as tk">
-              <select
+              <mat-select
                 *ngIf="usePicker(tk); else segText"
                 class="rb-token"
+                panelWidth="null"
                 [class.rb-token--empty]="!tokenValues[tk.token]"
-                [ngModel]="tokenValues[tk.token] || ''"
+                [ngModel]="tokenValues[tk.token] || null"
                 (ngModelChange)="onTokenSelected(tk, $event)"
-                [attr.aria-label]="
+                [placeholder]="
+                  tk.labelKey
+                    ? (tk.labelKey | transloco)
+                    : humanizeToken(tk.token)
+                "
+                [aria-label]="
                   tk.labelKey
                     ? (tk.labelKey | transloco)
                     : humanizeToken(tk.token)
                 ">
-                <option value="" disabled>
-                  {{
-                    tk.labelKey
-                      ? (tk.labelKey | transloco)
-                      : humanizeToken(tk.token)
-                  }}
-                </option>
-                <option
+                <df-select-search #tokenSearch></df-select-search>
+                <mat-option
                   *ngFor="
-                    let opt of tokenOptions[tk.token];
+                    let opt of tokenOptions[tk.token]
+                      | dfSearch: tokenSearch.query;
                     trackBy: trackByOption
                   "
                   [value]="opt">
                   {{ opt }}
-                </option>
-              </select>
+                </mat-option>
+              </mat-select>
               <ng-template #segText>
                 <input
                   class="rb-token rb-token--text"

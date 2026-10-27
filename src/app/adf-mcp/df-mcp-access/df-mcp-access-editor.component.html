@@ -12,7 +12,7 @@
     </p>
     <div class="mcp-acc-keybox" *ngIf="apiKey">
       <span>API key created. Copy it now — it is shown once.</span>
-      <code data-testid="mcp-access-key">{{ apiKey }}</code>
+      <df-secret data-testid="mcp-access-key" [value]="apiKey"></df-secret>
       <button mat-stroked-button type="button" (click)="copyKey()">
         Copy key
       </button>
