@@ -213,7 +213,7 @@
               mat-cell
               *matCellDef="let row; let i = dataIndex"
               [formGroupName]="getFormArrayIndex(i)">
-              <button mat-icon-button (click)="remove(i)">
+              <button mat-icon-button type="button" (click)="remove(i)">
                 <fa-icon [icon]="faTrashCan" size="xs"></fa-icon>
               </button>
             </td>
