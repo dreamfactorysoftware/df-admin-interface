@@ -12,6 +12,12 @@ export const ERROR_HANDLING = new HttpContextToken<
   'default' | 'silent' | 'toast-off'
 >(() => 'default');
 
+/**
+ * Set by errorInterceptor on the single retry it makes after dropping a dead
+ * session token, so a request is never retried twice.
+ */
+export const SESSION_RETRY = new HttpContextToken<boolean>(() => false);
+
 /** Translation key for a success toast shown when the request succeeds. */
 export const SUCCESS_TOAST = new HttpContextToken<string | null>(() => null);
 
