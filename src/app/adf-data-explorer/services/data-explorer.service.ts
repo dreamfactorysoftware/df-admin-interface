@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { BASE_URL } from '../../shared/constants/urls';
 import { toastOff } from '../../shared/utilities/http-contexts';
@@ -14,11 +14,14 @@ export interface DatabaseService {
   label: string;
   description: string;
   type: string;
+  /** Human name of the service type, e.g. "MySQL" for type "mysql". */
+  typeLabel?: string;
   isActive: boolean;
 }
 
 export interface ServiceType {
   name: string;
+  label?: string;
 }
 
 export interface TableInfo {
@@ -80,17 +83,41 @@ export interface TableSchemaResponse {
 
 const DB_GROUPS = ['Database', 'Big Data'];
 
+/** A role that can GET a given table, with one of its API keys. A role
+ *  with no key yet appears once with empty appName/apiKey. */
+export interface TableKey {
+  appName: string;
+  roleId: number;
+  roleName: string;
+  apiKey: string;
+}
+
+interface RoleWithAccess {
+  id: number;
+  name: string;
+  isActive: boolean;
+  roleServiceAccessByRoleId: {
+    serviceId: number | null;
+    component: string;
+    verbMask: number;
+    requestorMask: number;
+  }[];
+  appByRoleId: { name: string; apiKey: string; isActive: boolean }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class DataExplorerService {
   private http = inject(HttpClient);
 
   getDatabaseServices(): Observable<DatabaseService[]> {
-    // Step 1: Get service type names for Database and Big Data groups
+    // Step 1: service types in the Database and Big Data groups. The label
+    // ("MySQL", "PostgreSQL") is what the selector shows under the service
+    // name; the raw type name is only used to filter services.
     const typeRequests = DB_GROUPS.map(group =>
       this.http.get<{ resource: ServiceType[] }>(
         `${BASE_URL}/system/service_type`,
         {
-          params: { fields: 'name', group },
+          params: { fields: 'name,label', group },
           headers: { 'show-loading': '', 'Cache-Control': 'no-cache, private' },
           context: toastOff(),
         }
@@ -98,23 +125,24 @@ export class DataExplorerService {
     );
 
     return forkJoin(typeRequests).pipe(
-      map(responses =>
-        responses.flatMap(r => r.resource || []).map(t => t.name)
-      ),
-      switchMap(typeNames => {
-        if (typeNames.length === 0) {
+      map(responses => responses.flatMap(r => r.resource || [])),
+      switchMap(types => {
+        if (types.length === 0) {
           return new Observable<DatabaseService[]>(sub => {
             sub.next([]);
             sub.complete();
           });
         }
-        const typeFilter = `(type in ("${typeNames.join('","')}"))`;
+        const labelByType = new Map(types.map(t => [t.name, t.label]));
+        const typeFilter = `(type in ("${types.map(t => t.name).join('","')}"))`;
+        // Step 2: every active database service. No client-side row cap: an
+        // instance with hundreds of connections must list all of them, so
+        // leave the page size to the server's max_records_returned.
         return this.http
           .get<{ resource: DatabaseService[] }>(`${BASE_URL}/system/service`, {
             params: {
               filter: typeFilter,
-              fields: 'id,name,label,description,type',
-              limit: '100',
+              fields: 'id,name,label,description,type,is_active',
               sort: 'name',
             },
             headers: {
@@ -124,7 +152,11 @@ export class DataExplorerService {
             context: toastOff(),
           })
           .pipe(
-            map(res => (res.resource || []).filter(s => s.isActive !== false))
+            map(res =>
+              (res.resource || [])
+                .filter(s => s.isActive !== false)
+                .map(s => ({ ...s, typeLabel: labelByType.get(s.type) }))
+            )
           );
       })
     );
@@ -183,6 +215,201 @@ export class DataExplorerService {
         headers: { 'show-loading': '' },
         context: toastOff(),
       }
+    );
+  }
+
+  /**
+   * Active roles that can GET this table from the API, one entry per active
+   * key (or one keyless entry when the role has none): service row
+   * for this service (or all services), component covering the table, GET
+   * verb, API requestor. Row-level filters on the access row are ignored.
+   */
+  findReadKeys(serviceName: string, tableName: string): Observable<TableKey[]> {
+    const covers = [
+      '*',
+      '_table/*',
+      `_table/${tableName}`,
+      `_table/${tableName}/*`,
+    ];
+    return forkJoin([
+      this.http.get<{ resource: { id: number }[] }>(
+        `${BASE_URL}/system/service`,
+        {
+          params: { filter: `name="${serviceName}"`, fields: 'id' },
+          context: toastOff(),
+        }
+      ),
+      // ponytail: loads every role; fine for typical installs, move to a
+      // server-side filter if role counts reach the thousands.
+      this.http.get<{ resource: RoleWithAccess[] }>(`${BASE_URL}/system/role`, {
+        params: {
+          fields: 'id,name,is_active',
+          related: 'role_service_access_by_role_id,app_by_role_id',
+          limit: '0',
+        },
+        context: toastOff(),
+      }),
+    ]).pipe(
+      map(([service, roles]) => {
+        const serviceId = service.resource[0]?.id;
+        return (
+          roles.resource
+            .filter(
+              role =>
+                role.isActive &&
+                role.roleServiceAccessByRoleId.some(
+                  a =>
+                    (a.serviceId === serviceId || a.serviceId === null) &&
+                    covers.includes(a.component) &&
+                    (a.verbMask & 1) === 1 &&
+                    (a.requestorMask & 1) === 1
+                )
+            )
+            .flatMap(role => {
+              const keys = role.appByRoleId.filter(
+                app => app.isActive && app.apiKey
+              );
+              const base = { roleId: role.id, roleName: role.name };
+              return keys.length
+                ? keys.map(app => ({
+                    ...base,
+                    appName: app.name,
+                    apiKey: app.apiKey,
+                  }))
+                : [{ ...base, appName: '', apiKey: '' }];
+            })
+            // Roles that already have a key first: those are ready to use.
+            .sort((a, b) => Number(!a.apiKey) - Number(!b.apiKey))
+        );
+      })
+    );
+  }
+
+  /**
+   * One-click starter key: a role that can only GET this one table, and an
+   * app (API key) bound to it. Safe to click again: an existing key or role
+   * with the generated name is reused instead of failing on the unique name.
+   */
+  createReadOnlyKey(
+    serviceName: string,
+    tableName: string
+  ): Observable<TableKey> {
+    const roleName = `${serviceName}_${tableName}_read`;
+    const byName = (name: string, fields: string) => ({
+      params: { filter: `name="${name}"`, fields },
+      context: toastOff(),
+    });
+    const done = (apiKey: string, roleId: number): TableKey => ({
+      appName: roleName,
+      roleId,
+      roleName,
+      apiKey,
+    });
+    return this.http
+      .get<{
+        resource: { apiKey: string; roleId: number }[];
+      }>(`${BASE_URL}/system/app`, byName(roleName, 'api_key,role_id'))
+      .pipe(
+        switchMap(app =>
+          app.resource.length
+            ? of(done(app.resource[0].apiKey, app.resource[0].roleId))
+            : this.findOrCreateReadRole(serviceName, tableName, roleName).pipe(
+                switchMap(roleId =>
+                  this.http
+                    .post<{ resource: { apiKey: string }[] }>(
+                      `${BASE_URL}/system/app`,
+                      {
+                        resource: [
+                          {
+                            name: roleName,
+                            description: `API key for role ${roleName}. Created from Data Explorer.`,
+                            type: 0,
+                            isActive: true,
+                            roleId,
+                          },
+                        ],
+                      },
+                      { params: { fields: 'api_key' }, context: toastOff() }
+                    )
+                    .pipe(
+                      map(created => done(created.resource[0].apiKey, roleId))
+                    )
+                )
+              )
+        )
+      );
+  }
+
+  /** Add an API key to an existing role. */
+  createKeyForRole(roleId: number, roleName: string): Observable<TableKey> {
+    const appName = `${roleName}_key`;
+    return this.http
+      .post<{ resource: { apiKey: string }[] }>(
+        `${BASE_URL}/system/app`,
+        {
+          resource: [
+            {
+              name: appName,
+              description: `API key for role ${roleName}. Created from Data Explorer.`,
+              type: 0,
+              isActive: true,
+              roleId,
+            },
+          ],
+        },
+        { params: { fields: 'api_key' }, context: toastOff() }
+      )
+      .pipe(
+        map(created => ({
+          appName,
+          roleId,
+          roleName,
+          apiKey: created.resource[0].apiKey,
+        }))
+      );
+  }
+
+  private findOrCreateReadRole(
+    serviceName: string,
+    tableName: string,
+    roleName: string
+  ): Observable<number> {
+    const byName = (name: string) => ({
+      params: { filter: `name="${name}"`, fields: 'id' },
+      context: toastOff(),
+    });
+    type Ids = { resource: { id: number }[] };
+    return forkJoin([
+      this.http.get<Ids>(`${BASE_URL}/system/role`, byName(roleName)),
+      this.http.get<Ids>(`${BASE_URL}/system/service`, byName(serviceName)),
+    ]).pipe(
+      switchMap(([role, service]) =>
+        role.resource.length
+          ? of(role.resource[0].id)
+          : this.http
+              .post<Ids>(
+                `${BASE_URL}/system/role`,
+                {
+                  resource: [
+                    {
+                      name: roleName,
+                      description: `Read-only access to ${serviceName}/_table/${tableName}. Created from Data Explorer.`,
+                      isActive: true,
+                      roleServiceAccessByRoleId: [
+                        {
+                          serviceId: service.resource[0].id,
+                          component: `_table/${tableName}`,
+                          verbMask: 1, // GET
+                          requestorMask: 1, // API
+                        },
+                      ],
+                    },
+                  ],
+                },
+                { context: toastOff() }
+              )
+              .pipe(map(created => created.resource[0].id))
+      )
     );
   }
 }

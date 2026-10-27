@@ -33,7 +33,8 @@
   "options": "Advanced Options",
   "overview": {
     "eyebrow": "Live API",
-    "description": "Your API is live. Copy a request and run it."
+    "description": "Copy a request and run it.",
+    "title": "Your API is live"
   },
   "controls": {
     "serviceType": {
@@ -103,7 +104,8 @@
       "title": "{{verb}} on {{service}}",
       "hint": "This is everything the role reaches, not just this service. Grants marked inherited come from a wildcard rule; explicit grants target one service. Edit the role to change what agents and keys under it can touch.",
       "close": "Close"
-    }
+    },
+    "summary": "{{granted}} of {{total}} roles can reach this service"
   },
   "pipeline": {
     "eyebrow": "Pipeline",

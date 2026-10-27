@@ -55,24 +55,41 @@ import { DatabaseService } from './services/data-explorer.service';
         <small>{{ t('dataExplorer.noDatabasesHint') }}</small>
       </div>
 
+      <!-- Search: only worth the space once the list is long -->
+      <div
+        class="db-search"
+        *ngIf="!loading && !error && databases.length > searchThreshold">
+        <mat-icon class="db-search-icon">search</mat-icon>
+        <input
+          type="search"
+          [placeholder]="t('dataExplorer.searchDatabases')"
+          [attr.aria-label]="t('dataExplorer.searchDatabases')"
+          (input)="onSearch($event)" />
+      </div>
+
       <!-- Database list -->
       <mat-nav-list
         *ngIf="!loading && !error && databases.length > 0"
         class="db-list">
         <a
           mat-list-item
-          *ngFor="let db of databases; trackBy: trackByDbName"
+          *ngFor="let db of filtered; trackBy: trackByDbName"
+          tabindex="0"
           (click)="databaseSelected.emit(db)"
-          [matTooltip]="db.description || db.name"
+          (keyup.enter)="databaseSelected.emit(db)"
+          [matTooltip]="tooltipFor(db)"
           matTooltipPosition="right"
           class="db-item">
           <fa-icon [icon]="faDatabase" class="db-icon"></fa-icon>
           <div class="db-info">
-            <span class="db-name">{{ db.label || db.name }}</span>
-            <span class="db-type">{{ db.type }}</span>
+            <span class="db-name">{{ db.name }}</span>
+            <span class="db-type">{{ db.typeLabel || db.type }}</span>
           </div>
           <mat-icon class="chevron">chevron_right</mat-icon>
         </a>
+        <div class="no-matches" *ngIf="filtered.length === 0">
+          {{ t('dataExplorer.noMatches') }}
+        </div>
       </mat-nav-list>
     </div>
   `,
@@ -118,10 +135,47 @@ import { DatabaseService } from './services/data-explorer.service';
         font-size: 1.3rem;
       }
 
+      .db-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--df-border);
+
+        .db-search-icon {
+          font-size: 18px;
+          width: 18px;
+          height: 18px;
+          color: var(--df-text-muted);
+        }
+
+        input {
+          flex: 1;
+          min-width: 0;
+          border: 0;
+          background: transparent;
+          color: var(--df-text);
+          font: inherit;
+          font-size: 1.3rem;
+          outline: none;
+
+          &::placeholder {
+            color: var(--df-text-muted);
+          }
+        }
+      }
+
       .db-list {
         flex: 1;
         overflow-y: auto;
         padding-top: 4px;
+      }
+
+      .no-matches {
+        padding: 24px 16px;
+        text-align: center;
+        color: var(--df-text-muted);
+        font-size: 1.3rem;
       }
 
       .db-item {
@@ -189,6 +243,34 @@ export class DfDbSelectorComponent {
   @Output() retry = new EventEmitter<void>();
 
   faDatabase = faDatabase;
+
+  /** Below this many services a search box is just noise. */
+  readonly searchThreshold = 8;
+  query = '';
+
+  get filtered(): DatabaseService[] {
+    const q = this.query.trim().toLowerCase();
+    if (!q) {
+      return this.databases;
+    }
+    return this.databases.filter(db =>
+      [db.name, db.label, db.typeLabel, db.type].some(v =>
+        (v ?? '').toLowerCase().includes(q)
+      )
+    );
+  }
+
+  onSearch(event: Event): void {
+    this.query = (event.target as HTMLInputElement).value;
+  }
+
+  /** The hover text carries what the row does not: description, then a label that differs from the name. */
+  tooltipFor(db: DatabaseService): string {
+    if (db.description) {
+      return db.description;
+    }
+    return db.label && db.label !== db.name ? db.label : db.name;
+  }
 
   trackByDbName(_index: number, db: DatabaseService): string {
     return db.name;

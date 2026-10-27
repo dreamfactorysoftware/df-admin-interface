@@ -193,8 +193,9 @@
   }
 }
 
-// Prompt row under a zero-value stat.
-::ng-deep [prompt] {
+// Prompt row under a zero-value stat (projected content, hence ::ng-deep;
+// :host keeps the rule from applying to every [prompt] in the app).
+:host ::ng-deep [prompt] {
   font-size: 1.3rem;
   color: var(--df-text-2);
   font-weight: 400;

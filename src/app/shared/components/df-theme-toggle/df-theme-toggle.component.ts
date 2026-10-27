@@ -1,6 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 import { DfThemeService } from '../../services/df-theme.service';
+import { DfPresentationService } from '../../services/df-presentation.service';
 import { BehaviorSubject } from 'rxjs';
 import { AsyncPipe } from '@angular/common';
 import { TranslocoService } from '@ngneat/transloco';
@@ -32,6 +35,28 @@ import { TranslocoService } from '@ngneat/transloco';
         border-color: var(--df-border);
         color: var(--df-text);
       }
+      .presentation-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--df-text-muted);
+        cursor: pointer;
+      }
+      .presentation-toggle:hover {
+        border-color: var(--df-border);
+        color: var(--df-text);
+      }
+      .presentation-toggle.on {
+        border-color: var(--df-border);
+        background: var(--df-warn-bg, rgba(255, 176, 32, 0.16));
+        color: var(--df-warn-text, #b26a00);
+      }
       :host-context(.phosphor-theme) .phosphor-toggle {
         color: #33ff66;
         border-color: rgba(51, 255, 102, 0.4);
@@ -40,12 +65,18 @@ import { TranslocoService } from '@ngneat/transloco';
     `,
   ],
   standalone: true,
-  imports: [MatSlideToggleModule, AsyncPipe],
+  imports: [MatSlideToggleModule, AsyncPipe, FontAwesomeModule],
 })
 export class DfThemeToggleComponent {
   isDarkMode$: BehaviorSubject<boolean> = new BehaviorSubject<boolean>(true);
   themeService = inject(DfThemeService);
+  presentation = inject(DfPresentationService);
+  readonly faEyeSlash = faEyeSlash;
   private transloco = inject(TranslocoService);
+
+  togglePresentation(): void {
+    this.presentation.toggle();
+  }
 
   toggle() {
     this.isDarkMode$.subscribe(isDarkMode => {

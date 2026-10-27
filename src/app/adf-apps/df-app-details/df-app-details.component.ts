@@ -32,6 +32,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import {
   faCircleInfo,
+  faMagnifyingGlass,
   faCopy,
   faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
@@ -50,12 +51,16 @@ import { DfAlertComponent } from 'src/app/shared/components/df-alert/df-alert.co
 import { RoleType } from 'src/app/shared/types/role';
 import { DfThemeService } from 'src/app/shared/services/df-theme.service';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
-import { DfScopeMapComponent } from 'src/app/shared/components/df-scope-map/df-scope-map.component';
+import {
+  DfScopeMapComponent,
+  ScopeMapSummary,
+} from 'src/app/shared/components/df-scope-map/df-scope-map.component';
 import { DecimalPipe, CurrencyPipe } from '@angular/common';
 import { LimitType } from 'src/app/shared/types/limit';
 import { UsageService, n } from 'src/app/adf-ai-usage/services/usage.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ROUTES } from 'src/app/shared/types/routes';
+import { DfSecretComponent } from 'src/app/shared/components/df-secret/df-secret.component';
 
 /** One rate limit governing this key's role, resolved to a live meter. */
 interface RoleLimitMeter {
@@ -81,6 +86,7 @@ interface KeyUsage {
   styleUrls: ['./df-app-details.component.scss'],
   standalone: true,
   imports: [
+    DfSecretComponent,
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
@@ -115,6 +121,7 @@ export class DfAppDetailsComponent implements OnInit {
   urlOrigin: string;
   faCopy = faCopy;
   faCircleInfo = faCircleInfo;
+  faMagnifyingGlass = faMagnifyingGlass;
   faRefresh = faRefresh;
   alertMsg = '';
   showAlert = false;
@@ -124,6 +131,9 @@ export class DfAppDetailsComponent implements OnInit {
   /** Role currently selected in the form. Drives the scope-map preview and the
    *  rate-limit read-out, updating live as the user picks a different role. */
   selectedRoleId: number | null = null;
+  /** "What this key can reach" starts closed; the header carries its size. */
+  reachOpen = false;
+  reachSummary: ScopeMapSummary | null = null;
   /** Rate limits that govern the selected role, resolved to live meters. */
   roleLimits: RoleLimitMeter[] = [];
   /** This key's 30-day usage, or null when it has driven no traffic. */
@@ -165,8 +175,8 @@ export class DfAppDetailsComponent implements OnInit {
       this.filteredRoles = roles.resource || [];
       this.editApp = appData || null;
     });
-    this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
     if (this.editApp) {
+      this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
       this.appForm.patchValue({
         name: this.editApp.name,
         description: this.editApp.description,

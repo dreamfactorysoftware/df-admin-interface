@@ -20,13 +20,11 @@
   margin-bottom: 2.4rem;
 }
 
-// ---- Meridian Phase 5: Pipeline section (request chain under the overview) ---
-// ---- Meridian Phase 3: Access section (scope matrix under the overview) ----
-.service-pipeline,
-.service-access {
-  margin-top: 3.2rem;
-  padding-top: 3.2rem;
-  border-top: 1px solid var(--df-border-2);
+// ---- Live API / Pipeline / Access as closed sections ----
+// Each df-disclosure owns its top hairline; this only spaces them in the
+// form's flex flow and styles the one-line hint inside an open section.
+.service-section {
+  margin-top: var(--df-space-5);
 
   &__hint {
     margin: 0 0 1.6rem;
@@ -225,10 +223,10 @@ mat-icon {
   }
 }
 
-::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
+:host ::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
   color: unset !important;
 }
-::ng-deep .mat-mdc-select-arrow {
+:host ::ng-deep .mat-mdc-select-arrow {
   color: unset !important;
 }
 
