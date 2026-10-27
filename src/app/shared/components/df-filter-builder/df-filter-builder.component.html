@@ -46,8 +46,12 @@
           *ngIf="fields.length; else fieldText">
           <mat-label>{{ 'filterBuilder.field' | transloco }}</mat-label>
           <mat-select [(ngModel)]="cond.field" (selectionChange)="emit()">
+            <df-select-search #fieldSearch></df-select-search>
             <mat-option
-              *ngFor="let f of fields; trackBy: trackByIndex"
+              *ngFor="
+                let f of fields | dfSearch: fieldSearch.query;
+                trackBy: trackByIndex
+              "
               [value]="f">
               {{ f }}
             </mat-option>

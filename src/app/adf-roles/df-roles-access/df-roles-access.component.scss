@@ -40,8 +40,3 @@ tr.element-row:not(.example-expanded-row):active {
 .detail-input {
   margin-right: 20px;
 }
-::ng-deep {
-  .cdk-overlay-pane {
-    width: max-content !important;
-  }
-}

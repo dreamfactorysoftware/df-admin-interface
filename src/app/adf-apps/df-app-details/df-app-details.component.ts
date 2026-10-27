@@ -32,6 +32,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import {
   faCircleInfo,
+  faMagnifyingGlass,
   faCopy,
   faRefresh,
 } from '@fortawesome/free-solid-svg-icons';
@@ -59,6 +60,7 @@ import { LimitType } from 'src/app/shared/types/limit';
 import { UsageService, n } from 'src/app/adf-ai-usage/services/usage.service';
 import { GenericListResponse } from 'src/app/shared/types/generic-http';
 import { ROUTES } from 'src/app/shared/types/routes';
+import { DfSecretComponent } from 'src/app/shared/components/df-secret/df-secret.component';
 
 /** One rate limit governing this key's role, resolved to a live meter. */
 interface RoleLimitMeter {
@@ -84,6 +86,7 @@ interface KeyUsage {
   styleUrls: ['./df-app-details.component.scss'],
   standalone: true,
   imports: [
+    DfSecretComponent,
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
@@ -118,6 +121,7 @@ export class DfAppDetailsComponent implements OnInit {
   urlOrigin: string;
   faCopy = faCopy;
   faCircleInfo = faCircleInfo;
+  faMagnifyingGlass = faMagnifyingGlass;
   faRefresh = faRefresh;
   alertMsg = '';
   showAlert = false;
