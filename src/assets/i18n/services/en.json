@@ -97,7 +97,7 @@
   "access": {
     "eyebrow": "Access",
     "title": "Who can reach this service",
-    "description": "Every role is a row, every HTTP verb a column. Green is full access, amber is filtered, muted is none. Derived live from the role graph.",
+    "description": "Roles that can reach this service are listed; switch to all roles to prove one has none. Every HTTP verb is a column. Green is full access, amber is filtered, muted is none. Derived live from the role graph.",
     "hint": "Agents and API keys inherit these grants through their role. Click any granted cell to see exactly what that role can reach across the platform.",
     "dialog": {
       "eyebrow": "Resolved scope",

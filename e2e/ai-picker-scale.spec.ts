@@ -1,10 +1,11 @@
 import { Page, expect, test } from '@playwright/test';
 import { loginAsAdmin, waitForAppReady } from './fixtures/admin-login';
+import { DfApi } from './fixtures/df-api';
 
 /**
  * The df-ai-* pickers (allowed roles, AI chat role/connection, data services,
- * MCP servers) must stay the same height however many roles or services the
- * instance has. Before the shared df-picker-list, each rendered one chip per
+ * MCP servers) and the service Access matrix must stay the same height
+ * however many roles or services the instance has. Before the shared df-picker-list, each rendered one chip per
  * record straight into the form: 314 roles made the AI Chat form 7,800px tall.
  *
  * Runs against whatever the target instance holds; the search assertions
@@ -84,4 +85,63 @@ test('AI Chat setup pickers stay bounded', async ({ page }) => {
   const h = await form.evaluate(el => el.scrollHeight);
   // The whole create form, pickers included, fits in a few screens.
   expect(h).toBeLessThan(4000);
+});
+
+test('Database service Access matrix stays bounded', async ({ page }) => {
+  await loginAsAdmin(page);
+  await waitForAppReady(page);
+  // Any database service will do; find one through the system API.
+  const api = await DfApi.login(page.request);
+  const groups = await api.listServiceTypeGroups();
+  const db = (await api.listServices()).find(
+    s => groups[s.type] === 'Database'
+  );
+  test.skip(!db, 'no database service on this instance');
+  await page.goto(
+    `/dreamfactory/dist/#/api-connections/api-types/database/${db.id}`,
+    { waitUntil: 'domcontentloaded' }
+  );
+
+  // The Access section is a closed disclosure; open it.
+  const header = page
+    .locator('mat-sidenav-content .disclosure__header', {
+      hasText: 'Who can reach this service',
+    })
+    .first();
+  await expect(header).toBeVisible({ timeout: 30_000 });
+  await header.click();
+
+  const grid = page.getByTestId('scope-matrix-grid');
+  await expect(grid).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(500);
+  const box = await grid.boundingBox();
+  expect(box!.height).toBeLessThanOrEqual(400);
+  expect(
+    await page.getByTestId('scope-matrix-row').count()
+  ).toBeLessThanOrEqual(60);
+
+  // With controls present, "all roles" is still bounded and search narrows.
+  const all = page.getByTestId('scope-matrix-view-all');
+  if (await all.count()) {
+    await all.click();
+    await page.waitForTimeout(300);
+    expect((await grid.boundingBox())!.height).toBeLessThanOrEqual(400);
+    const sample = (await page
+      .getByTestId('scope-matrix-row')
+      .last()
+      .locator('.scope-matrix__role')
+      .textContent())!.trim();
+    await page
+      .getByTestId('scope-matrix-search')
+      .locator('input')
+      .fill(sample.slice(0, 8));
+    await page.waitForTimeout(300);
+    const names = await page
+      .locator('[data-testid="scope-matrix-row"] .scope-matrix__role')
+      .allTextContents();
+    expect(names.length).toBeGreaterThan(0);
+    for (const n of names) {
+      expect(n.toLowerCase()).toContain(sample.slice(0, 8).toLowerCase());
+    }
+  }
 });

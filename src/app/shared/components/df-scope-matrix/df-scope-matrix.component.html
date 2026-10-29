@@ -13,11 +13,51 @@
       [description]="t('emptyHint')">
     </df-empty-state>
 
-    <!-- The grid: roles (rows) x verbs (cols) -->
+    <!-- Narrowing controls: which roles to list. Roles that reach the service
+         lead by default; "all roles" proves absence of access, search finds
+         one role by name in either view. -->
     <div
-      *ngIf="!loading && rows.length > 0"
+      *ngIf="!loading && rows.length > 0 && searchable"
+      class="scope-matrix__toolbar">
+      <label class="scope-matrix__search" data-testid="scope-matrix-search">
+        <mat-icon aria-hidden="true">search</mat-icon>
+        <input
+          type="search"
+          autocomplete="off"
+          [ngModel]="query"
+          (ngModelChange)="onQuery($event)"
+          [placeholder]="t('searchPlaceholder')"
+          [attr.aria-label]="t('searchPlaceholder')" />
+      </label>
+      <div class="scope-matrix__views" role="group">
+        <button
+          type="button"
+          class="scope-matrix__view"
+          [class.scope-matrix__view--active]="!showAll"
+          [attr.aria-pressed]="!showAll"
+          data-testid="scope-matrix-view-access"
+          (click)="setShowAll(false)">
+          {{ t('withAccess', { count: reachingRows.length }) }}
+        </button>
+        <button
+          type="button"
+          class="scope-matrix__view"
+          [class.scope-matrix__view--active]="showAll"
+          [attr.aria-pressed]="showAll"
+          data-testid="scope-matrix-view-all"
+          (click)="setShowAll(true)">
+          {{ t('allRoles', { count: rows.length }) }}
+        </button>
+      </div>
+    </div>
+
+    <!-- The grid: roles (rows) x verbs (cols), inside a fixed-height well -->
+    <div
+      *ngIf="!loading && visibleRows.length > 0"
       class="scope-matrix__grid"
+      [class.scope-matrix__grid--bounded]="searchable"
       role="table"
+      data-testid="scope-matrix-grid"
       [attr.aria-label]="t('ariaLabel')">
       <!-- Header row -->
       <div class="scope-matrix__row scope-matrix__row--head" role="row">
@@ -32,11 +72,12 @@
         >
       </div>
 
-      <!-- One row per role -->
+      <!-- One row per listed role -->
       <div
-        *ngFor="let row of rows; trackBy: trackByRoleId"
+        *ngFor="let row of visibleRows; trackBy: trackByRoleId"
         class="scope-matrix__row"
-        role="row">
+        role="row"
+        data-testid="scope-matrix-row">
         <span
           class="scope-matrix__role"
           role="rowheader"
@@ -62,7 +103,24 @@
           <span class="scope-matrix__dot" aria-hidden="true"></span>
         </button>
       </div>
+
+      <div *ngIf="hiddenCount > 0" class="scope-matrix__more">
+        <button
+          type="button"
+          class="scope-matrix__more-btn"
+          data-testid="scope-matrix-more"
+          (click)="showMore()">
+          {{ t('showMore', { count: nextPage }) }}
+        </button>
+      </div>
     </div>
+
+    <p
+      *ngIf="!loading && rows.length > 0 && statusKey"
+      class="scope-matrix__status"
+      data-testid="scope-matrix-status">
+      {{ t(statusKey, statusParams) }}
+    </p>
 
     <!-- Legend -->
     <div
