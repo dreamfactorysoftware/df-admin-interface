@@ -31,6 +31,10 @@ test.describe('Server settings', () => {
     // Hash-only change: no reload, so the in-memory login survives.
     await page.goto('/dreamfactory/dist/#/system-settings/config/server-settings');
 
+    // sidenav label and page header must be translated, not raw i18n keys
+    await expect(page.locator('body')).toContainText('Server Settings');
+    await expect(page.locator('body')).not.toContainText(/nav\.system-settings/);
+
     const row = page.getByTestId('server-setting-log_level');
     await expect(row.getByTestId('server-setting-source')).toHaveText(/\.env/);
     await expect(row.getByTestId('server-setting-reset')).toBeDisabled();
