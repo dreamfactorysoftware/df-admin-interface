@@ -56,6 +56,12 @@
         <li *ngIf="environment.platform?.logLevel">
           {{ 'systemInfo.instance.logLevel' | transloco }}:
           {{ environment.platform?.logLevel }}
+          <a
+            *ngIf="canEditServerSettings"
+            [routerLink]="serverSettingsLink"
+            data-testid="system-info-log-level-change"
+            >{{ 'systemInfo.instance.logLevelChange' | transloco }}</a
+          >
         </li>
         <li *ngIf="environment.platform?.cacheDriver">
           {{ 'systemInfo.instance.cacheDriver' | transloco }}:

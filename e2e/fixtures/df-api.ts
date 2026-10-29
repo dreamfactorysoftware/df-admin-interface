@@ -141,6 +141,82 @@ export class DfApi {
     }
   }
 
+  /** Effective log level as system/environment reports it. */
+  async getEnvironmentLogLevel(): Promise<string> {
+    const resp = await this.ctx.get('/api/v2/system/environment', {
+      headers: this.headers(),
+    });
+    expect(resp.ok()).toBe(true);
+    return (await resp.json()).platform.log_level;
+  }
+
+  /** Remove a server-setting override (back to the .env value). */
+  async resetServerSetting(name: string): Promise<void> {
+    const resp = await this.ctx.delete(
+      `/api/v2/system/server_setting/${name}`,
+      { headers: this.headers() }
+    );
+    expect(resp.ok(), `DELETE server_setting/${name} -> ${resp.status()}`).toBe(
+      true
+    );
+  }
+
+  /** Create a restricted admin limited to the given tabs; returns the admin id. */
+  async createRestrictedAdmin(
+    email: string,
+    password: string,
+    tabs: string[]
+  ): Promise<number> {
+    const resp = await this.ctx.post('/api/v2/system/admin', {
+      headers: this.headers(),
+      data: {
+        resource: [
+          {
+            email,
+            password,
+            name: 'E2E Restricted',
+            first_name: 'E2E',
+            last_name: 'Restricted',
+            is_active: true,
+            is_restricted_admin: true,
+            access_by_tabs: tabs,
+          },
+        ],
+      },
+    });
+    expect(
+      resp.ok(),
+      `POST admin -> HTTP ${resp.status()}: ${await resp.text()}`
+    ).toBe(true);
+    return (await resp.json()).resource[0].id;
+  }
+
+  /** API key of the admin UI app; a role only applies to requests that carry it. */
+  async getAdminAppApiKey(): Promise<string> {
+    const resp = await this.ctx.get(
+      '/api/v2/system/app?filter=name%3Dadmin&fields=api_key',
+      { headers: this.headers() }
+    );
+    expect(resp.ok()).toBe(true);
+    return (await resp.json()).resource[0].api_key;
+  }
+
+  /** Delete an admin and the role created for it (restricted admins get "<email>'s role"). */
+  async deleteRestrictedAdmin(id: number, email: string): Promise<void> {
+    await this.ctx.delete(`/api/v2/system/admin/${id}`, {
+      headers: this.headers(),
+    });
+    const roles = await this.ctx.get(
+      `/api/v2/system/role?filter=${encodeURIComponent(`name=${email}'s role`)}`,
+      { headers: this.headers() }
+    );
+    for (const r of (await roles.json())?.resource ?? []) {
+      await this.ctx.delete(`/api/v2/system/role/${r.id}`, {
+        headers: this.headers(),
+      });
+    }
+  }
+
   /** Delete every service whose name starts with the e2e prefix. */
   async deleteByNamePrefix(prefix: string = E2E_SERVICE_PREFIX): Promise<void> {
     const rows = await this.listServices();

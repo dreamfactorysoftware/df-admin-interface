@@ -631,6 +631,10 @@
           "nav": "System Info",
           "header": "{{nav.system-settings.config.system-info.nav}}"
         },
+        "server-settings": {
+          "nav": "Server Settings",
+          "header": "{{nav.system-settings.config.server-settings.nav}}"
+        },
         "cors": {
           "header": "Cors Configuration",
           "nav": "CORS",
