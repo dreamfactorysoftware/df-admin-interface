@@ -14,6 +14,7 @@ import { GenericListResponse } from '../shared/types/generic-http';
 import { ROUTES } from '../shared/types/routes';
 import { ServiceType } from '../shared/types/service';
 import { DfSystemConfigDataService } from '../shared/services/df-system-config-data.service';
+import { DfUserDataService } from '../shared/services/df-user-data.service';
 import { Environment } from '../shared/types/system';
 
 @Component({
@@ -36,6 +37,7 @@ import { Environment } from '../shared/types/system';
 export class DfSystemOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
   private systemConfigDataService = inject(DfSystemConfigDataService);
+  private userDataService = inject(DfUserDataService);
   private serviceTypes: ServiceType[] | null = null;
   environment = this.systemConfigDataService.environment;
 
@@ -160,6 +162,19 @@ export class DfSystemOverviewComponent implements OnInit {
             action: 'View system info',
             category: 'system',
           },
+          // Sys admins only; the route is guarded too.
+          ...(this.userDataService.userData?.isSysAdmin
+            ? [
+                {
+                  icon: 'tune',
+                  title: 'Server Settings',
+                  text: 'Change the log level at runtime without editing .env or restarting.',
+                  route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.SERVER_SETTINGS}`,
+                  action: 'Edit server settings',
+                  category: 'system' as const,
+                },
+              ]
+            : []),
           {
             icon: 'cached',
             title: 'Cache',

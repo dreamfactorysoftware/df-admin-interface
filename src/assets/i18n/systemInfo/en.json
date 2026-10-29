@@ -12,6 +12,7 @@
     "logPath": "Log Path",
     "logMode": "Log Mode",
     "logLevel": "Log Level",
+    "logLevelChange": "Change",
     "cacheDriver": "Cache Driver",
     "demo": "Demo",
     "instanceId": "Instance ID",

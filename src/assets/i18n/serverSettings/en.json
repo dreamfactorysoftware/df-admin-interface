@@ -1,0 +1,17 @@
+{
+  "description": "Change server settings at runtime without editing .env or restarting. Only a short list of safe settings can be changed here.",
+  "hint": "Applies on the next request; long-running queue workers pick it up on restart.",
+  "loading": "Loading server settings…",
+  "empty": "No server settings are available to change.",
+  "loadError": "Could not load server settings.",
+  "saveError": "Could not save the change. The previous value is unchanged.",
+  "saved": "Saved.",
+  "viewSystemInfo": "View System Info",
+  "save": "Save",
+  "reset": "Reset to .env value",
+  "resetTitle": "Reset to .env value?",
+  "resetMessage": "The override will be removed and the value from .env will apply again.",
+  "sourceEnv": ".env",
+  "sourceOverride": "override",
+  "envValue": ".env value: {{ value }}"
+}

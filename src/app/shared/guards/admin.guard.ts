@@ -13,6 +13,16 @@ import { ROUTES } from '../types/routes';
 // (no breadcrumb, title, or table) in every theme. Fix: wait for the session to
 // actually resolve before deciding, and redirect a genuine non-root admin to
 // Home instead of stranding them on a blank screen.
+export const sysAdminGuard = () => {
+  const userDataService = inject(DfUserDataService);
+  const router = inject(Router);
+  return userDataService.userData$.pipe(
+    filter((user): user is UserSession => user !== null),
+    take(1),
+    map(user => (user.isSysAdmin ? true : router.createUrlTree([ROUTES.HOME])))
+  );
+};
+
 export const rootAdminGuard = () => {
   const userDataService = inject(DfUserDataService);
   const router = inject(Router);

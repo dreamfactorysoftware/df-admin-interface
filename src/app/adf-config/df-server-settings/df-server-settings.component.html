@@ -1,0 +1,70 @@
+<div class="server-settings-container">
+  <p>{{ 'serverSettings.description' | transloco }}</p>
+  <p class="hint">{{ 'serverSettings.hint' | transloco }}</p>
+
+  <p *ngIf="error" class="error" role="alert" data-testid="server-settings-error">
+    {{ error | transloco }}
+  </p>
+  <p *ngIf="saved" class="saved" role="status" data-testid="server-settings-saved">
+    {{ 'serverSettings.saved' | transloco }}
+    <a [routerLink]="systemInfoLink" data-testid="server-settings-view-info">{{
+      'serverSettings.viewSystemInfo' | transloco
+    }}</a>
+  </p>
+
+  <p *ngIf="loading">{{ 'serverSettings.loading' | transloco }}</p>
+  <p *ngIf="!loading && !rows.length && !error">
+    {{ 'serverSettings.empty' | transloco }}
+  </p>
+
+  <div class="settings-list">
+    <div
+      *ngFor="let row of rows"
+      class="setting-row"
+      [attr.data-testid]="'server-setting-' + row.setting.name">
+      <div class="setting-head">
+        <strong>{{ row.setting.label }}</strong>
+        <span
+          class="badge"
+          [class.override]="row.setting.source === 'override'"
+          data-testid="server-setting-source">
+          {{
+            (row.setting.source === 'override'
+              ? 'serverSettings.sourceOverride'
+              : 'serverSettings.sourceEnv'
+            ) | transloco
+          }}
+        </span>
+      </div>
+      <div class="setting-body">
+        <mat-select
+          [(ngModel)]="row.draft"
+          [attr.aria-label]="row.setting.label"
+          data-testid="server-setting-select">
+          <mat-option *ngFor="let v of row.setting.allowedValues" [value]="v">{{
+            v
+          }}</mat-option>
+        </mat-select>
+        <button
+          mat-flat-button
+          class="save-btn"
+          color="primary"
+          [disabled]="row.draft === row.setting.value"
+          (click)="save(row)"
+          data-testid="server-setting-save">
+          {{ 'serverSettings.save' | transloco }}
+        </button>
+        <button
+          mat-stroked-button
+          [disabled]="!canReset(row)"
+          (click)="reset(row)"
+          data-testid="server-setting-reset">
+          {{ 'serverSettings.reset' | transloco }}
+        </button>
+      </div>
+      <small>{{
+        'serverSettings.envValue' | transloco: { value: row.setting.envValue }
+      }}</small>
+    </div>
+  </div>
+</div>

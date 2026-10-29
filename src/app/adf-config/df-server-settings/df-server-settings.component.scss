@@ -1,0 +1,56 @@
+.server-settings-container {
+  > p {
+    max-width: 720px;
+    margin: 0 0 12px;
+    color: var(--df-text-2);
+    font-size: 1.4rem;
+    line-height: 1.5;
+  }
+
+  .error {
+    color: var(--df-danger, #b3261e);
+  }
+
+  .settings-list {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .setting-row {
+    max-width: 720px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--df-border, rgba(128, 128, 128, 0.3));
+    border-radius: 8px;
+  }
+
+  .setting-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    border: 1px solid var(--df-border, rgba(128, 128, 128, 0.4));
+
+    &.override {
+      font-weight: 600;
+    }
+  }
+
+  .setting-body {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+
+    mat-select {
+      width: 200px;
+    }
+  }
+}

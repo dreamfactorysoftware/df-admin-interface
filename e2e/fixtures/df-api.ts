@@ -141,6 +141,26 @@ export class DfApi {
     }
   }
 
+  /** Effective log level as system/environment reports it. */
+  async getEnvironmentLogLevel(): Promise<string> {
+    const resp = await this.ctx.get('/api/v2/system/environment', {
+      headers: this.headers(),
+    });
+    expect(resp.ok()).toBe(true);
+    return (await resp.json()).platform.log_level;
+  }
+
+  /** Remove a server-setting override (back to the .env value). */
+  async resetServerSetting(name: string): Promise<void> {
+    const resp = await this.ctx.delete(
+      `/api/v2/system/server_setting/${name}`,
+      { headers: this.headers() }
+    );
+    expect(resp.ok(), `DELETE server_setting/${name} -> ${resp.status()}`).toBe(
+      true
+    );
+  }
+
   /** Delete every service whose name starts with the e2e prefix. */
   async deleteByNamePrefix(prefix: string = E2E_SERVICE_PREFIX): Promise<void> {
     const rows = await this.listServices();

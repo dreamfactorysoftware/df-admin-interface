@@ -66,5 +66,10 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
     // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
+    // Runtime server settings (#552): service, sys-admin guard, page, nav link.
+    '<rootDir>/src/app/shared/services/df-server-settings.service.spec.ts',
+    '<rootDir>/src/app/shared/guards/admin.guard.spec.ts',
+    '<rootDir>/src/app/adf-config/df-server-settings/df-server-settings.component.spec.ts',
+    '<rootDir>/src/app/adf-config/df-system-info/system-info-link.spec.ts',
   ],
 };
