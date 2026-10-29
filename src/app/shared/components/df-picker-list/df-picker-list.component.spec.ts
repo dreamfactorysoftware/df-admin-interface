@@ -92,6 +92,17 @@ describe('DfPickerListComponent', () => {
     expect(component.status).toBe('10 items match');
   });
 
+  it('also matches an item by its keywords, so a service is found by its label', () => {
+    setItems([
+      { id: 'dvdstore', label: 'dvdstore', keywords: 'mysql' },
+      { id: 'northwind', label: 'northwind', keywords: 'MySQL' },
+      { id: 'files', label: 'files' },
+    ]);
+    component.onQuery('mysql');
+    fixture.detectChanges();
+    expect(labels()).toEqual(['dvdstore', 'northwind']);
+  });
+
   it('tells the user when nothing matches', () => {
     setItems(items(20));
     component.onQuery('zzz');

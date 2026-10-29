@@ -30,9 +30,12 @@ export type PickerId = number | string;
 
 export interface PickerItem {
   id: PickerId;
+  /** Chip text. Hosts pass the unique name here, not a display label. */
   label: string;
   /** Shown as the chip's tooltip. */
   hint?: string;
+  /** Extra text the search also matches, e.g. a service's display label. */
+  keywords?: string;
 }
 
 /**
@@ -465,7 +468,11 @@ export class DfPickerListComponent implements OnInit, OnChanges, OnDestroy {
     const q = this.query.trim().toLowerCase();
     const source = this.remote ?? this.items;
     const filtered = q
-      ? source.filter(it => it.label.toLowerCase().includes(q))
+      ? source.filter(
+          it =>
+            it.label.toLowerCase().includes(q) ||
+            (it.keywords ?? '').toLowerCase().includes(q)
+        )
       : source;
     const lead = filtered.filter(it => this.pinned.has(it.id));
     const rest = filtered.filter(it => !this.pinned.has(it.id));

@@ -22,9 +22,12 @@ interface McpServerRow {
 }
 
 const toItem = (s: McpServerRow): PickerItem => ({
+  // The API name is unique and is what the form stores; the display label
+  // is free text, so it only rides along as tooltip and search keyword.
   id: s.name,
-  label: s.label || s.name,
-  hint: s.label ? s.name : undefined,
+  label: s.name,
+  hint: s.label && s.label !== s.name ? s.label : undefined,
+  keywords: s.label,
 });
 
 @Component({
