@@ -13,6 +13,7 @@ import { Service } from 'src/app/shared/types/service';
 import { TranslocoService } from '@ngneat/transloco';
 import { getFilterQuery } from 'src/app/shared/utilities/filter-queries';
 import { UntilDestroy } from '@ngneat/until-destroy';
+import { describeLastRun } from '../utils/run-status';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-manage-scheduler-table',
@@ -85,6 +86,14 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
       header: 'scheduler.table.header.frequency',
     },
     {
+      columnDef: 'lastRun',
+      cell: (row: SchedulerTaskData) => {
+        const d = describeLastRun(row.runStatus);
+        return this._translateService.translate(d.key, d.params);
+      },
+      header: 'scheduler.table.header.lastRun',
+    },
+    {
       columnDef: 'log',
       cell: (row: SchedulerTaskData) => !!row.taskLogByTaskId,
       header: 'scheduler.table.header.log',
@@ -106,6 +115,7 @@ export class DfManageSchedulerTableComponent extends DfManageTableComponent<Sche
         verb: val.verb,
         frequency: val.frequency,
         taskLogByTaskId: val.taskLogByTaskId,
+        runStatus: val.runStatus,
         serviceByServiceId: val.serviceByServiceId,
       };
     });

@@ -150,6 +150,86 @@
         </div>
       </form>
     </mat-tab>
+    <mat-tab
+      *ngIf="scheduleToEdit"
+      [label]="'scheduler.run.historyTab' | transloco">
+      <div class="details-section run-history">
+        <p *ngIf="scheduleToEdit.runStatus as rs" class="run-summary">
+          {{ 'scheduler.run.lastSuccess' | transloco }}:
+          {{
+            rs.lastSuccess
+              ? (rs.lastSuccess.finishedAt | date: 'medium')
+              : ('scheduler.run.none' | transloco)
+          }}
+          &middot;
+          {{ 'scheduler.run.lastFailure' | transloco }}:
+          {{
+            rs.lastFailure
+              ? (rs.lastFailure.finishedAt | date: 'medium')
+              : ('scheduler.run.none' | transloco)
+          }}
+        </p>
+        <div *ngIf="!runs.length" class="run-empty">
+          <p>{{ 'scheduler.run.emptyTitle' | transloco }}</p>
+          <p>
+            {{
+              'scheduler.run.emptyHint'
+                | transloco: { frequency: scheduleToEdit.frequency }
+            }}
+          </p>
+        </div>
+        <table *ngIf="runs.length" class="run-table full-width">
+          <thead>
+            <tr>
+              <th>{{ 'scheduler.run.started' | transloco }}</th>
+              <th>{{ 'scheduler.run.duration' | transloco }}</th>
+              <th>{{ 'scheduler.run.status' | transloco }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let run of pagedRuns; trackBy: trackById">
+              <tr data-testid="run-row">
+                <td>{{ run.startedAt | date: 'medium' }}</td>
+                <td>
+                  {{
+                    durationSeconds(run) === null
+                      ? ('scheduler.run.inProgress' | transloco)
+                      : durationSeconds(run) + 's'
+                  }}
+                </td>
+                <td>{{ run.statusCode ?? '-' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    mat-button
+                    *ngIf="run.output"
+                    [attr.aria-expanded]="expandedRuns.has(run.id)"
+                    (click)="toggleRun(run.id)">
+                    {{
+                      (expandedRuns.has(run.id)
+                        ? 'scheduler.run.hideOutput'
+                        : 'scheduler.run.showOutput'
+                      ) | transloco
+                    }}
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="expandedRuns.has(run.id)">
+                <td colspan="4"><pre class="run-output">{{ run.output }}</pre></td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+        <mat-paginator
+          *ngIf="runs.length > runPageSize"
+          [length]="runs.length"
+          [pageSize]="runPageSize"
+          [pageIndex]="runPage"
+          [hidePageSize]="true"
+          (page)="onRunPage($event)"></mat-paginator>
+      </div>
+    </mat-tab>
     <mat-tab label="Log">
       <div class="details-section">
         <p>

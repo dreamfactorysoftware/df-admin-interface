@@ -1,5 +1,21 @@
 import { Service } from 'src/app/shared/types/service';
 
+export type RunSummary = {
+  id: number;
+  startedAt: string;
+  finishedAt: string | null;
+  statusCode: number | null;
+};
+
+export type RunStatus = {
+  isRunning: boolean;
+  lastRun: RunSummary | null;
+  lastSuccess: RunSummary | null;
+  lastFailure: RunSummary | null;
+};
+
+export type TaskRun = RunSummary & { output: string | null };
+
 export type UpdateSchedulePayload = CreateSchedulePayload & {
   createdById: number;
   createdDate: string;
@@ -58,6 +74,8 @@ export interface SchedulerTaskData {
   verbMask: number;
   appId?: number | null;
   userId?: number | null;
+  runStatus?: RunStatus;
+  taskRunByTaskId?: TaskRun[];
   taskLogByTaskId: {
     taskId: number;
     statusCode: number;

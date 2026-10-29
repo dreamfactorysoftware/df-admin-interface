@@ -13,11 +13,20 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import {
   CreateSchedulePayload,
   SchedulerTaskData,
+  TaskRun,
   UpdateSchedulePayload,
 } from '../../shared/types/scheduler';
 import { TranslocoPipe } from '@ngneat/transloco';
-import { NgIf, NgFor, NgTemplateOutlet, AsyncPipe } from '@angular/common';
+import {
+  NgIf,
+  NgFor,
+  NgTemplateOutlet,
+  AsyncPipe,
+  DatePipe,
+} from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { durationSeconds, isOk } from '../utils/run-status';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -50,6 +59,8 @@ import { catchError, throwError } from 'rxjs';
     MatButtonModule,
     MatInputModule,
     MatTabsModule,
+    MatPaginatorModule,
+    DatePipe,
     MatSelectModule,
     MatSlideToggleModule,
     NgIf,
@@ -79,6 +90,13 @@ export class DfSchedulerDetailsComponent implements OnInit {
   runAsApps: Array<{ id: number; name: string }> = [];
   runAsUsers: Array<{ id: number; name: string; email?: string }> = [];
   log = '';
+  // Run history tab: newest first, paged client-side; output stays collapsed.
+  runs: TaskRun[] = [];
+  runPage = 0;
+  readonly runPageSize = 10;
+  expandedRuns = new Set<number>();
+  durationSeconds = durationSeconds;
+  isOk = isOk;
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
@@ -135,6 +153,9 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
       if (this.scheduleToEdit) {
         this.log = this.scheduleToEdit.taskLogByTaskId?.content ?? '';
+        this.runs = [...(this.scheduleToEdit.taskRunByTaskId ?? [])].sort(
+          (a, b) => b.id - a.id
+        );
 
         this.getServiceAccessList(this.scheduleToEdit.serviceId as number);
 
@@ -172,6 +193,19 @@ export class DfSchedulerDetailsComponent implements OnInit {
     this.formGroup.get('appId')?.valueChanges.subscribe(appId => {
       if (!appId) this.formGroup.get('userId')?.setValue(null);
     });
+  }
+
+  get pagedRuns(): TaskRun[] {
+    const start = this.runPage * this.runPageSize;
+    return this.runs.slice(start, start + this.runPageSize);
+  }
+
+  onRunPage(e: PageEvent) {
+    this.runPage = e.pageIndex;
+  }
+
+  toggleRun(id: number) {
+    if (!this.expandedRuns.delete(id)) this.expandedRuns.add(id);
   }
 
   triggerAlert(type: AlertType, msg: string) {
