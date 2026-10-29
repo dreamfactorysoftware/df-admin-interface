@@ -6,21 +6,32 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
-  faCheck,
-  faCircleCheck,
   faPlus,
   faShieldHalved,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { TranslocoModule } from '@ngneat/transloco';
+import { Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { DfScopeMapComponent } from '../df-scope-map/df-scope-map.component';
+import {
+  DfPickerListComponent,
+  PickerId,
+  PickerItem,
+} from '../df-picker-list/df-picker-list.component';
 
 interface RoleRow {
   id: number;
   name: string;
   description?: string;
 }
+
+const toItem = (r: RoleRow): PickerItem => ({
+  id: r.id,
+  label: r.name,
+  hint: r.description,
+});
 
 @Component({
   selector: 'df-ai-allowed-roles',
@@ -32,6 +43,7 @@ interface RoleRow {
     FontAwesomeModule,
     TranslocoModule,
     DfScopeMapComponent,
+    DfPickerListComponent,
   ],
   template: `
     <div class="allowed-roles" *transloco="let t; read: 'aiAllowedRoles'">
@@ -42,7 +54,7 @@ interface RoleRow {
           {{
             t('count', {
               selected: selected.length,
-              available: roles.length,
+              available: total ?? roles.length,
             })
           }}
         </span>
@@ -68,21 +80,15 @@ interface RoleRow {
         {{ t('loading') }}
       </div>
 
-      <ul *ngIf="!loading && roles.length > 0" class="allowed-roles__list">
-        <li *ngFor="let r of roles; trackBy: trackById">
-          <button
-            type="button"
-            class="allowed-roles__chip"
-            [class.allowed-roles__chip--selected]="isSelected(r.id)"
-            (click)="toggle(r.id)">
-            <fa-icon
-              *ngIf="isSelected(r.id)"
-              [icon]="faCircleCheck"
-              class="allowed-roles__chip-check"></fa-icon>
-            <span class="allowed-roles__name">{{ r.name }}</span>
-          </button>
-        </li>
-      </ul>
+      <df-picker-list
+        *ngIf="!loading && roles.length > 0"
+        noun="roles"
+        testId="allowed-roles"
+        [items]="items"
+        [selected]="selected"
+        [truncated]="truncated"
+        [remoteSearch]="searchRoles"
+        (toggle)="toggle($event)"></df-picker-list>
 
       <p *ngIf="!loading && roles.length === 0" class="allowed-roles__empty">
         {{ t('empty') }}
@@ -195,57 +201,6 @@ interface RoleRow {
           font-size: 1.3rem;
         }
 
-        &__list {
-          list-style: none;
-          margin: 0.25rem 0 0;
-          padding: 0;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.625rem 0.75rem;
-
-          li {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.625rem;
-          }
-        }
-
-        &__chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem 1rem;
-          background: var(--df-surface);
-          border: 1px solid var(--df-border);
-          border-radius: var(--df-radius-sm);
-          font: inherit;
-          font-size: 1.4rem;
-          color: inherit;
-          cursor: pointer;
-          transition:
-            border-color 120ms ease,
-            background 120ms ease;
-
-          &:hover {
-            border-color: var(--df-accent);
-            background: var(--df-hover);
-          }
-
-          &--selected {
-            border-color: var(--df-accent);
-            background: var(--df-accent-soft);
-            color: var(--df-text);
-          }
-        }
-
-        &__chip-check {
-          color: var(--df-accent);
-        }
-
-        &__name {
-          font-weight: 500;
-        }
-
         &__reach {
           display: flex;
           flex-direction: column;
@@ -296,21 +251,37 @@ export class DfAiAllowedRolesComponent implements OnInit {
 
   loading = true;
   roles: RoleRow[] = [];
+  items: PickerItem[] = [];
+  /** meta.count from the load; null until known. */
+  total: number | null = null;
+  /** True when the server capped the load, so the picker also searches server-side. */
+  truncated = false;
+  /** Roles found through server-side search, so a picked one can still be shown. */
+  private found = new Map<number, RoleRow>();
 
   faShieldHalved = faShieldHalved;
-  faCheck = faCheck;
-  faCircleCheck = faCircleCheck;
   faPlus = faPlus;
   faTriangleExclamation = faTriangleExclamation;
 
   ngOnInit(): void {
     this.http
-      .get<{ resource: RoleRow[] }>(`${BASE_URL}/system/role`, {
-        params: { fields: 'id,name,description', sort: 'name' },
-      })
+      .get<{ resource: RoleRow[]; meta?: { count?: number } }>(
+        `${BASE_URL}/system/role`,
+        {
+          params: {
+            fields: 'id,name,description',
+            sort: 'name',
+            include_count: 'true',
+          },
+        }
+      )
       .subscribe({
         next: res => {
           this.roles = res.resource ?? [];
+          this.items = this.roles.map(toItem);
+          const total = res.meta?.count ?? this.roles.length;
+          this.total = total;
+          this.truncated = total > this.roles.length;
           this.loading = false;
         },
         error: () => {
@@ -318,6 +289,23 @@ export class DfAiAllowedRolesComponent implements OnInit {
         },
       });
   }
+
+  /** Server-side role search for instances whose role list exceeded the load cap. */
+  searchRoles = (query: string): Observable<PickerItem[]> =>
+    this.http
+      .get<{ resource: RoleRow[] }>(`${BASE_URL}/system/role`, {
+        params: {
+          fields: 'id,name,description',
+          sort: 'name',
+          limit: '50',
+          filter: `name like "%${query.replace(/["\\%]/g, '')}%"`,
+        },
+      })
+      .pipe(
+        map(res => res.resource ?? []),
+        tap(rows => rows.forEach(r => this.found.set(r.id, r))),
+        map(rows => rows.map(toItem))
+      );
 
   /** Read the current allowed_roles list from the form, normalized to numbers. */
   get selected(): number[] {
@@ -334,12 +322,19 @@ export class DfAiAllowedRolesComponent implements OnInit {
    *  place instead of behind a link. */
   get selectedRoles(): RoleRow[] {
     const ids = this.selected;
-    return this.roles.filter(r => ids.includes(r.id));
+    const known = new Map<number, RoleRow>(this.found);
+    this.roles.forEach(r => known.set(r.id, r));
+    return ids
+      .map(id => known.get(id))
+      .filter((r): r is RoleRow => r !== undefined);
   }
 
-  toggle(id: number): void {
+  toggle(id: PickerId): void {
+    const roleId = Number(id);
     const cur = this.selected;
-    const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+    const next = cur.includes(roleId)
+      ? cur.filter(x => x !== roleId)
+      : [...cur, roleId];
     this.form.get('config.allowedRoles')?.setValue(next);
   }
 

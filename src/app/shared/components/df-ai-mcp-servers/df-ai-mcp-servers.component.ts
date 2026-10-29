@@ -5,12 +5,15 @@ import { FormGroup } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import {
-  faCircleCheck,
-  faPlus,
-  faPlug,
-} from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faPlug } from '@fortawesome/free-solid-svg-icons';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import {
+  DfPickerListComponent,
+  PickerId,
+  PickerItem,
+} from '../df-picker-list/df-picker-list.component';
 
 interface McpServerRow {
   id: number;
@@ -18,10 +21,22 @@ interface McpServerRow {
   label?: string;
 }
 
+const toItem = (s: McpServerRow): PickerItem => ({
+  id: s.name,
+  label: s.label || s.name,
+  hint: s.label ? s.name : undefined,
+});
+
 @Component({
   selector: 'df-ai-mcp-servers',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, FontAwesomeModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    FontAwesomeModule,
+    DfPickerListComponent,
+  ],
   template: `
     <div class="mcp-servers">
       <div class="mcp-servers__header">
@@ -50,21 +65,15 @@ interface McpServerRow {
         Loading MCP servers…
       </div>
 
-      <ul *ngIf="!loading && servers.length > 0" class="mcp-servers__list">
-        <li *ngFor="let s of servers; trackBy: trackByName">
-          <button
-            type="button"
-            class="mcp-servers__chip"
-            [class.mcp-servers__chip--selected]="isSelected(s.name)"
-            (click)="toggle(s.name)">
-            <fa-icon
-              *ngIf="isSelected(s.name)"
-              [icon]="faCircleCheck"
-              class="mcp-servers__chip-check"></fa-icon>
-            <span class="mcp-servers__name">{{ s.label || s.name }}</span>
-          </button>
-        </li>
-      </ul>
+      <df-picker-list
+        *ngIf="!loading && servers.length > 0"
+        noun="MCP servers"
+        testId="mcp-servers"
+        [items]="items"
+        [selected]="selected"
+        [truncated]="truncated"
+        [remoteSearch]="searchServers"
+        (toggle)="toggle($event)"></df-picker-list>
 
       <p *ngIf="!loading && servers.length === 0" class="mcp-servers__empty">
         No MCP services exist yet. Create one (service type “MCP Server”) and
@@ -135,57 +144,6 @@ interface McpServerRow {
           font-style: italic;
           font-size: 1.3rem;
         }
-
-        &__list {
-          list-style: none;
-          margin: 0.25rem 0 0;
-          padding: 0;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.625rem 0.75rem;
-
-          li {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.625rem;
-          }
-        }
-
-        &__chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem 1rem;
-          background: var(--df-surface);
-          border: 1px solid var(--df-border);
-          border-radius: var(--df-radius-sm);
-          font: inherit;
-          font-size: 1.4rem;
-          color: inherit;
-          cursor: pointer;
-          transition:
-            border-color 120ms ease,
-            background 120ms ease;
-
-          &:hover {
-            border-color: var(--df-accent);
-            background: var(--df-hover);
-          }
-
-          &--selected {
-            border-color: var(--df-accent);
-            background: var(--df-accent-soft);
-            color: var(--df-text);
-          }
-        }
-
-        &__chip-check {
-          color: var(--df-accent);
-        }
-
-        &__name {
-          font-weight: 500;
-        }
       }
     `,
   ],
@@ -199,23 +157,32 @@ export class DfAiMcpServersComponent implements OnInit {
 
   loading = true;
   servers: McpServerRow[] = [];
+  items: PickerItem[] = [];
+  /** True when the server capped the load; the picker then searches server-side. */
+  truncated = false;
 
   faPlug = faPlug;
-  faCircleCheck = faCircleCheck;
   faPlus = faPlus;
 
   ngOnInit(): void {
     this.http
-      .get<{ resource: McpServerRow[] }>(`${BASE_URL}/system/service`, {
-        params: {
-          filter: 'type = "mcp"',
-          fields: 'id,name,label',
-          sort: 'name',
-        },
-      })
+      .get<{ resource: McpServerRow[]; meta?: { count?: number } }>(
+        `${BASE_URL}/system/service`,
+        {
+          params: {
+            filter: 'type = "mcp"',
+            fields: 'id,name,label',
+            sort: 'name',
+            include_count: 'true',
+          },
+        }
+      )
       .subscribe({
         next: res => {
           this.servers = res.resource ?? [];
+          this.items = this.servers.map(toItem);
+          this.truncated =
+            (res.meta?.count ?? this.servers.length) > this.servers.length;
           this.loading = false;
         },
         error: () => {
@@ -223,6 +190,21 @@ export class DfAiMcpServersComponent implements OnInit {
         },
       });
   }
+
+  /** Server-side search for instances whose MCP list exceeded the load cap. */
+  searchServers = (query: string): Observable<PickerItem[]> => {
+    const q = query.replace(/["\\%]/g, '');
+    return this.http
+      .get<{ resource: McpServerRow[] }>(`${BASE_URL}/system/service`, {
+        params: {
+          fields: 'id,name,label',
+          sort: 'name',
+          limit: '50',
+          filter: `(type = "mcp") and ((name like "%${q}%") or (label like "%${q}%"))`,
+        },
+      })
+      .pipe(map(res => (res.resource ?? []).map(toItem)));
+  };
 
   /** Current mcp_servers list from the form, normalized to service names. */
   get selected(): string[] {
@@ -233,7 +215,8 @@ export class DfAiMcpServersComponent implements OnInit {
     return this.selected.includes(name);
   }
 
-  toggle(name: string): void {
+  toggle(id: PickerId): void {
+    const name = String(id);
     const cur = this.selected;
     const next = cur.includes(name)
       ? cur.filter(x => x !== name)

@@ -3,9 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { FormGroup } from '@angular/forms';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { faCircleCheck, faDatabase } from '@fortawesome/free-solid-svg-icons';
-import { forkJoin } from 'rxjs';
+import { faDatabase } from '@fortawesome/free-solid-svg-icons';
+import { Observable, forkJoin } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import {
+  DfPickerListComponent,
+  PickerId,
+  PickerItem,
+} from '../df-picker-list/df-picker-list.component';
 
 interface ServiceRow {
   id: number;
@@ -22,10 +28,16 @@ interface ServiceTypeRow {
 // Service-type groups whose services are queryable "data" for the AI.
 const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
 
+const toItem = (s: ServiceRow): PickerItem => ({
+  id: s.name,
+  label: s.label || s.name,
+  hint: s.label ? s.name : undefined,
+});
+
 @Component({
   selector: 'df-ai-data-services',
   standalone: true,
-  imports: [CommonModule, FontAwesomeModule],
+  imports: [CommonModule, FontAwesomeModule, DfPickerListComponent],
   template: `
     <div class="data-services">
       <div class="data-services__header">
@@ -46,21 +58,15 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
         Loading data services…
       </div>
 
-      <ul *ngIf="!loading && services.length > 0" class="data-services__list">
-        <li *ngFor="let s of services; trackBy: trackByName">
-          <button
-            type="button"
-            class="data-services__chip"
-            [class.data-services__chip--selected]="isSelected(s.name)"
-            (click)="toggle(s.name)">
-            <fa-icon
-              *ngIf="isSelected(s.name)"
-              [icon]="faCircleCheck"
-              class="data-services__chip-check"></fa-icon>
-            <span class="data-services__name">{{ s.label || s.name }}</span>
-          </button>
-        </li>
-      </ul>
+      <df-picker-list
+        *ngIf="!loading && services.length > 0"
+        noun="data services"
+        testId="data-services"
+        [items]="items"
+        [selected]="selected"
+        [truncated]="truncated"
+        [remoteSearch]="searchServices"
+        (toggle)="toggle($event)"></df-picker-list>
 
       <p *ngIf="!loading && services.length === 0" class="data-services__empty">
         No database services exist yet. Create one under API Generation &amp;
@@ -121,57 +127,6 @@ const DATA_GROUPS = new Set(['Database', 'Big Data', 'File', 'Excel']);
           font-style: italic;
           font-size: 1.3rem;
         }
-
-        &__list {
-          list-style: none;
-          margin: 0.25rem 0 0;
-          padding: 0;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.625rem 0.75rem;
-
-          li {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.625rem;
-          }
-        }
-
-        &__chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem 1rem;
-          background: var(--df-surface);
-          border: 1px solid var(--df-border);
-          border-radius: var(--df-radius-sm);
-          font: inherit;
-          font-size: 1.4rem;
-          color: inherit;
-          cursor: pointer;
-          transition:
-            border-color 120ms ease,
-            background 120ms ease;
-
-          &:hover {
-            border-color: var(--df-accent);
-            background: var(--df-hover);
-          }
-
-          &--selected {
-            border-color: var(--df-accent);
-            background: var(--df-accent-soft);
-            color: var(--df-text);
-          }
-        }
-
-        &__chip-check {
-          color: var(--df-accent);
-        }
-
-        &__name {
-          font-weight: 500;
-        }
       }
     `,
   ],
@@ -185,9 +140,12 @@ export class DfAiDataServicesComponent implements OnInit {
 
   loading = true;
   services: ServiceRow[] = [];
+  items: PickerItem[] = [];
+  /** True when the server capped the service load; the picker then searches server-side. */
+  truncated = false;
+  private dataTypes = new Set<string>();
 
   faDatabase = faDatabase;
-  faCircleCheck = faCircleCheck;
 
   ngOnInit(): void {
     // Join service types (for their group) with the service catalog so we only
@@ -197,20 +155,27 @@ export class DfAiDataServicesComponent implements OnInit {
         `${BASE_URL}/system/service_type`,
         { params: { fields: 'name,group' } }
       ),
-      services: this.http.get<{ resource: ServiceRow[] }>(
-        `${BASE_URL}/system/service`,
-        { params: { fields: 'id,name,label,type', sort: 'name' } }
-      ),
+      services: this.http.get<{
+        resource: ServiceRow[];
+        meta?: { count?: number };
+      }>(`${BASE_URL}/system/service`, {
+        params: {
+          fields: 'id,name,label,type',
+          sort: 'name',
+          include_count: 'true',
+        },
+      }),
     }).subscribe({
       next: ({ types, services }) => {
-        const dataTypes = new Set(
+        this.dataTypes = new Set(
           (types.resource ?? [])
             .filter(t => DATA_GROUPS.has(t.group ?? ''))
             .map(t => t.name)
         );
-        this.services = (services.resource ?? []).filter(s =>
-          dataTypes.has(s.type)
-        );
+        const rows = services.resource ?? [];
+        this.services = rows.filter(s => this.dataTypes.has(s.type));
+        this.items = this.services.map(toItem);
+        this.truncated = (services.meta?.count ?? rows.length) > rows.length;
         this.loading = false;
       },
       error: () => {
@@ -218,6 +183,27 @@ export class DfAiDataServicesComponent implements OnInit {
       },
     });
   }
+
+  /** Server-side search for instances whose service list exceeded the load cap. */
+  searchServices = (query: string): Observable<PickerItem[]> => {
+    const q = query.replace(/["\\%]/g, '');
+    return this.http
+      .get<{ resource: ServiceRow[] }>(`${BASE_URL}/system/service`, {
+        params: {
+          fields: 'id,name,label,type',
+          sort: 'name',
+          limit: '50',
+          filter: `(name like "%${q}%") or (label like "%${q}%")`,
+        },
+      })
+      .pipe(
+        map(res =>
+          (res.resource ?? [])
+            .filter(s => this.dataTypes.has(s.type))
+            .map(toItem)
+        )
+      );
+  };
 
   get selected(): string[] {
     return this.parse(this.form.get('config.defaultDataServices')?.value);
@@ -227,7 +213,8 @@ export class DfAiDataServicesComponent implements OnInit {
     return this.selected.includes(name);
   }
 
-  toggle(name: string): void {
+  toggle(id: PickerId): void {
+    const name = String(id);
     const cur = this.selected;
     const next = cur.includes(name)
       ? cur.filter(x => x !== name)
