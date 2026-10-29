@@ -7,3 +7,21 @@ h4 {
   letter-spacing: -0.01em;
   color: var(--df-text);
 }
+
+.run-table {
+  border-collapse: collapse;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--df-border, rgba(128, 128, 128, 0.3));
+  }
+}
+
+.run-output {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  margin: 0;
+}

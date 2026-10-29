@@ -20,7 +20,7 @@ export const schedulerResolver: ResolveFn<
         const id = route.paramMap.get('id');
         if (id)
           return schedulerService.get<SchedulerTaskData>(id, {
-            related: 'task_log_by_task_id',
+            related: 'task_log_by_task_id,task_run_by_task_id',
           });
 
         // List branch only: complete navigation on failure so the table

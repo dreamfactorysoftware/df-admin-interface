@@ -66,5 +66,7 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
     // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
+    // df-scheduler#41: last-run / running-state helpers.
+    '<rootDir>/src/app/adf-scheduler/utils/run-status.spec.ts',
   ],
 };
