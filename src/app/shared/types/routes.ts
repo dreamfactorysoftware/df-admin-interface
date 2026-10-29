@@ -41,6 +41,8 @@ export enum ROUTES {
   DATA_EXPLORER = 'data-explorer',
   API_SECURITY = 'api-security',
   RATE_LIMITING = 'rate-limiting',
+  DATA_MASKING = 'data-masking',
+  COMPLIANCE = 'compliance',
   AUTHENTICATION = 'authentication',
   SYSTEM_SETTINGS = 'system-settings',
   CONFIG = 'config',

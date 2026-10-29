@@ -1,0 +1,144 @@
+<df-empty-state
+  *ngIf="store.failed.has('rules') && !store.rules; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'dataMasking.empty.sliceFailed' | transloco"
+  [actionLabel]="'dataMasking.retry' | transloco"
+  (action)="store.loadRules()"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!store.rules; else body"
+    variant="table-row"
+    [count]="4"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <div class="detection" data-testid="dm-detection">
+    <header class="head">
+      <h2 class="title">{{ 'dataMasking.detection.title' | transloco }}</h2>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="addRule()"
+        data-testid="dm-add-rule">
+        <mat-icon>add</mat-icon>
+        {{ 'dataMasking.detection.addRule' | transloco }}
+      </button>
+    </header>
+
+    <div class="rules" role="table" *ngIf="store.rules?.length; else noRules">
+      <div class="row head-row" role="row">
+        <span role="columnheader">{{
+          'dataMasking.detection.match' | transloco
+        }}</span>
+        <span role="columnheader">{{
+          'dataMasking.detection.pattern' | transloco
+        }}</span>
+        <span role="columnheader">{{
+          'dataMasking.columns.class' | transloco
+        }}</span>
+        <span role="columnheader" class="num">{{
+          'dataMasking.detection.matches' | transloco
+        }}</span>
+        <span role="columnheader"></span>
+      </div>
+      <div
+        class="row"
+        role="row"
+        *ngFor="let r of store.rules; trackBy: trackRule">
+        <span role="cell" class="match">{{
+          (r.match === 'name'
+            ? 'dataMasking.detection.matchName'
+            : 'dataMasking.detection.matchValue'
+          ) | transloco
+        }}</span>
+        <span role="cell" class="pattern-cell"
+          ><code class="pattern">{{ r.pattern }}</code
+          ><span
+            *ngIf="baselineOf(r) as b"
+            class="source"
+            data-testid="dm-rule-source"
+            >{{
+              'dataMasking.detection.fromBaseline' | transloco: { name: b }
+            }}</span
+          ></span
+        >
+        <span role="cell" class="cls" [ngClass]="'dm-tier-' + tierOf(r.class)">
+          <span class="dot" aria-hidden="true"></span>
+          {{ 'dataMasking.classes.' + r.class | transloco }}
+        </span>
+        <span role="cell" class="num">
+          <button
+            type="button"
+            class="count df-numeric"
+            [disabled]="!r.matches"
+            (click)="openMatches(r)"
+            [attr.aria-label]="
+              'dataMasking.detection.showMatches'
+                | transloco: { count: r.matches }
+            "
+            data-testid="dm-rule-matches">
+            {{ r.matches }}
+          </button>
+        </span>
+        <span role="cell" class="del">
+          <button
+            mat-icon-button
+            type="button"
+            [attr.aria-label]="'dataMasking.detection.delete' | transloco"
+            [matTooltip]="'dataMasking.detection.delete' | transloco"
+            (click)="deleteRule(r)"
+            data-testid="dm-rule-delete">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </span>
+      </div>
+    </div>
+
+    <ng-template #noRules>
+      <df-empty-state
+        icon="rule"
+        [title]="'dataMasking.detection.empty' | transloco"></df-empty-state>
+    </ng-template>
+
+    <section class="builtin" *ngIf="store.builtin as b">
+      <button
+        type="button"
+        class="builtin-toggle"
+        [attr.aria-expanded]="builtInOpen"
+        (click)="builtInOpen = !builtInOpen"
+        data-testid="dm-builtin">
+        <mat-icon aria-hidden="true">chevron_right</mat-icon>
+        {{ 'dataMasking.detection.builtIn' | transloco }}
+        <span class="ruleset">{{ b.ruleset }} {{ b.version }}</span>
+      </button>
+      <div class="builtin-body" *ngIf="builtInOpen">
+        <div
+          class="bi-tier"
+          *ngFor="let g of groups"
+          [ngClass]="'dm-tier-' + g.tier">
+          <h3 class="bi-head">
+            <span class="dot" aria-hidden="true"></span>
+            {{ 'dataMasking.tiers.' + g.tier | transloco }}
+          </h3>
+          <div class="bi-row" *ngFor="let c of g.classes">
+            <span class="bi-cls">{{
+              'dataMasking.classes.' + c.id | transloco
+            }}</span>
+            <span class="bi-dets">
+              <span class="det" *ngFor="let d of detectorsFor(c.id)">{{
+                d
+              }}</span>
+              <span
+                class="bi-none"
+                *ngIf="!detectorsFor(c.id).length"
+                aria-hidden="true"
+                >—</span
+              >
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</ng-template>

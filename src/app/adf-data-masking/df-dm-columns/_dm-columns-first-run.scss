@@ -1,0 +1,165 @@
+// Columns tab first run: the never-scanned call to action with one
+// shortcut per compliance framework, and the first scan's progress.
+@mixin dm-columns-first-run {
+  .first-run {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: var(--df-space-8);
+  }
+
+  // The first scan could not read a database: one line, under the action.
+  .first-run-failed {
+    align-items: center;
+    color: var(--df-danger);
+    display: flex;
+    font-size: var(--df-font-size-sm);
+    gap: var(--df-space-1);
+    margin: calc(-1 * var(--df-space-5)) 0 var(--df-space-6);
+
+    mat-icon {
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+  }
+
+  // Sits under the empty state's button, tucked into its bottom padding.
+  .baselines {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-2);
+    margin-top: calc(-1 * var(--df-space-5));
+    max-width: 100%;
+  }
+
+  .baselines-label {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+  }
+
+  .baselines-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--df-space-2);
+    justify-content: center;
+    list-style: none;
+    margin: 0;
+    padding: 0 var(--df-space-4);
+  }
+
+  .baseline {
+    align-items: center;
+    background: var(--df-surface);
+    border: 1px solid var(--df-border);
+    border-radius: 999px;
+    color: var(--df-text-2);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+    gap: 6px;
+    height: 30px;
+    padding: 0 var(--df-space-3) 0 var(--df-space-2);
+    transition:
+      background-color var(--df-duration-fast) var(--df-ease-standard),
+      border-color var(--df-duration-fast) var(--df-ease-standard);
+
+    mat-icon {
+      color: var(--df-text-muted);
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+
+    &:hover {
+      background: var(--df-hover);
+      border-color: var(--df-text-faint);
+      color: var(--df-text);
+
+      mat-icon {
+        color: var(--df-accent);
+      }
+    }
+
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+  }
+
+  // First scan: the icon chip, a live label and a thin bar.
+  .first-scan {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--df-space-3);
+    padding: var(--df-space-8) var(--df-space-5);
+    text-align: center;
+  }
+
+  .first-scan-icon {
+    align-items: center;
+    background: var(--df-accent-soft);
+    border-radius: var(--df-radius);
+    color: var(--df-accent);
+    display: inline-flex;
+    height: var(--df-space-8);
+    justify-content: center;
+    width: var(--df-space-8);
+
+    mat-icon {
+      font-size: var(--df-font-size-2xl);
+      height: var(--df-font-size-2xl);
+      width: var(--df-font-size-2xl);
+    }
+  }
+
+  .first-scan-title {
+    color: var(--df-text);
+    font-size: var(--df-font-size-lg);
+    font-weight: var(--df-font-weight-heading);
+    margin: 0;
+  }
+
+  .first-scan-bar {
+    background: var(--df-surface-2);
+    border: 1px solid var(--df-border-2);
+    border-radius: 999px;
+    height: 6px;
+    overflow: hidden;
+    width: min(280px, 100%);
+
+    span {
+      background: var(--df-accent);
+      border-radius: inherit;
+      display: block;
+      height: 100%;
+      transition: width var(--df-duration-standard) var(--df-ease-standard);
+    }
+
+    // No percentage yet: a short segment sweeps across.
+    &.is-indeterminate span {
+      animation: dm-sweep 1.4s var(--df-ease-standard) infinite;
+      width: 30% !important;
+    }
+  }
+
+  @keyframes dm-sweep {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(340%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .first-scan-bar.is-indeterminate span {
+      animation: none;
+      width: 100% !important;
+      opacity: 0.4;
+    }
+  }
+}

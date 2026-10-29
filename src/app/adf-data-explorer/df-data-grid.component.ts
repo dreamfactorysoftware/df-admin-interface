@@ -52,6 +52,7 @@ import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
 import { RouterLink } from '@angular/router';
+import { MaskingNote, MaskingNotice, maskingNoteFor } from './masking-notice';
 import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
 import { maskSecret } from 'src/app/shared/utilities/mask';
 
@@ -111,6 +112,17 @@ interface ColumnFilter {
                 {{ t('dataExplorer.readOnly') }}
               </mat-chip>
             </mat-chip-set>
+            <!-- Data Masking (df-masking): only when the response says so. -->
+            <a
+              *ngIf="maskingNotice?.masked"
+              class="masked-chip"
+              routerLink="/api-security/data-masking"
+              [queryParams]="{ tab: 'access' }"
+              [matTooltip]="t('dataExplorer.maskedTip')"
+              data-testid="de-masked">
+              <mat-icon aria-hidden="true">visibility_off</mat-icon>
+              {{ t('dataExplorer.masked') }}
+            </a>
           </div>
           <div class="toolbar-right">
             <!-- Quick search -->
@@ -200,6 +212,21 @@ interface ColumnFilter {
             matTooltip="Remove navigation filter and show all records">
             <mat-icon>close</mat-icon>
           </button>
+        </div>
+
+        <!-- Data Masking: filters on masked columns match no rows; sorts on
+             them are ignored. One line, only when the response says so. -->
+        <div
+          class="masking-note"
+          *ngIf="maskingNote && !error"
+          role="status"
+          data-testid="de-masking-dropped">
+          <mat-icon class="masking-note-icon" aria-hidden="true"
+            >filter_alt_off</mat-icon
+          >
+          <span class="masking-note-text" [attr.title]="maskingNoteText(t)">{{
+            maskingNoteText(t)
+          }}</span>
         </div>
 
         <!-- Top pagination bar -->
@@ -715,6 +742,30 @@ interface ColumnFilter {
             .lock-icon {
               font-size: 11px;
               margin-right: 4px;
+            }
+          }
+
+          .masked-chip {
+            align-items: center;
+            background: var(--df-accent-soft);
+            border-radius: 999px;
+            color: var(--df-accent-strong, var(--df-accent));
+            display: inline-flex;
+            font-size: 12px;
+            font-weight: 500;
+            gap: 4px;
+            padding: 2px 10px 2px 8px;
+            text-decoration: none;
+
+            mat-icon {
+              font-size: 14px;
+              height: 14px;
+              width: 14px;
+            }
+
+            &:focus-visible {
+              box-shadow: var(--df-focus-ring);
+              outline: none;
             }
           }
         }
@@ -1322,6 +1373,36 @@ interface ColumnFilter {
         }
       }
 
+      /* Data Masking: request parts it ignored */
+      .masking-note {
+        align-items: center;
+        background: var(--df-surface-2);
+        border-bottom: 1px solid var(--df-border);
+        color: var(--df-text-2);
+        display: flex;
+        flex-shrink: 0;
+        font-size: 12px;
+        gap: 8px;
+        padding: 4px 12px;
+
+        .masking-note-icon {
+          color: var(--df-text-muted);
+          flex: none;
+          font-size: 16px;
+          height: 16px;
+          width: 16px;
+        }
+
+        // One line: a long column list ends in an ellipsis (full text in
+        // the title) instead of growing the note.
+        .masking-note-text {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
+
       /* Navigation filter bar */
       .nav-filter-bar {
         display: flex;
@@ -1410,6 +1491,15 @@ export class DfDataGridComponent
   // Filter state
   columnFilters: Record<string, ColumnFilter> = {};
   activeFilterCount = 0;
+
+  /**
+   * Data Masking's headers on the last response (masked values, ignored
+   * filters/sorts); null when there were none, which is always the case
+   * without the commercial df-masking package.
+   */
+  maskingNotice: MaskingNotice | null = null;
+  /** The one-line note those headers call for, or null. */
+  maskingNote: MaskingNote | null = null;
   private filterSubject$ = new Subject<void>();
 
   // Column resize state
@@ -1537,6 +1627,8 @@ export class DfDataGridComponent
     this.cachedSchema = null;
     this.columnWidths = {};
     this.navigationFilter = this.initialFilter || null;
+    this.maskingNotice = null;
+    this.maskingNote = null;
     this.initialLoading = true;
     this.loadData();
     this.loadSchemaForTable();
@@ -1595,10 +1687,14 @@ export class DfDataGridComponent
           }
           this.dataSource.data = records;
           this.totalRecords = res.meta?.count ?? records.length;
+          this.maskingNotice = res.masking ?? null;
+          this.maskingNote = maskingNoteFor(this.maskingNotice);
           this.loading = false;
           this.initialLoading = false;
         },
         error: err => {
+          this.maskingNotice = null;
+          this.maskingNote = null;
           this.error = normalizeError(err).message;
           this.loading = false;
           this.initialLoading = false;
@@ -1836,6 +1932,32 @@ export class DfDataGridComponent
     this.pageIndex = 0;
     this.currentOffset = 0;
     this.loadData();
+  }
+
+  /**
+   * "Masked columns can't be filtered: email · Sort ignored on masked
+   * columns: ssn", from the note (`t` is the template's translate).
+   */
+  maskingNoteText(
+    t: (key: string, params?: Record<string, unknown>) => string
+  ): string {
+    const note = this.maskingNote;
+    if (!note) return '';
+    const parts: string[] = [];
+    if (note.filter) {
+      parts.push(
+        note.filter.length
+          ? t('dataExplorer.maskingFilter', { cols: note.filter.join(', ') })
+          : t('dataExplorer.maskingFilterAll')
+      );
+    }
+    if (note.sort) {
+      parts.push(t('dataExplorer.maskingSort', { cols: note.sort.join(', ') }));
+    }
+    const line = parts.join(' · ');
+    return note.more
+      ? `${line} ${t('dataExplorer.maskingMore', { count: note.more })}`
+      : line;
   }
 
   private updateActiveFilterCount(): void {

@@ -1,0 +1,458 @@
+@use './dm-columns-toolbar' as *;
+@use './dm-columns-rail' as *;
+@use './dm-columns-first-run' as *;
+
+:host {
+  display: block;
+}
+
+.sr-only {
+  clip: rect(0 0 0 0);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+// ---------------------------------------------------------------- toolbar
+
+@include dm-columns-toolbar;
+
+// -------------------------------------------------------------- first run
+
+@include dm-columns-first-run;
+
+// ------------------------------------------------------------------ panes
+
+.table-select {
+  display: none;
+  margin-bottom: var(--df-space-3);
+  width: 100%;
+}
+
+// Narrow screens: never-scanned services get their Scan buttons here,
+// since the rail (where they normally sit) collapses to the select.
+.pending-narrow {
+  display: none;
+  flex-wrap: wrap;
+  gap: var(--df-space-2);
+  margin-bottom: var(--df-space-3);
+}
+
+.panes {
+  align-items: start;
+  display: grid;
+  gap: var(--df-space-5);
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+
+@include dm-columns-rail;
+
+// ------------------------------------------------------------------- list
+
+.list {
+  min-width: 0;
+}
+
+.list-head {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-3);
+  justify-content: space-between;
+  min-height: 36px;
+  margin-bottom: var(--df-space-2);
+}
+
+.list-title {
+  color: var(--df-text);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-lg);
+  font-weight: var(--df-font-weight-heading);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.all-done {
+  align-items: center;
+  color: var(--df-success);
+  display: inline-flex;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-1);
+
+  mat-icon {
+    font-size: 18px;
+    height: 18px;
+    width: 18px;
+  }
+}
+
+.grid {
+  border-top: 1px solid var(--df-border-2);
+}
+
+.row {
+  align-items: center;
+  border-bottom: 1px solid var(--df-border-2);
+  column-gap: var(--df-space-3);
+  display: grid;
+  // Every row is its own grid, so the chip and value tracks are fixed
+  // widths: content-sized tracks would differ row to row. 216px fits the
+  // longest class chip ("Health & special category" with its lock).
+  grid-template-columns:
+    minmax(120px, 1.1fr) 216px minmax(100px, 0.8fr)
+    200px 28px;
+  min-height: var(--df-row-height);
+  padding: 0 var(--df-space-2);
+  position: relative;
+  // Off-screen rows of a wide table skip layout and paint.
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--df-row-height);
+  transition: background-color var(--df-duration-standard)
+    var(--df-ease-standard);
+
+  &:not(.head):hover {
+    background: var(--df-hover);
+  }
+
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--df-accent);
+    outline: none;
+  }
+
+  &.head {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    min-height: 32px;
+  }
+
+  &.is-open {
+    background: var(--df-surface-2);
+    border-bottom-color: transparent;
+  }
+
+  // Undecided rows carry a thin accent edge, not a loud fill. The accent
+  // means "needs you" here; tier colours only ever mean the kind of data.
+  &.is-review::before {
+    background: var(--df-accent);
+    border-radius: 2px;
+    bottom: 8px;
+    content: '';
+    left: 0;
+    position: absolute;
+    top: 8px;
+    width: 2px;
+  }
+
+  // A decision lands: brief wash that settles back. No size change.
+  &.is-settled {
+    animation: dm-settle 900ms var(--df-ease-standard);
+  }
+}
+
+@keyframes dm-settle {
+  0% {
+    background-color: var(--df-accent-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row.is-settled {
+    animation: none;
+  }
+}
+
+.c-name {
+  min-width: 0;
+
+  code {
+    color: var(--df-text);
+    display: block;
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    .is-clear & {
+      color: var(--df-text-2);
+    }
+  }
+}
+
+.c-class,
+.c-value {
+  display: flex;
+  min-width: 0;
+}
+
+.dash {
+  color: var(--df-text-faint);
+}
+
+// "Redact" for a masked column with no class: the format, named.
+.c-format {
+  color: var(--df-text-2);
+  font-size: var(--df-font-size-sm);
+}
+
+.c-act {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-1);
+  justify-content: flex-end;
+}
+
+.act {
+  background: transparent;
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  height: 26px;
+  padding: 0 var(--df-space-2);
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--df-hover);
+    color: var(--df-text);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+}
+
+.act-keep {
+  background: var(--df-accent-soft);
+  border-color: transparent;
+  color: var(--df-accent-strong);
+
+  &:hover {
+    background: var(--df-accent-soft);
+    border-color: var(--df-accent);
+    color: var(--df-accent-strong);
+  }
+}
+
+.decided {
+  border-radius: 50%;
+  color: var(--df-text-muted);
+  cursor: default;
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+}
+
+.exp {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+
+  &:hover {
+    background: var(--df-hover);
+    color: var(--df-text);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+
+  mat-icon {
+    transition: transform var(--df-duration-standard) var(--df-ease-standard);
+  }
+
+  &[aria-expanded='true'] mat-icon {
+    transform: rotate(180deg);
+  }
+}
+
+.ledger-row {
+  background: var(--df-surface-2);
+  border-bottom: 1px solid var(--df-border-2);
+}
+
+// The rest of the table under the review queue: present, but quiet. A
+// heavier rule above the first one marks where the queue ends.
+.row.is-context-start {
+  border-top: 2px solid var(--df-border);
+}
+
+.row.is-context {
+  opacity: 0.75;
+  transition: opacity var(--df-duration-fast) var(--df-ease-standard);
+
+  &:hover,
+  &:focus-within,
+  &.is-open {
+    opacity: 1;
+  }
+}
+
+// ---------------------------------------------------------------- narrow
+
+@media (max-width: 1240px) {
+  .panes {
+    gap: var(--df-space-4);
+    grid-template-columns: 224px minmax(0, 1fr);
+  }
+
+  .rail {
+    --dm-strip-slot: 48px;
+  }
+}
+
+@media (max-width: 760px) {
+  // Search and an icon-only Scan share the first line; the filter chips
+  // are one row that scrolls sideways.
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--df-space-2);
+  }
+
+  .search {
+    width: auto;
+  }
+
+  .scan {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0;
+    min-width: 0;
+    padding: 0 var(--df-space-2);
+
+    .scan-label {
+      display: none;
+    }
+
+    mat-icon {
+      margin: 0;
+    }
+  }
+
+  // Chips wrap: every filter stays in view on a phone.
+  .filters {
+    grid-column: 1 / -1;
+  }
+
+  .filter {
+    flex: 0 0 auto;
+  }
+
+  // The rail foot (failed / quiet / uncovered databases) under the list.
+  .rail.rail-solo {
+    display: block;
+  }
+
+  .table-select {
+    display: block;
+  }
+
+  .pending-narrow {
+    display: flex;
+  }
+
+  .panes {
+    display: block;
+  }
+
+  .rail:not(.rail-solo),
+  .list-title {
+    display: none;
+  }
+
+  .list-head:not(:has(button, .all-done)) {
+    display: none;
+  }
+}
+
+// The list reflows on its own width, not the viewport's, so it holds up
+// beside the rail at 1024 as well as alone on a phone.
+.list {
+  container-type: inline-size;
+}
+
+@container (max-width: 700px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) 172px minmax(72px, 112px) 28px;
+  }
+
+  .row.head > :nth-child(4) {
+    display: none;
+  }
+
+  // Decisions drop to their own line under the row; the row stays a row.
+  .c-act {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    padding-bottom: var(--df-space-2);
+
+    &:not(:has(*)) {
+      display: none;
+    }
+  }
+}
+
+@container (max-width: 380px) {
+  .row.head {
+    display: none;
+  }
+
+  // Name on top; class chip and value wrap underneath; decisions last.
+  .row {
+    grid-template-areas:
+      'name name exp'
+      'cls val val'
+      'act act act';
+    grid-template-columns: max-content minmax(0, 1fr) 28px;
+    padding: var(--df-space-2);
+    row-gap: 6px;
+  }
+
+  .c-name {
+    grid-area: name;
+  }
+
+  .c-class {
+    grid-area: cls;
+  }
+
+  .c-value {
+    grid-area: val;
+  }
+
+  .c-act {
+    grid-area: act;
+    padding-bottom: 0;
+  }
+
+  .c-exp {
+    grid-area: exp;
+  }
+}

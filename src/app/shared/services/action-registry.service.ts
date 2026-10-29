@@ -59,6 +59,8 @@ const RECENTS_MAX = 6;
 
 // Group render + fuzzy tie-break order. Actions first (a verb the operator
 // typed is almost always the intent), then objects, then plain nav jumps.
+// Groups whose only hits are fuzzy subsequence matches follow the groups
+// with a label or exact keyword hit, in the same order.
 const GROUP_ORDER: PaletteKind[] = [
   'action',
   'service',
@@ -67,6 +69,11 @@ const GROUP_ORDER: PaletteKind[] = [
   'mcp',
   'doc',
 ];
+
+/** Match tiers, strongest first (see rank()). */
+const TIER_LABEL = 3;
+const TIER_KEYWORD = 2;
+const TIER_FUZZY = 1;
 
 const GROUP_LABEL: Record<PaletteKind, string> = {
   action: 'commandPalette.groups.actions',
@@ -198,6 +205,24 @@ export class ActionRegistryService {
       keywords: 'throttle quota 429 security',
     },
     {
+      id: 'jump.data-masking',
+      kind: 'doc',
+      label: 'Data Masking',
+      path: `/${ROUTES.API_SECURITY}/${ROUTES.DATA_MASKING}`,
+      // Hidden match terms (never shown): what admins type for this,
+      // including the regulated-data acronyms the UI copy avoids.
+      keywords:
+        'pii phi pci mask masking redact sensitive personal data privacy anonymize obfuscate hide classification columns hipaa gdpr',
+    },
+    {
+      id: 'jump.compliance',
+      kind: 'doc',
+      label: 'Compliance',
+      path: `/${ROUTES.API_SECURITY}/${ROUTES.COMPLIANCE}`,
+      keywords:
+        'baseline hipaa phi pci dss gdpr soc 2 soc2 iso 27001 glba cjis audit evidence pii',
+    },
+    {
       id: 'jump.ai',
       kind: 'doc',
       label: 'AI Gateway',
@@ -327,24 +352,32 @@ export class ActionRegistryService {
       return [];
     }
     const scored = this.all()
-      .map(item => ({ item, score: this.score(q, item) }))
+      .map(item => ({ item, ...this.rank(q, item) }))
       .filter(entry => entry.score > 0)
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => b.tier - a.tier || b.score - a.score);
 
     const byKind = new Map<PaletteKind, PaletteItem[]>();
-    for (const { item } of scored) {
+    // Best tier per group: a group whose only hits are fuzzy subsequence
+    // matches goes after every group with a label or exact keyword hit.
+    const bestTier = new Map<PaletteKind, number>();
+    for (const { item, tier } of scored) {
       const bucket = byKind.get(item.kind) ?? [];
       // Cap each group so one huge object type cannot bury the others.
       if (bucket.length < 8) {
         bucket.push(item);
         byKind.set(item.kind, bucket);
       }
+      bestTier.set(item.kind, Math.max(bestTier.get(item.kind) ?? 0, tier));
     }
-    return GROUP_ORDER.filter(kind => byKind.has(kind)).map(kind => ({
-      kind,
-      labelKey: GROUP_LABEL[kind],
-      items: byKind.get(kind)!,
-    }));
+    const strong = (kind: PaletteKind) =>
+      (bestTier.get(kind) ?? 0) > TIER_FUZZY ? 0 : 1;
+    return GROUP_ORDER.filter(kind => byKind.has(kind))
+      .sort((a, b) => strong(a) - strong(b))
+      .map(kind => ({
+        kind,
+        labelKey: GROUP_LABEL[kind],
+        items: byKind.get(kind)!,
+      }));
   }
 
   /**
@@ -399,6 +432,26 @@ export class ActionRegistryService {
       ids = [verb('verb.new-service'), verb('verb.new-key'), jump('jump.ai')];
     }
     return ids.filter((i): i is PaletteItem => !!i);
+  }
+
+  /**
+   * How well an item matches: the tier first (label hit, then a whole-word
+   * keyword hit such as "pii", then a fuzzy subsequence), the score within
+   * it. An exact keyword is what an admin types for a page ("pii" for Data
+   * Masking), so it outranks letters that merely appear in order.
+   */
+  private rank(q: string, item: PaletteItem): { tier: number; score: number } {
+    const label = item.label.toLowerCase();
+    if (label.startsWith(q) || label.includes(q)) {
+      return { tier: TIER_LABEL, score: this.score(q, item) };
+    }
+    const keywords = ` ${(item.keywords ?? '').toLowerCase()} `;
+    const at = keywords.indexOf(` ${q} `);
+    if (at >= 0) {
+      // Earlier keywords are the item's main terms.
+      return { tier: TIER_KEYWORD, score: 1000 - at };
+    }
+    return { tier: TIER_FUZZY, score: this.score(q, item) };
   }
 
   /**

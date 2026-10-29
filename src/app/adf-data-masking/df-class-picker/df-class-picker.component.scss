@@ -1,0 +1,170 @@
+@use '../dm-tier' as *;
+@include dm-tiers;
+
+:host {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.chip {
+  align-items: center;
+  background: var(--dm-tier-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--dm-tier-ink);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  gap: 2px;
+  height: 24px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0 4px 0 10px;
+  transition:
+    background-color var(--df-duration-standard) var(--df-ease-standard),
+    border-color var(--df-duration-standard) var(--df-ease-standard),
+    color var(--df-duration-standard) var(--df-ease-standard);
+
+  &:hover:not(:disabled) {
+    border-color: var(--dm-tier);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  // Undecided: outlined, no wash. Matches the hollow strip tick.
+  &.is-review {
+    background: transparent;
+    border: 1px dashed var(--dm-tier);
+  }
+
+  // Not sensitive: quiet text. The outline and caret come back on row
+  // hover or keyboard focus, so a column of clear rows is not a wall of
+  // identical chips.
+  &.is-clear {
+    background: transparent;
+    border-color: transparent;
+    color: var(--df-text-muted);
+    font-weight: var(--df-font-weight-body);
+
+    .chip-caret {
+      opacity: 0;
+    }
+
+    &:focus-visible {
+      border-color: var(--df-border);
+
+      .chip-caret {
+        opacity: 0.7;
+      }
+    }
+  }
+}
+
+:host-context(.row:hover) .chip.is-clear,
+:host-context(.row:focus-within) .chip.is-clear {
+  border-color: var(--df-border);
+  color: var(--df-text-muted);
+
+  .chip-caret {
+    opacity: 0.7;
+  }
+}
+
+.chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-lock {
+  font-size: 13px;
+  height: 13px;
+  margin: 0 2px 0 -3px;
+  width: 13px;
+}
+
+.chip-caret {
+  font-size: 16px;
+  height: 16px;
+  opacity: 0.7;
+  width: 16px;
+}
+
+// Menu content renders in the overlay but these classes are on our own
+// template nodes, so component-scoped styles still apply.
+.menu-group {
+  align-items: center;
+  color: var(--df-text-muted);
+  display: flex;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  gap: var(--df-space-2);
+  padding: var(--df-space-3) var(--df-space-4) var(--df-space-1);
+}
+
+.menu-dot {
+  background: var(--dm-tier-fill);
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.menu-item {
+  align-items: center;
+  display: flex;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-2);
+  justify-content: space-between;
+  width: 100%;
+}
+
+.menu-check {
+  color: var(--df-accent);
+  font-size: 18px;
+  height: 18px;
+  margin: 0 !important;
+  width: 18px;
+}
+
+.is-current .menu-item {
+  font-weight: var(--df-font-weight-medium);
+}
+
+.menu-sep {
+  border-top: 1px solid var(--df-border-2);
+  margin: var(--df-space-1) 0;
+}
+
+.mat-mdc-menu-item {
+  min-height: 34px;
+}
+
+// The menu content uses theme tokens, so paint its panel with them too;
+// otherwise dark/phosphor ink lands on Material's light overlay surface.
+::ng-deep .mat-mdc-menu-panel.dm-class-menu {
+  --mat-menu-container-color: var(--df-surface);
+  background: var(--df-surface);
+  max-height: min(480px, calc(100vh - 32px));
+}
+
+.mat-mdc-menu-item {
+  --mat-menu-item-label-text-color: var(--df-text);
+  color: var(--df-text);
+
+  &:hover:not([disabled]),
+  &.cdk-keyboard-focused,
+  &.cdk-program-focused {
+    background: var(--df-hover);
+  }
+}

@@ -1,0 +1,75 @@
+<df-empty-state
+  *ngIf="store.failed.has('masks') && !store.masks; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'dataMasking.empty.sliceFailed' | transloco"
+  [actionLabel]="'dataMasking.retry' | transloco"
+  (action)="store.loadMasks()"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!store.masks; else body"
+    variant="table-row"
+    [count]="8"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <div class="masks" data-testid="dm-masks">
+    <section
+      *ngFor="let g of groups; trackBy: trackTier"
+      class="tier"
+      [ngClass]="'dm-tier-' + g.tier">
+      <h2 class="tier-head">
+        <span class="dot" aria-hidden="true"></span>
+        <mat-icon
+          *ngIf="g.tier === 'restricted'"
+          class="lock"
+          aria-hidden="true"
+          >lock</mat-icon
+        >
+        {{ 'dataMasking.tiers.' + g.tier | transloco }}
+      </h2>
+      <div class="row" *ngFor="let m of g.rows; trackBy: trackMask">
+        <span class="cls">
+          {{ 'dataMasking.classes.' + m.class | transloco }}
+        </span>
+        <mat-select
+          class="dm-select"
+          [value]="m.format"
+          (valueChange)="setFormat(m, $event)"
+          [aria-label]="
+            'dataMasking.masks.formatFor'
+              | transloco
+                : { cls: ('dataMasking.classes.' + m.class | transloco) }
+          "
+          [attr.data-testid]="'dm-format-' + m.class">
+          <mat-select-trigger>{{
+            'dataMasking.formats.' + m.format | transloco
+          }}</mat-select-trigger>
+          <mat-option *ngFor="let f of m.formatsAllowed" [value]="f">{{
+            'dataMasking.formats.' + f | transloco
+          }}</mat-option>
+        </mat-select>
+        <span class="examples">
+          <span class="example" *ngIf="example(m) as ex">
+            <span class="before" [attr.title]="ex.before">{{ ex.before }}</span>
+            <mat-icon class="arrow" aria-hidden="true">arrow_forward</mat-icon>
+            <df-masked-value
+              [value]="ex.after"
+              [format]="m.format"
+              [tier]="g.tier"></df-masked-value>
+          </span>
+          <span
+            class="example"
+            *ngIf="numericExample(m) as n"
+            data-testid="dm-numeric-example">
+            <span class="before">{{ n }}</span>
+            <mat-icon class="arrow" aria-hidden="true">arrow_forward</mat-icon>
+            <df-masked-value
+              [value]="null"
+              [format]="m.format"
+              [tier]="g.tier"></df-masked-value>
+          </span>
+        </span>
+      </div>
+    </section>
+  </div>
+</ng-template>

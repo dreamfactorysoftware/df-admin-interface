@@ -4,6 +4,7 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { BASE_URL } from '../../shared/constants/urls';
 import { toastOff } from '../../shared/utilities/http-contexts';
+import { MaskingNotice, readMaskingNotice } from '../masking-notice';
 
 // toast-off on every request: the data explorer components render their own
 // in-page error states (with Retry), so the interceptor must not also toast.
@@ -39,6 +40,11 @@ export interface TableDataResponse {
   meta?: {
     count: number;
   };
+  /**
+   * From the response headers, not the body: what Data Masking (df-masking)
+   * did to this response. Null when it sent no masking headers.
+   */
+  masking?: MaskingNotice | null;
 }
 
 export interface FieldInfo {
@@ -208,14 +214,22 @@ export class DataExplorerService {
     if (filter) {
       params.filter = filter;
     }
-    return this.http.get<TableDataResponse>(
-      `${BASE_URL}/${serviceName}/_table/${tableName}`,
-      {
-        params,
-        headers: { 'show-loading': '' },
-        context: toastOff(),
-      }
-    );
+    return this.http
+      .get<TableDataResponse>(
+        `${BASE_URL}/${serviceName}/_table/${tableName}`,
+        {
+          params,
+          headers: { 'show-loading': '' },
+          context: toastOff(),
+          observe: 'response',
+        }
+      )
+      .pipe(
+        map(res => ({
+          ...(res.body ?? { resource: [] }),
+          masking: readMaskingNotice(res.headers),
+        }))
+      );
   }
 
   /**

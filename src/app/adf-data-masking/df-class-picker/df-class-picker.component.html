@@ -1,0 +1,67 @@
+<button
+  type="button"
+  class="chip"
+  [ngClass]="'dm-tier-' + tier"
+  [class.is-review]="verdict === 'review'"
+  [class.is-clear]="verdict === 'clear'"
+  [disabled]="disabled"
+  [attr.tabindex]="tabIndex"
+  [matMenuTriggerFor]="menu"
+  data-testid="dm-class-chip">
+  <mat-icon *ngIf="tier === 'restricted'" class="chip-lock" aria-hidden="true"
+    >lock</mat-icon
+  >
+  <span class="chip-label" [attr.title]="label">{{
+    labelKey | transloco
+  }}</span>
+  <mat-icon class="chip-caret" aria-hidden="true">expand_more</mat-icon>
+</button>
+
+<!-- Items render only when the menu opens: a wide table has one picker
+     per row, and eager menus made opening it slow. -->
+<mat-menu #menu="matMenu" class="dm-class-menu" xPosition="after">
+  <ng-template matMenuContent>
+    <ng-container *ngFor="let g of groups">
+      <div
+        class="menu-group"
+        [ngClass]="'dm-tier-' + g.tier"
+        role="presentation">
+        <span class="menu-dot" aria-hidden="true"></span>
+        {{ 'dataMasking.tiers.' + g.tier | transloco }}
+      </div>
+      <button
+        mat-menu-item
+        *ngFor="let c of g.classes"
+        type="button"
+        [class.is-current]="verdict !== 'clear' && c.id === cls"
+        (click)="choose(c.id)">
+        <span class="menu-item">
+          {{ 'dataMasking.classes.' + c.id | transloco }}
+          <mat-icon
+            *ngIf="verdict !== 'clear' && c.id === cls"
+            class="menu-check"
+            aria-hidden="true"
+            >check</mat-icon
+          >
+        </span>
+      </button>
+    </ng-container>
+    <div class="menu-sep" role="separator"></div>
+    <button
+      mat-menu-item
+      type="button"
+      [class.is-current]="verdict === 'clear'"
+      data-testid="dm-class-none"
+      (click)="choose(null)">
+      <span class="menu-item">
+        {{ 'dataMasking.notSensitive' | transloco }}
+        <mat-icon
+          *ngIf="verdict === 'clear'"
+          class="menu-check"
+          aria-hidden="true"
+          >check</mat-icon
+        >
+      </span>
+    </button>
+  </ng-template>
+</mat-menu>

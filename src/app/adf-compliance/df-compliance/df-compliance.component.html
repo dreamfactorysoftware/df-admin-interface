@@ -1,0 +1,313 @@
+<df-paywall
+  *ngIf="paywall; else page"
+  [serviceName]="'Compliance'"></df-paywall>
+
+<ng-template #page>
+  <div class="cp">
+    <df-skeleton
+      *ngIf="store.loading; else loaded"
+      variant="table-row"
+      [count]="8"></df-skeleton>
+
+    <ng-template #loaded>
+      <df-empty-state
+        *ngIf="store.loadFailed; else list"
+        icon="cloud_off"
+        [title]="'compliance.empty.loadFailed' | transloco"
+        [description]="store.loadError ?? undefined"
+        [actionLabel]="'compliance.retry' | transloco"
+        (action)="store.load(store.selectedId)"
+        data-testid="cp-load-failed"></df-empty-state>
+    </ng-template>
+
+    <ng-template #list>
+      <df-empty-state
+        *ngIf="!store.baselines?.length; else panes"
+        icon="verified_user"
+        [title]="'compliance.empty.none' | transloco"></df-empty-state>
+    </ng-template>
+
+    <ng-template #panes>
+      <!-- Narrow screens: the rail collapses to a baseline picker. -->
+      <mat-form-field
+        class="baseline-select"
+        subscriptSizing="dynamic"
+        appearance="outline">
+        <mat-label>{{ 'compliance.baseline' | transloco }}</mat-label>
+        <mat-select
+          [value]="store.selectedId"
+          (valueChange)="select($event)"
+          data-testid="cp-select">
+          <mat-select-trigger>{{ store.selected?.name }}</mat-select-trigger>
+          <mat-optgroup
+            *ngFor="let g of store.groups; trackBy: trackGroup"
+            [label]="verticalLabel(g.vertical)">
+            <mat-option
+              *ngFor="let b of g.baselines; trackBy: trackBaseline"
+              [value]="b.id">
+              {{ b.name }}
+              <span class="opt-score df-numeric">{{ railScore(b) }}</span>
+            </mat-option>
+          </mat-optgroup>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="panes">
+        <nav
+          class="rail"
+          [attr.aria-label]="'compliance.baselines' | transloco">
+          <section
+            *ngFor="let g of store.groups; trackBy: trackGroup"
+            class="rail-group">
+            <h3 class="rail-vertical">
+              <mat-icon aria-hidden="true">{{ g.icon }}</mat-icon>
+              {{ verticalLabel(g.vertical) }}
+            </h3>
+            <button
+              *ngFor="let b of g.baselines; trackBy: trackBaseline"
+              type="button"
+              class="rail-row"
+              [class.is-selected]="store.selectedId === b.id"
+              [attr.aria-current]="store.selectedId === b.id ? 'true' : null"
+              [attr.aria-label]="railLabel(b)"
+              (click)="select(b.id)"
+              [attr.data-testid]="'cp-rail-' + b.id">
+              <span class="rail-name">{{ b.name }}</span>
+              <span
+                class="rail-tracking"
+                *ngIf="b.adopted"
+                aria-hidden="true"></span>
+              <span class="rail-score df-numeric" aria-hidden="true">{{
+                railScore(b)
+              }}</span>
+            </button>
+          </section>
+        </nav>
+
+        <section
+          class="detail"
+          aria-labelledby="cp-title"
+          [attr.aria-busy]="!store.detail || null"
+          data-testid="cp-detail">
+          <ng-container *ngIf="store.detail as d; else detailPending">
+            <header class="head">
+              <div class="title-row">
+                <h2 class="title" id="cp-title">{{ title(d) }}</h2>
+                <span
+                  *ngIf="d.adopted"
+                  class="tracking"
+                  tabindex="0"
+                  [matTooltip]="trackingTip(d)"
+                  [attr.aria-label]="trackingTip(d)"
+                  data-testid="cp-tracking">
+                  <span class="tracking-dot" aria-hidden="true"></span>
+                  {{ 'compliance.tracking' | transloco }}
+                </span>
+              </div>
+              <div class="actions">
+                <button
+                  *ngIf="d.adopted"
+                  mat-button
+                  type="button"
+                  class="stop"
+                  [disabled]="!!store.busy"
+                  (click)="stop(d)"
+                  data-testid="cp-stop">
+                  {{ 'compliance.stopTracking' | transloco }}
+                </button>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [matMenuTriggerFor]="exportMenu"
+                  [disabled]="!!store.busy"
+                  data-testid="cp-export">
+                  <mat-icon aria-hidden="true">download</mat-icon>
+                  {{ 'compliance.export' | transloco }}
+                </button>
+                <mat-menu #exportMenu="matMenu" xPosition="before">
+                  <button
+                    mat-menu-item
+                    type="button"
+                    (click)="exportReport(d, 'json')"
+                    data-testid="cp-export-json">
+                    {{ 'compliance.exportJson' | transloco }}
+                  </button>
+                  <button
+                    mat-menu-item
+                    type="button"
+                    (click)="exportReport(d, 'csv')"
+                    data-testid="cp-export-csv">
+                    {{ 'compliance.exportCsv' | transloco }}
+                  </button>
+                </mat-menu>
+                <button
+                  *ngIf="canApply(d)"
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="!!store.busy"
+                  (click)="apply(d)"
+                  data-testid="cp-apply">
+                  {{ 'compliance.apply' | transloco }}
+                  <span
+                    *ngIf="d.changes.length"
+                    class="apply-n df-numeric"
+                    [attr.aria-label]="
+                      'compliance.changesN'
+                        | transloco: { count: d.changes.length }
+                    "
+                    >{{ d.changes.length }}</span
+                  >
+                </button>
+              </div>
+            </header>
+
+            <p class="mapped" data-testid="cp-mapped">{{ mapped(d) }}</p>
+
+            <div
+              class="scan"
+              *ngIf="store.scanning"
+              role="status"
+              data-testid="cp-scanning">
+              <span class="scan-text">
+                {{ 'compliance.scanning' | transloco }}
+                <span class="df-numeric" *ngIf="store.scanProgress !== null"
+                  >{{ store.scanProgress }}%</span
+                >
+              </span>
+              <mat-progress-bar
+                [mode]="
+                  store.scanProgress === null ? 'indeterminate' : 'determinate'
+                "
+                [value]="store.scanProgress ?? 0"></mat-progress-bar>
+            </div>
+
+            <div class="score" *ngIf="score(d) as s">
+              <span class="score-num df-numeric" data-testid="cp-score">
+                <strong>{{ s.pass }}</strong>
+                {{ 'compliance.of' | transloco: { total: s.checked } }}
+              </span>
+              <span
+                class="meter"
+                role="meter"
+                aria-valuemin="0"
+                [attr.aria-valuemax]="s.checked"
+                [attr.aria-valuenow]="s.pass"
+                [attr.aria-label]="
+                  'compliance.scoreLabel'
+                    | transloco: { pass: s.pass, total: s.checked }
+                "
+                ><span [style.width.%]="s.pct"></span
+              ></span>
+            </div>
+
+            <ul
+              class="controls"
+              [attr.aria-label]="'compliance.checks' | transloco"
+              data-testid="cp-controls">
+              <ng-container
+                *ngFor="let c of automated(d); trackBy: trackControl">
+                <ng-container
+                  *ngTemplateOutlet="
+                    controlRow;
+                    context: { $implicit: c }
+                  "></ng-container>
+              </ng-container>
+            </ul>
+
+            <section class="manual" *ngIf="manual(d) as m">
+              <ng-container *ngIf="m.length">
+                <button
+                  type="button"
+                  class="manual-toggle"
+                  [attr.aria-expanded]="manualOpen"
+                  aria-controls="cp-manual-list"
+                  (click)="manualOpen = !manualOpen"
+                  data-testid="cp-manual-toggle">
+                  <mat-icon aria-hidden="true">chevron_right</mat-icon>
+                  {{ 'compliance.manual' | transloco }}
+                  <span class="manual-n df-numeric">{{ m.length }}</span>
+                </button>
+                <ul
+                  *ngIf="manualOpen"
+                  id="cp-manual-list"
+                  class="controls is-manual"
+                  [attr.aria-label]="'compliance.manual' | transloco">
+                  <ng-container *ngFor="let c of m; trackBy: trackControl">
+                    <ng-container
+                      *ngTemplateOutlet="
+                        controlRow;
+                        context: { $implicit: c }
+                      "></ng-container>
+                  </ng-container>
+                </ul>
+              </ng-container>
+            </section>
+          </ng-container>
+
+          <ng-template #detailPending>
+            <df-empty-state
+              *ngIf="store.detailFailed; else detailLoading"
+              icon="cloud_off"
+              [title]="'compliance.empty.detailFailed' | transloco"
+              [actionLabel]="'compliance.retry' | transloco"
+              (action)="store.loadDetail(store.selectedId!)"></df-empty-state>
+            <ng-template #detailLoading>
+              <df-skeleton variant="table-row" [count]="8"></df-skeleton>
+            </ng-template>
+          </ng-template>
+        </section>
+      </div>
+    </ng-template>
+  </div>
+</ng-template>
+
+<!-- One check: status mark, title (+ what was found), refs, one action. -->
+<ng-template #controlRow let-c>
+  <li
+    class="control"
+    [ngClass]="'is-' + c.status"
+    [attr.data-testid]="'cp-control-' + c.id">
+    <span class="mark">
+      <mat-icon aria-hidden="true">{{ statusIcon(c) }}</mat-icon>
+      <span class="sr-only">{{ statusLabel(c) }}:</span>
+    </span>
+    <span class="body">
+      <span class="c-title">{{ c.title }}</span>
+      <span class="c-detail" *ngIf="showDetail(c)">{{ c.detail }}</span>
+    </span>
+    <span class="refs">
+      <span class="ref" *ngFor="let r of c.refs; trackBy: trackRef">{{
+        r
+      }}</span>
+    </span>
+    <span class="act">
+      <ng-container *ngIf="action(c) as a">
+        <a
+          *ngIf="a.kind === 'link'; else applyFix"
+          class="fix"
+          [routerLink]="a.path"
+          [queryParams]="a.query"
+          [attr.aria-label]="
+            'compliance.fixFor' | transloco: { title: c.title }
+          "
+          data-testid="cp-fix">
+          {{ 'compliance.fix' | transloco }}
+        </a>
+        <ng-template #applyFix>
+          <button
+            type="button"
+            class="fix"
+            [disabled]="!!store.busy"
+            (click)="fixWithApply(store.detail!, a)"
+            [attr.aria-label]="
+              'compliance.fixFor' | transloco: { title: c.title }
+            "
+            data-testid="cp-fix">
+            {{ 'compliance.fix' | transloco }}
+          </button>
+        </ng-template>
+      </ng-container>
+    </span>
+  </li>
+</ng-template>

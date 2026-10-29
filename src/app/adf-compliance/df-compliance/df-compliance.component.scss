@@ -1,0 +1,527 @@
+// Compliance page: a rail of baselines grouped by vertical (the same
+// grammar as Data Masking's Columns rail) and the selected baseline's
+// score and checks. Tokens only: light, dark and phosphor resolve from
+// src/styles.scss.
+
+:host {
+  display: block;
+}
+
+.cp {
+  margin: 0 auto;
+  max-width: var(--df-content-max);
+}
+
+.sr-only {
+  clip: rect(0 0 0 0);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+// ------------------------------------------------------------------ panes
+
+.baseline-select {
+  display: none;
+  margin-bottom: var(--df-space-3);
+  width: 100%;
+}
+
+.opt-score {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  margin-left: var(--df-space-2);
+}
+
+.panes {
+  align-items: start;
+  display: grid;
+  gap: var(--df-space-5);
+  grid-template-columns: 248px minmax(0, 1fr);
+}
+
+// ------------------------------------------------------------------- rail
+
+.rail {
+  border-right: 1px solid var(--df-border-2);
+  padding-right: var(--df-space-3);
+  position: sticky;
+  top: 0;
+}
+
+.rail-group + .rail-group {
+  margin-top: var(--df-space-4);
+}
+
+.rail-vertical {
+  align-items: center;
+  color: var(--df-text-muted);
+  display: flex;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  gap: 6px;
+  margin: 0 0 var(--df-space-1);
+  padding: 0 var(--df-space-2);
+
+  mat-icon {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+  }
+}
+
+.rail-row {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-2);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  height: 32px;
+  padding: 0 var(--df-space-2);
+  text-align: left;
+  width: 100%;
+
+  &:hover {
+    background: var(--df-hover);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+
+  &.is-selected {
+    background: var(--df-accent-soft);
+    color: var(--df-text);
+    font-weight: var(--df-font-weight-medium);
+  }
+}
+
+.rail-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Tracked baselines carry a small accent dot; spoken via the row label.
+.rail-tracking {
+  background: var(--df-accent);
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+.rail-score {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  min-width: 34px;
+  text-align: right;
+
+  .is-selected & {
+    color: var(--df-text-2);
+  }
+}
+
+// ----------------------------------------------------------------- detail
+
+.detail {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-3);
+  justify-content: space-between;
+  margin-bottom: var(--df-space-2);
+  min-height: 40px;
+}
+
+.title-row {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-3);
+  min-width: 0;
+}
+
+.title {
+  color: var(--df-text);
+  font-size: var(--df-font-size-xl);
+  font-weight: var(--df-font-weight-heading);
+  letter-spacing: var(--df-tracking-tight);
+  margin: 0;
+}
+
+.tracking {
+  align-items: center;
+  background: var(--df-accent-soft);
+  border-radius: 999px;
+  color: var(--df-accent-strong);
+  cursor: default;
+  display: inline-flex;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--df-space-2);
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+}
+
+.tracking-dot {
+  background: var(--df-accent);
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-2);
+
+  mat-icon {
+    font-size: 18px;
+    height: 18px;
+    width: 18px;
+  }
+}
+
+.stop {
+  color: var(--df-text-2);
+}
+
+// Pending change count riding the Apply button.
+.apply-n {
+  background: var(--df-accent-contrast);
+  border-radius: 999px;
+  color: var(--df-accent-strong);
+  display: inline-block;
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-heading);
+  line-height: 18px;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 5px;
+  text-align: center;
+}
+
+// ------------------------------------------------------------------ score
+
+// What the baseline maps to, and that it is not a certification.
+.mapped {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
+  margin: calc(-1 * var(--df-space-1)) 0 var(--df-space-3);
+}
+
+.scan {
+  color: var(--df-text-2);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-1);
+  margin-bottom: var(--df-space-3);
+  max-width: 360px;
+}
+
+.score {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-3);
+  margin-bottom: var(--df-space-4);
+}
+
+.score-num {
+  color: var(--df-text-2);
+  font-size: var(--df-font-size-sm);
+  white-space: nowrap;
+
+  strong {
+    color: var(--df-text);
+    font-size: var(--df-font-size-xl);
+    font-weight: var(--df-font-weight-heading);
+  }
+}
+
+.meter {
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: 999px;
+  display: block;
+  flex: 0 1 240px;
+  height: 6px;
+  overflow: hidden;
+
+  span {
+    background: var(--df-success);
+    border-radius: inherit;
+    display: block;
+    height: 100%;
+    transition: width var(--df-duration-standard) var(--df-ease-standard);
+  }
+}
+
+// --------------------------------------------------------------- controls
+
+.controls {
+  border-top: 1px solid var(--df-border-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.control {
+  align-items: center;
+  border-bottom: 1px solid var(--df-border-2);
+  column-gap: var(--df-space-3);
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 48px;
+  min-height: var(--df-row-height);
+  padding: 6px var(--df-space-2);
+}
+
+.mark {
+  display: inline-flex;
+
+  mat-icon {
+    font-size: 18px;
+    height: 18px;
+    width: 18px;
+  }
+
+  .is-pass & {
+    color: var(--df-success);
+  }
+
+  .is-fail & {
+    color: var(--df-danger);
+  }
+
+  .is-manual & {
+    color: var(--df-text-muted);
+  }
+
+  .is-na & {
+    color: var(--df-text-faint);
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.c-title {
+  color: var(--df-text);
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
+
+  .is-na & {
+    color: var(--df-text-muted);
+  }
+}
+
+.c-detail {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  line-height: var(--df-lh-base);
+}
+
+.refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-1);
+  justify-content: flex-end;
+  max-width: 340px;
+}
+
+.ref {
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2);
+  font-family: var(--df-font-mono);
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.act {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fix {
+  border-radius: var(--df-radius-sm);
+  color: var(--df-accent-strong);
+  font-size: var(--df-font-size-sm);
+  font-weight: var(--df-font-weight-medium);
+  padding: 2px 6px;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--df-accent-soft);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+}
+
+// Apply fixes: the same quiet action as the links, as a button.
+button.fix {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
+
+  &:disabled {
+    color: var(--df-text-muted);
+    cursor: default;
+  }
+}
+
+// ----------------------------------------------------------------- manual
+
+.manual {
+  margin-top: var(--df-space-4);
+}
+
+.manual-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-1);
+  height: 30px;
+  padding: 0 var(--df-space-2) 0 var(--df-space-1);
+
+  &:hover {
+    background: var(--df-hover);
+    color: var(--df-text);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+
+  mat-icon {
+    font-size: 18px;
+    height: 18px;
+    transition: transform var(--df-duration-standard) var(--df-ease-standard);
+    width: 18px;
+  }
+
+  &[aria-expanded='true'] mat-icon {
+    transform: rotate(90deg);
+  }
+}
+
+.manual-n {
+  background: var(--df-surface-2);
+  border-radius: 999px;
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  line-height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  text-align: center;
+}
+
+.controls.is-manual {
+  margin-top: var(--df-space-2);
+}
+
+// ---------------------------------------------------------------- narrow
+
+@media (max-width: 1240px) {
+  .panes {
+    gap: var(--df-space-4);
+    grid-template-columns: 216px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .baseline-select {
+    display: block;
+  }
+
+  .panes {
+    display: block;
+  }
+
+  .rail {
+    display: none;
+  }
+}
+
+// Checks reflow on the detail's own width: refs drop under the title.
+@container (max-width: 640px) {
+  .control {
+    grid-template-areas:
+      'mark body act'
+      '. refs refs';
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    row-gap: var(--df-space-1);
+  }
+
+  .mark {
+    align-self: start;
+    grid-area: mark;
+    padding-top: 1px;
+  }
+
+  .body {
+    grid-area: body;
+  }
+
+  .act {
+    align-self: start;
+    grid-area: act;
+  }
+
+  .refs {
+    grid-area: refs;
+    justify-content: flex-start;
+    max-width: none;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .head {
+    align-items: flex-start;
+  }
+
+  // The actions wrap under the title here: no pull-up.
+  .mapped {
+    margin-top: 0;
+  }
+}

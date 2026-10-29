@@ -1,0 +1,110 @@
+<h2 mat-dialog-title>{{ 'dataMasking.detection.addRule' | transloco }}</h2>
+<form mat-dialog-content class="form" (ngSubmit)="save()" id="dm-rule-form">
+  <mat-button-toggle-group
+    class="dm-seg"
+    name="match"
+    [(ngModel)]="draft.match"
+    (ngModelChange)="changed()"
+    [attr.aria-label]="'dataMasking.detection.match' | transloco"
+    data-testid="dm-rule-match">
+    <mat-button-toggle value="name">{{
+      'dataMasking.detection.matchName' | transloco
+    }}</mat-button-toggle>
+    <mat-button-toggle value="value">{{
+      'dataMasking.detection.matchValue' | transloco
+    }}</mat-button-toggle>
+  </mat-button-toggle-group>
+
+  <label class="field">
+    <span class="label">{{ 'dataMasking.detection.pattern' | transloco }}</span>
+    <input
+      class="input mono"
+      name="pattern"
+      autocomplete="off"
+      spellcheck="false"
+      [attr.maxlength]="maxPattern"
+      [class.is-invalid]="invalid"
+      [attr.aria-invalid]="invalid"
+      [(ngModel)]="draft.pattern"
+      (ngModelChange)="changed()"
+      [placeholder]="
+        (draft.match === 'name'
+          ? 'dataMasking.detection.patternNameExample'
+          : 'dataMasking.detection.patternValueExample'
+        ) | transloco
+      "
+      data-testid="dm-rule-pattern" />
+  </label>
+
+  <div class="field">
+    <span class="label" id="dm-rule-class-label">{{
+      'dataMasking.columns.class' | transloco
+    }}</span>
+    <mat-select
+      aria-labelledby="dm-rule-class-label"
+      class="dm-select"
+      name="class"
+      [(ngModel)]="draft.class"
+      [placeholder]="'dataMasking.detection.pickClass' | transloco"
+      data-testid="dm-rule-class">
+      <mat-optgroup
+        *ngFor="let g of groups"
+        [label]="'dataMasking.tiers.' + g.tier | transloco">
+        <mat-option *ngFor="let c of g.classes" [value]="c.id">{{
+          'dataMasking.classes.' + c.id | transloco
+        }}</mat-option>
+      </mat-optgroup>
+    </mat-select>
+  </div>
+
+  <div
+    class="preview"
+    role="status"
+    aria-live="polite"
+    data-testid="dm-rule-preview">
+    <ng-container *ngIf="problem as p; else ok">
+      <span class="bad" data-testid="dm-rule-error">{{ p }}</span>
+    </ng-container>
+    <ng-template #ok>
+      <ng-container *ngIf="preview; else idle">
+        <strong class="df-numeric">{{
+          (partial
+            ? 'dataMasking.detection.matchesAtLeast'
+            : 'dataMasking.detection.matchesN'
+          ) | transloco: { columns: columnsLabel(preview.length) }
+        }}</strong>
+        <ul class="ids" *ngIf="preview.length">
+          <li *ngFor="let id of preview.slice(0, 5)">
+            <code>{{ id }}</code>
+          </li>
+          <li *ngIf="preview.length > 5" class="more df-numeric">
+            {{
+              'dataMasking.detection.more'
+                | transloco: { count: preview.length - 5 }
+            }}
+          </li>
+        </ul>
+      </ng-container>
+      <ng-template #idle>
+        <span class="idle">{{
+          'dataMasking.detection.matchesN'
+            | transloco: { columns: columnsLabel(0) }
+        }}</span>
+      </ng-template>
+    </ng-template>
+  </div>
+</form>
+<div mat-dialog-actions align="end">
+  <button mat-button type="button" mat-dialog-close>
+    {{ 'dataMasking.cancel' | transloco }}
+  </button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    form="dm-rule-form"
+    [disabled]="!canSave"
+    data-testid="dm-rule-save">
+    {{ 'dataMasking.detection.addRule' | transloco }}
+  </button>
+</div>

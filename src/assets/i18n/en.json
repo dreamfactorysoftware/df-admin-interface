@@ -388,6 +388,19 @@
       "rateTitle": "Rate Limiting",
       "rateText": "Cap how many calls a user, role, service, IP, or key can make so no single client can overwhelm your APIs.",
       "rateAction": "Manage rate limits",
+      "maskingTitle": "Data Masking",
+      "maskingText": "Find sensitive columns and mask their values for apps, roles, and AI tools.",
+      "maskingAction": "Manage data masking",
+      "maskingNotScanned": "Not scanned",
+      "maskingScanning": "Scanning",
+      "maskingOff": "Off",
+      "maskingPreview": "Preview",
+      "maskingPreviewReview": "Preview · {{review}} to review",
+      "maskingOn": "On · {{masked}} masked",
+      "maskingOnReview": "On · {{masked}} masked · {{review}} to review",
+      "complianceTitle": "Compliance",
+      "complianceText": "Apply a baseline for HIPAA, PCI DSS, GDPR, SOC 2 and more, then track every check.",
+      "complianceAction": "Manage compliance",
       "rolesTitle": "Role-Based Access",
       "rolesText": "Define exactly which services, tables, and endpoints each caller can reach.",
       "rolesAction": "Manage roles",
@@ -603,6 +616,14 @@
         "edit": {
           "header": "Edit Limit"
         }
+      },
+      "data-masking": {
+        "nav": "Data Masking",
+        "header": "{{nav.api-security.data-masking.nav}}"
+      },
+      "compliance": {
+        "nav": "Compliance",
+        "header": "{{nav.api-security.compliance.nav}}"
       },
       "authentication": {
         "nav": "Authentication",
