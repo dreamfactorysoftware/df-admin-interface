@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, UrlTree } from '@angular/router';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { sysAdminGuard } from './admin.guard';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+import { serverSettingsGuard } from './admin.guard';
 import { DfUserDataService } from '../services/df-user-data.service';
 import { ROUTES } from '../types/routes';
 
-describe('sysAdminGuard', () => {
+describe('serverSettingsGuard', () => {
   const userData$ = new BehaviorSubject<unknown>(null);
+  const accessibleTabs = jest.fn();
   const router = {
     createUrlTree: jest.fn(
       (commands: string[]) => commands as unknown as UrlTree
@@ -14,20 +15,23 @@ describe('sysAdminGuard', () => {
   };
 
   const run = () =>
-    TestBed.runInInjectionContext(() => sysAdminGuard()) as Observable<unknown>;
+    TestBed.runInInjectionContext(() =>
+      serverSettingsGuard()
+    ) as Observable<unknown>;
 
   beforeEach(() => {
     userData$.next(null);
     router.createUrlTree.mockClear();
+    accessibleTabs.mockReset().mockReturnValue(of([]));
     TestBed.configureTestingModule({
       providers: [
-        { provide: DfUserDataService, useValue: { userData$ } },
+        { provide: DfUserDataService, useValue: { userData$, accessibleTabs } },
         { provide: Router, useValue: router },
       ],
     });
   });
 
-  it('allows a sys admin', done => {
+  it('allows a full admin', done => {
     userData$.next({ isSysAdmin: true });
     run().subscribe(r => {
       expect(r).toBe(true);
@@ -37,6 +41,33 @@ describe('sysAdminGuard', () => {
 
   it('sends a non-admin Home', done => {
     userData$.next({ isSysAdmin: false });
+    run().subscribe(r => {
+      expect(r).toEqual([ROUTES.HOME]);
+      done();
+    });
+  });
+
+  it('allows a restricted admin with the config tab', done => {
+    accessibleTabs.mockReturnValue(of(['config']));
+    userData$.next({ isSysAdmin: true, roleId: 3 });
+    run().subscribe(r => {
+      expect(r).toBe(true);
+      done();
+    });
+  });
+
+  it('sends a restricted admin without config Home', done => {
+    accessibleTabs.mockReturnValue(of(['apps']));
+    userData$.next({ isSysAdmin: true, roleId: 3 });
+    run().subscribe(r => {
+      expect(r).toEqual([ROUTES.HOME]);
+      done();
+    });
+  });
+
+  it('sends a restricted admin Home when the tabs cannot be loaded', done => {
+    accessibleTabs.mockReturnValue(throwError(() => new Error('403')));
+    userData$.next({ isSysAdmin: true, roleId: 3 });
     run().subscribe(r => {
       expect(r).toEqual([ROUTES.HOME]);
       done();

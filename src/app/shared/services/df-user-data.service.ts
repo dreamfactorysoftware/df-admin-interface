@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@angular/core';
-import { BehaviorSubject, map, of, switchMap } from 'rxjs';
+import { BehaviorSubject, Observable, map, of, switchMap } from 'rxjs';
 import { UserSession } from '../types/user';
 import { ROLE_SERVICE_TOKEN } from '../constants/tokens';
 import { DfBaseCrudService } from './df-base-crud.service';
@@ -23,36 +23,37 @@ export class DfUserDataService {
     @Inject(ROLE_SERVICE_TOKEN) private roleService: DfBaseCrudService
   ) {
     this.userData$
-      .pipe(
-        switchMap(userData => {
-          if (
-            userData &&
-            userData.isSysAdmin &&
-            !userData.isRootAdmin &&
-            userData.roleId
-          ) {
-            return this.roleService
-              .get<RoleType>(userData.roleId, {
-                related: 'role_service_access_by_role_id',
-                additionalParams: [
-                  {
-                    key: 'accessible_tabs',
-                    value: true,
-                  },
-                ],
-                additionalHeaders: [
-                  {
-                    key: SESSION_TOKEN_HEADER,
-                    value: userData.sessionToken,
-                  },
-                ],
-              })
-              .pipe(map(role => role.accessibleTabs ?? []));
-          }
-          return of([]);
-        })
-      )
+      .pipe(switchMap(userData => this.accessibleTabs(userData)))
       .subscribe(role => this.restrictedAccessSubject.next(role));
+  }
+
+  /** Tabs a restricted admin may use; empty for everyone else. */
+  accessibleTabs(userData: UserSession | null): Observable<Array<string>> {
+    if (
+      userData &&
+      userData.isSysAdmin &&
+      !userData.isRootAdmin &&
+      userData.roleId
+    ) {
+      return this.roleService
+        .get<RoleType>(userData.roleId, {
+          related: 'role_service_access_by_role_id',
+          additionalParams: [
+            {
+              key: 'accessible_tabs',
+              value: true,
+            },
+          ],
+          additionalHeaders: [
+            {
+              key: SESSION_TOKEN_HEADER,
+              value: userData.sessionToken,
+            },
+          ],
+        })
+        .pipe(map(role => role.accessibleTabs ?? []));
+    }
+    return of([]);
   }
 
   clearToken() {

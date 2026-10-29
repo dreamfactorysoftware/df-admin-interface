@@ -133,7 +133,8 @@ export function accessibleRoutes(
           ROUTES.CONFIG_PACKAGE,
           ROUTES.EMAIL_TEMPLATES,
           ROUTES.GLOBAL_LOOKUP_KEYS,
-          ROUTES.INTERCOM
+          ROUTES.INTERCOM,
+          ROUTES.SERVER_SETTINGS
         );
         break;
       case 'limits':

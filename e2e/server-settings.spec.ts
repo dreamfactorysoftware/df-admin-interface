@@ -55,4 +55,65 @@ test.describe('Server settings', () => {
     await expect(row.getByTestId('server-setting-source')).toHaveText(/\.env/);
     expect(await api.getEnvironmentLogLevel()).toBe(original);
   });
+
+  test.describe('restricted admins', () => {
+    const password = 'E2e-restricted-pass1!';
+    const created: { id: number; email: string }[] = [];
+
+    const makeAdmin = async (tabs: string[]) => {
+      const email = `e2e-ss-${tabs[0]}-${Date.now()}@example.com`;
+      created.push({
+        id: await api.createRestrictedAdmin(email, password, tabs),
+        email,
+      });
+      return email;
+    };
+
+    test.afterAll(async () => {
+      for (const a of created) {
+        await api.deleteRestrictedAdmin(a.id, a.email);
+      }
+    });
+
+    test('without the Config tab: API 403, no nav entry, deep link lands Home', async ({
+      page,
+    }) => {
+      const email = await makeAdmin(['apps']);
+
+      const session = await ctx.post('/api/v2/system/admin/session', {
+        data: { email, password },
+      });
+      expect(session.ok()).toBe(true);
+      const denied = await ctx.get('/api/v2/system/server_setting', {
+        headers: {
+          'X-DreamFactory-API-Key': await api.getAdminAppApiKey(),
+          'X-DreamFactory-Session-Token': (await session.json())
+            .session_token,
+        },
+      });
+      expect(denied.status()).toBe(403);
+
+      await loginAsAdmin(page, email, password);
+      await waitForAppReady(page);
+      await page.goto(
+        '/dreamfactory/dist/#/system-settings/config/server-settings'
+      );
+      await expect(page).toHaveURL(/#\/home/);
+      await expect(page.getByTestId('server-setting-log_level')).toHaveCount(0);
+      await expect(
+        page.getByRole('link', { name: 'Server Settings' })
+      ).toHaveCount(0);
+    });
+
+    test('with the Config tab: opens the page', async ({ page }) => {
+      const email = await makeAdmin(['config']);
+
+      await loginAsAdmin(page, email, password);
+      await waitForAppReady(page);
+      await page.goto(
+        '/dreamfactory/dist/#/system-settings/config/server-settings'
+      );
+      await expect(page.getByTestId('server-setting-log_level')).toBeVisible();
+    });
+  });
 });

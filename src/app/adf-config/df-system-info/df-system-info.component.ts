@@ -11,6 +11,7 @@ import { TrialInfo } from 'src/app/shared/types/trial';
 import { trialFromEnvironment } from 'src/app/shared/utilities/trial';
 import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
 import { ROUTES } from 'src/app/shared/types/routes';
+import { canManageServerSettings } from 'src/app/shared/utilities/server-settings-access';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -33,8 +34,13 @@ export class DfSystemInfoComponent implements OnInit {
 
   serverSettingsLink = `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.SERVER_SETTINGS}`;
 
+  private tabs: Array<string> = [];
+  private tabsSub = this.userDataService.restrictedAccess$.subscribe(
+    tabs => (this.tabs = tabs)
+  );
+
   get canEditServerSettings(): boolean {
-    return !!this.userDataService.userData?.isSysAdmin;
+    return canManageServerSettings(this.userDataService.userData, this.tabs);
   }
 
   /** Docker trial block (platform.trial, or top-level pre-login); null otherwise. */

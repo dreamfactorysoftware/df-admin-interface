@@ -57,7 +57,7 @@ import { globalLicenseGuard } from './shared/guards/global-license.guard';
 import { trialGuard } from './shared/guards/trial.guard';
 import { errorGuard } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
-import { rootAdminGuard, sysAdminGuard } from './shared/guards/admin.guard';
+import { rootAdminGuard, serverSettingsGuard } from './shared/guards/admin.guard';
 import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
 
 export const routes: Routes = [
@@ -472,7 +472,7 @@ export const routes: Routes = [
                 './adf-config/df-server-settings/df-server-settings.component'
               ).then(m => m.DfServerSettingsComponent),
             providers: [provideTranslocoScope('serverSettings')],
-            canActivate: [sysAdminGuard],
+            canActivate: [serverSettingsGuard],
           },
           {
             path: ROUTES.CORS,
