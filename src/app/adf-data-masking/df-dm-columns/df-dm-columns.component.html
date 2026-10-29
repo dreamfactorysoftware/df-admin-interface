@@ -1,0 +1,592 @@
+<ng-container *ngIf="!store.firstRun; else firstRun">
+  <!-- Scanned, and no covered database holds a table: nothing to mask
+       until one with tables is added. -->
+  <df-empty-state
+    *ngIf="store.noTables; else results"
+    icon="storage"
+    [title]="'dataMasking.empty.noTables' | transloco"
+    [actionLabel]="'dataMasking.empty.addDatabase' | transloco"
+    [secondaryLabel]="
+      store.scanning ? scanningLabel : ('dataMasking.columns.scan' | transloco)
+    "
+    (action)="addDatabase()"
+    (secondaryAction)="scan()"
+    data-testid="dm-no-tables"></df-empty-state>
+</ng-container>
+
+<ng-template #results>
+  <div class="toolbar">
+    <label class="search">
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input
+        type="search"
+        [(ngModel)]="search"
+        (ngModelChange)="searchChanged()"
+        (keydown.enter)="onSearch()"
+        [attr.aria-label]="'dataMasking.columns.search' | transloco"
+        [placeholder]="'dataMasking.columns.search' | transloco"
+        data-testid="dm-search" />
+      <button
+        *ngIf="search"
+        type="button"
+        class="search-clear"
+        [attr.aria-label]="'dataMasking.columns.clearSearch' | transloco"
+        (click)="clearSearch()">
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </label>
+
+    <div
+      class="filters"
+      role="group"
+      [attr.aria-label]="'dataMasking.columns.filter' | transloco">
+      <span
+        *ngIf="store.idFilter as f"
+        class="filter is-on id-filter"
+        data-testid="dm-id-filter">
+        <code>{{ f.label }}</code>
+        <button
+          type="button"
+          [attr.aria-label]="'dataMasking.columns.clearFilter' | transloco"
+          (click)="clearIdFilter()">
+          <mat-icon aria-hidden="true">close</mat-icon>
+        </button>
+      </span>
+      <ng-container *ngIf="!store.idFilter">
+        <button
+          *ngFor="let f of filters"
+          type="button"
+          class="filter"
+          [class.is-on]="filter === f"
+          [class.is-review]="f === 'review' && count('review') > 0"
+          [attr.aria-pressed]="filter === f"
+          [attr.data-testid]="'dm-filter-' + f"
+          (click)="setFilter(f)">
+          {{ 'dataMasking.filters.' + f | transloco }}
+          <span class="filter-n df-numeric">{{ count(f) }}</span>
+        </button>
+      </ng-container>
+    </div>
+
+    <!-- While a scan runs the button stays live-looking and fills with
+         progress; clicks are ignored until it finishes. -->
+    <button
+      mat-stroked-button
+      type="button"
+      class="scan"
+      [class.is-scanning]="store.scanning"
+      [style.--dm-scan-progress]="scanProgress + '%'"
+      [attr.aria-busy]="store.scanning || null"
+      [attr.aria-label]="
+        store.scanning
+          ? scanningLabel
+          : ('dataMasking.columns.scan' | transloco)
+      "
+      (click)="scan()"
+      data-testid="dm-scan">
+      <mat-icon aria-hidden="true">refresh</mat-icon>
+      <span class="scan-label df-numeric">{{
+        store.scanning
+          ? scanningLabel
+          : ('dataMasking.columns.scan' | transloco)
+      }}</span>
+    </button>
+  </div>
+
+  <ng-container *ngIf="rail.length; else emptyView">
+    <!-- Narrow screens: the rail collapses to a table picker. -->
+    <mat-form-field
+      class="table-select"
+      subscriptSizing="dynamic"
+      appearance="outline">
+      <mat-label>{{ 'dataMasking.columns.table' | transloco }}</mat-label>
+      <mat-select
+        [value]="selected"
+        (valueChange)="select($event)"
+        [aria-label]="'dataMasking.columns.table' | transloco">
+        <mat-optgroup *ngFor="let g of rail" [label]="g.label">
+          <mat-option *ngFor="let r of g.rows" [value]="r.key">
+            {{ r.table }}
+            <ng-container *ngIf="r.summary?.columns?.review as n">
+              ({{ n }})</ng-container
+            >
+          </mat-option>
+        </mat-optgroup>
+        <mat-optgroup
+          *ngIf="uncovered.length"
+          [label]="'dataMasking.columns.uncovered' | transloco"
+          [disabled]="true">
+          <mat-option
+            *ngFor="let u of uncovered; trackBy: trackService"
+            [value]="null"
+            >{{ u.label }} · {{ u.type }}</mat-option
+          >
+        </mat-optgroup>
+      </mat-select>
+    </mat-form-field>
+    <div
+      class="pending-narrow"
+      *ngIf="pendingServices.length || failedServices.length">
+      <button
+        *ngFor="let s of failedServices; trackBy: trackService"
+        type="button"
+        class="rail-scan is-failed"
+        [disabled]="store.scanning"
+        [matTooltip]="store.scanErrorOf(s) ?? ''"
+        (click)="scan(s.service)">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        {{ 'dataMasking.columns.retryService' | transloco: { name: s.label } }}
+      </button>
+      <button
+        *ngFor="let s of pendingServices; trackBy: trackService"
+        type="button"
+        class="rail-scan"
+        [disabled]="store.scanning"
+        (click)="scan(s.service)">
+        <mat-icon aria-hidden="true">radar</mat-icon>
+        {{ 'dataMasking.columns.scanService' | transloco: { name: s.label } }}
+      </button>
+    </div>
+
+    <div class="panes">
+      <nav
+        class="rail"
+        [attr.aria-label]="'dataMasking.columns.tables' | transloco">
+        <section *ngFor="let g of rail; trackBy: trackGroup" class="rail-group">
+          <h3 class="rail-service">{{ g.label }}</h3>
+          <!-- One tab stop for the whole rail: arrows move between tables. -->
+          <button
+            #railEl
+            *ngFor="let r of g.rows; trackBy: trackRailRow"
+            type="button"
+            class="rail-row"
+            [class.is-selected]="selected === r.key"
+            [attr.aria-current]="selected === r.key ? 'true' : null"
+            [attr.tabindex]="r.key === railFocus ? 0 : -1"
+            (click)="select(r.key)"
+            (keydown)="onRailKey($event, r.key)"
+            data-testid="dm-rail-row">
+            <span class="rail-name">{{ r.table }}</span>
+            <df-sensitivity-strip
+              [strip]="r.summary?.strip ?? []"
+              [label]="stripLabel(r.summary)"></df-sensitivity-strip>
+            <span class="rail-badge">
+              <span
+                *ngIf="r.summary?.columns?.review as n; else railDone"
+                class="badge df-numeric"
+                >{{ n }}</span
+              >
+              <ng-template #railDone>
+                <mat-icon
+                  *ngIf="filter === 'review'"
+                  class="rail-check"
+                  [attr.aria-label]="'dataMasking.columns.reviewed' | transloco"
+                  >check</mat-icon
+                >
+              </ng-template>
+            </span>
+          </button>
+        </section>
+
+        <ng-container *ngTemplateOutlet="railFoot"></ng-container>
+      </nav>
+
+      <section class="list" [attr.aria-label]="selectedTable">
+        <header class="list-head">
+          <h2 class="list-title">{{ selectedTable }}</h2>
+          <ng-container *ngIf="selectedDone">
+            <button
+              *ngIf="nextReviewTable; else allDone"
+              mat-flat-button
+              color="primary"
+              type="button"
+              class="next"
+              (click)="goNext()"
+              data-testid="dm-next-table">
+              {{ 'dataMasking.columns.next' | transloco }}
+            </button>
+            <ng-template #allDone>
+              <span class="all-done" role="status">
+                <mat-icon aria-hidden="true">check_circle</mat-icon>
+                {{ 'dataMasking.columns.allReviewed' | transloco }}
+              </span>
+            </ng-template>
+          </ng-container>
+        </header>
+
+        <div class="grid" role="table" [attr.aria-label]="selectedTable">
+          <div class="row head" role="row">
+            <span role="columnheader">{{
+              'dataMasking.columns.column' | transloco
+            }}</span>
+            <span role="columnheader">{{
+              'dataMasking.columns.class' | transloco
+            }}</span>
+            <span role="columnheader">{{
+              'dataMasking.columns.maskedAs' | transloco
+            }}</span>
+            <span role="columnheader" class="sr-only">{{
+              'dataMasking.columns.decision' | transloco
+            }}</span>
+            <span role="columnheader" class="sr-only">{{
+              'dataMasking.columns.evidence' | transloco
+            }}</span>
+          </div>
+
+          <!-- One tab stop for the grid: the active row (and its controls)
+               is tabbable; arrows and j/k move between rows. -->
+          <ng-container
+            *ngFor="let c of shownRows; let i = index; trackBy: trackRow">
+            <div
+              #rowEl
+              class="row"
+              role="row"
+              [attr.tabindex]="i === activeRow ? 0 : -1"
+              aria-keyshortcuts="j k m n Enter"
+              [class.is-review]="c.verdict === 'review'"
+              [class.is-clear]="c.verdict === 'clear'"
+              [class.is-open]="expanded.has(c.id)"
+              [class.is-settled]="settled.has(c.id)"
+              [class.is-context]="context.has(c.id)"
+              [class.is-context-start]="i === firstContext && i > 0"
+              (focusin)="activeRow = i"
+              (keydown)="onRowKey($event, c, i)"
+              data-testid="dm-row">
+              <span role="cell" class="c-name">
+                <code [attr.title]="c.column">{{ c.column }}</code>
+              </span>
+              <span role="cell" class="c-class">
+                <df-class-picker
+                  [cls]="c.class"
+                  [verdict]="c.verdict"
+                  [tabIndex]="i === activeRow ? 0 : -1"
+                  (pick)="decide(c, $event)"></df-class-picker>
+              </span>
+              <span role="cell" class="c-value">
+                <ng-container *ngIf="c.verdict !== 'clear'; else dash">
+                  <!-- No class yet (e.g. a computed field whose expression
+                       can't be checked): the server redacts it. -->
+                  <span
+                    *ngIf="!c.class; else maskedValue"
+                    class="c-format"
+                    data-testid="dm-masked-as-redact"
+                    >{{ 'dataMasking.formats.redact' | transloco }}</span
+                  >
+                  <ng-template #maskedValue>
+                    <df-masked-value
+                      [value]="c.example"
+                      [format]="c.format"
+                      [tier]="c.tier"></df-masked-value>
+                  </ng-template>
+                </ng-container>
+                <ng-template #dash
+                  ><span class="dash" aria-hidden="true">—</span></ng-template
+                >
+              </span>
+              <span role="cell" class="c-act">
+                <ng-container *ngIf="c.verdict === 'review'; else decidedIcon">
+                  <button
+                    *ngIf="canKeep(c)"
+                    type="button"
+                    class="act act-keep"
+                    [attr.tabindex]="i === activeRow ? 0 : -1"
+                    (click)="keep(c, rowEl)"
+                    data-testid="dm-keep">
+                    {{ 'dataMasking.columns.keep' | transloco }}
+                  </button>
+                  <button
+                    type="button"
+                    class="act"
+                    [attr.tabindex]="i === activeRow ? 0 : -1"
+                    (click)="decide(c, null, rowEl)"
+                    data-testid="dm-clear">
+                    {{ 'dataMasking.notSensitive' | transloco }}
+                  </button>
+                </ng-container>
+                <ng-template #decidedIcon>
+                  <mat-icon
+                    *ngIf="c.source === 'admin'"
+                    class="decided"
+                    [attr.tabindex]="i === activeRow ? 0 : -1"
+                    [matTooltip]="decidedTip(c)"
+                    [attr.aria-label]="decidedTip(c)"
+                    data-testid="dm-decided"
+                    >person</mat-icon
+                  >
+                </ng-template>
+              </span>
+              <span role="cell" class="c-exp">
+                <button
+                  type="button"
+                  class="exp"
+                  [attr.tabindex]="i === activeRow ? 0 : -1"
+                  [attr.aria-expanded]="expanded.has(c.id)"
+                  [attr.aria-label]="
+                    'dataMasking.columns.evidenceFor'
+                      | transloco: { column: c.column }
+                  "
+                  (click)="toggle(c)"
+                  data-testid="dm-expand">
+                  <mat-icon aria-hidden="true">expand_more</mat-icon>
+                </button>
+              </span>
+            </div>
+            <div *ngIf="expanded.has(c.id)" class="ledger-row" role="row">
+              <div role="cell" class="ledger-cell">
+                <df-evidence-ledger [column]="c"></df-evidence-ledger>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </section>
+    </div>
+  </ng-container>
+</ng-template>
+
+<!-- Rail foot: databases the rail does not list as tables. Couldn't scan
+     (with Retry), not scanned yet (with Scan), scanned with nothing under
+     this filter, then the ones Data Masking cannot cover, always last. -->
+<ng-template #railFoot>
+  <section
+    *ngIf="failedServices.length"
+    class="rail-group is-failed"
+    aria-labelledby="dm-failed-head"
+    data-testid="dm-rail-failed">
+    <h3 class="rail-service" id="dm-failed-head">
+      {{ 'dataMasking.columns.failed' | transloco }}
+    </h3>
+    <div
+      *ngFor="let s of failedServices; trackBy: trackService"
+      class="rail-row is-pending"
+      data-testid="dm-rail-failed-row">
+      <span
+        class="rail-name"
+        [matTooltip]="store.scanErrorOf(s) ?? ''"
+        matTooltipPosition="right"
+        >{{ s.label }}</span
+      >
+      <span class="sr-only">{{ store.scanErrorOf(s) }}</span>
+      <button
+        type="button"
+        class="rail-scan"
+        [disabled]="store.scanning"
+        [attr.aria-label]="
+          'dataMasking.columns.retryService' | transloco: { name: s.label }
+        "
+        (click)="scan(s.service)">
+        {{ 'dataMasking.retry' | transloco }}
+      </button>
+    </div>
+  </section>
+
+  <!-- No scan time because the scan history could not be read: say so,
+       never "Not scanned yet". -->
+  <p
+    *ngIf="pendingServices.length && store.scanUnknown; else pending"
+    class="rail-group rail-unknown"
+    role="status"
+    data-testid="dm-scan-unknown">
+    {{ 'dataMasking.columns.scanUnknown' | transloco }}
+  </p>
+
+  <!-- Covered services added since the last scan: one Scan each. -->
+  <ng-template #pending>
+    <section
+      *ngIf="pendingServices.length"
+      class="rail-group is-pending"
+      aria-labelledby="dm-pending-head"
+      data-testid="dm-rail-unscanned">
+      <h3 class="rail-service" id="dm-pending-head">
+        {{ 'dataMasking.columns.notScanned' | transloco }}
+      </h3>
+      <div
+        *ngFor="let s of pendingServices; trackBy: trackService"
+        class="rail-row is-pending"
+        data-testid="dm-rail-unscanned-row">
+        <span class="rail-name">{{ s.label }}</span>
+        <button
+          type="button"
+          class="rail-scan"
+          [disabled]="store.scanning"
+          [attr.aria-label]="
+            'dataMasking.columns.scanService' | transloco: { name: s.label }
+          "
+          (click)="scan(s.service)">
+          {{ 'dataMasking.columns.scanShort' | transloco }}
+        </button>
+      </div>
+    </section>
+  </ng-template>
+
+  <!-- Scanned, nothing to list under this filter: still visibly scanned. -->
+  <section
+    *ngIf="quiet.length"
+    class="rail-group is-quiet"
+    data-testid="dm-rail-quiet">
+    <ng-container *ngFor="let r of quiet; trackBy: trackService">
+      <button
+        *ngIf="r.status === 'none'; else emptyDb"
+        type="button"
+        class="rail-row is-quiet"
+        tabindex="-1"
+        (click)="openQuiet(r)"
+        data-testid="dm-rail-quiet-row">
+        <span class="rail-name">{{ r.label }}</span>
+        <span class="rail-note">{{
+          'dataMasking.columns.nothingSensitive' | transloco
+        }}</span>
+      </button>
+      <ng-template #emptyDb>
+        <div class="rail-row is-quiet" data-testid="dm-rail-quiet-row">
+          <span class="rail-name">{{ r.label }}</span>
+          <span class="rail-note">{{
+            'dataMasking.columns.noTables' | transloco
+          }}</span>
+        </div>
+      </ng-template>
+    </ng-container>
+  </section>
+
+  <!-- Databases Data Masking cannot mask: listed, never selectable. -->
+  <section
+    *ngIf="uncovered.length"
+    class="rail-group is-uncovered"
+    aria-labelledby="dm-uncovered-head"
+    data-testid="dm-rail-uncovered">
+    <h3 class="rail-service" id="dm-uncovered-head">
+      {{ 'dataMasking.columns.uncovered' | transloco }}
+    </h3>
+    <ul class="rail-list">
+      <li
+        *ngFor="let u of uncovered; trackBy: trackService"
+        class="rail-row is-uncovered"
+        tabindex="0"
+        [matTooltip]="'dataMasking.columns.uncoveredTip' | transloco"
+        matTooltipPosition="right"
+        data-testid="dm-rail-uncovered-row">
+        <span class="rail-name">{{ u.label }}</span>
+        <span class="rail-type">{{ u.type }}</span>
+        <span class="sr-only">{{
+          'dataMasking.columns.uncoveredTip' | transloco
+        }}</span>
+      </li>
+    </ul>
+  </section>
+</ng-template>
+
+<ng-template #emptyView>
+  <df-empty-state
+    *ngIf="search.trim(); else noFilterHits"
+    icon="search_off"
+    [title]="
+      'dataMasking.empty.search' | transloco: { q: search.trim() }
+    "></df-empty-state>
+  <ng-template #noFilterHits>
+    <df-empty-state
+      *ngIf="filter === 'review'; else otherEmpty"
+      icon="task_alt"
+      [title]="'dataMasking.empty.reviewed' | transloco"
+      data-testid="dm-all-reviewed"></df-empty-state>
+    <ng-template #otherEmpty>
+      <df-empty-state
+        icon="filter_alt_off"
+        [title]="
+          'dataMasking.empty.filter.' + filter | transloco
+        "></df-empty-state>
+    </ng-template>
+  </ng-template>
+  <!-- Databases with nothing under this filter stay listed. -->
+  <nav
+    *ngIf="quiet.length || failedServices.length || pendingServices.length"
+    class="rail rail-solo"
+    [attr.aria-label]="'dataMasking.columns.tables' | transloco">
+    <ng-container *ngTemplateOutlet="railFoot"></ng-container>
+  </nav>
+</ng-template>
+
+<!-- First run: one primary action, plus a shortcut per framework into its
+     Compliance baseline. While the first scan runs it shows progress here,
+     not an empty filter. -->
+<ng-template #firstRun>
+  <div
+    *ngIf="store.scanning || store.settling; else firstRunCta"
+    class="first-scan"
+    data-testid="dm-first-scan">
+    <span class="first-scan-icon" aria-hidden="true"
+      ><mat-icon>radar</mat-icon></span
+    >
+    <h3 class="first-scan-title df-numeric">{{ scanningLabel }}</h3>
+    <div
+      class="first-scan-bar"
+      role="progressbar"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="store.scanProgress"
+      [attr.aria-label]="'dataMasking.columns.scanProgress' | transloco"
+      [class.is-indeterminate]="store.scanProgress === null">
+      <span [style.width.%]="store.settling ? 100 : scanProgress"></span>
+    </div>
+  </div>
+  <ng-template #firstRunCta>
+    <div class="first-run">
+      <!-- The scan history could not be read: whether anything was scanned
+           is unknown, so no never-scanned copy and no first-scan action. -->
+      <df-empty-state
+        *ngIf="store.scanUnknown; else known"
+        icon="history"
+        [title]="'dataMasking.columns.scanUnknown' | transloco"
+        data-testid="dm-scan-unknown"></df-empty-state>
+      <ng-template #known>
+        <!-- Nothing to scan yet: point at adding a SQL database instead. -->
+        <df-empty-state
+          *ngIf="noDatabases || store.nothingToScan; else scanCta"
+          icon="storage"
+          [title]="
+            (noDatabases
+              ? 'dataMasking.empty.noDatabases'
+              : 'dataMasking.empty.noTables'
+            ) | transloco
+          "
+          [actionLabel]="'dataMasking.empty.addDatabase' | transloco"
+          (action)="addDatabase()"
+          data-testid="dm-no-databases"></df-empty-state>
+        <ng-template #scanCta>
+          <df-empty-state
+            icon="radar"
+            [title]="'dataMasking.empty.noScan' | transloco"
+            [actionLabel]="'dataMasking.empty.scanAction' | transloco"
+            (action)="scan()"
+            data-testid="dm-no-scan"></df-empty-state>
+        </ng-template>
+      </ng-template>
+      <p
+        *ngIf="firstScanFailures as names"
+        class="first-run-failed"
+        role="status"
+        data-testid="dm-first-scan-failed">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        {{ 'dataMasking.toast.scanFailed' | transloco: { label: names } }}
+      </p>
+      <nav
+        class="baselines"
+        aria-labelledby="dm-baselines-label"
+        data-testid="dm-first-run-baselines">
+        <span class="baselines-label" id="dm-baselines-label">{{
+          'dataMasking.firstRun.baselines' | transloco
+        }}</span>
+        <ul class="baselines-list">
+          <li *ngFor="let b of baselines; trackBy: trackBaseline">
+            <button
+              type="button"
+              class="baseline"
+              (click)="openBaseline(b)"
+              [attr.data-testid]="'dm-baseline-' + b.id">
+              <mat-icon aria-hidden="true">{{ b.icon }}</mat-icon>
+              {{ b.name }}
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </ng-template>
+</ng-template>

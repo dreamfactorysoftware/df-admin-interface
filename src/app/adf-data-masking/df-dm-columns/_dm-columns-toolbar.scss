@@ -1,0 +1,184 @@
+// Columns tab toolbar: search, filter chips, Scan now (with its progress
+// fill). Included at its place in df-dm-columns.component.scss so the
+// cascade order is unchanged.
+@mixin dm-columns-toolbar {
+  .toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--df-space-3);
+    margin-bottom: var(--df-space-4);
+  }
+
+  .search {
+    align-items: center;
+    background: var(--df-surface);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    color: var(--df-text-muted);
+    display: flex;
+    gap: var(--df-space-1);
+    height: 32px;
+    padding: 0 var(--df-space-2);
+    width: 248px;
+
+    // One focus ring, on the field; the input's own ring is switched off.
+    &:focus-within {
+      border-color: var(--df-accent);
+      box-shadow: var(--df-focus-ring);
+    }
+
+    mat-icon {
+      font-size: 18px;
+      height: 18px;
+      width: 18px;
+    }
+
+    input {
+      background: transparent;
+      border: 0;
+      color: var(--df-text);
+      flex: 1;
+      font: inherit;
+      font-size: var(--df-font-size-sm);
+      min-width: 0;
+      outline: none;
+
+      &:focus,
+      &:focus-visible {
+        box-shadow: none;
+        outline: none;
+      }
+
+      &::placeholder {
+        color: var(--df-text-faint);
+      }
+
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
+    }
+  }
+
+  .search-clear {
+    background: none;
+    border: 0;
+    border-radius: 50%;
+    color: var(--df-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    padding: 2px;
+
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--df-space-1);
+  }
+
+  .filter {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--df-border);
+    border-radius: 999px;
+    color: var(--df-text-2);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+    gap: 6px;
+    height: 30px;
+    padding: 0 var(--df-space-3);
+    transition:
+      background-color var(--df-duration-fast) var(--df-ease-standard),
+      border-color var(--df-duration-fast) var(--df-ease-standard);
+
+    &:hover {
+      background: var(--df-hover);
+    }
+
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+
+    &.is-on {
+      background: var(--df-accent-soft);
+      border-color: transparent;
+      color: var(--df-accent-strong);
+      font-weight: var(--df-font-weight-medium);
+    }
+
+    button {
+      background: none;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      padding: 0;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+
+    code {
+      font-family: var(--df-font-mono);
+      font-size: var(--df-font-size-xs);
+    }
+  }
+
+  .filter-n {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+
+    .is-on & {
+      color: inherit;
+    }
+
+    .is-review:not(.is-on) & {
+      color: var(--df-accent-strong);
+      font-weight: var(--df-font-weight-medium);
+    }
+  }
+
+  .scan {
+    margin-left: auto;
+    overflow: hidden;
+    position: relative;
+
+    mat-icon {
+      font-size: 18px;
+      height: 18px;
+      width: 18px;
+    }
+
+    // Progress fills the button from the left; the label stays readable on
+    // top. Width changes are not animated, so reduced motion is respected.
+    &.is-scanning {
+      cursor: progress;
+
+      &::before {
+        background: var(--df-accent-soft);
+        bottom: 0;
+        content: '';
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: var(--dm-scan-progress, 0%);
+      }
+
+      mat-icon,
+      .scan-label {
+        position: relative;
+      }
+    }
+  }
+}

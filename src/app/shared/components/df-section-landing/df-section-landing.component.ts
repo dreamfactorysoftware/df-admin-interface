@@ -76,6 +76,12 @@ export class DfSectionLandingComponent {
   @Input() stats: SectionLandingStat[] = [];
   @Input() groups: SectionLandingGroup[] = [];
   @Input() notes: SectionLandingNote[] = [];
+  /**
+   * Optional fixed card column count at desktop widths (e.g. 3 for a tidy
+   * 3+2 with five cards). Unset keeps the default auto-fit grid, so other
+   * overviews are unaffected. Narrow screens always fall back to auto-fit.
+   */
+  @Input() cardColumns: number | null = null;
 
   trackByGroupTitle(_: number, group: SectionLandingGroup): string {
     return group.title;

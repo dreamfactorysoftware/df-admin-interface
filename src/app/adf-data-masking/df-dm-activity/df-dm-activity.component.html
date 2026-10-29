@@ -1,0 +1,71 @@
+<div class="activity" data-testid="dm-activity">
+  <div
+    class="filters"
+    role="group"
+    [attr.aria-label]="'dataMasking.activity.filter' | transloco">
+    <button
+      *ngFor="let f of filters"
+      type="button"
+      class="filter"
+      [class.is-on]="filter === f"
+      [attr.aria-pressed]="filter === f"
+      [attr.data-testid]="'dm-activity-filter-' + f"
+      (click)="setFilter(f)">
+      {{ 'dataMasking.activity.filters.' + f | transloco }}
+    </button>
+  </div>
+
+  <df-empty-state
+    *ngIf="store.failed.has('activity') && !store.activity; else loadingOrList"
+    icon="cloud_off"
+    [title]="'dataMasking.empty.sliceFailed' | transloco"
+    [actionLabel]="'dataMasking.retry' | transloco"
+    (action)="store.loadActivity()"></df-empty-state>
+  <ng-template #loadingOrList>
+    <df-skeleton
+      *ngIf="!store.activity; else list"
+      variant="table-row"
+      [count]="6"></df-skeleton>
+  </ng-template>
+
+  <ng-template #list>
+    <ng-container *ngIf="groups.length; else empty">
+      <section class="day" *ngFor="let g of groups; trackBy: trackDay">
+        <h3 class="day-head">{{ g.day }}</h3>
+        <ol class="events">
+          <li
+            class="event"
+            *ngFor="let e of g.events; trackBy: trackEvent"
+            [ngClass]="'is-' + e.kind">
+            <span class="ico" aria-hidden="true"
+              ><mat-icon>{{ icon(e) }}</mat-icon></span
+            >
+            <span class="text">
+              {{ e.text }}
+              <code class="target" *ngIf="e.target">{{ e.target }}</code>
+            </span>
+            <span class="actor">{{ e.actor }}</span>
+            <time class="when" [attr.datetime]="e.at" [matTooltip]="exact(e)">{{
+              ago(e)
+            }}</time>
+          </li>
+        </ol>
+      </section>
+      <button
+        *ngIf="store.activityHasMore"
+        mat-stroked-button
+        type="button"
+        class="older"
+        [disabled]="store.activityLoadingOlder"
+        (click)="store.loadOlderActivity()"
+        data-testid="dm-activity-older">
+        {{ 'dataMasking.activity.older' | transloco }}
+      </button>
+    </ng-container>
+    <ng-template #empty>
+      <df-empty-state
+        icon="history"
+        [title]="'dataMasking.activity.empty' | transloco"></df-empty-state>
+    </ng-template>
+  </ng-template>
+</div>

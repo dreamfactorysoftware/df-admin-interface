@@ -1,0 +1,124 @@
+@use '../../shared/components/df-dialog-surface' as *;
+@use '../dm-controls' as *;
+@include df-dialog-surface;
+@include dm-select;
+@include dm-segmented;
+
+// Two equal segments, so neither choice looks like the default.
+.dm-seg {
+  display: flex;
+  width: 100%;
+
+  mat-button-toggle {
+    flex: 1 1 0;
+  }
+}
+
+// Disabled primary in dark/phosphor: faint ink on a raised surface, so it
+// is visibly there but clearly unavailable.
+:host-context(.dark-theme) [mat-flat-button]:disabled {
+  --mdc-filled-button-disabled-container-color: var(--df-surface-2);
+  --mdc-filled-button-disabled-label-text-color: var(--df-text-faint);
+  border: 1px solid var(--df-border-2);
+}
+
+.form {
+  display: grid;
+  gap: var(--df-space-4);
+  min-width: 440px;
+
+  @media (max-width: 520px) {
+    min-width: 0;
+  }
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  color: var(--df-text-2);
+  font-size: var(--df-font-size-sm);
+  font-weight: var(--df-font-weight-medium);
+}
+
+.input {
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text);
+  font-size: var(--df-font-size-sm);
+  height: 34px;
+  outline: none;
+  padding: 0 var(--df-space-3);
+
+  &:focus {
+    border-color: var(--df-accent);
+    box-shadow: 0 0 0 1px var(--df-accent);
+  }
+
+  &.is-invalid {
+    border-color: var(--df-danger);
+    box-shadow: 0 0 0 1px var(--df-danger);
+  }
+
+  &::placeholder {
+    color: var(--df-text-faint);
+  }
+}
+
+.mono {
+  font-family: var(--df-font-mono);
+}
+
+.dm-select {
+  height: 34px;
+  line-height: 32px;
+  width: 100%;
+}
+
+.preview {
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  font-size: var(--df-font-size-sm);
+  // Fixed height (five ids plus "and N more"), so the dialog never jumps
+  // while the preview grows or turns invalid.
+  box-sizing: border-box;
+  height: 168px;
+  overflow: hidden;
+  padding: var(--df-space-3);
+
+  strong {
+    color: var(--df-text);
+    font-weight: var(--df-font-weight-heading);
+  }
+}
+
+.idle {
+  color: var(--df-text-muted);
+}
+
+.bad {
+  color: var(--df-danger);
+}
+
+.ids {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: var(--df-space-2) 0 0;
+  padding: 0;
+
+  code {
+    color: var(--df-text-2);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+  }
+}
+
+.more {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+}

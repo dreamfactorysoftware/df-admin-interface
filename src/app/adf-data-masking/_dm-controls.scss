@@ -1,0 +1,86 @@
+// Compact standalone mat-select (no form-field chrome) for dense rows.
+@mixin dm-select {
+  .dm-select {
+    background: var(--df-surface);
+    box-sizing: border-box;
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    font-size: var(--df-font-size-sm);
+    height: 30px;
+    line-height: 28px;
+    padding: 0 var(--df-space-2) 0 var(--df-space-3);
+    width: 176px;
+
+    &:hover:not(.mat-mdc-select-disabled) {
+      border-color: var(--df-text-faint);
+    }
+
+    &.mat-focused {
+      border-color: var(--df-accent);
+      box-shadow: 0 0 0 1px var(--df-accent);
+    }
+
+    &.mat-mdc-select-disabled {
+      opacity: 0.6;
+    }
+
+    ::ng-deep .mat-mdc-select-trigger {
+      height: 28px;
+    }
+
+    ::ng-deep .mat-mdc-select-value,
+    ::ng-deep .mat-mdc-select-value-text {
+      color: var(--df-text);
+    }
+
+    &.mat-mdc-select-disabled ::ng-deep .mat-mdc-select-value,
+    &.mat-mdc-select-disabled ::ng-deep .mat-mdc-select-value-text {
+      color: var(--df-text-muted);
+    }
+
+    ::ng-deep .mat-mdc-select-placeholder {
+      color: var(--df-text-faint);
+    }
+  }
+}
+
+// Compact mat-button-toggle segmented control.
+@mixin dm-segmented {
+  .dm-seg {
+    --mat-standard-button-toggle-height: 30px;
+    font-size: var(--df-font-size-sm);
+
+    ::ng-deep .mat-button-toggle-label-content {
+      line-height: 28px !important;
+      padding: 0 var(--df-space-3) !important;
+    }
+
+    ::ng-deep .mat-button-toggle-checked {
+      font-weight: var(--df-font-weight-medium);
+    }
+  }
+}
+
+// The one-line lock note ("Only the super admin can …"): same look on the
+// mode bar and the Access tab.
+@mixin dm-lock {
+  .lock {
+    align-items: center;
+    background: var(--df-surface-2);
+    border-bottom: 1px solid var(--df-border-2);
+    color: var(--df-text-2);
+    display: flex;
+    font-size: var(--df-font-size-sm);
+    gap: var(--df-space-2);
+    margin: 0;
+    padding: var(--df-space-2) var(--df-space-3);
+
+    mat-icon {
+      color: var(--df-text-muted);
+      flex: none;
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+  }
+}

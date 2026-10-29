@@ -1,0 +1,142 @@
+@use '../dm-controls' as *;
+@include dm-lock;
+
+:host {
+  display: block;
+}
+
+.dm {
+  margin: 0 auto;
+  max-width: var(--df-content-max);
+}
+
+// The one control row: mode on the left, live counts beside it.
+.dm-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-4);
+  margin-bottom: var(--df-space-2);
+}
+
+.dm-mode {
+  --mat-standard-button-toggle-height: 32px;
+  font-size: var(--df-font-size-sm);
+
+  ::ng-deep .mat-button-toggle-label-content {
+    line-height: 30px !important;
+    padding: 0 var(--df-space-4) !important;
+  }
+
+  ::ng-deep .mat-button-toggle-checked {
+    font-weight: var(--df-font-weight-medium);
+  }
+
+  // Keyboard focus: a full ring on the segment, not a thin bar.
+  ::ng-deep .mat-button-toggle.cdk-keyboard-focused {
+    border-radius: var(--df-radius-sm);
+    box-shadow: var(--df-focus-ring);
+    position: relative;
+    z-index: 1;
+  }
+}
+
+// Same footprint as the toggle, so nothing shifts when the overview lands.
+.dm-mode-skeleton {
+  background: var(--df-surface-2);
+  border-radius: var(--df-radius-sm);
+  display: inline-block;
+  height: 32px;
+  width: 212px;
+}
+
+.lock {
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  margin-bottom: var(--df-space-3);
+  max-width: 560px;
+}
+
+// Shown only while masking is on: a live dot on the segment in force.
+.dm-mode-dot {
+  background: var(--df-success);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--df-success-soft);
+  display: inline-block;
+  height: 7px;
+  margin-right: 6px;
+  vertical-align: 1px;
+  width: 7px;
+}
+
+.dm-counts {
+  align-items: center;
+  color: var(--df-text-muted);
+  display: flex;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-2);
+}
+
+.dm-count {
+  background: none;
+  border: 0;
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text-2);
+  cursor: pointer;
+  font: inherit;
+  padding: 2px 4px;
+
+  span {
+    color: var(--df-text);
+    font-weight: var(--df-font-weight-heading);
+  }
+
+  &:hover {
+    background: var(--df-hover);
+    color: var(--df-text);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+
+  // "To review" is a call to act, not a tier: it rides the accent, so it
+  // never reads as the amber identity tier.
+  &.is-review,
+  &.is-review span {
+    color: var(--df-accent-strong);
+  }
+}
+
+.dm-sep {
+  color: var(--df-text-faint);
+}
+
+.dm-tabs {
+  border-bottom: 1px solid var(--df-border-2);
+  margin-bottom: var(--df-space-5);
+
+  // Nav-bar links keep the compiled light-theme indicator colour; paint it
+  // with the accent so the active tab reads in every theme.
+  ::ng-deep .mdc-tab-indicator__content--underline {
+    border-color: var(--df-accent) !important;
+  }
+}
+
+// Phones: the tab bar gives way to one select (five labels do not fit).
+.dm-tab-select {
+  display: none;
+  margin-bottom: var(--df-space-4);
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .dm-tabs {
+    display: none;
+  }
+
+  .dm-tab-select {
+    display: block;
+  }
+}

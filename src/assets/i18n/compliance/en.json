@@ -1,0 +1,55 @@
+{
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "baselines": "Baselines",
+  "baseline": "Baseline",
+  "title": "{{name}} baseline",
+  "mapped": "Mapped to {{frameworks}}",
+  "notCertification": "Not a certification",
+  "scanning": "Scanning databases…",
+  "tracking": "Tracking",
+  "trackingSince": "Tracking since {{when}}",
+  "of": "of {{total}}",
+  "scoreLabel": "{{pass}} of {{total}} checks pass",
+  "checks": "Checks",
+  "apply": "Apply",
+  "changesN": "{{count}} changes",
+  "export": "Export",
+  "exportJson": "JSON",
+  "exportCsv": "CSV",
+  "stopTracking": "Stop tracking",
+  "fix": "Fix",
+  "fixFor": "Fix: {{title}}",
+  "manual": "Manual checks",
+  "status": {
+    "pass": "Passes",
+    "fail": "Fails",
+    "manual": "Check manually",
+    "na": "Not applicable"
+  },
+  "verticals": {
+    "healthcare": "Healthcare",
+    "payments": "Payments",
+    "banking": "Banking",
+    "government": "Government",
+    "privacy": "Privacy",
+    "general": "General"
+  },
+  "applyDialog": {
+    "title": "Apply {{name}} baseline?",
+    "none": "Your settings already match. Applying starts tracking this baseline.",
+    "turnOn": "Mask values now (masking On)",
+    "confirm": "Apply"
+  },
+  "toast": {
+    "applied": "{{name}} baseline applied",
+    "appliedOn": "{{name}} baseline applied. Masking is on.",
+    "appliedScanning": "{{name}} baseline applied. Scanning…",
+    "stopped": "Stopped tracking {{name}}"
+  },
+  "empty": {
+    "loadFailed": "Couldn't load compliance baselines",
+    "detailFailed": "Couldn't load this baseline",
+    "none": "No baselines"
+  }
+}

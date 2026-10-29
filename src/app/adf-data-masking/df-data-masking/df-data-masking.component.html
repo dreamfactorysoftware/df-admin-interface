@@ -1,0 +1,130 @@
+<df-paywall
+  *ngIf="paywall; else page"
+  [serviceName]="'Data Masking'"></df-paywall>
+
+<ng-template #page>
+  <div class="dm">
+    <div class="dm-bar">
+      <!-- Until the overview answers, a placeholder: never a guessed mode. -->
+      <span
+        *ngIf="!store.overview && !store.loadFailed"
+        class="dm-mode-skeleton"
+        aria-hidden="true"
+        data-testid="dm-mode-loading"></span>
+      <mat-button-toggle-group
+        *ngIf="showModeControl"
+        #modeGroup="matButtonToggleGroup"
+        class="dm-mode"
+        [class.is-on]="store.mode === 'on'"
+        [value]="store.mode"
+        (change)="requestMode($event.value)"
+        [attr.aria-label]="'dataMasking.mode.label' | transloco"
+        [attr.aria-busy]="store.modeSaving || null"
+        data-testid="dm-mode">
+        <mat-button-toggle
+          *ngFor="let m of modes"
+          [value]="m"
+          [disabled]="modeDisabled(m)"
+          [attr.data-testid]="'dm-mode-' + m">
+          <span
+            class="dm-mode-dot"
+            *ngIf="m === 'on' && store.mode === 'on'"
+            aria-hidden="true"></span>
+          {{ 'dataMasking.mode.' + m | transloco }}
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+
+      <div class="dm-counts" *ngIf="store.overview as o">
+        <ng-container *ngIf="!store.unscanned && store.foundColumns">
+          <button
+            type="button"
+            class="dm-count"
+            (click)="showColumns('masked')"
+            data-testid="dm-count-masked">
+            <span class="df-numeric">{{ o.counts.masked }}</span>
+            {{ 'dataMasking.counts.masked' | transloco }}
+          </button>
+          <ng-container *ngIf="o.counts.review > 0">
+            <span class="dm-sep" aria-hidden="true">·</span>
+            <button
+              type="button"
+              class="dm-count is-review"
+              (click)="showColumns('review')"
+              data-testid="dm-count-review">
+              <span class="df-numeric">{{ o.counts.review }}</span>
+              {{ 'dataMasking.counts.review' | transloco }}
+            </button>
+          </ng-container>
+        </ng-container>
+      </div>
+    </div>
+
+    <p class="lock" *ngIf="lowerLocked" data-testid="dm-mode-lock">
+      <mat-icon aria-hidden="true">lock</mat-icon>
+      {{ 'dataMasking.mode.locked' | transloco }}
+    </p>
+
+    <!-- Phones: the five tabs become one select, so none hides off-screen. -->
+    <mat-form-field
+      class="dm-tab-select"
+      appearance="outline"
+      subscriptSizing="dynamic">
+      <mat-select
+        [value]="tab"
+        (valueChange)="setTab($event)"
+        [aria-label]="'dataMasking.tabs.label' | transloco"
+        data-testid="dm-tab-select">
+        <mat-option *ngFor="let t of tabs" [value]="t">{{
+          'dataMasking.tabs.' + t | transloco
+        }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <nav
+      mat-tab-nav-bar
+      class="dm-tabs"
+      mat-stretch-tabs="false"
+      mat-align-tabs="start"
+      [disablePagination]="true"
+      [tabPanel]="panel">
+      <a
+        mat-tab-link
+        *ngFor="let t of tabs"
+        [active]="tab === t"
+        [routerLink]="[]"
+        [queryParams]="tabQuery(t)"
+        queryParamsHandling="merge"
+        [replaceUrl]="true"
+        [attr.data-testid]="'dm-tab-' + t">
+        {{ 'dataMasking.tabs.' + t | transloco }}
+      </a>
+    </nav>
+
+    <mat-tab-nav-panel #panel class="dm-panel">
+      <df-skeleton
+        *ngIf="store.loading; else body"
+        variant="table-row"
+        [count]="8"></df-skeleton>
+      <ng-template #body>
+        <df-empty-state
+          *ngIf="store.loadFailed; else tabBody"
+          icon="cloud_off"
+          [title]="'dataMasking.empty.loadFailed' | transloco"
+          [description]="store.loadError ?? undefined"
+          [actionLabel]="'dataMasking.retry' | transloco"
+          (action)="store.load()"></df-empty-state>
+      </ng-template>
+      <ng-template #tabBody>
+        <ng-container [ngSwitch]="tab">
+          <df-dm-columns *ngSwitchCase="'columns'"></df-dm-columns>
+          <df-dm-access *ngSwitchCase="'access'"></df-dm-access>
+          <df-dm-masks *ngSwitchCase="'masks'"></df-dm-masks>
+          <df-dm-detection
+            *ngSwitchCase="'detection'"
+            (showMatches)="setTab('columns')"></df-dm-detection>
+          <df-dm-activity *ngSwitchCase="'activity'"></df-dm-activity>
+        </ng-container>
+      </ng-template>
+    </mat-tab-nav-panel>
+  </div>
+</ng-template>

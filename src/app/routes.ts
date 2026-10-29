@@ -14,6 +14,8 @@ import {
   rolesResolver,
 } from './adf-roles/resolvers/role.resolver';
 import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
+import { dataMaskingResolver } from './adf-data-masking/data-masking.resolver';
+import { complianceResolver } from './adf-compliance/compliance.resolver';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
 import { DfPasswordService } from './adf-user-management/services/df-password.service';
@@ -419,6 +421,24 @@ export const routes: Routes = [
           },
         ],
         providers: [provideTranslocoScope('limits')],
+      },
+      {
+        path: ROUTES.DATA_MASKING,
+        loadComponent: () =>
+          import('./adf-data-masking/df-data-masking/df-data-masking.component').then(
+            m => m.DfDataMaskingComponent
+          ),
+        resolve: { data: dataMaskingResolver },
+        providers: [provideTranslocoScope('dataMasking')],
+      },
+      {
+        path: ROUTES.COMPLIANCE,
+        loadComponent: () =>
+          import('./adf-compliance/df-compliance/df-compliance.component').then(
+            m => m.DfComplianceComponent
+          ),
+        resolve: { data: complianceResolver },
+        providers: [provideTranslocoScope('compliance')],
       },
       {
         path: ROUTES.ROLE_BASED_ACCESS,

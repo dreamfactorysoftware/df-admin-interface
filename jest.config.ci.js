@@ -66,5 +66,22 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
     // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
+    // 2026-10-29 Data Masking: mask formats, API service, store (polling,
+    // write ordering, load failures), masked-value privacy guard, shell
+    // mode confirm, Columns review flow.
+    '<rootDir>/src/app/adf-data-masking/**/*.spec.ts',
+    // 2026-10-29 Compliance baselines: API service (report as text), store
+    // (selection, apply, stop tracking, export), page (apply confirm lists
+    // the server's changes, fix links, manual checks).
+    '<rootDir>/src/app/adf-compliance/**/*.spec.ts',
+    // 2026-10-29 Data Masking on shared/existing screens: the standard
+    // paywall without the package (every license), palette keywords,
+    // Security overview status, Data Explorer masking marker and
+    // ignored-filter note.
+    '<rootDir>/src/app/shared/services/df-paywall.service.spec.ts',
+    '<rootDir>/src/app/shared/services/action-registry.service.spec.ts',
+    '<rootDir>/src/app/adf-section-overviews/df-security-overview.component.spec.ts',
+    '<rootDir>/src/app/adf-data-explorer/masking-notice.spec.ts',
+    '<rootDir>/src/app/adf-data-explorer/df-data-grid.masking.spec.ts',
   ],
 };

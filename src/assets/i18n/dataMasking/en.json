@@ -1,0 +1,279 @@
+{
+  "notSensitive": "Not sensitive",
+  "cancel": "Cancel",
+  "retry": "Retry",
+  "strip": "{{masked}} masked, {{review}} to review, {{clear}} not sensitive",
+  "mode": {
+    "label": "Masking mode",
+    "off": "Off",
+    "preview": "Preview",
+    "on": "On",
+    "confirmOn": {
+      "title": "Turn on masking?",
+      "message": "{{columns}} in {{databases}} will be masked for apps, AI tools and admins, you included.",
+      "messageWithAccess": "{{columns}} in {{databases}} will be masked for apps, AI tools and admins without access.",
+      "review": "{{review}} still to review.",
+      "confirm": "Turn on"
+    },
+    "confirmOff": {
+      "title": "Turn off masking?",
+      "message": "Apps, AI tools and admins will receive real values.",
+      "confirm": "Turn off"
+    },
+    "locked": "Only the super admin can lower the masking mode.",
+    "confirmPreview": {
+      "title": "Stop masking?",
+      "message": "Apps, AI tools and admins will receive real values. Preview only reports what would be masked.",
+      "confirm": "Switch to Preview"
+    }
+  },
+  "counts": {
+    "masked": "masked",
+    "review": "to review"
+  },
+  "tabs": {
+    "columns": "Columns",
+    "access": "Access",
+    "masks": "Masks",
+    "detection": "Detection",
+    "activity": "Activity",
+    "label": "Section"
+  },
+  "filters": {
+    "review": "To review",
+    "masked": "Masked",
+    "clear": "Not sensitive",
+    "all": "All"
+  },
+  "columns": {
+    "search": "Search tables and columns",
+    "clearSearch": "Clear search",
+    "clearFilter": "Clear filter",
+    "filter": "Filter columns",
+    "scan": "Scan now",
+    "scanning": "Scanning {{progress}}%",
+    "table": "Table",
+    "tables": "Tables",
+    "column": "Column",
+    "class": "Class",
+    "maskedAs": "Masked as",
+    "decision": "Decision",
+    "evidence": "Evidence",
+    "evidenceFor": "Evidence for {{column}}",
+    "keep": "Keep masked",
+    "next": "Next table",
+    "reviewed": "Reviewed",
+    "allReviewed": "All reviewed",
+    "scanningNoProgress": "Scanning…",
+    "scanProgress": "Scan progress",
+    "notScanned": "Not scanned yet",
+    "scanUnknown": "Couldn't read the scan history. Check the DreamFactory log.",
+    "scanShort": "Scan",
+    "scanService": "Scan {{name}}",
+    "uncovered": "Not covered",
+    "uncoveredTip": "Data Masking can't mask this database. AI tools can't read it while masking is on.",
+    "scanFailed": "Couldn't read this database",
+    "failed": "Couldn't scan",
+    "retryService": "Retry {{name}}",
+    "nothingSensitive": "Nothing sensitive",
+    "noTables": "No tables"
+  },
+  "verdict": {
+    "masked": "Masked",
+    "review": "Needs review",
+    "clear": "Not sensitive"
+  },
+  "ledger": {
+    "score": "Score",
+    "type": "Type",
+    "shapes": "Value shapes",
+    "decision": "Decision",
+    "setBy": "Set by {{name}} {{when}}",
+    "setByYou": "Set by you {{when}}"
+  },
+  "empty": {
+    "noScan": "No scan yet",
+    "scanAction": "Scan databases",
+    "noDatabases": "No SQL databases yet",
+    "addDatabase": "Add a database",
+    "reviewed": "All reviewed",
+    "search": "No columns match \"{{q}}\"",
+    "loadFailed": "Couldn't load data masking",
+    "filter": {
+      "masked": "No masked columns",
+      "clear": "No columns marked not sensitive",
+      "all": "No columns",
+      "review": "All reviewed"
+    },
+    "sliceFailed": "Couldn't load this tab",
+    "noTables": "No tables to scan"
+  },
+  "firstRun": {
+    "baselines": "Start from a baseline"
+  },
+  "access": {
+    "title": "Who sees real values",
+    "locked": "Only the super admin can give access.",
+    "admins": "Admins",
+    "none": "No one",
+    "selected": "Selected",
+    "allAdmins": "All admins",
+    "you": "(you)",
+    "expiryFor": "Access for {{name}} lasts",
+    "until": "until {{when}}",
+    "durations": {
+      "1h": "1 hour",
+      "8h": "8 hours",
+      "24h": "24 hours",
+      "7d": "7 days",
+      "forever": "Until turned off"
+    },
+    "ai": "AI and MCP sessions",
+    "aiMasked": "Always masked",
+    "aiSame": "Same as admins",
+    "roles": "Roles",
+    "noRoles": "No roles",
+    "scopeFor": "Real values {{name}} sees",
+    "scopeAll": "All classes",
+    "scopeExceptRestricted": "All except restricted",
+    "exceeds": "Exceeds {{name}}",
+    "confirmAll": {
+      "title": "Give every admin real values?",
+      "message": "All admins will see real values in {{columns}}.",
+      "confirm": "Give access"
+    },
+    "confirmAi": {
+      "title": "Let AI sessions see real values?",
+      "message": "AI and MCP sessions will see real values wherever their admin does.",
+      "confirm": "Allow"
+    }
+  },
+  "masks": {
+    "formatFor": "Mask format for {{cls}}"
+  },
+  "detection": {
+    "title": "Custom rules",
+    "addRule": "Add rule",
+    "match": "Match",
+    "matchName": "Column name",
+    "matchValue": "Value pattern",
+    "pattern": "Pattern",
+    "patternNameExample": "^emp_ssn$|social_sec",
+    "patternValueExample": "^[A-Z]{2}\\d{6}$",
+    "pickClass": "Choose a class",
+    "matches": "Matches",
+    "matchesN": "Matches {{columns}}",
+    "more": "and {{count}} more",
+    "showMatches": "Show {{count}} matching columns",
+    "invalid": "Not a valid pattern",
+    "delete": "Delete rule",
+    "empty": "No custom rules",
+    "builtIn": "Built-in rules",
+    "matchesAtLeast": "Matches at least {{columns}}",
+    "fromBaseline": "Added by the {{name}} baseline",
+    "deleteTitle": "Delete rule?",
+    "deleteKept": "{{columns}} it masked stay masked.",
+    "deleteConfirm": "Delete rule",
+    "deleteUnmask": "Delete and unmask {{count}}"
+  },
+  "activity": {
+    "filter": "Filter activity",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "empty": "No activity yet",
+    "filters": {
+      "all": "All",
+      "changes": "Changes",
+      "access": "Access",
+      "scans": "Scans",
+      "blocked": "Blocked",
+      "preview": "Preview"
+    },
+    "older": "Load older"
+  },
+  "toast": {
+    "mode": {
+      "on": "Masking turned on",
+      "off": "Masking turned off",
+      "preview": "Preview turned on",
+      "paused": "Masking stopped. Preview is on."
+    },
+    "access": "Access updated",
+    "accessStale": "Access settings changed elsewhere. Showing the latest.",
+    "mask": "Mask updated",
+    "ruleAdded": "Rule added",
+    "ruleDeleted": "Rule deleted",
+    "scanDone": "Scan finished",
+    "scanDonePreview": "Scan finished. Preview is on.",
+    "scanPartial": "Scan finished. Couldn't read {{label}}.",
+    "scanFailed": "Scan failed. Couldn't read {{label}}.",
+    "scanFailedNoReason": "Scan didn't finish.",
+    "notSensitive": "{{column}} marked not sensitive",
+    "ruleDeletedKept": "Rule deleted. {{columns}} stay masked.",
+    "ruleDeletedUnmasked": "Rule deleted. {{columns}} unmasked.",
+    "ruleUnmaskPartial": "Rule deleted. Unmasked {{done}} of {{total}} columns."
+  },
+  "mv": {
+    "masked": "Masked",
+    "endsIn": "Masked, ends in {{tail}}",
+    "startsWith": "Masked, starts with {{head}}",
+    "token": "Token {{token}}",
+    "null": "Null",
+    "nullValue": "Masked, returned as null"
+  },
+  "tiers": {
+    "restricted": "Restricted",
+    "identity": "Identity",
+    "quasi": "Quasi-identifiers",
+    "free_text": "Free text"
+  },
+  "formats": {
+    "redact": "Redact",
+    "last4": "Last 4",
+    "initial": "First letter",
+    "year": "Year only",
+    "token": "Token",
+    "null": "Null",
+    "span": "Detected spans"
+  },
+  "classes": {
+    "national_id": "National ID",
+    "tax_id": "Tax ID",
+    "passport_number": "Passport number",
+    "drivers_license": "Driver's license",
+    "card_number": "Card number",
+    "card_security": "Card security code",
+    "bank_account": "Bank account",
+    "credential": "Credential",
+    "special_category": "Health & special category",
+    "email": "Email",
+    "phone": "Phone",
+    "person_name": "Person name",
+    "street_address": "Street address",
+    "date_of_birth": "Date of birth",
+    "ip_address": "IP address",
+    "username": "Username",
+    "geo_precise": "Precise location",
+    "postal_code": "Postal code",
+    "gender": "Gender",
+    "age": "Age",
+    "card_expiry": "Card expiry",
+    "financial_personal": "Personal financial",
+    "free_text_pii": "Free text with personal data"
+  },
+  "plural": {
+    "columns": {
+      "one": "{{count}} column",
+      "other": "{{count}} columns"
+    },
+    "databases": {
+      "one": "{{count}} database",
+      "other": "{{count}} databases"
+    }
+  },
+  "undo": "Undo",
+  "list": {
+    "two": "{{a}} and {{b}}",
+    "more": "{{a}} and {{count}} more"
+  }
+}

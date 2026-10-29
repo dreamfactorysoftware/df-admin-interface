@@ -1,0 +1,112 @@
+@use '../dm-tier' as *;
+@use '../dm-controls' as *;
+@include dm-tiers;
+@include dm-select;
+
+:host {
+  display: block;
+}
+
+.masks {
+  display: grid;
+  gap: var(--df-space-5);
+  max-width: 920px;
+}
+
+.tier-head {
+  align-items: center;
+  color: var(--df-text);
+  display: flex;
+  font-size: var(--df-font-size-md);
+  font-weight: var(--df-font-weight-heading);
+  gap: var(--df-space-2);
+  margin: 0 0 var(--df-space-1);
+}
+
+.dot {
+  background: var(--dm-tier-fill);
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.row {
+  align-items: center;
+  border-bottom: 1px solid var(--df-border-2);
+  display: grid;
+  gap: var(--df-space-4);
+  grid-template-columns: minmax(180px, 1fr) 176px minmax(0, 1.5fr);
+  min-height: 44px;
+  padding: 0 var(--df-space-2);
+
+  &:first-of-type {
+    border-top: 1px solid var(--df-border-2);
+  }
+}
+
+.cls {
+  align-items: center;
+  color: var(--df-text);
+  display: flex;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-1);
+}
+
+.lock {
+  color: var(--dm-tier);
+  font-size: 14px;
+  height: 14px;
+  width: 14px;
+}
+
+// One or two examples side by side: the class sample, and for classes that
+// are often numeric, what a number comes back as.
+.examples {
+  align-items: center;
+  column-gap: var(--df-space-5);
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  row-gap: var(--df-space-1);
+}
+
+.example {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-2);
+  min-width: 0;
+}
+
+.before {
+  color: var(--df-text-muted);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.example df-masked-value {
+  // The kept characters are the point of the example: shorten the input.
+  flex-shrink: 0;
+}
+
+.arrow {
+  color: var(--df-text-faint);
+  flex-shrink: 0;
+  font-size: 14px;
+  height: 14px;
+  width: 14px;
+}
+
+@media (max-width: 760px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--df-space-2);
+    row-gap: var(--df-space-2);
+  }
+
+  .examples {
+    grid-column: 1 / -1;
+  }
+}
