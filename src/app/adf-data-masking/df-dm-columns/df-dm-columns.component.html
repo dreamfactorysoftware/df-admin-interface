@@ -44,7 +44,7 @@
         *ngIf="store.idFilter as f"
         class="filter is-on id-filter"
         data-testid="dm-id-filter">
-        <code>{{ f.label }}</code>
+        <span>{{ f.label }}</span>
         <button
           type="button"
           [attr.aria-label]="'dataMasking.columns.clearFilter' | transloco"

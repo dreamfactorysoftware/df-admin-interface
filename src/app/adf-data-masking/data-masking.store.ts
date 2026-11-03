@@ -79,6 +79,8 @@ export const ACTIVITY_PAGE = 200;
 const WATCH_MS = 30_000;
 /** Poll retries before a running scan is given up on. */
 const POLL_RETRIES = 4;
+/** After a scan a new value rule waited for: when to look once more. */
+const RECHECK_MS = 1500;
 
 export function stripMark(c: MaskedColumn): StripMark {
   if (c.verdict === 'review') return 'review';
@@ -108,7 +110,8 @@ export function summarize(
 /**
  * The evidence line a rule writes on the columns it matches (the scanner's
  * Rules::describe): "Custom rule P", "Custom value rule P", or
- * "Baseline rule P (hipaa)".
+ * "Baseline rule P (hipaa)". A value rule's line carries its count, see
+ * isRuleLine.
  */
 export function ruleEvidence(rule: DetectionRule): string {
   const kind = rule.match === 'value' ? 'value rule' : 'rule';
@@ -116,6 +119,24 @@ export function ruleEvidence(rule: DetectionRule): string {
   return source.startsWith('baseline:')
     ? `Baseline ${kind} ${rule.pattern} (${source.slice('baseline:'.length)})`
     : `Custom ${kind} ${rule.pattern}`;
+}
+
+const VALUE_COUNT = /^\d+ of \d+ values match$/;
+
+/**
+ * Is `text` the line `rule` wrote? Scans write a value rule's line with
+ * its count ("Custom value rule P: 9 of 12 values match", Rules::apply),
+ * which is checked exactly, so the rule `a` never claims the line of the
+ * rule `a: b` (as RuleHandler::countMatches does).
+ */
+export function isRuleLine(text: string, rule: DetectionRule): boolean {
+  const own = ruleEvidence(rule);
+  if (text === own) return true;
+  return (
+    rule.match === 'value' &&
+    text.startsWith(`${own}: `) &&
+    VALUE_COUNT.test(text.slice(own.length + 2))
+  );
 }
 
 /** What deleting a rule leaves behind. */
@@ -130,13 +151,13 @@ export function ruleFootprint(
   rule: DetectionRule,
   columns: MaskedColumn[]
 ): RuleFootprint {
-  const text = ruleEvidence(rule);
   const masked: MaskedColumn[] = [];
   const ruleOnly: MaskedColumn[] = [];
   for (const c of columns) {
     if (c.source !== 'detected' || c.verdict !== 'masked') continue;
     const lines = c.evidence?.lines ?? [];
-    const line = lines.find(l => l.points > 0 && l.text === text);
+    // "Also matches: …" lines score 0: a stricter class masked the column.
+    const line = lines.find(l => l.points > 0 && isRuleLine(l.text, rule));
     if (!line) continue;
     const others = lines
       .filter(l => l !== line)
@@ -668,6 +689,10 @@ export class DataMaskingStore implements OnDestroy {
   }
 
   private finishScan(own: boolean): void {
+    if (this.recheckAfterScan) {
+      this.recheckAfterScan = false;
+      this.recheckSoon();
+    }
     // The server switches Off to Preview after the first scan ever; the
     // last poll already carried the new mode, so say why it moved.
     const toPreview =
@@ -680,6 +705,7 @@ export class DataMaskingStore implements OnDestroy {
     this.api.tables().subscribe({
       next: services => {
         this.setServices(services);
+        this.rereadRules();
         this.loadColumns().subscribe(() => {
           this.settling = false;
           this.invalidateActivity();
@@ -769,11 +795,15 @@ export class DataMaskingStore implements OnDestroy {
     }
   }
 
-  /** Reload the table list and columns in place (no filter reset). */
+  /**
+   * Reload the table list, columns and rule counts in place (no filter
+   * reset): a scan finished between two looks.
+   */
   private refreshTables(): void {
     this.api.tables().subscribe({
       next: services => {
         this.setServices(services);
+        this.rereadRules();
         this.loadColumns().subscribe(() => this.invalidateActivity());
       },
       error: () => undefined,
@@ -1064,17 +1094,86 @@ export class DataMaskingStore implements OnDestroy {
   ): Observable<DetectionRule> {
     return this.api.addRule(rule).pipe(
       tap({
-        next: saved => {
-          this.rules = [...(this.rules ?? []), saved];
+        next: ({ scanStarted, ...saved }) => {
+          this.rulesEpoch++;
+          // A re-read that landed first may already list it.
+          const others = (this.rules ?? []).filter(r => r.id !== saved.id);
+          this.rules = [...others, saved];
           this.invalidateActivity();
-          this.toast('toast.ruleAdded');
-          this.reloadAfterRule();
+          if (scanStarted) {
+            this.toast('toast.ruleAddedScanning');
+            this.recheckAfterScan = true;
+            this.followRuleScan();
+          } else {
+            this.toast('toast.ruleAdded');
+            this.reloadAfterRule();
+          }
         },
         error: e => {
           if (errorStatus(e) === 403) this.fail(e);
         },
       })
     );
+  }
+
+  /**
+   * A value rule applies at a scan, and the server started one: follow it
+   * like a background scan (quietly unless it fails). Its finish re-reads
+   * the rules, so their counts include it. A scan already being followed
+   * takes the rule along.
+   */
+  private followRuleScan(): void {
+    if (this.poll || !this.overview) return;
+    if (!this.scanning) {
+      this.overview = {
+        ...this.overview,
+        scan: { ...this.overview.scan, status: 'running', progress: 0 },
+      };
+    }
+    this.startPolling(false);
+  }
+
+  /** Bumped by every rule add and delete, so an older re-read never lands. */
+  private rulesEpoch = 0;
+  /** Rules whose DELETE is on its way: a re-read served first lists them. */
+  private deletingRules = new Set<number>();
+
+  /** Re-read the rules quietly: a finished scan moves their counts. */
+  private rereadRules(): void {
+    if (!this.rules) return; // never opened: the tab loads fresh
+    const epoch = this.rulesEpoch;
+    this.api.rules(true).subscribe({
+      next: r => {
+        if (epoch !== this.rulesEpoch) return;
+        this.rules = r.filter(x => !this.deletingRules.has(x.id));
+      },
+      error: () => undefined,
+    });
+  }
+
+  /**
+   * A value rule added while a scan ran is applied by the follow-up scan
+   * the server starts as that one ends (ScanRunner), which a poll can miss
+   * by milliseconds. So once the scan a rule waited for has finished, look
+   * once more shortly after: a running scan is followed, a newer finish
+   * re-reads the lists (and the rule counts).
+   */
+  private recheckAfterScan = false;
+  private recheck?: Subscription;
+
+  private recheckSoon(): void {
+    this.recheck?.unsubscribe();
+    this.recheck = timer(RECHECK_MS)
+      .pipe(
+        exhaustMap(() => {
+          const epoch = this.modeEpoch;
+          return this.api.overview(true).pipe(
+            map(o => ({ o, epoch })),
+            catchError(() => EMPTY)
+          );
+        })
+      )
+      .subscribe(({ o, epoch }) => this.onWatched(o, epoch));
   }
 
   /** What deleting `rule` leaves masked, from the loaded columns. */
@@ -1089,9 +1188,12 @@ export class DataMaskingStore implements OnDestroy {
    */
   deleteRule(rule: DetectionRule, unmask: MaskedColumn[] = []): void {
     const kept = this.footprint(rule).masked.length;
+    this.rulesEpoch++;
+    this.deletingRules.add(rule.id);
     this.rules = (this.rules ?? []).filter(r => r.id !== rule.id);
     this.api.deleteRule(rule.id).subscribe({
       next: () => {
+        this.deletingRules.delete(rule.id);
         this.invalidateActivity();
         if (!unmask.length) {
           this.toast(kept ? 'toast.ruleDeletedKept' : 'toast.ruleDeleted', {
@@ -1134,6 +1236,7 @@ export class DataMaskingStore implements OnDestroy {
           });
       },
       error: e => {
+        this.deletingRules.delete(rule.id);
         if (!(this.rules ?? []).some(r => r.id === rule.id)) {
           this.rules = [...(this.rules ?? []), rule].sort(
             (a, b) => a.id - b.id
@@ -1290,6 +1393,7 @@ export class DataMaskingStore implements OnDestroy {
 
   ngOnDestroy(): void {
     this.poll?.unsubscribe();
+    this.recheck?.unsubscribe();
     this.stopWatching();
     this.activitySub?.unsubscribe();
   }

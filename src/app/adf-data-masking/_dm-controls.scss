@@ -58,6 +58,16 @@
     ::ng-deep .mat-button-toggle-checked {
       font-weight: var(--df-font-weight-medium);
     }
+
+    // Keyboard focus: an inset ring on the segment, which the group's
+    // rounded clip cannot cut (the button's own outer ring would be).
+    ::ng-deep .mat-button-toggle.cdk-keyboard-focused {
+      box-shadow: inset 0 0 0 2px var(--df-accent);
+    }
+
+    ::ng-deep .mat-button-toggle-button:focus-visible {
+      box-shadow: none;
+    }
   }
 }
 

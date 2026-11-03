@@ -255,6 +255,8 @@ function buildState(opts: DataMaskingMockOptions) {
       match: 'name' | 'value';
       pattern: string;
       class: string;
+      /** A value rule waiting for the scan that applies it. */
+      pending?: boolean;
     }[],
     nextRule: 2,
     activity: [] as {
@@ -264,6 +266,8 @@ function buildState(opts: DataMaskingMockOptions) {
       kind: string;
       text: string;
       target?: string | null;
+      /** Rule events: the rule's target (ActivityHandler, from meta). */
+      match?: 'name' | 'value';
     }[],
     nextEvent: 100,
     canGrant: opts.scenario !== 'nogrant',
@@ -351,7 +355,8 @@ function buildState(opts: DataMaskingMockOptions) {
     actor: string,
     kind: string,
     text: string,
-    target?: string
+    target?: string,
+    match?: 'name' | 'value'
   ) =>
     state.activity.push({
       id: state.nextEvent++,
@@ -360,6 +365,7 @@ function buildState(opts: DataMaskingMockOptions) {
       kind,
       text,
       target: target ?? null,
+      ...(match ? { match } : {}),
     });
 
   if (scanned) {
@@ -388,7 +394,8 @@ function buildState(opts: DataMaskingMockOptions) {
       'Priya Shah',
       'rule',
       'Added a column name rule for National ID',
-      '(^|_)(ssn|nino|bsn)($|_)'
+      '(^|_)(ssn|nino|bsn)($|_)',
+      'name'
     );
     ev(
       2 * DAY,
@@ -435,13 +442,21 @@ function formatOf(state: State, cls: string | null): MaskFormat | null {
   return (state.masks.find(m => m.class === cls)?.format as MaskFormat) ?? null;
 }
 
-function ruleMatches(state: State, match: 'name' | 'value', pattern: string) {
-  let re: RegExp;
-  try {
-    re = new RegExp(pattern, 'i');
-  } catch {
-    return [];
+/** The server's /iu as near as JavaScript gets (\p{L} needs u; \- fails it). */
+function ruleRegExp(pattern: string): RegExp | null {
+  for (const flags of ['iu', 'i']) {
+    try {
+      return new RegExp(pattern, flags);
+    } catch {
+      // try the next
+    }
   }
+  return null;
+}
+
+function ruleMatches(state: State, match: 'name' | 'value', pattern: string) {
+  const re = ruleRegExp(pattern);
+  if (!re) return [];
   return state.columns.filter(c => {
     if (match === 'name') return re.test(c.column);
     // No raw values in the mock: test value shapes and the class sample.
@@ -465,11 +480,13 @@ function applyRule(
     c.verdict = 'masked';
     c.class = rule.class;
     c.tier = classDef(rule.class)?.tier ?? null;
-    // The scanner's evidence line (Rules::describe).
-    const kind = rule.match === 'value' ? 'value rule' : 'rule';
-    c.extra = [
-      { points: 70, kind: 'context', text: `Custom ${kind} ${rule.pattern}` },
-    ];
+    // The scanner's evidence line (Rules::describe; a value rule's line
+    // carries its count, Rules::apply).
+    const text =
+      rule.match === 'value'
+        ? `Custom value rule ${rule.pattern}: 3 of 3 values match`
+        : `Custom rule ${rule.pattern}`;
+    c.extra = [{ points: 70, kind: 'context', text }];
     c.total = Math.max(c.total, 70);
   }
 }
@@ -727,6 +744,11 @@ function finishScan(state: State) {
   ) {
     state.columns = state.seedColumns();
     state.rules.forEach(r => applyRule(state, r));
+  }
+  // Value rules added since the last scan apply now.
+  for (const r of state.rules.filter(x => x.pending)) {
+    r.pending = false;
+    applyRule(state, r);
   }
   done.forEach(svc => {
     state.scannedAt.set(svc, now);
@@ -1046,40 +1068,65 @@ async function handle(route: Route, state: State) {
     });
   }
   if (sub === '/rule') {
+    // A value rule waiting for its scan has matched nothing yet.
+    const wire = (r: (typeof state.rules)[number]) => ({
+      id: r.id,
+      match: r.match,
+      pattern: r.pattern,
+      class: r.class,
+      matches: r.pending ? 0 : ruleMatches(state, r.match, r.pattern).length,
+    });
     if (method === 'POST') {
-      const rule = {
+      const rule: (typeof state.rules)[number] = {
         id: state.nextRule++,
         match: body.match,
         pattern: body.pattern,
         class: body.class,
       };
       state.rules.push(rule);
-      applyRule(state, rule);
       state.ev(
         0,
         ME.name,
         'rule',
         `Added a ${rule.match === 'name' ? 'column name' : 'value'} rule for ${CLASS_LABEL(rule.class)}`,
-        rule.pattern
+        rule.pattern,
+        rule.match
       );
-      return json(route, {
-        ...rule,
-        matches: ruleMatches(state, rule.match, rule.pattern).length,
-      });
+      // Like the server: name rules apply at once; a value rule asks for
+      // a scan (ScanLauncher::startThrottled) once anything was scanned,
+      // and applies when it finishes.
+      const scanStarted =
+        rule.match === 'value' && [...state.scannedAt.values()].some(Boolean);
+      if (scanStarted) {
+        rule.pending = true;
+        if (state.scan.status !== 'running') {
+          state.scan.status = 'running';
+          state.scan.progress = 0;
+          state.scan.only = null;
+        }
+        state.ev(0, ME.name, 'scan', 'Scan started to apply a value rule');
+      } else {
+        applyRule(state, rule);
+      }
+      return json(route, { ...wire(rule), scan_started: scanStarted });
     }
-    return json(route, {
-      resource: state.rules.map(r => ({
-        ...r,
-        matches: ruleMatches(state, r.match, r.pattern).length,
-      })),
-    });
+    return json(route, { resource: state.rules.map(wire) });
   }
   const ruleMatch = sub.match(/^\/rule\/(\d+)$/);
   if (ruleMatch && method === 'DELETE') {
     const id = Number(ruleMatch[1]);
     const r = state.rules.find(x => x.id === id);
     state.rules = state.rules.filter(x => x.id !== id);
-    if (r) state.ev(0, ME.name, 'rule', 'Deleted a rule', r.pattern);
+    if (r) {
+      state.ev(
+        0,
+        ME.name,
+        'rule',
+        `Deleted a ${r.match === 'name' ? 'column name' : 'value'} rule for ${CLASS_LABEL(r.class)}`,
+        r.pattern,
+        r.match
+      );
+    }
     return json(route, { id });
   }
 

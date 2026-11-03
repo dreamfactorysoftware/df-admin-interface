@@ -9,6 +9,7 @@ import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-sk
 import { DataMaskingStore } from '../data-masking.store';
 import { ActivityEvent, ActivityKind } from '../data-masking.types';
 import { relTime } from '../dm-time';
+import { DfDmRuleSentenceComponent } from '../df-dm-detection/df-dm-rule-sentence.component';
 
 export type ActivityFilter =
   | 'all'
@@ -57,6 +58,7 @@ interface DayGroup {
     TranslocoPipe,
     DfEmptyStateComponent,
     DfSkeletonComponent,
+    DfDmRuleSentenceComponent,
   ],
   templateUrl: './df-dm-activity.component.html',
   styleUrls: ['./df-dm-activity.component.scss'],

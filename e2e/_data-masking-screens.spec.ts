@@ -158,9 +158,10 @@ for (const theme of ['light', 'dark'] as Theme[]) {
     await shot(page, `detection-${theme}`);
     await page.getByTestId('dm-builtin').click();
     await page.getByTestId('dm-add-rule').click();
-    await page
-      .getByTestId('dm-rule-pattern')
-      .fill('(^|_)(lat|lng|latitude|longitude)$');
+    for (const term of ['lat', 'lng', 'latitude', 'longitude']) {
+      await page.getByTestId('dm-rule-terms').fill(term);
+      await page.getByTestId('dm-rule-terms').press('Enter');
+    }
     await page.getByTestId('dm-rule-class').click();
     await page.getByRole('option', { name: 'Precise location' }).click();
     await expect(page.getByTestId('dm-rule-preview')).toContainText('Matches');
@@ -443,9 +444,10 @@ test('final set (light)', async ({ page }) => {
   await page.getByTestId('dm-tab-detection').click();
   await expect(page.getByTestId('dm-detection')).toBeVisible();
   await page.getByTestId('dm-add-rule').click();
-  await page
-    .getByTestId('dm-rule-pattern')
-    .fill('(^|_)(lat|lng|latitude|longitude)$');
+  for (const term of ['lat', 'lng', 'latitude', 'longitude']) {
+    await page.getByTestId('dm-rule-terms').fill(term);
+    await page.getByTestId('dm-rule-terms').press('Enter');
+  }
   await page.getByTestId('dm-rule-class').click();
   await page.getByRole('option', { name: 'Precise location' }).click();
   await expect(page.getByTestId('dm-rule-preview')).toContainText('Matches');

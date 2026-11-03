@@ -22,14 +22,11 @@
   border: 1px solid var(--df-border-2);
 }
 
+// The dialog opens at a fixed width (560px, less on a small screen), so
+// chips wrap inside their field instead of resizing it as they come and go.
 .form {
   display: grid;
   gap: var(--df-space-4);
-  min-width: 440px;
-
-  @media (max-width: 520px) {
-    min-width: 0;
-  }
 }
 
 .field {
@@ -43,10 +40,46 @@
   font-weight: var(--df-font-weight-medium);
 }
 
+// Operator, then its terms (or the regex), on one row; stacked on a
+// phone, where a row has no room for both.
+.sentence {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--df-space-2);
+
+  > .input,
+  > .terms {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  @media (max-width: 480px) {
+    flex-wrap: wrap;
+
+    > .input,
+    > .terms,
+    > .dm-select.op {
+      flex-basis: 100%;
+    }
+  }
+}
+
+.dm-select {
+  height: 34px;
+  line-height: 32px;
+  width: 100%;
+
+  &.op {
+    flex: none;
+    width: 148px;
+  }
+}
+
 .input {
   background: var(--df-surface);
   border: 1px solid var(--df-border);
   border-radius: var(--df-radius-sm);
+  box-sizing: border-box;
   color: var(--df-text);
   font-size: var(--df-font-size-sm);
   height: 34px;
@@ -68,14 +101,139 @@
   }
 }
 
+// The regex grows to a few rows (autosize) and wraps anywhere, so a long
+// pattern stays readable from its start. Autosize sets the content height,
+// so padding and border go outside it: one row is 18 + 14 + 2 = 34px.
+textarea.input {
+  box-sizing: content-box;
+  display: block;
+  height: 18px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  padding: 7px var(--df-space-3);
+  resize: none;
+}
+
 .mono {
   font-family: var(--df-font-mono);
 }
 
-.dm-select {
-  height: 34px;
-  line-height: 32px;
-  width: 100%;
+// The chip field looks like the input: chips wrap inside it, and typing
+// never changes its height (the input keeps a fixed width share).
+.terms {
+  align-items: center;
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
+  box-sizing: border-box;
+  cursor: text;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-height: 34px;
+  padding: 3px var(--df-space-2);
+
+  &:hover {
+    border-color: var(--df-text-faint);
+  }
+
+  &:focus-within {
+    border-color: var(--df-accent);
+    box-shadow: 0 0 0 1px var(--df-accent);
+  }
+
+  &.is-invalid {
+    border-color: var(--df-danger);
+    box-shadow: 0 0 0 1px var(--df-danger);
+  }
+}
+
+.chip {
+  align-items: center;
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  box-sizing: border-box;
+  color: var(--df-text);
+  cursor: default;
+  display: inline-flex;
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  gap: 2px;
+  height: 24px;
+  max-width: 100%;
+  padding: 0 2px 0 var(--df-space-2);
+}
+
+.chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.chip-remove {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: var(--df-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  height: 18px;
+  justify-content: center;
+  padding: 0;
+  width: 18px;
+
+  &:hover {
+    background: var(--df-border-2);
+    color: var(--df-text);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+
+  mat-icon {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+  }
+}
+
+// "or" between chips: the sentence says any of them.
+.or {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+}
+
+.term-input {
+  background: none;
+  border: 0;
+  color: var(--df-text);
+  flex: 1 0 96px;
+  font-size: var(--df-font-size-sm);
+  height: 26px;
+  min-width: 96px;
+  outline: none;
+  padding: 0 2px;
+
+  // The field shows focus (focus-within), not the input inside it.
+  &:focus-visible {
+    box-shadow: none;
+  }
+
+  &::placeholder {
+    color: var(--df-text-faint);
+  }
+}
+
+// Column-name suggestions read like the chips they become.
+.mat-mdc-option.name-option {
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-sm);
+  min-height: 36px;
 }
 
 .preview {
@@ -83,8 +241,8 @@
   border: 1px solid var(--df-border-2);
   border-radius: var(--df-radius-sm);
   font-size: var(--df-font-size-sm);
-  // Fixed height (five ids plus "and N more"), so the dialog never jumps
-  // while the preview grows or turns invalid.
+  // Fixed height (five ids, or four plus "and N more"), so the dialog never
+  // jumps while the preview grows or turns invalid.
   box-sizing: border-box;
   height: 168px;
   overflow: hidden;
@@ -94,10 +252,6 @@
     color: var(--df-text);
     font-weight: var(--df-font-weight-heading);
   }
-}
-
-.idle {
-  color: var(--df-text-muted);
 }
 
 .bad {

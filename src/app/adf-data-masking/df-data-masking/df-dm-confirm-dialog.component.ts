@@ -16,7 +16,7 @@ export interface DmConfirmData {
   extra?: string;
 }
 
-/** Confirm: one sentence carrying the real numbers. */
+/** Confirm: a sentence or two (one per line) carrying the real numbers. */
 @Component({
   selector: 'df-dm-confirm-dialog',
   standalone: true,
@@ -62,6 +62,8 @@ export interface DmConfirmData {
         color: var(--df-text-2);
         font-size: var(--df-font-size-sm);
         max-width: 420px;
+        // One sentence per line (what is deleted, then what stays).
+        white-space: pre-line;
       }
 
       .confirm.danger {

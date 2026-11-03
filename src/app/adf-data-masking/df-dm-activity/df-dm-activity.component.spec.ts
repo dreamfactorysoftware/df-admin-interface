@@ -50,8 +50,12 @@ function serve(q: ActivityQuery = {}) {
 describe('DfDmActivityComponent', () => {
   let api: { activity: jest.Mock };
 
-  function create() {
-    api = { activity: jest.fn((q: ActivityQuery) => of(serve(q))) };
+  function create(events?: ActivityEvent[]) {
+    api = {
+      activity: jest.fn((q: ActivityQuery) =>
+        of(events ? { events, hasMore: false } : serve(q))
+      ),
+    };
     TestBed.configureTestingModule({
       imports: [DfDmActivityComponent, NoopAnimationsModule, dmTransloco()],
       providers: [
@@ -94,5 +98,51 @@ describe('DfDmActivityComponent', () => {
     fixture.detectChanges();
     expect(count()).toBe(253);
     expect(el.querySelector('[data-testid="dm-activity-older"]')).toBeNull();
+  });
+
+  it('a rule event reads its pattern as the rule; others keep the code target', () => {
+    const at = '2026-10-29T00:00:00Z';
+    const ev = (id: number, e: Partial<ActivityEvent>): ActivityEvent => ({
+      id,
+      at,
+      actor: 'Alex Rivera',
+      kind: 'rule',
+      text: '',
+      ...e,
+    });
+    const fixture = create([
+      ev(4, {
+        text: 'Added a value rule for National ID',
+        target: '^\\d{3}-\\d{2}-\\d{4}$',
+        match: 'value',
+      }),
+      ev(3, {
+        text: 'Deleted a column name rule for National ID',
+        target: '^(?:ssn|tax_id)$',
+        match: 'name',
+      }),
+      // Logged before rule rows carried their match.
+      ev(2, { text: 'Deleted a rule', target: '_email$' }),
+      ev(1, {
+        kind: 'decision',
+        text: 'Kept masked as Username',
+        target: 'crm.a.ssn',
+      }),
+    ]);
+    const rows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.event .text')
+    ).map(r => ({
+      sentence: r
+        .querySelector('df-dm-rule-sentence')
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim(),
+      code: r.querySelector('code.target')?.textContent,
+    }));
+    expect(rows).toEqual([
+      { sentence: 'Column values look like ###-##-####', code: undefined },
+      { sentence: 'Column name is ssn or tax_id', code: undefined },
+      { sentence: undefined, code: '_email$' },
+      { sentence: undefined, code: 'crm.a.ssn' },
+    ]);
   });
 });

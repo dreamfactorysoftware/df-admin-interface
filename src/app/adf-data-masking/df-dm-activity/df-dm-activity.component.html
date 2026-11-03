@@ -42,7 +42,15 @@
             >
             <span class="text">
               {{ e.text }}
-              <code class="target" *ngIf="e.target">{{ e.target }}</code>
+              <!-- A rule's pattern reads as the sentence that wrote it. -->
+              <df-dm-rule-sentence
+                *ngIf="e.kind === 'rule' && e.match && e.target; else code"
+                class="target-rule"
+                [match]="e.match"
+                [pattern]="e.target"></df-dm-rule-sentence>
+              <ng-template #code>
+                <code class="target" *ngIf="e.target">{{ e.target }}</code>
+              </ng-template>
             </span>
             <span class="actor">{{ e.actor }}</span>
             <time class="when" [attr.datetime]="e.at" [matTooltip]="exact(e)">{{

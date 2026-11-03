@@ -318,17 +318,33 @@ test('detection: delete asks and offers to unmask what only it masked', async ({
   await boot(page);
   await open(page, 'detection');
   await page.getByTestId('dm-add-rule').click();
-  await page.getByTestId('dm-rule-pattern').fill('(^|_)sku$');
+  // The sentence builder: Column name is sku (the chip compiles ^sku$).
+  // Focus starts in the term input; a suggestion picked with the mouse
+  // adds that name, not the half-typed text.
+  await expect(page.getByTestId('dm-rule-terms')).toBeFocused();
+  await page.keyboard.type('sk');
+  await page.getByRole('option', { name: 'sku', exact: true }).click();
+  await expect(
+    page.getByTestId('dm-rule-chip').locator('.chip-text')
+  ).toHaveText(['sku']);
+  await expect(page.getByTestId('dm-rule-terms')).toHaveValue('');
+  await expect(page.getByTestId('dm-rule-terms')).toBeFocused();
   await page.getByTestId('dm-rule-class').click();
   await page.getByRole('option', { name: 'Username' }).click();
   await page.getByTestId('dm-rule-save').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByTestId('dm-rule-delete').last().click();
   await expect(page.getByRole('dialog')).toContainText('Delete rule?');
+  // The confirm names the rule it deletes.
+  await expect(page.getByRole('dialog')).toContainText('Column name is sku');
   await shot(page, 'r2-rule-delete-confirm');
   await page.getByTestId('dm-confirm-cancel').click();
   // A PCRE-only pattern is the server's to judge, not refused here.
   await page.getByTestId('dm-add-rule').click();
+  await page.getByTestId('dm-rule-op').click();
+  await page
+    .getByRole('option', { name: 'matches regex', exact: true })
+    .click();
   await page.getByTestId('dm-rule-pattern').fill('^(?>emp|staff)_ssn$');
   await page.getByTestId('dm-rule-class').click();
   await page.getByRole('option', { name: 'National ID' }).click();

@@ -3,8 +3,8 @@
   <mat-button-toggle-group
     class="dm-seg"
     name="match"
-    [(ngModel)]="draft.match"
-    (ngModelChange)="changed()"
+    [ngModel]="target"
+    (ngModelChange)="setTarget($event)"
     [attr.aria-label]="'dataMasking.detection.match' | transloco"
     data-testid="dm-rule-match">
     <mat-button-toggle value="name">{{
@@ -15,36 +15,110 @@
     }}</mat-button-toggle>
   </mat-button-toggle-group>
 
-  <label class="field">
-    <span class="label">{{ 'dataMasking.detection.pattern' | transloco }}</span>
-    <input
-      class="input mono"
+  <div class="sentence">
+    <mat-select
+      class="dm-select op"
+      name="op"
+      [ngModel]="op"
+      (ngModelChange)="setOp($event)"
+      [aria-label]="targetLabel"
+      data-testid="dm-rule-op">
+      <mat-option *ngFor="let o of ops" [value]="o">{{
+        opLabel(o)
+      }}</mat-option>
+    </mat-select>
+
+    <textarea
+      *ngIf="op === 'regex'; else chips"
+      class="input mono regex"
       name="pattern"
+      rows="1"
+      cdkTextareaAutosize
+      cdkAutosizeMinRows="1"
+      cdkAutosizeMaxRows="4"
       autocomplete="off"
       spellcheck="false"
       [attr.maxlength]="maxPattern"
       [class.is-invalid]="invalid"
       [attr.aria-invalid]="invalid"
-      [(ngModel)]="draft.pattern"
-      (ngModelChange)="changed()"
-      [placeholder]="
-        (draft.match === 'name'
-          ? 'dataMasking.detection.patternNameExample'
-          : 'dataMasking.detection.patternValueExample'
-        ) | transloco
-      "
-      data-testid="dm-rule-pattern" />
-  </label>
+      [attr.aria-label]="sentence"
+      [ngModel]="regex"
+      (ngModelChange)="setRegex($event)"
+      (keydown.enter)="$event.preventDefault(); save()"
+      [placeholder]="example"
+      data-testid="dm-rule-pattern"></textarea>
+
+    <ng-template #chips>
+      <div
+        class="terms"
+        [class.is-invalid]="invalid"
+        matAutocompleteOrigin
+        #origin="matAutocompleteOrigin"
+        (mousedown)="focusTerms($event)">
+        <ng-container
+          *ngFor="let term of terms; let i = index; let last = last">
+          <span class="chip" data-testid="dm-rule-chip"
+            ><span class="chip-text">{{ term }}</span
+            ><button
+              type="button"
+              class="chip-remove"
+              [attr.aria-label]="
+                'dataMasking.detection.removeTerm' | transloco: { term: term }
+              "
+              (click)="removeTerm(i)">
+              <mat-icon aria-hidden="true">close</mat-icon>
+            </button></span
+          >
+          <span *ngIf="!last" class="or">{{
+            'dataMasking.detection.or' | transloco
+          }}</span>
+        </ng-container>
+        <input
+          #termInput
+          cdkFocusInitial
+          class="term-input mono"
+          name="terms"
+          spellcheck="false"
+          [attr.maxlength]="maxPattern"
+          [attr.aria-invalid]="invalid"
+          [attr.aria-label]="sentence"
+          [(ngModel)]="text"
+          (ngModelChange)="changed()"
+          (keydown)="onKeydown($event)"
+          (paste)="onPaste($event)"
+          (blur)="onBlur()"
+          [matAutocomplete]="names"
+          [matAutocompleteConnectedTo]="origin"
+          [matAutocompleteDisabled]="!suggestOn"
+          [placeholder]="terms.length ? '' : example"
+          data-testid="dm-rule-terms" />
+      </div>
+      <mat-autocomplete
+        #names="matAutocomplete"
+        (optionSelected)="pick($event)">
+        <!-- Pressing an option keeps focus in the input: a blur would
+             commit the typed text and take the option away mid-click. -->
+        <mat-option
+          *ngFor="let name of suggestions"
+          class="name-option"
+          [value]="name"
+          (mousedown)="$event.preventDefault()"
+          >{{ name }}</mat-option
+        >
+      </mat-autocomplete>
+    </ng-template>
+  </div>
 
   <div class="field">
     <span class="label" id="dm-rule-class-label">{{
-      'dataMasking.columns.class' | transloco
+      'dataMasking.detection.maskAs' | transloco
     }}</span>
     <mat-select
       aria-labelledby="dm-rule-class-label"
       class="dm-select"
       name="class"
-      [(ngModel)]="draft.class"
+      [(ngModel)]="cls"
+      (ngModelChange)="saveError = null"
       [placeholder]="'dataMasking.detection.pickClass' | transloco"
       data-testid="dm-rule-class">
       <mat-optgroup
@@ -66,7 +140,8 @@
       <span class="bad" data-testid="dm-rule-error">{{ p }}</span>
     </ng-container>
     <ng-template #ok>
-      <ng-container *ngIf="preview; else idle">
+      <!-- Empty until the sentence has a term: no count for no rule. -->
+      <ng-container *ngIf="preview">
         <strong class="df-numeric">{{
           (partial
             ? 'dataMasking.detection.matchesAtLeast'
@@ -74,23 +149,17 @@
           ) | transloco: { columns: columnsLabel(preview.length) }
         }}</strong>
         <ul class="ids" *ngIf="preview.length">
-          <li *ngFor="let id of preview.slice(0, 5)">
+          <li *ngFor="let id of shownIds">
             <code>{{ id }}</code>
           </li>
-          <li *ngIf="preview.length > 5" class="more df-numeric">
+          <li *ngIf="preview.length > shownIds.length" class="more df-numeric">
             {{
               'dataMasking.detection.more'
-                | transloco: { count: preview.length - 5 }
+                | transloco: { count: preview.length - shownIds.length }
             }}
           </li>
         </ul>
       </ng-container>
-      <ng-template #idle>
-        <span class="idle">{{
-          'dataMasking.detection.matchesN'
-            | transloco: { columns: columnsLabel(0) }
-        }}</span>
-      </ng-template>
     </ng-template>
   </div>
 </form>

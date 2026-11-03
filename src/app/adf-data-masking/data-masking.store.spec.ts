@@ -9,6 +9,7 @@ import { Subject, of, throwError } from 'rxjs';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import {
   DataMaskingStore,
+  isRuleLine,
   ruleFootprint,
   summarize,
 } from './data-masking.store';
@@ -891,6 +892,199 @@ describe('DataMaskingStore', () => {
       expect(store.rules?.map(r => r.id)).toEqual([1, 2]);
     });
 
+    describe('adding a rule', () => {
+      const running = () =>
+        overview({ scan: { status: 'running', progress: 40, columns: 3 } });
+      const finished = () =>
+        overview({
+          scan: {
+            status: 'idle',
+            columns: 3,
+            finishedAt: '2026-10-29T00:00:00Z',
+            lastStatus: 'done',
+          },
+        });
+      const valueRule = (matches: number) =>
+        rule({ id: 7, match: 'value', pattern: '^[A-Z]{2}$', matches });
+
+      it('a value rule that started a scan says so, follows it quietly, then re-reads the rules', fakeAsync(() => {
+        store.overview = overview();
+        store.rules = [];
+        api['addRule'].mockReturnValue(
+          of({ ...valueRule(0), scanStarted: true })
+        );
+        let polls = 0;
+        api['overview'].mockImplementation(() =>
+          of(++polls < 2 ? running() : finished())
+        );
+        api['rules'].mockReturnValue(of([valueRule(4)]));
+        let saved: DetectionRule | undefined;
+        store
+          .addRule({ match: 'value', pattern: '^[A-Z]{2}$', class: 'username' })
+          .subscribe(r => (saved = r));
+        expect(saved?.id).toBe(7);
+        expect(store.rules?.map(r => r.id)).toEqual([7]);
+        expect('scanStarted' in store.rules![0]).toBe(false);
+        expect(snack.openSnackBar).toHaveBeenCalledWith(
+          'Rule added. Scanning to apply it.',
+          'success'
+        );
+        // Shown as scanning at once; nothing to reload until it finishes.
+        expect(store.scanning).toBe(true);
+        expect(api['tables']).not.toHaveBeenCalled();
+        tick(800);
+        expect(store.scanning).toBe(true);
+        tick(800);
+        expect(store.scanning).toBe(false);
+        expect(api['tables']).toHaveBeenCalledTimes(1);
+        expect(api['rules']).toHaveBeenCalledWith(true);
+        expect(store.rules?.[0].matches).toBe(4);
+        // Finished like a background scan: no "Scan finished" on top.
+        expect(snack.openSnackBar).toHaveBeenCalledTimes(1);
+        discardPeriodicTasks();
+      }));
+
+      it('looks once more after the scan a rule waited for: a follow-up scan is followed too', fakeAsync(() => {
+        store.overview = overview();
+        store.rules = [];
+        api['addRule'].mockReturnValue(
+          of({ ...valueRule(0), scanStarted: true })
+        );
+        // The rule's scan, then (after its finish) the server's follow-up.
+        const answers = [
+          running(),
+          finished(),
+          running(),
+          overview({
+            scan: {
+              status: 'idle',
+              columns: 3,
+              finishedAt: '2026-10-29T00:00:09Z',
+              lastStatus: 'done',
+            },
+          }),
+        ];
+        api['overview'].mockImplementation(() =>
+          of(answers.shift() ?? finished())
+        );
+        api['rules']
+          .mockReturnValueOnce(of([valueRule(0)]))
+          .mockReturnValue(of([valueRule(5)]));
+        store
+          .addRule({ match: 'value', pattern: '^[A-Z]{2}$', class: 'username' })
+          .subscribe();
+        tick(1600);
+        expect(store.scanning).toBe(false);
+        expect(store.rules?.[0].matches).toBe(0);
+        // The look after the finish finds the follow-up running and follows it.
+        tick(1500);
+        expect(store.scanning).toBe(true);
+        tick(800);
+        expect(store.scanning).toBe(false);
+        expect(store.rules?.[0].matches).toBe(5);
+        expect(api['rules']).toHaveBeenCalledTimes(2);
+        // Just once: no more looks.
+        tick(5000);
+        expect(api['overview']).toHaveBeenCalledTimes(4);
+        discardPeriodicTasks();
+      }));
+
+      it('a rule with no scan says Rule added and reloads at once', fakeAsync(() => {
+        store.overview = overview();
+        store.rules = [];
+        api['addRule'].mockReturnValue(
+          of({ ...rule({ id: 8 }), scanStarted: false })
+        );
+        store
+          .addRule({ match: 'name', pattern: '^b$', class: 'email' })
+          .subscribe();
+        expect(snack.openSnackBar).toHaveBeenCalledWith(
+          'Rule added and applied.',
+          'success'
+        );
+        expect(api['overview']).toHaveBeenCalledTimes(1);
+        expect(api['tables']).toHaveBeenCalledTimes(1);
+        expect(store.scanning).toBe(false);
+        tick(2000);
+        expect(api['overview']).toHaveBeenCalledTimes(1);
+        discardPeriodicTasks();
+      }));
+
+      it('a scan already being followed takes the rule along (and still announces)', fakeAsync(() => {
+        store.overview = overview();
+        store.rules = [];
+        api['scan'].mockReturnValue(of(running()));
+        let polls = 0;
+        api['overview'].mockImplementation(() =>
+          of(++polls < 2 ? running() : finished())
+        );
+        api['rules'].mockReturnValue(of([valueRule(2)]));
+        store.scan();
+        api['addRule'].mockReturnValue(
+          of({ ...valueRule(0), scanStarted: true })
+        );
+        store
+          .addRule({ match: 'value', pattern: '^[A-Z]{2}$', class: 'username' })
+          .subscribe();
+        tick(800);
+        tick(800);
+        expect(store.scanning).toBe(false);
+        expect(polls).toBe(2);
+        expect(store.rules?.[0].matches).toBe(2);
+        expect(snack.openSnackBar).toHaveBeenLastCalledWith(
+          'Scan finished',
+          'success'
+        );
+        discardPeriodicTasks();
+      }));
+    });
+
+    it('a finished scan re-reads the rules only once they were loaded', fakeAsync(() => {
+      const finishOnce = () => {
+        store.overview = overview();
+        api['scan'].mockReturnValue(
+          of(overview({ scan: { status: 'running', progress: 0, columns: 3 } }))
+        );
+        api['overview'].mockReturnValue(
+          of(
+            overview({
+              scan: {
+                status: 'idle',
+                columns: 3,
+                finishedAt: '2026-10-30T00:00:00Z',
+                lastStatus: 'done',
+              },
+            })
+          )
+        );
+        store.scan();
+        tick(800);
+      };
+      api['rules'].mockReturnValue(of([rule({ matches: 9 })]));
+      finishOnce();
+      expect(api['rules']).not.toHaveBeenCalled();
+      store.rules = [rule({ matches: 1 })];
+      finishOnce();
+      expect(api['rules']).toHaveBeenCalledWith(true);
+      expect(store.rules[0].matches).toBe(9);
+      discardPeriodicTasks();
+    }));
+
+    it('a re-read that lands after a newer add never drops it', () => {
+      const a = rule({ id: 1 });
+      store.rules = [a];
+      const reread = new Subject<DetectionRule[]>();
+      api['rules'].mockReturnValue(reread);
+      (store as unknown as { rereadRules(): void }).rereadRules();
+      api['addRule'].mockReturnValue(of({ ...rule({ id: 2 }) }));
+      store
+        .addRule({ match: 'name', pattern: '^b$', class: 'email' })
+        .subscribe();
+      reread.next([a]);
+      reread.complete();
+      expect(store.rules?.map(r => r.id)).toEqual([1, 2]);
+    });
+
     it('knows which columns a rule masked, and which nothing else would flag', () => {
       const r = rule();
       const cols = [
@@ -940,6 +1134,95 @@ describe('DataMaskingStore', () => {
           }),
         ]).masked.length
       ).toBe(1);
+    });
+
+    it("a value rule's lines carry their count; only its own, scored lines count", () => {
+      const r = rule({ id: 3, match: 'value', pattern: 'qqq' });
+      const cols = [
+        // What a scan writes (Rules::apply): the rule's line with its count.
+        column({
+          id: 's.t.code',
+          verdict: 'masked',
+          evidence: ev([
+            [70, 'values', 'Custom value rule qqq: 9 of 12 values match'],
+          ]),
+        }),
+        // A stricter class masked it: the rule's "Also matches" line scores 0.
+        column({
+          id: 's.t.ssn',
+          verdict: 'masked',
+          evidence: ev([
+            [90, 'name', 'Column name "ssn"'],
+            [
+              0,
+              'values',
+              'Also matches: Custom value rule qqq: 3 of 3 values match',
+            ],
+          ]),
+        }),
+        // The rule `qqq: b` is another rule.
+        column({
+          id: 's.t.other',
+          verdict: 'masked',
+          evidence: ev([
+            [70, 'values', 'Custom value rule qqq: b: 3 of 4 values match'],
+          ]),
+        }),
+        // Not a count.
+        column({
+          id: 's.t.odd',
+          verdict: 'masked',
+          evidence: ev([[70, 'values', 'Custom value rule qqq: lots']]),
+        }),
+      ];
+      const f = ruleFootprint(r, cols);
+      expect(f.masked.map(c => c.id)).toEqual(['s.t.code']);
+      expect(f.ruleOnly.map(c => c.id)).toEqual(['s.t.code']);
+      expect(
+        isRuleLine(
+          'Custom value rule qqq: b: 3 of 4 values match',
+          rule({ match: 'value', pattern: 'qqq: b' })
+        )
+      ).toBe(true);
+      // Name rules never carry a count.
+      expect(
+        isRuleLine(
+          'Custom rule qqq: 3 of 4 values match',
+          rule({ match: 'name', pattern: 'qqq' })
+        )
+      ).toBe(false);
+    });
+
+    it('a re-read that already lists the new rule does not list it twice', () => {
+      store.rules = [rule({ id: 1 })];
+      const added = new Subject<DetectionRule>();
+      api['addRule'].mockReturnValue(added);
+      api['rules'].mockReturnValue(of([rule({ id: 1 }), rule({ id: 2 })]));
+      store
+        .addRule({ match: 'name', pattern: '^b$', class: 'email' })
+        .subscribe();
+      // A scan's re-read was served after the INSERT, before the POST answered.
+      (store as unknown as { rereadRules(): void }).rereadRules();
+      added.next(rule({ id: 2, matches: 3 }));
+      expect(store.rules?.map(r => r.id)).toEqual([1, 2]);
+      expect(store.rules?.[1].matches).toBe(3);
+    });
+
+    it('a re-read served before the DELETE does not bring the rule back', () => {
+      store.rules = [rule({ id: 1 }), rule({ id: 2 })];
+      const del = new Subject<unknown>();
+      api['deleteRule'].mockReturnValue(del);
+      api['tables'].mockReturnValue(of([]));
+      const reread = new Subject<DetectionRule[]>();
+      api['rules'].mockReturnValue(reread);
+      store.deleteRule(store.rules[0]);
+      // Started after the delete (same epoch), answered with the old list.
+      (store as unknown as { rereadRules(): void }).rereadRules();
+      reread.next([rule({ id: 1 }), rule({ id: 2 })]);
+      expect(store.rules?.map(r => r.id)).toEqual([2]);
+      del.next({});
+      del.complete();
+      expect(store.rules?.map(r => r.id)).toEqual([2]);
     });
 
     it('delete and unmask marks those columns not sensitive, then says so', () => {

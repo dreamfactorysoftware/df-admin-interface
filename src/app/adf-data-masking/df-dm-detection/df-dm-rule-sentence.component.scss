@@ -1,0 +1,53 @@
+// Muted lead-in, then mono terms joined by "or", wrapping as a sentence.
+:host {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-size: var(--df-font-size-sm);
+  gap: 4px 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.lead {
+  color: var(--df-text-muted);
+  flex: none;
+}
+
+// A baseline rule's own name reads as the rest of the sentence.
+.name {
+  color: var(--df-text);
+  min-width: 0;
+}
+
+.or {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+}
+
+.term {
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  line-height: 20px;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 6px;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+// A regex stays on the sentence's line; the full pattern is its title.
+.pattern {
+  color: var(--df-text);
+  flex: 1 1 0;
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

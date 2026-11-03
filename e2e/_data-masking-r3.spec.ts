@@ -289,8 +289,8 @@ test('a 403 on any write: the server says why, the screen stays as it was', asyn
   await open(page, 'detection');
   await page.getByRole('button', { name: 'Add rule' }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.locator('input').first().fill('^emp_ssn$');
-  await dialog.getByRole('combobox').click();
+  await dialog.getByTestId('dm-rule-terms').fill('emp_ssn');
+  await dialog.getByTestId('dm-rule-class').click();
   await page.getByRole('option', { name: 'National ID' }).click();
   await dialog
     .getByRole('button', { name: /save|add/i })

@@ -1024,6 +1024,10 @@ test('detection: built-in pack, rules and a live rule test', async () => {
     match: 'name',
     pattern,
   });
+  await page.getByTestId('dm-rule-op').click();
+  await page
+    .getByRole('option', { name: DMT.detection.ops.name.regex, exact: true })
+    .click();
   await page.getByTestId('dm-rule-pattern').fill(pattern);
   const n = test.matches.length;
   await expect(page.getByTestId('dm-rule-preview')).toContainText(

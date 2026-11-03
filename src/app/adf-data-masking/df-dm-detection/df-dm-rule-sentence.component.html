@@ -1,0 +1,20 @@
+<!-- &ngsp;: real spaces between the parts (screen readers, copy), which
+     the flex layout does not render; its gap spaces them on screen. -->
+<span class="lead">{{ lead }}</span
+>&ngsp;<span *ngIf="title; else shaped" class="name" [title]="pattern">{{
+  title
+}}</span>
+<ng-template #shaped>
+  <ng-container *ngIf="terms as list; else regex">
+    <ng-container *ngFor="let term of list; let last = last"
+      ><code class="term">{{ term }}</code
+      ><ng-container *ngIf="!last"
+        >&ngsp;<span class="or">{{ or }}</span
+        >&ngsp;</ng-container
+      ></ng-container
+    >
+  </ng-container>
+  <ng-template #regex>
+    <code class="pattern" [title]="pattern">{{ pattern }}</code>
+  </ng-template>
+</ng-template>

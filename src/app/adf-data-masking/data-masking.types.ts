@@ -195,6 +195,20 @@ export interface DetectionRule {
   matches: number;
   /** 'admin', or 'baseline:<id>' for a rule a Compliance baseline added. */
   source?: string;
+  /**
+   * A baseline rule's own name ("Medical record, patient and chart
+   * numbers"), shown instead of its regex. Admin rules have none.
+   */
+  title?: string;
+}
+
+/** POST rule: the new rule, and whether a scan started to apply it. */
+export interface CreatedRule extends DetectionRule {
+  /**
+   * A value rule applies at a scan: true when the server started (or
+   * queued behind the running scan) the one that applies it.
+   */
+  scanStarted?: boolean;
 }
 
 export interface RuleTestResult {
@@ -221,6 +235,8 @@ export interface ActivityEvent {
   kind: ActivityKind;
   text: string;
   target?: string | null;
+  /** Rule events: the rule's target, so the UI reads `target` (its pattern) as a sentence. */
+  match?: DetectionRule['match'];
 }
 
 /** One page of activity, newest first. */

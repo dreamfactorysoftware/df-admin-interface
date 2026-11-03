@@ -156,16 +156,50 @@
     "addRule": "Add rule",
     "match": "Match",
     "matchName": "Column name",
-    "matchValue": "Value pattern",
-    "pattern": "Pattern",
-    "patternNameExample": "^emp_ssn$|social_sec",
-    "patternValueExample": "^[A-Z]{2}\\d{6}$",
+    "matchValue": "Column values",
+    "rule": "Rule",
+    "maskAs": "Mask as",
+    "sentence": "{{target}} {{op}}",
+    "ops": {
+      "name": {
+        "is": "is",
+        "contains": "contains",
+        "startsWith": "starts with",
+        "endsWith": "ends with",
+        "regex": "matches regex"
+      },
+      "value": {
+        "looksLike": "look like",
+        "contains": "contain",
+        "startsWith": "start with",
+        "regex": "match regex"
+      }
+    },
+    "examples": {
+      "name": {
+        "is": "emp_ssn",
+        "contains": "ssn",
+        "startsWith": "tax_",
+        "endsWith": "_ssn",
+        "regex": "^emp_ssn$|social_sec"
+      },
+      "value": {
+        "looksLike": "AB123456",
+        "contains": "@example.com",
+        "startsWith": "EMP-",
+        "regex": "^[A-Z]{2}\\d{6}$"
+      }
+    },
+    "or": "or",
+    "removeTerm": "Remove {{term}}",
+    "scanning": "Scanning",
     "pickClass": "Choose a class",
     "matches": "Matches",
     "matchesN": "Matches {{columns}}",
     "more": "and {{count}} more",
     "showMatches": "Show {{count}} matching columns",
     "invalid": "Not a valid pattern",
+    "tooMany": "Too many terms for one rule",
     "delete": "Delete rule",
     "empty": "No custom rules",
     "builtIn": "Built-in rules",
@@ -201,7 +235,8 @@
     "access": "Access updated",
     "accessStale": "Access settings changed elsewhere. Showing the latest.",
     "mask": "Mask updated",
-    "ruleAdded": "Rule added",
+    "ruleAdded": "Rule added and applied.",
+    "ruleAddedScanning": "Rule added. Scanning to apply it.",
     "ruleDeleted": "Rule deleted",
     "scanDone": "Scan finished",
     "scanDonePreview": "Scan finished. Preview is on.",

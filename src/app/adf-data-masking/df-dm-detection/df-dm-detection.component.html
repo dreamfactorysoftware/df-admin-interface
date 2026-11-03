@@ -29,13 +29,10 @@
     <div class="rules" role="table" *ngIf="store.rules?.length; else noRules">
       <div class="row head-row" role="row">
         <span role="columnheader">{{
-          'dataMasking.detection.match' | transloco
+          'dataMasking.detection.rule' | transloco
         }}</span>
         <span role="columnheader">{{
-          'dataMasking.detection.pattern' | transloco
-        }}</span>
-        <span role="columnheader">{{
-          'dataMasking.columns.class' | transloco
+          'dataMasking.detection.maskAs' | transloco
         }}</span>
         <span role="columnheader" class="num">{{
           'dataMasking.detection.matches' | transloco
@@ -46,40 +43,45 @@
         class="row"
         role="row"
         *ngFor="let r of store.rules; trackBy: trackRule">
-        <span role="cell" class="match">{{
-          (r.match === 'name'
-            ? 'dataMasking.detection.matchName'
-            : 'dataMasking.detection.matchValue'
-          ) | transloco
-        }}</span>
-        <span role="cell" class="pattern-cell"
-          ><code class="pattern">{{ r.pattern }}</code
-          ><span
+        <span role="cell" class="rule-cell" data-testid="dm-rule-sentence">
+          <df-dm-rule-sentence
+            class="sentence"
+            [match]="r.match"
+            [pattern]="r.pattern"
+            [title]="r.title"></df-dm-rule-sentence>
+          <span
             *ngIf="baselineOf(r) as b"
             class="source"
             data-testid="dm-rule-source"
             >{{
               'dataMasking.detection.fromBaseline' | transloco: { name: b }
             }}</span
-          ></span
-        >
+          >
+        </span>
         <span role="cell" class="cls" [ngClass]="'dm-tier-' + tierOf(r.class)">
           <span class="dot" aria-hidden="true"></span>
           {{ 'dataMasking.classes.' + r.class | transloco }}
         </span>
         <span role="cell" class="num">
-          <button
-            type="button"
-            class="count df-numeric"
-            [disabled]="!r.matches"
-            (click)="openMatches(r)"
-            [attr.aria-label]="
-              'dataMasking.detection.showMatches'
-                | transloco: { count: r.matches }
-            "
-            data-testid="dm-rule-matches">
-            {{ r.matches }}
-          </button>
+          <mat-spinner
+            *ngIf="pending(r); else count"
+            diameter="16"
+            [attr.aria-label]="'dataMasking.detection.scanning' | transloco"
+            data-testid="dm-rule-scanning"></mat-spinner>
+          <ng-template #count>
+            <button
+              type="button"
+              class="count df-numeric"
+              [disabled]="!r.matches"
+              (click)="openMatches(r)"
+              [attr.aria-label]="
+                'dataMasking.detection.showMatches'
+                  | transloco: { count: r.matches }
+              "
+              data-testid="dm-rule-matches">
+              {{ r.matches }}
+            </button>
+          </ng-template>
         </span>
         <span role="cell" class="del">
           <button

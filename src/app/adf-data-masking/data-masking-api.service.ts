@@ -22,6 +22,7 @@ import {
   ActivityQuery,
   BaselineSummary,
   BuiltInRules,
+  CreatedRule,
   DetectionRule,
   MaskSetting,
   MaskedColumn,
@@ -152,9 +153,11 @@ export class DfDataMaskingApiService {
       .pipe(map(r => r?.resource ?? []));
   }
 
-  rules(): Observable<DetectionRule[]> {
+  /** `quiet`: a background re-read that keeps what it had on failure. */
+  rules(quiet = false): Observable<DetectionRule[]> {
+    const options = quiet ? { context: silent() } : {};
     return this.http
-      .get<ListResponse<DetectionRule>>(`${DATA_MASKING_URL}/rule`)
+      .get<ListResponse<DetectionRule>>(`${DATA_MASKING_URL}/rule`, options)
       .pipe(map(r => r?.resource ?? []));
   }
 
@@ -164,8 +167,8 @@ export class DfDataMaskingApiService {
 
   addRule(
     rule: Pick<DetectionRule, 'match' | 'pattern' | 'class'>
-  ): Observable<DetectionRule> {
-    return this.http.post<DetectionRule>(`${DATA_MASKING_URL}/rule`, rule, {
+  ): Observable<CreatedRule> {
+    return this.http.post<CreatedRule>(`${DATA_MASKING_URL}/rule`, rule, {
       context: toastOff(),
     });
   }

@@ -42,7 +42,9 @@ const SCAN_TIMEOUT = Number(
 const DM = '/dreamfactory/dist/#/api-security/data-masking';
 const CP = '/dreamfactory/dist/#/api-security/compliance';
 /** A name rule that matches no real column. */
-const PROBE = `^dm_e2e_probe_${Date.now().toString(36)}$`;
+const PROBE_NAME = `dm_e2e_probe_${Date.now().toString(36)}`;
+/** What "Column name is <PROBE_NAME>" compiles to. */
+const PROBE = `^${PROBE_NAME}$`;
 
 if (EVIDENCE) mkdirSync(EVIDENCE, { recursive: true });
 
@@ -593,14 +595,22 @@ test('detection: live rule test, add a rule, delete it', async () => {
   await page.getByTestId('dm-tab-detection').click();
   await expect(page.getByTestId('dm-detection')).toBeVisible();
   await page.getByTestId('dm-add-rule').click();
-  const pattern = page.getByTestId('dm-rule-pattern');
-  // A pattern that matches real columns: the preview counts them live.
-  await pattern.fill('e_?mail');
+  // A regex that matches real columns: the preview counts them live.
+  await page.getByTestId('dm-rule-op').click();
+  await page
+    .getByRole('option', { name: 'matches regex', exact: true })
+    .click();
+  await page.getByTestId('dm-rule-pattern').fill('e_?mail');
   await expect(page.getByTestId('dm-rule-preview')).toContainText(
     /Matches (at least )?[1-9]\d* columns?/,
     { timeout: 15_000 }
   );
-  await pattern.fill(PROBE);
+  // Back to "is": not a shape the builder writes, so no chips; the probe
+  // name becomes the rule (still typed: pending text counts).
+  await page.getByTestId('dm-rule-op').click();
+  await page.getByRole('option', { name: 'is', exact: true }).click();
+  await expect(page.getByTestId('dm-rule-chip')).toHaveCount(0);
+  await page.getByTestId('dm-rule-terms').fill(PROBE_NAME);
   await expect(page.getByTestId('dm-rule-preview')).toContainText(
     'Matches 0 columns',
     { timeout: 15_000 }
@@ -609,7 +619,11 @@ test('detection: live rule test, add a rule, delete it', async () => {
   await page.getByRole('option', { name: 'Email', exact: true }).click();
   await page.getByTestId('dm-rule-save').click();
   await expect(page.locator('mat-dialog-container')).toHaveCount(0);
-  const row = page.locator('.rules .row').filter({ hasText: PROBE });
+  // The list reads it back as the sentence: Column name is <probe>.
+  const row = page.locator('.rules .row').filter({ hasText: PROBE_NAME });
+  await expect(row.getByTestId('dm-rule-sentence')).toContainText(
+    'Column name is'
+  );
   await expect(row).toBeVisible();
   await waitFor(
     () => api.get('/system/data_masking/rule'),
