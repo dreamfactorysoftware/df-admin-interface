@@ -1047,14 +1047,15 @@ test('detection: built-in pack, rules and a live rule test', async () => {
 
 test('activity mirrors the server, newest first', async () => {
   await dismissToasts();
-  // In Preview, an app reading a covered table leaves a "would mask" row.
+  // In Preview, an app reading a covered table gets no masking headers and
+  // leaves a "would mask" row.
   const o = await api.get('/system/data_masking');
   if (o.mode === 'preview' && PREVIEW_KEY) {
     const res = await page.request.get(PREVIEW_PATH, {
       headers: { 'X-DreamFactory-API-Key': PREVIEW_KEY },
     });
     expect(res.status(), `GET ${PREVIEW_PATH} with the app key`).toBe(200);
-    expect(res.headers()['x-dreamfactory-masking']).toBe('preview');
+    expect(res.headers()['x-dreamfactory-masked-fields']).toBeUndefined();
     await res.dispose();
   }
   await page.getByTestId('dm-tab-activity').click();

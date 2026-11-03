@@ -1186,8 +1186,10 @@ export async function installDataMaskingMock(
  * as df-masking answers them in mode On (decision 20): synthetic rows with
  * masked columns masked; a filter condition on a masked column is unknown,
  * so the filter (Data Explorer ANDs its column filters) matches no rows; a
- * sort on one is ignored. Both are named in X-DreamFactory-Masking-Dropped.
- * Outside mode On there are no masking headers and nothing is dropped.
+ * sort on one is left out. Masked columns in the rows are named in
+ * X-DreamFactory-Masked-Fields; the filter and sort items in
+ * X-DreamFactory-Masking-Rewrites. Outside mode On there are no masking
+ * headers and nothing is rewritten.
  */
 export async function installDataExplorerMaskingMock(
   page: Page,
@@ -1245,14 +1247,20 @@ export async function installDataExplorerMaskingMock(
           Object.fromEntries(cols.map(c => [c.column, value(c, i + 1)]))
         );
     const headers: Record<string, string> = {};
-    if (on && hidden.size) headers['X-DreamFactory-Masking'] = 'on';
+    if (resource.length && hidden.size) {
+      headers['X-DreamFactory-Masked-Fields'] = [...hidden.values()]
+        .map(c => encodeURIComponent(c.column))
+        .join(', ');
+    }
     if (dropped.length) {
-      headers['X-DreamFactory-Masking-Dropped'] = [...new Set(dropped)].join(
-        ','
+      headers['X-DreamFactory-Masking-Rewrites'] = [...new Set(dropped)].join(
+        ', '
       );
+    }
+    if (Object.keys(headers).length) {
       // Same-origin in the app; exposed anyway, like the server's CORS.
       headers['Access-Control-Expose-Headers'] =
-        'X-DreamFactory-Masking, X-DreamFactory-Masking-Dropped';
+        'X-DreamFactory-Masked-Fields, X-DreamFactory-Masking-Rewrites';
     }
     return route.fulfill({
       status: 200,

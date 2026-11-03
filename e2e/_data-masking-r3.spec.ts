@@ -84,6 +84,9 @@ test('data explorer: masked filter matches no rows; masked sort ignored (decisio
     .first()
     .click({ timeout: 60_000 });
   await expect(page.getByTestId('de-masked')).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator('th.mat-column-EMail [data-testid="de-masked-col"]').first()
+  ).toBeVisible();
   await expect(page.getByTestId('de-masking-dropped')).toHaveCount(0);
 
   // Filter on a masked column: no rows, and the note says why.
@@ -94,9 +97,10 @@ test('data explorer: masked filter matches no rows; masked sort ignored (decisio
   const filterInput = page.locator('th.mat-column-filter_EMail .filter-input');
   await filterInput.fill('example');
   const note = page.getByTestId('de-masking-dropped');
-  await expect(note).toHaveText(/Masked columns can't be filtered: EMail/, {
-    timeout: 15_000,
-  });
+  await expect(note).toHaveText(
+    /Conditions on masked columns match no rows: EMail/,
+    { timeout: 15_000 }
+  );
   await expect(page.locator('.footer-info').first()).toContainText('0 records');
   await expect(page.locator('.footer-info').first()).toContainText(
     '(filtered)'

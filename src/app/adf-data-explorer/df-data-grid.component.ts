@@ -55,6 +55,7 @@ import { RouterLink } from '@angular/router';
 import { MaskingNote, MaskingNotice, maskingNoteFor } from './masking-notice';
 import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
 import { maskSecret } from 'src/app/shared/utilities/mask';
+import { snakeToCamelString } from 'src/app/shared/utilities/case';
 
 interface FilterOp {
   value: string;
@@ -118,7 +119,6 @@ interface ColumnFilter {
               class="masked-chip"
               routerLink="/api-security/data-masking"
               [queryParams]="{ tab: 'access' }"
-              [matTooltip]="t('dataExplorer.maskedTip')"
               data-testid="de-masked">
               <mat-icon aria-hidden="true">visibility_off</mat-icon>
               {{ t('dataExplorer.masked') }}
@@ -527,6 +527,13 @@ interface ColumnFilter {
                     class="pk-icon"
                     matTooltip="Primary Key"
                     >vpn_key</mat-icon
+                  >
+                  <mat-icon
+                    *ngIf="isMaskedColumn(col)"
+                    class="masked-col-icon"
+                    [matTooltip]="t('dataExplorer.masked')"
+                    data-testid="de-masked-col"
+                    >visibility_off</mat-icon
                   >
                   {{ col }}
                   <span
@@ -1341,6 +1348,16 @@ interface ColumnFilter {
         vertical-align: middle;
       }
 
+      /* Data Masking: masked column in header */
+      .masked-col-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+        color: var(--df-text-muted);
+        margin-right: 2px;
+        vertical-align: middle;
+      }
+
       /* FK link cells */
       .fk-cell {
         cursor: pointer !important;
@@ -1500,6 +1517,8 @@ export class DfDataGridComponent
   maskingNotice: MaskingNotice | null = null;
   /** The one-line note those headers call for, or null. */
   maskingNote: MaskingNote | null = null;
+  /** Masked top-level columns the header named, lower-cased (both cases). */
+  private maskedColumns = new Set<string>();
   private filterSubject$ = new Subject<void>();
 
   // Column resize state
@@ -1629,6 +1648,7 @@ export class DfDataGridComponent
     this.navigationFilter = this.initialFilter || null;
     this.maskingNotice = null;
     this.maskingNote = null;
+    this.maskedColumns.clear();
     this.initialLoading = true;
     this.loadData();
     this.loadSchemaForTable();
@@ -1689,12 +1709,20 @@ export class DfDataGridComponent
           this.totalRecords = res.meta?.count ?? records.length;
           this.maskingNotice = res.masking ?? null;
           this.maskingNote = maskingNoteFor(this.maskingNotice);
+          // Response keys arrive camelCased (first_name -> firstName).
+          this.maskedColumns = new Set(
+            (this.maskingNotice?.fields ?? []).flatMap(f => [
+              f.toLowerCase(),
+              snakeToCamelString(f).toLowerCase(),
+            ])
+          );
           this.loading = false;
           this.initialLoading = false;
         },
         error: err => {
           this.maskingNotice = null;
           this.maskingNote = null;
+          this.maskedColumns.clear();
           this.error = normalizeError(err).message;
           this.loading = false;
           this.initialLoading = false;
@@ -1935,8 +1963,8 @@ export class DfDataGridComponent
   }
 
   /**
-   * "Masked columns can't be filtered: email · Sort ignored on masked
-   * columns: ssn", from the note (`t` is the template's translate).
+   * "Conditions on masked columns match no rows: email · Sort ignored on
+   * masked columns: ssn", from the note (`t` is the template's translate).
    */
   maskingNoteText(
     t: (key: string, params?: Record<string, unknown>) => string
@@ -2075,6 +2103,14 @@ export class DfDataGridComponent
   }
 
   // --- Primary key detection ---
+
+  /** The column is named in X-DreamFactory-Masked-Fields (case-insensitive). */
+  isMaskedColumn(col: string): boolean {
+    return (
+      this.maskedColumns.has(col.toLowerCase()) ||
+      this.maskedColumns.has(this.getDbColumnName(col).toLowerCase())
+    );
+  }
 
   isPrimaryKey(col: string): boolean {
     const fi = this.getFieldInfo(col);

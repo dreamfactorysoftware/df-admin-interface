@@ -1,9 +1,10 @@
 /**
- * Data Explorer and Data Masking (df-masking): a small "Masked" marker when
- * the response carries X-DreamFactory-Masking: on, one line naming the
- * masked columns a filter could not use (they match no rows, decision 20)
- * or a sort ignored (X-DreamFactory-Masking-Dropped), and nothing at all
- * when the headers are absent (OSS, unmasked use).
+ * Data Explorer and Data Masking (df-masking): a small "Masked" marker and
+ * an icon on each masked column header when the response carries
+ * X-DreamFactory-Masked-Fields, one line naming the masked columns a filter
+ * could not use (they match no rows, decision 20) or a sort left out
+ * (X-DreamFactory-Masking-Rewrites), and nothing at all when the headers
+ * are absent (OSS, Preview, unmasked use).
  */
 import {
   ComponentFixture,
@@ -87,22 +88,60 @@ describe('DfDataGridComponent and Data Masking headers', () => {
     expect(el().querySelector('.data-table')).toBeTruthy();
     expect(q('de-masked')).toBeNull();
     expect(q('de-masking-dropped')).toBeNull();
-    expect(el().querySelector('.masked-chip, .masking-note')).toBeNull();
+    expect(
+      el().querySelector('.masked-chip, .masking-note, .masked-col-icon')
+    ).toBeNull();
   });
 
-  it('shows a small Masked marker when values are masked', () => {
+  it('shows a small Masked marker (no tooltip) when values are masked', () => {
     response.masking = readMaskingNotice(
-      new HttpHeaders({ 'X-DreamFactory-Masking': 'on' })
+      new HttpHeaders({ 'X-DreamFactory-Masked-Fields': 'email' })
     );
     create();
     expect(text(q('de-masked'))).toBe('visibility_off Masked');
     expect(q('de-masked')!.getAttribute('href')).toBe(
       '/api-security/data-masking?tab=access'
     );
+    expect(q('de-masked')!.hasAttribute('ng-reflect-message')).toBe(false);
     expect(q('de-masking-dropped')).toBeNull();
   });
 
-  it('says in one line that masked columns cannot be filtered (no rows) and that a sort on one was ignored', fakeAsync(() => {
+  it('marks each masked top-level column header, case-insensitively', () => {
+    response.masking = readMaskingNotice(
+      new HttpHeaders({
+        'X-DreamFactory-Masked-Fields':
+          'EMAIL, Last_Name, orders.card_number, +2 more',
+      })
+    );
+    create();
+    const marked = Array.from(el().querySelectorAll('th.header-cell')).filter(
+      th => th.querySelector('[data-testid="de-masked-col"]')
+    );
+    expect(marked.map(th => text(th))).toEqual([
+      'visibility_off email',
+      'visibility_off last_name',
+    ]);
+    // Tooltip: the one word 'Masked', as the key icon says 'Primary Key'.
+    expect(q('de-masked-col')!.getAttribute('ng-reflect-message')).toBe(
+      'Masked'
+    );
+    const c = fixture.componentInstance;
+    expect(c.isMaskedColumn('id')).toBe(false);
+    // The app camelCases response keys: lastName is last_name.
+    expect(c.isMaskedColumn('lastName')).toBe(true);
+    expect(c.isMaskedColumn('orders')).toBe(false);
+  });
+
+  it('"*" marks the response but no column', () => {
+    response.masking = readMaskingNotice(
+      new HttpHeaders({ 'X-DreamFactory-Masked-Fields': '*' })
+    );
+    create();
+    expect(q('de-masked')).toBeTruthy();
+    expect(q('de-masked-col')).toBeNull();
+  });
+
+  it('says in one line that conditions on masked columns match no rows and that a sort on one was ignored', fakeAsync(() => {
     create();
     const c = fixture.componentInstance;
     // Decision 20: the admin filters EMAIL (masked). The server treats the
@@ -113,8 +152,8 @@ describe('DfDataGridComponent and Data Masking headers', () => {
       meta: { count: 0 },
       masking: readMaskingNotice(
         new HttpHeaders({
-          'X-DreamFactory-Masking': 'on',
-          'X-DreamFactory-Masking-Dropped': 'filter:email,order:last%20name',
+          'X-DreamFactory-Masked-Fields': 'email, last_name',
+          'X-DreamFactory-Masking-Rewrites': 'filter:email, order:last%20name',
         })
       ),
     };
@@ -128,12 +167,12 @@ describe('DfDataGridComponent and Data Masking headers', () => {
     const note = q('de-masking-dropped')!;
     expect(note.querySelectorAll('.masking-note-text').length).toBe(1);
     expect(text(note.querySelector('.masking-note-text'))).toBe(
-      "Masked columns can't be filtered: email · Sort ignored on masked columns: last name"
+      'Conditions on masked columns match no rows: email · Sort ignored on masked columns: last name'
     );
     expect(
       note.querySelector('.masking-note-text')!.getAttribute('title')
     ).toBe(
-      "Masked columns can't be filtered: email · Sort ignored on masked columns: last name"
+      'Conditions on masked columns match no rows: email · Sort ignored on masked columns: last name'
     );
     // The rows are filtered (to none): the footer says so, as without masking.
     expect(text(el().querySelector('.grid-footer .footer-info'))).toBe(
@@ -146,8 +185,8 @@ describe('DfDataGridComponent and Data Masking headers', () => {
       meta: { count: 1 },
       masking: readMaskingNotice(
         new HttpHeaders({
-          'X-DreamFactory-Masking': 'on',
-          'X-DreamFactory-Masking-Dropped': 'filter:email',
+          'X-DreamFactory-Masked-Fields': 'email',
+          'X-DreamFactory-Masking-Rewrites': 'filter:email',
         })
       ),
     };
@@ -161,7 +200,7 @@ describe('DfDataGridComponent and Data Masking headers', () => {
     c.loadData();
     fixture.detectChanges();
     expect(text(q('de-masking-dropped')!.querySelector('span'))).toBe(
-      "Masked columns can't be filtered: email"
+      'Conditions on masked columns match no rows: email'
     );
     expect(text(el().querySelector('.grid-footer .footer-info'))).toBe(
       '1 records (filtered)'
@@ -171,8 +210,8 @@ describe('DfDataGridComponent and Data Masking headers', () => {
   it('a sort on a masked column alone: "Sort ignored on masked columns"', () => {
     response.masking = readMaskingNotice(
       new HttpHeaders({
-        'X-DreamFactory-Masking': 'on',
-        'X-DreamFactory-Masking-Dropped': 'order:ssn',
+        'X-DreamFactory-Masked-Fields': 'email',
+        'X-DreamFactory-Masking-Rewrites': 'order:ssn',
       })
     );
     create();
@@ -184,18 +223,20 @@ describe('DfDataGridComponent and Data Masking headers', () => {
   it('clears the notice when the next response has no headers', () => {
     response.masking = readMaskingNotice(
       new HttpHeaders({
-        'X-DreamFactory-Masking': 'on',
-        'X-DreamFactory-Masking-Dropped': 'filter:*,+2 more',
+        'X-DreamFactory-Masked-Fields': 'email',
+        'X-DreamFactory-Masking-Rewrites': 'filter:*, +2 more',
       })
     );
     create();
     expect(text(q('de-masking-dropped')!.querySelector('span'))).toBe(
-      "Masked columns can't be filtered +2 more"
+      'A filter Data Masking could not check matched no rows +2 more'
     );
+    expect(q('de-masked-col')).toBeTruthy();
     response = { resource: ROWS, meta: { count: 300 }, masking: null };
     fixture.componentInstance.loadData();
     fixture.detectChanges();
     expect(q('de-masked')).toBeNull();
+    expect(q('de-masked-col')).toBeNull();
     expect(q('de-masking-dropped')).toBeNull();
   });
 });
@@ -230,8 +271,8 @@ describe('DataExplorerService.getTableData masking headers', () => {
       { resource: ROWS, meta: { count: 300 } },
       {
         headers: {
-          'X-DreamFactory-Masking': 'on',
-          'X-DreamFactory-Masking-Dropped': 'filter:email',
+          'X-DreamFactory-Masked-Fields': 'email, ssn',
+          'X-DreamFactory-Masking-Rewrites': 'filter:email',
         },
       }
     );
@@ -243,6 +284,7 @@ describe('DataExplorerService.getTableData masking headers', () => {
     expect(got[1].resource).toEqual(ROWS);
     expect(got[1].masking).toEqual({
       masked: true,
+      fields: ['email', 'ssn'],
       dropped: [{ kind: 'filter', columns: ['email'], all: false }],
       more: 0,
     });
