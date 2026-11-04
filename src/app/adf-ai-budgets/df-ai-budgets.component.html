@@ -1,0 +1,262 @@
+<div class="budgets">
+  <header class="budgets__header">
+    <div class="budgets__title">
+      <fa-icon class="budgets__title-icon" [icon]="faScaleBalanced"></fa-icon>
+      <h2>AI Budgets</h2>
+      <fa-icon
+        class="budgets__title-hint"
+        [icon]="faCircleInfo"
+        matTooltip="Spend limits for AI requests. Periods follow calendar boundaries in the server time zone. A hard stop refuses the next request after spend reaches the cap, so the request that crosses the cap still completes."
+        matTooltipPosition="below"></fa-icon>
+    </div>
+
+    <div class="budgets__controls">
+      <a mat-stroked-button [routerLink]="usageLink">View usage</a>
+      <button
+        type="button"
+        mat-stroked-button
+        [disabled]="loading"
+        (click)="refresh()">
+        <fa-icon [icon]="faArrowsRotate"></fa-icon>
+        <span>Refresh</span>
+      </button>
+      <button
+        type="button"
+        mat-flat-button
+        color="primary"
+        data-testid="budget-new"
+        (click)="openCreate()">
+        <fa-icon [icon]="faPlus"></fa-icon>
+        <span>New budget</span>
+      </button>
+    </div>
+  </header>
+
+  <p *ngIf="errorMessage" class="budgets__error" role="alert">
+    {{ errorMessage }}
+  </p>
+
+  <p
+    *ngIf="!usageLoggingEnabled"
+    class="budgets__warning"
+    role="alert"
+    data-testid="budget-logging-off">
+    AI usage logging is off on this server. Spend is not recorded, so budgets
+    will not block requests or send alerts.
+  </p>
+
+  <mat-card *ngIf="form" class="budgets__form">
+    <mat-card-content>
+      <h3>{{ form.id ? 'Edit budget' : 'New budget' }}</h3>
+      <form class="budgets__fields" (ngSubmit)="save()">
+        <mat-form-field appearance="outline">
+          <mat-label>Label</mat-label>
+          <input
+            matInput
+            name="label"
+            maxlength="256"
+            required
+            data-testid="budget-label"
+            [(ngModel)]="form.label" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Applies to</mat-label>
+          <mat-select
+            name="dimension_type"
+            data-testid="budget-scope-type"
+            [(ngModel)]="form.dimension_type"
+            (selectionChange)="onScopeTypeChange()">
+            <mat-option *ngFor="let t of scopeTypes" [value]="t">
+              {{ scopeLabels[t] }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field
+          *ngIf="form.dimension_type !== 'global'"
+          appearance="outline">
+          <mat-label>{{ scopeLabels[form.dimension_type] }}</mat-label>
+          <mat-select
+            name="dimension_id"
+            required
+            data-testid="budget-scope-record"
+            [(ngModel)]="form.dimension_id">
+            <df-select-search #scopeSearch></df-select-search>
+            <mat-option
+              *ngFor="
+                let o of scopeOptions
+                  | dfSearch: scopeSearch.query : '' : 'label';
+                trackBy: trackById
+              "
+              [value]="o.id">
+              {{ o.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Period</mat-label>
+          <mat-select name="period" [(ngModel)]="form.period">
+            <mat-option *ngFor="let p of periods" [value]="p">
+              {{ p | titlecase }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cap (USD)</mat-label>
+          <input
+            matInput
+            type="number"
+            name="budget_usd"
+            min="0.0001"
+            step="0.01"
+            required
+            data-testid="budget-cap"
+            [(ngModel)]="form.budget_usd" />
+          <mat-hint
+            >A connection with no rates records $0, so set rates.</mat-hint
+          >
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="budgets__wide">
+          <mat-label>Alert webhook URL (optional)</mat-label>
+          <input
+            matInput
+            type="url"
+            name="alert_webhook_url"
+            maxlength="1024"
+            placeholder="https://"
+            [(ngModel)]="form.alert_webhook_url" />
+          <mat-hint>Receives a POST at 50, 80 and 100 percent.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="budgets__wide">
+          <mat-label>Webhook Authorization header (optional)</mat-label>
+          <input
+            matInput
+            type="password"
+            name="alert_webhook_auth_header"
+            autocomplete="new-password"
+            [disabled]="form.clear_alert_webhook_auth"
+            [placeholder]="
+              form.has_alert_webhook_auth
+                ? 'Stored. Leave blank to keep it.'
+                : ''
+            "
+            [(ngModel)]="form.alert_webhook_auth_header" />
+        </mat-form-field>
+
+        <mat-slide-toggle
+          *ngIf="form.has_alert_webhook_auth"
+          class="budgets__wide"
+          name="clear_alert_webhook_auth"
+          [(ngModel)]="form.clear_alert_webhook_auth">
+          Remove the stored header
+        </mat-slide-toggle>
+
+        <mat-slide-toggle
+          class="budgets__wide"
+          name="hard_stop"
+          data-testid="budget-hard-stop"
+          [(ngModel)]="form.hard_stop">
+          Hard stop
+        </mat-slide-toggle>
+
+        <p
+          *ngIf="form.hard_stop"
+          class="budgets__warning budgets__wide"
+          role="alert"
+          data-testid="budget-hard-stop-warning">
+          Requests will be refused with HTTP 429 once spend reaches the cap,
+          until the period resets.
+        </p>
+
+        <p *ngIf="formError" class="budgets__error budgets__wide" role="alert">
+          {{ formError }}
+        </p>
+
+        <div class="budgets__form-actions budgets__wide">
+          <button type="button" mat-stroked-button (click)="closeForm()">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            mat-flat-button
+            color="primary"
+            data-testid="budget-save"
+            [disabled]="!canSave">
+            Save
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <div *ngIf="loading && !budgets.length" class="budgets__loading">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+
+  <p
+    *ngIf="!loading && !budgets.length && !errorMessage"
+    class="budgets__empty">
+    No budgets yet. Create one to set a spend limit.
+  </p>
+
+  <div *ngIf="budgets.length" class="budgets__table-wrap">
+    <table class="budgets__table" data-testid="budget-table">
+      <thead>
+        <tr>
+          <th scope="col">Label</th>
+          <th scope="col">Scope</th>
+          <th scope="col">Period</th>
+          <th scope="col" class="num">Cap</th>
+          <th scope="col" class="num">Spent</th>
+          <th scope="col" class="num">Used</th>
+          <th scope="col">Hard stop</th>
+          <th scope="col">Active</th>
+          <th scope="col"><span class="cdk-visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let b of budgets; trackBy: trackById">
+          <td>{{ b.label }}</td>
+          <td>{{ scopeText(b) }}</td>
+          <td>{{ b.period | titlecase }}</td>
+          <td class="num">
+            {{ b.budget_usd | currency: 'USD' : 'symbol' : '1.2-4' }}
+          </td>
+          <td class="num">{{ formatUsd(b.spent_usd) }}</td>
+          <td class="num">{{ percent(b) | number: '1.0-1' }}%</td>
+          <td>
+            {{ b.hard_stop ? 'On' : 'Off' }}
+            <span *ngIf="b.blocking" class="budgets__blocking">Blocking</span>
+          </td>
+          <td>
+            <mat-slide-toggle
+              [checked]="b.is_active"
+              [attr.aria-label]="'Active: ' + b.label"
+              (change)="toggleActive(b, $event)"></mat-slide-toggle>
+          </td>
+          <td class="budgets__row-actions">
+            <button
+              type="button"
+              mat-icon-button
+              [attr.aria-label]="'Edit ' + b.label"
+              (click)="openEdit(b)">
+              <fa-icon [icon]="faPenToSquare"></fa-icon>
+            </button>
+            <button
+              type="button"
+              mat-icon-button
+              [attr.aria-label]="'Delete ' + b.label"
+              (click)="confirmDelete(b)">
+              <fa-icon [icon]="faTrash"></fa-icon>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

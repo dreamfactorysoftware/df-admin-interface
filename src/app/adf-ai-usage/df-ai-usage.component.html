@@ -11,6 +11,8 @@
     </div>
 
     <div class="usage__controls">
+      <a mat-stroked-button routerLink="/ai/budgets">Manage budgets</a>
+
       <mat-button-toggle-group
         [value]="range"
         (change)="setRange($event.value)"

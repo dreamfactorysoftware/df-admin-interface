@@ -475,6 +475,10 @@
         "nav": "Usage",
         "header": "AI Usage Analytics"
       },
+      "budgets": {
+        "nav": "Budgets",
+        "header": "AI Budgets"
+      },
       "mcp": {
         "nav": "MCP",
         "header": "MCP Servers",
@@ -1062,6 +1066,12 @@
         "title": "Open API docs",
         "desc": "Browse and try every endpoint live in the console."
       }
+    }
+  },
+  "aiBudgets": {
+    "delete": {
+      "title": "Delete this budget?",
+      "message": "Its cap and alerts stop applying. Past usage is not changed."
     }
   },
   "agents": {
