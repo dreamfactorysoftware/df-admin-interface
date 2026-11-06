@@ -18,7 +18,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfLookupKeysComponent } from 'src/app/shared/components/df-lookup-keys/df-lookup-keys.component';
-import { JsonValidator } from 'src/app/shared/validators/json.validator';
+import { JsonObjectValidator } from 'src/app/shared/validators/json.validator';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { BASE_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfFunctionUseComponent } from './df-function-use/df-function-use.component';
@@ -123,7 +123,7 @@ export class DfFieldDetailsComponent implements OnInit {
       isForeignKey: [false],
       refTable: [{ value: '', disabled: true }],
       refField: [{ value: '', disabled: true }],
-      validation: ['', JsonValidator],
+      validation: ['', JsonObjectValidator],
       dbFunction: this.formBuilder.array([]),
       picklist: ['', CsvValidator],
     });
@@ -173,7 +173,7 @@ export class DfFieldDetailsComponent implements OnInit {
             isForeignKey: data.isForeignKey,
             refTable: data.refTable,
             refField: data.refField,
-            validation: data.validation ?? '',
+            validation: this.validationToText(data.validation),
             picklist: data.picklist,
           });
 
@@ -322,13 +322,47 @@ export class DfFieldDetailsComponent implements OnInit {
     if (value) this.fieldDetailsForm.controls[fieldName].setValue(value);
   }
 
+  // The API stores `validation` as given: raw textarea text gets wrapped as
+  // ["{...}"] and is never applied, so send the parsed rules object (or null to
+  // clear them).
+  private validationFromText(
+    text: string | null
+  ): Record<string, unknown> | null {
+    return text && text.trim() ? JSON.parse(text) : null;
+  }
+
+  // Older UI builds saved the raw text wrapped in an array (["{...}"], or [""]
+  // once cleared). Unwrap those so re-saving the field repairs the stored rules.
+  private validationToText(validation: unknown): string {
+    if (Array.isArray(validation)) {
+      if (validation.length !== 1 || typeof validation[0] !== 'string') {
+        return validation.length ? JSON.stringify(validation, null, 2) : '';
+      }
+      const legacy = validation[0].trim();
+      if (!legacy) return '';
+      try {
+        validation = JSON.parse(legacy);
+      } catch (e) {
+        return legacy;
+      }
+    }
+    return validation ? JSON.stringify(validation, null, 2) : '';
+  }
+
   onSubmit() {
     if (this.fieldDetailsForm.valid) {
+      const field = {
+        ...this.fieldDetailsForm.value,
+        validation: this.validationFromText(
+          this.fieldDetailsForm.value.validation
+        ),
+      };
+
       if (this.databaseFieldToEdit) {
         this.service
           .update(
             `${this.dbName}/_schema/${this.tableName}/_field`,
-            { resource: [this.fieldDetailsForm.value] },
+            { resource: [field] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.updateSuccess',
             }
@@ -341,7 +375,7 @@ export class DfFieldDetailsComponent implements OnInit {
       } else {
         this.service
           .create(
-            { resource: [this.fieldDetailsForm.value] },
+            { resource: [field] },
             {
               snackbarSuccess: 'schema.fieldDetailsForm.createSuccess',
             },
