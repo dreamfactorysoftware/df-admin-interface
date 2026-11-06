@@ -15,6 +15,93 @@
     padding: var(--df-space-2) 0;
   }
 
+  // ---- narrowing controls ----
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--df-space-3);
+  }
+
+  &__search {
+    display: flex;
+    align-items: center;
+    gap: var(--df-space-2);
+    flex: 1 1 24rem;
+    max-width: 36rem;
+    min-height: 3.8rem;
+    padding: 0 var(--df-space-3);
+    background: var(--df-surface);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    cursor: text;
+
+    &:focus-within {
+      border-color: var(--df-accent);
+    }
+
+    mat-icon {
+      color: var(--df-text-muted);
+      font-size: 2rem;
+      width: 2rem;
+      height: 2rem;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      font-size: var(--df-font-size-sm);
+      color: inherit;
+      outline: none;
+
+      &::placeholder {
+        color: var(--df-text-muted);
+      }
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
+    }
+  }
+
+  &__views {
+    display: inline-flex;
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    overflow: hidden;
+  }
+
+  &__view {
+    padding: 0 var(--df-space-3);
+    min-height: 3.6rem;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text-2);
+    cursor: pointer;
+
+    & + & {
+      border-left: 1px solid var(--df-border);
+    }
+
+    &:hover {
+      background: var(--df-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--df-accent);
+      outline-offset: -2px;
+    }
+
+    &--active {
+      background: var(--df-accent-soft);
+      color: var(--df-text);
+    }
+  }
+
   // ---- the grid ----
   &__grid {
     display: flex;
@@ -22,6 +109,52 @@
     gap: var(--df-space-1);
     overflow-x: auto;
     padding-bottom: var(--df-space-1);
+
+    // The bound: rows scroll under a sticky header, so the section stays
+    // the same height at 12 or 1,200 roles.
+    &--bounded {
+      max-height: 36rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 0 var(--df-space-3) var(--df-space-2);
+      background: var(--df-surface);
+      border: 1px solid var(--df-border-2);
+      border-radius: var(--df-radius-sm);
+
+      .scope-matrix__row--head {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding-top: var(--df-space-2);
+        background: var(--df-surface);
+      }
+    }
+  }
+
+  &__more {
+    padding-top: var(--df-space-2);
+  }
+
+  &__more-btn {
+    padding: var(--df-space-1) var(--df-space-3);
+    border: 1px dashed var(--df-border);
+    border-radius: var(--df-radius-sm);
+    background: transparent;
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+    color: var(--df-text-2);
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--df-accent);
+      color: var(--df-text);
+    }
+  }
+
+  &__status {
+    margin: 0;
+    font-size: var(--df-font-size-xs);
+    color: var(--df-text-muted);
   }
 
   &__row {
