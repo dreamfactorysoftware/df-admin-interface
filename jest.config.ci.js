@@ -71,5 +71,8 @@ module.exports = {
     // 2026-11-09 AI budgets and model aliases: payloads, bounded scope lookups,
     // server support check, page states, CRUD, scale, entry point gating.
     '<rootDir>/src/app/adf-ai-budgets/budgets.service.spec.ts',
+    '<rootDir>/src/app/adf-ai-budgets/ai-budgets-availability.service.spec.ts',
+    '<rootDir>/src/app/adf-ai-budgets/df-ai-budgets-link.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-budgets/ai-budgets-nav-gate.spec.ts',
   ],
 };

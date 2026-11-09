@@ -36,7 +36,14 @@ import { AsyncPipe, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
 import { DfErrorService } from 'src/app/shared/services/df-error.service';
 import { DfLicenseCheckService } from '../../services/df-license-check.service';
 import { DfTrialService } from '../../services/df-trial.service';
-import { debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
+import {
+  combineLatestWith,
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DfSearchDialogComponent } from '../df-search-dialog/df-search-dialog.component';
 import { DfCommandPaletteService } from '../df-command-palette/df-command-palette.service';
@@ -50,6 +57,10 @@ import { MatInputModule } from '@angular/material/input';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfPaywallService } from '../../services/df-paywall.service';
 import { DfSystemConfigDataService } from '../../services/df-system-config-data.service';
+import {
+  AiBudgetsAvailabilityService,
+  withoutNavRoute,
+} from 'src/app/adf-ai-budgets/ai-budgets-availability.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -115,7 +126,8 @@ export class DfSideNavComponent implements OnInit {
     private paywallService: DfPaywallService,
     private systemConfigDataService: DfSystemConfigDataService,
     private commandPalette: DfCommandPaletteService,
-    private trialService: DfTrialService
+    private trialService: DfTrialService,
+    private aiBudgetsAvailability: AiBudgetsAvailabilityService
   ) {}
 
   ngOnInit(): void {
@@ -155,11 +167,18 @@ export class DfSideNavComponent implements OnInit {
           return of([]);
         })
       )
-      .subscribe(accessByTabs => {
+      // The Budgets entry shows only once the server is known to have the
+      // budget API and to accept this user. It starts hidden for everyone,
+      // root admins included, who skip the tab filter below.
+      .pipe(combineLatestWith(this.aiBudgetsAvailability.available$))
+      .subscribe(([accessByTabs, aiBudgetsAvailable]) => {
         if (accessByTabs) {
           this.nav = accessibleRoutes(transformRoutes(routes), accessByTabs);
         } else {
           this.nav = transformRoutes(routes);
+        }
+        if (!aiBudgetsAvailable) {
+          this.nav = withoutNavRoute(this.nav, ROUTES.AI_BUDGETS);
         }
         this.navGroups = this.buildNavGroups(this.nav);
       });

@@ -43,6 +43,7 @@ import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.c
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
 import { DfCostEstimatorComponent } from './components/df-cost-estimator/df-cost-estimator.component';
 import { DfTaskEstimatorComponent } from './components/df-task-estimator/df-task-estimator.component';
+import { DfAiBudgetsLinkComponent } from '../adf-ai-budgets/df-ai-budgets-link.component';
 import {
   DfCostByDimensionComponent,
   DimensionSeriesPoint,
@@ -113,6 +114,7 @@ export interface BudgetRow {
     DfCostByDimensionComponent,
     DfExpensiveCallsComponent,
     DfSpendBreakdownComponent,
+    DfAiBudgetsLinkComponent,
   ],
   templateUrl: './df-ai-usage.component.html',
   styleUrls: ['./df-ai-usage.component.scss'],
