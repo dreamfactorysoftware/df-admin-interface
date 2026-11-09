@@ -69,5 +69,6 @@ module.exports = {
     // 2026-10-29 bounded df-ai-* pickers: search, paging, selected-first, remote search.
     '<rootDir>/src/app/shared/components/df-picker-list/df-picker-list.component.spec.ts',
     '<rootDir>/src/app/shared/components/df-ai-mcp-servers/df-ai-mcp-servers.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/df-ai-usage.deep-link.spec.ts',
   ],
 };

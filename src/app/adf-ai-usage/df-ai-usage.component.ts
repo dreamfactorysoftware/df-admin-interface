@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -120,6 +120,7 @@ export interface BudgetRow {
 export class DfAiUsageComponent implements OnInit {
   private api = inject(UsageService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   loading = true;
   errorMessage: string | null = null;
@@ -224,6 +225,12 @@ export class DfAiUsageComponent implements OnInit {
   faXmark = faXmark;
 
   ngOnInit(): void {
+    // Deep link: /ai/usage?service_id=<id> opens with that service selected
+    // in the Connection filter.
+    const id = Number(this.route.snapshot.queryParamMap.get('service_id'));
+    if (Number.isInteger(id) && id > 0) {
+      this.filters = { ...this.filters, service_id: [id] };
+    }
     this.refresh();
   }
 
