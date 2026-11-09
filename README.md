@@ -22,6 +22,7 @@ DreamFactory is a secure, self-hosted enterprise data access platform that provi
   - [Run and Watch Unit Tests](#run-and-watch-unit-tests)
   - [Run Unit Tests with Coverage](#run-unit-tests-with-coverage)
 - [Building the Project](#building-the-project)
+  - [dist is built by CI](#dist-is-built-by-ci)
 - [Adding additional languages](#adding-additional-languages)
 
 ## Getting Started
@@ -101,6 +102,47 @@ npm run test:coverage
 
 ```
 npm run build
+```
+
+### dist is built by CI
+
+`dist/` is tracked in git because DreamFactory installs this repository as a composer package and serves `dist/` as it is. Nothing builds at install time.
+
+On `develop`, CI is the only writer of `dist/`. After every push to `develop`, the [Build dist](.github/workflows/dist.yml) workflow builds the app with Node 22, checks the output with `scripts/verify-dist.sh`, and commits `dist/` as `github-actions[bot]` if it changed. The bot commit lands a few minutes after the merge. Pull `develop` again after it lands.
+
+Rules for contributors:
+
+- Do not commit `dist/`. Do not push "rebuild dist" commits. The [Guard dist](.github/workflows/guard-dist.yml) check fails on a pull request that changes `dist/`.
+- Do not put `[skip ci]` in a commit that goes to `develop`. It stops the build, and `dist/` falls behind the source.
+
+A local `npm run build` writes into the tracked `dist/` directory and renames most files in it. To undo that:
+
+```
+git restore --staged --worktree -- dist
+git clean -fdq dist
+```
+
+To build without touching the tracked directory, send the output somewhere else:
+
+```
+npx ng build --output-path /tmp/df-admin-dist
+scripts/verify-dist.sh /tmp/df-admin-dist
+```
+
+If your branch already has commits that change `dist/`, drop those changes:
+
+```
+git fetch origin
+git restore --source="origin/develop...HEAD" --staged --worktree -- dist
+git commit -m "chore: drop dist changes"
+```
+
+If merging `develop` into your branch conflicts in `dist/`, take the copy from `develop` and finish the merge:
+
+```
+git rm -rfq dist
+git checkout origin/develop -- dist
+git commit
 ```
 
 ## Adding additional languages
