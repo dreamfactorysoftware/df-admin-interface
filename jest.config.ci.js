@@ -66,6 +66,8 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
     // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
+    // 2026-10-29 bounded df-ai-* pickers: search, paging, selected-first, remote search.
+    '<rootDir>/src/app/shared/components/df-picker-list/df-picker-list.component.spec.ts',
     // Runtime server settings (#552): service, access rule + guard, page, and
     // the three entry points (nav, overview card, System Info link). The user
     // data spec pins the restricted-admin tab logic the feature shares.

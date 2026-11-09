@@ -81,6 +81,36 @@ describe('DfAiChatPrereqsComponent', () => {
     expect(spy).toHaveBeenCalledWith(12);
   });
 
+  it('hands the picker items and reports a capped role load', () => {
+    fixture.detectChanges();
+    const reqs = http.match(r => r.url.startsWith('/api/v2/system/'));
+    const conn = reqs.find(r => r.request.url === '/api/v2/system/service');
+    const role = reqs.find(r => r.request.url === '/api/v2/system/role');
+    expect(role!.request.params.get('include_count')).toBe('true');
+    conn!.flush({ resource: [{ id: 3, name: 'anthropic', label: 'Claude' }] });
+    role!.flush({
+      resource: [{ id: 12, name: 'reader' }],
+      meta: { count: 1500 },
+    });
+    expect(component.connectionItems).toEqual([{ id: 3, label: 'Claude' }]);
+    expect(component.roleItems).toEqual([{ id: 12, label: 'reader' }]);
+    expect(component.rolesTotal).toBe(1500);
+    expect(component.rolesTruncated).toBe(true);
+  });
+
+  it('searches roles server-side with a LIKE filter', () => {
+    flushBoth([], [{ id: 12, name: 'reader' }]);
+    let got: unknown;
+    component.searchRoles('ad"min').subscribe(r => (got = r));
+    const req = http.expectOne(
+      r =>
+        r.url === '/api/v2/system/role' &&
+        r.params.get('filter') === 'name like "%admin%"'
+    );
+    req.flush({ resource: [{ id: 40, name: 'admin_ro' }] });
+    expect(got).toEqual([{ id: 40, label: 'admin_ro' }]);
+  });
+
   it('reflects @Input selectedConnectionId/selectedRoleId', () => {
     component.selectedConnectionId = 5;
     component.selectedRoleId = 12;
