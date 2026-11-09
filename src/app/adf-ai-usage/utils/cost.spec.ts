@@ -1,4 +1,27 @@
-import { DEFAULT_RATES, estimateCost, formatUSD } from './cost';
+import {
+  DEFAULT_RATES,
+  estimateCost,
+  formatUSD,
+  liveRates,
+  rateFor,
+  ratesFromBundle,
+} from './cost';
+
+/** `default_rates` as df-ai 0.1.0 and later serve it (DreamFactory 7.7). */
+const NESTED = {
+  providers: {
+    anthropic: { input_per_1k: 0.004, output_per_1k: 0.02 },
+    gemini: { input_per_1k: 0.0001, output_per_1k: 0.0004 },
+    ollama: { input_per_1k: 0, output_per_1k: 0 },
+  },
+  models: {
+    'claude-opus-4-8': { input_per_1k: 0.015, output_per_1k: 0.075 },
+    'gpt-4.1-nano': { input_per_1k: 0.0001, output_per_1k: 0.0004 },
+  },
+};
+
+/** The same provider rates as df-ai 0.0.x served them: a flat map. */
+const FLAT = NESTED.providers;
 
 describe('cost', () => {
   describe('estimateCost', () => {
@@ -47,6 +70,127 @@ describe('cost', () => {
     it('handles non-finite gracefully', () => {
       expect(formatUSD(NaN)).toBe('$0.00');
       expect(formatUSD(Infinity)).toBe('$0.00');
+    });
+  });
+
+  describe('ratesFromBundle', () => {
+    // Regression: the nested shape was read as a flat provider map, which
+    // produced two bogus "providers" and "models" entries with undefined
+    // rates and left every real rate to the hardcoded fallback table.
+    it('reads provider rates from the nested shape', () => {
+      const rates = ratesFromBundle(NESTED);
+
+      expect(rates['providers']).toBeUndefined();
+      expect(rates['models']).toBeUndefined();
+      // Served values, not the hardcoded fallback (0.003 / 0.015).
+      expect(rates['anthropic']).toEqual({
+        provider: 'anthropic',
+        inputPer1k: 0.004,
+        outputPer1k: 0.02,
+      });
+      // A provider the hardcoded table does not know.
+      expect(rates['gemini']).toEqual({
+        provider: 'gemini',
+        inputPer1k: 0.0001,
+        outputPer1k: 0.0004,
+      });
+      for (const r of Object.values(rates)) {
+        expect(Number.isFinite(r.inputPer1k)).toBe(true);
+        expect(Number.isFinite(r.outputPer1k)).toBe(true);
+      }
+    });
+
+    it('still reads the flat shape of older backends', () => {
+      const rates = ratesFromBundle(FLAT);
+
+      expect(rates['anthropic']).toEqual({
+        provider: 'anthropic',
+        inputPer1k: 0.004,
+        outputPer1k: 0.02,
+      });
+      expect(rates['gemini'].outputPer1k).toBe(0.0004);
+    });
+
+    it('gives the same provider table for both shapes', () => {
+      expect(ratesFromBundle(NESTED)).toEqual(ratesFromBundle(FLAT));
+    });
+
+    it('keeps the fallback for providers the backend does not list', () => {
+      expect(ratesFromBundle(NESTED)['xai']).toEqual(DEFAULT_RATES['xai']);
+      expect(ratesFromBundle(FLAT)['openai']).toEqual(DEFAULT_RATES['openai']);
+    });
+
+    it('returns the fallback table when nothing was served', () => {
+      expect(ratesFromBundle(undefined)).toBe(DEFAULT_RATES);
+      expect(ratesFromBundle({})).toEqual(DEFAULT_RATES);
+      expect(ratesFromBundle({ providers: {}, models: {} })).toEqual(
+        DEFAULT_RATES
+      );
+    });
+
+    it('drops entries that carry no numeric rates', () => {
+      const rates = ratesFromBundle({
+        broken: { input_per_1k: 'n/a', output_per_1k: '' },
+        anthropic: { input_per_1k: '0.004', output_per_1k: '0.02' },
+      });
+
+      expect(rates['broken']).toBeUndefined();
+      expect(rates['anthropic'].inputPer1k).toBe(0.004);
+    });
+  });
+
+  describe('liveRates', () => {
+    it('splits the nested shape into provider and model rates', () => {
+      const live = liveRates(NESTED);
+
+      expect(Object.keys(live.providers)).toEqual([
+        'anthropic',
+        'gemini',
+        'ollama',
+      ]);
+      expect(live.models['claude-opus-4-8']).toEqual({
+        inputPer1k: 0.015,
+        outputPer1k: 0.075,
+      });
+    });
+
+    it('reads the flat shape as provider rates with no model rates', () => {
+      const live = liveRates(FLAT);
+
+      expect(Object.keys(live.providers)).toEqual([
+        'anthropic',
+        'gemini',
+        'ollama',
+      ]);
+      expect(live.models).toEqual({});
+    });
+
+    it('reads a flat map that prices a provider named "models" as flat', () => {
+      const live = liveRates({
+        models: { input_per_1k: 0.001, output_per_1k: 0.002 },
+        anthropic: { input_per_1k: 0.004, output_per_1k: 0.02 },
+      });
+
+      expect(Object.keys(live.providers)).toEqual(['models', 'anthropic']);
+      expect(live.models).toEqual({});
+    });
+
+    it('is empty for a missing or empty payload', () => {
+      const empty = { providers: {}, models: {} };
+      expect(liveRates(undefined)).toEqual(empty);
+      expect(liveRates(null)).toEqual(empty);
+      expect(liveRates({})).toEqual(empty);
+    });
+  });
+
+  describe('rateFor', () => {
+    it('only resolves own keys', () => {
+      const { models } = liveRates(NESTED);
+
+      expect(rateFor(models, 'gpt-4.1-nano')?.inputPer1k).toBe(0.0001);
+      expect(rateFor(models, 'constructor')).toBeUndefined();
+      expect(rateFor(models, 'unknown-model')).toBeUndefined();
+      expect(rateFor(models, null)).toBeUndefined();
     });
   });
 

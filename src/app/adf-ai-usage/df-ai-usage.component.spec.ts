@@ -292,4 +292,57 @@ describe('DfAiUsageComponent data states', () => {
     expect(count('df-cost-estimator')).toBe(1);
     expect(count('df-task-estimator')).toBe(1);
   });
+
+  // Regression: df-ai 0.1.0 and later serve default_rates as
+  // { providers, models }. Read as a flat map, it gave the calculator two
+  // bogus providers named "providers" and "models" and no served rate.
+  it.each([
+    [
+      'nested (df-ai 0.1.0 and later)',
+      {
+        providers: { acme: { input_per_1k: 0.007, output_per_1k: 0.009 } },
+        models: { 'acme-large': { input_per_1k: 0.07, output_per_1k: 0.09 } },
+      },
+    ],
+    [
+      'flat (df-ai 0.0.x)',
+      { acme: { input_per_1k: 0.007, output_per_1k: 0.009 } },
+    ],
+  ])('feeds the calculator the served %s provider rates', (_shape, rates) => {
+    load(
+      {
+        body: {
+          ...POPULATED,
+          default_rates: rates,
+          by_provider: [{ provider: 'acme', requests: 506 }],
+          by_service: [
+            {
+              service_id: 7,
+              requests: 506,
+              input_tokens: 291894,
+              output_tokens: 140958,
+            },
+          ],
+        },
+      },
+      { body: {} },
+      { body: { resource: [{ id: 7, name: 'ai', type: 'ai_connection' }] } }
+    );
+
+    const table = fixture.componentInstance.defaultRates;
+    expect(Object.keys(table)).not.toContain('providers');
+    expect(Object.keys(table)).not.toContain('models');
+    expect(table['acme']).toEqual({
+      provider: 'acme',
+      inputPer1k: 0.007,
+      outputPer1k: 0.009,
+    });
+
+    const row = el().querySelector('df-cost-estimator tbody tr')!;
+    expect(row.children[0].textContent?.trim()).toBe('acme');
+    // 291.894k in at $0.007 + 140.958k out at $0.009 = $3.31.
+    expect(row.children[row.children.length - 1].textContent?.trim()).toBe(
+      '$3.31'
+    );
+  });
 });
