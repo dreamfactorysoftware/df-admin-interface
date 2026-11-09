@@ -68,5 +68,8 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
     // 2026-10-29 bounded df-ai-* pickers: search, paging, selected-first, remote search.
     '<rootDir>/src/app/shared/components/df-picker-list/df-picker-list.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/df-ai-usage.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/components/df-cost-by-dimension/df-cost-by-dimension.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/components/df-usage-stacked-area/df-usage-stacked-area.component.spec.ts',
   ],
 };

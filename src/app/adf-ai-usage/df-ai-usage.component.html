@@ -280,7 +280,7 @@
   <div *ngIf="errorMessage" class="usage__error">{{ errorMessage }}</div>
 
   <ng-container *ngIf="!loading && bundle">
-    <mat-card *ngIf="bundle.raw.total_requests === 0" class="usage__empty">
+    <mat-card *ngIf="!bundle.raw.total_requests" class="usage__empty">
       <mat-card-content>
         <h3>No AI requests in this period</h3>
         <p>

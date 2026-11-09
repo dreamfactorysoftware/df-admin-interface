@@ -308,6 +308,9 @@ function sumKey(data: TimeBucket[], k: keyof TimeBucket): number {
 
 function shortDate(iso: string): string {
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return ''; // a bucket with no usable date gets no label, not "NaN/NaN"
+  }
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 

@@ -236,7 +236,13 @@ export class DfCostByDimensionComponent implements OnChanges {
     this.xTicks = [];
     this.yTicks = [];
 
-    const data = this.data ?? [];
+    // A point without a date cannot be placed on the time axis. Drop it, so
+    // a malformed row costs that row and not the whole render: the x-tick
+    // code threw on it during change detection, which also stopped every
+    // panel below this chart from updating.
+    const data = (this.data ?? []).filter(
+      p => typeof p?.date === 'string' && p.date !== ''
+    );
     if (data.length === 0) {
       return;
     }

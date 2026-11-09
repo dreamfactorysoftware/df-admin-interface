@@ -577,7 +577,7 @@ export class DfAiUsageComponent implements OnInit {
         : this.budgets;
 
     const services = this.bundle?.services;
-    const providerFallback = r.by_provider[0]?.provider ?? 'unknown';
+    const providerFallback = r.by_provider?.[0]?.provider ?? 'unknown';
     const cp = new Map<number, string>();
     if (services) {
       for (const row of r.by_service ?? []) {
