@@ -12,6 +12,7 @@ import {
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import {
   CreateSchedulePayload,
+  RunStatus,
   SchedulerTaskData,
   TaskRun,
   UpdateSchedulePayload,
@@ -20,13 +21,16 @@ import { TranslocoPipe } from '@ngneat/transloco';
 import {
   NgIf,
   NgFor,
+  NgSwitch,
+  NgSwitchCase,
+  NgSwitchDefault,
   NgTemplateOutlet,
   AsyncPipe,
   DatePipe,
 } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { durationSeconds, isOk } from '../utils/run-status';
+import { RunPhase, durationSeconds, runPhase } from '../utils/run-status';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -47,7 +51,14 @@ import {
   normalizeError,
 } from 'src/app/shared/utilities/app-error';
 
-import { catchError, throwError } from 'rxjs';
+import { Subscription, catchError, throwError } from 'rxjs';
+
+/** One Run history row, precomputed so the template calls no functions. */
+export type RunRow = TaskRun & { phase: RunPhase; duration: number | null };
+
+/** Position of the Run history tab: Basic (0), Run history (1), Log. */
+const RUN_HISTORY_TAB_INDEX = 1;
+
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-scheduler',
@@ -65,6 +76,9 @@ import { catchError, throwError } from 'rxjs';
     MatSlideToggleModule,
     NgIf,
     NgFor,
+    NgSwitch,
+    NgSwitchCase,
+    NgSwitchDefault,
     NgTemplateOutlet,
     TranslocoPipe,
     ReactiveFormsModule,
@@ -90,13 +104,28 @@ export class DfSchedulerDetailsComponent implements OnInit {
   runAsApps: Array<{ id: number; name: string }> = [];
   runAsUsers: Array<{ id: number; name: string; email?: string }> = [];
   log = '';
-  // Run history tab: newest first, paged client-side; output stays collapsed.
-  runs: TaskRun[] = [];
+  // Run history tab (df-scheduler#41). Optional backend feature: only a
+  // df-scheduler that keeps per-run history appends run_status to a task.
+  // Without it the tab is hidden and nothing extra is requested, so the page
+  // behaves exactly as it did before the feature existed.
+  runsSupported = false;
+  runStatus: RunStatus | undefined;
+  // Loaded on first open of the tab, not with the page: up to 100 runs with
+  // their output is too much to fetch for a tab that may never be opened.
+  runsState: 'idle' | 'loading' | 'loaded' | 'error' = 'idle';
+  runsError = '';
+  private runsRequest?: Subscription;
+  // The tab group keeps its selected tab when the router reuses this
+  // component for another task, so the open tab is tracked here.
+  private tabIndex = 0;
+  // Newest first, paged client-side; output stays collapsed.
+  runs: RunRow[] = [];
+  // Memoized page slice: a getter here would hand *ngFor a new array on
+  // every change detection.
+  pagedRuns: RunRow[] = [];
   runPage = 0;
   readonly runPageSize = 10;
   expandedRuns = new Set<number>();
-  durationSeconds = durationSeconds;
-  isOk = isOk;
   alertMsg = '';
   showAlert = false;
   alertType: AlertType = 'error';
@@ -153,9 +182,17 @@ export class DfSchedulerDetailsComponent implements OnInit {
 
       if (this.scheduleToEdit) {
         this.log = this.scheduleToEdit.taskLogByTaskId?.content ?? '';
-        this.runs = [...(this.scheduleToEdit.taskRunByTaskId ?? [])].sort(
-          (a, b) => b.id - a.id
-        );
+        this.runStatus = this.scheduleToEdit.runStatus ?? undefined;
+        this.runsSupported = !!this.runStatus;
+        // A response still in flight belongs to the previous task.
+        this.runsRequest?.unsubscribe();
+        this.runsState = 'idle';
+        this.runsError = '';
+        this.expandedRuns.clear();
+        this.setRuns([]);
+        // Arriving from another task with the Run history tab already open:
+        // no tab change will fire, so load now.
+        this.loadRunsIfShown();
 
         this.getServiceAccessList(this.scheduleToEdit.serviceId as number);
 
@@ -195,13 +232,66 @@ export class DfSchedulerDetailsComponent implements OnInit {
     });
   }
 
-  get pagedRuns(): TaskRun[] {
+  onTabIndexChange(index: number) {
+    this.tabIndex = index;
+    this.loadRunsIfShown();
+  }
+
+  private loadRunsIfShown() {
+    if (
+      this.runsSupported &&
+      this.tabIndex === RUN_HISTORY_TAB_INDEX &&
+      this.runsState === 'idle'
+    ) {
+      this.loadRuns();
+    }
+  }
+
+  /** Fetch the task's runs. Failures show in the tab; the form is untouched. */
+  loadRuns() {
+    if (!this.scheduleToEdit) return;
+    this.runsState = 'loading';
+    this.runsRequest?.unsubscribe();
+    this.runsRequest = this.service
+      .get<SchedulerTaskData>(this.scheduleToEdit.id, {
+        related: 'task_run_by_task_id',
+        errorHandling: 'toast-off',
+      })
+      .subscribe({
+        next: task => {
+          // Fresher than the resolver's copy: decides which open row is the
+          // run in progress.
+          this.runStatus = task.runStatus ?? this.runStatus;
+          this.setRuns(task.taskRunByTaskId ?? []);
+          this.runsState = 'loaded';
+        },
+        error: err => {
+          this.runsError = normalizeError(err).message;
+          this.runsState = 'error';
+        },
+      });
+  }
+
+  private setRuns(runs: TaskRun[]) {
+    this.runs = [...runs]
+      .sort((a, b) => b.id - a.id)
+      .map(run => ({
+        ...run,
+        phase: runPhase(run, this.runStatus),
+        duration: durationSeconds(run),
+      }));
+    this.runPage = 0;
+    this.updatePagedRuns();
+  }
+
+  private updatePagedRuns() {
     const start = this.runPage * this.runPageSize;
-    return this.runs.slice(start, start + this.runPageSize);
+    this.pagedRuns = this.runs.slice(start, start + this.runPageSize);
   }
 
   onRunPage(e: PageEvent) {
     this.runPage = e.pageIndex;
+    this.updatePagedRuns();
   }
 
   toggleRun(id: number) {

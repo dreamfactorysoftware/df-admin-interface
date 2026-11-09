@@ -44,8 +44,10 @@
     "duration": "Duration",
     "status": "Status",
     "inProgress": "In progress",
+    "seconds": "{{seconds}}s",
     "showOutput": "Show output",
     "hideOutput": "Hide output",
+    "loadError": "Run history could not be loaded.",
     "emptyTitle": "This task has not run yet",
     "emptyHint": "It runs every {{frequency}} minute(s) while it is active. Runs appear here after the first one."
   },

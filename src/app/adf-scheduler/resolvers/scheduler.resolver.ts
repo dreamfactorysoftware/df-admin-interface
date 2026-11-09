@@ -18,9 +18,13 @@ export const schedulerResolver: ResolveFn<
         return of('paywall');
       } else {
         const id = route.paramMap.get('id');
+        // Run history is NOT requested here. A df-scheduler without that
+        // relation answers 400 "Unknown relationship" and the edit page
+        // would not open. The details component loads runs on demand, and
+        // only when the task carries run_status (see runsSupported there).
         if (id)
           return schedulerService.get<SchedulerTaskData>(id, {
-            related: 'task_log_by_task_id,task_run_by_task_id',
+            related: 'task_log_by_task_id',
           });
 
         // List branch only: complete navigation on failure so the table

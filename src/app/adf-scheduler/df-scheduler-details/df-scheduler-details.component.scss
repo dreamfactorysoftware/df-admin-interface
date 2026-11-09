@@ -15,7 +15,7 @@ h4 {
   td {
     text-align: left;
     padding: 6px 12px;
-    border-bottom: 1px solid var(--df-border, rgba(128, 128, 128, 0.3));
+    border-bottom: 1px solid var(--df-border);
   }
 }
 
@@ -23,5 +23,7 @@ h4 {
   max-height: 240px;
   overflow: auto;
   white-space: pre-wrap;
+  // Long unbroken output (base64, minified JSON) must wrap, not widen the page.
+  overflow-wrap: anywhere;
   margin: 0;
 }
