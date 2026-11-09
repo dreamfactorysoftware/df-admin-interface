@@ -159,8 +159,8 @@ describe('DfAdminDetailsComponent - create', () => {
     expect(isChecked).toBeTruthy();
 
     component.userForm.patchValue({
-      password: 'password',
-      confirmPassword: 'password',
+      password: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
 
     component.save();
