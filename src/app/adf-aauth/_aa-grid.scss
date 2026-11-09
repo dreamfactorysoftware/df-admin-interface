@@ -1,0 +1,170 @@
+// CSS-grid tables shared by the AAuth tabs (masking's pattern): a header
+// row, hairline rows, and a phone layout where each row becomes a card.
+// Each tab sets its own grid-template-columns on `.row`.
+@mixin aa-grid {
+  .grid {
+    font-size: var(--df-font-size-sm);
+  }
+
+  .row {
+    align-items: center;
+    border-bottom: 1px solid var(--df-border-2);
+    color: var(--df-text);
+    display: grid;
+    gap: var(--df-space-3);
+    min-height: var(--df-row-height);
+    padding: var(--df-space-1) var(--df-space-2);
+
+    &.head {
+      border-top: 1px solid var(--df-border-2);
+      color: var(--df-text-muted);
+      font-size: var(--df-font-size-xs);
+      font-weight: var(--df-font-weight-medium);
+      min-height: 32px;
+      padding-bottom: 0;
+      padding-top: 0;
+    }
+
+    &:not(.head):hover {
+      background: var(--df-hover);
+    }
+  }
+
+  .cell {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mono {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+  }
+
+  .muted {
+    color: var(--df-text-muted);
+  }
+
+  .num {
+    justify-self: end;
+    text-align: right;
+  }
+
+  .end {
+    justify-self: end;
+  }
+
+  .nowrap {
+    white-space: nowrap;
+  }
+
+  .toolbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--df-space-3);
+    margin-bottom: var(--df-space-3);
+  }
+
+  // Plain text field (masking's search pattern), as tall as a button.
+  .field {
+    align-items: center;
+    background: var(--df-surface);
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    box-sizing: border-box;
+    color: var(--df-text-muted);
+    cursor: text;
+    display: flex;
+    gap: var(--df-space-1);
+    height: 36px;
+    padding: 0 var(--df-space-3);
+
+    &:hover {
+      border-color: var(--df-text-faint);
+    }
+
+    &:focus-within {
+      border-color: var(--df-accent);
+      box-shadow: var(--df-focus-ring);
+    }
+
+    mat-icon {
+      flex-shrink: 0;
+      font-size: 18px;
+      height: 18px;
+      width: 18px;
+    }
+
+    input {
+      background: transparent;
+      border: 0;
+      color: var(--df-text);
+      flex: 1;
+      font: inherit;
+      font-size: var(--df-font-size-sm);
+      height: 100%;
+      min-width: 0;
+      outline: none;
+
+      &:focus,
+      &:focus-visible {
+        box-shadow: none;
+        outline: none;
+      }
+
+      &::placeholder {
+        color: var(--df-text-faint);
+      }
+
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
+    }
+  }
+
+  .search {
+    max-width: 280px;
+    width: 100%;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .chip {
+    background: var(--df-accent-soft);
+    border-radius: 999px;
+    color: var(--df-accent-strong);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+    line-height: 20px;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+
+  // Phones: header hidden; each row stacks its cells.
+  @media (max-width: 600px) {
+    .row.head {
+      display: none;
+    }
+
+    .row:not(.head) {
+      gap: var(--df-space-1) var(--df-space-3);
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      padding: var(--df-space-3) var(--df-space-2);
+
+      > .cell {
+        grid-column: 1;
+      }
+
+      > .end,
+      > .num {
+        grid-column: 2;
+        grid-row: 1;
+      }
+    }
+  }
+}

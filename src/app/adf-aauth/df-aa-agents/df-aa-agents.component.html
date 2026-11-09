@@ -1,0 +1,70 @@
+<df-empty-state
+  *ngIf="store.failed.has('agents') && !store.agents; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'aauth.empty.sliceFailed' | transloco"
+  [actionLabel]="'aauth.retry' | transloco"
+  (action)="store.loadAgents()"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!store.agents; else body"
+    variant="table-row"
+    [count]="4"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <df-empty-state
+    *ngIf="!store.agents?.length; else table"
+    icon="smart_toy"
+    [title]="'aauth.agents.empty' | transloco"
+    data-testid="aa-agents-empty"></df-empty-state>
+</ng-template>
+
+<ng-template #table>
+  <div class="grid" role="table" data-testid="aa-agents">
+    <div class="row head" role="row">
+      <span role="columnheader">{{ 'aauth.agents.name' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.agents.agent' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.agents.provider' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.agents.lastSeen' | transloco }}</span>
+      <span role="columnheader" class="num">{{
+        'aauth.agents.requests' | transloco
+      }}</span>
+      <span role="columnheader" class="end">{{
+        'aauth.agents.blocked' | transloco
+      }}</span>
+    </div>
+    <div
+      class="row"
+      role="row"
+      *ngFor="let a of store.agents; trackBy: trackAgent"
+      [class.blocked]="a.status === 'blocked'"
+      [attr.data-testid]="'aa-agent-' + a.id">
+      <span role="cell" class="cell name">{{ a.name || a.agentId }}</span>
+      <span role="cell" class="cell mono" [title]="a.agentId">{{
+        a.agentId
+      }}</span>
+      <span role="cell" class="cell mono muted" [title]="a.issuer">{{
+        hostOf(a.issuer)
+      }}</span>
+      <span role="cell" class="cell muted nowrap">
+        <time
+          *ngIf="a.lastSeenAt"
+          [attr.datetime]="a.lastSeenAt"
+          [matTooltip]="a.lastSeenAt"
+          >{{ relTime(a.lastSeenAt) }}</time
+        >
+      </span>
+      <span role="cell" class="cell num df-numeric">{{ a.requestCount }}</span>
+      <span role="cell" class="end">
+        <mat-slide-toggle
+          class="block-toggle"
+          [checked]="a.status === 'blocked'"
+          (change)="store.setAgentBlocked(a.id, $event.checked)"
+          [aria-label]="
+            ('aauth.agents.blocked' | transloco) + ' ' + (a.name || a.agentId)
+          "
+          data-testid="aa-agent-block"></mat-slide-toggle>
+      </span>
+    </div>
+  </div>
+</ng-template>

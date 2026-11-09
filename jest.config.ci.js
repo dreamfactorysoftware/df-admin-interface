@@ -83,5 +83,8 @@ module.exports = {
     '<rootDir>/src/app/adf-section-overviews/df-security-overview.component.spec.ts',
     '<rootDir>/src/app/adf-data-explorer/masking-notice.spec.ts',
     '<rootDir>/src/app/adf-data-explorer/df-data-grid.masking.spec.ts',
+    // 2026-11-09 AAuth (agent authorization): API service, store (optimistic
+    // writes, playground polling), JWT/JSON helpers, shell and tabs.
+    '<rootDir>/src/app/adf-aauth/**/*.spec.ts',
   ],
 };

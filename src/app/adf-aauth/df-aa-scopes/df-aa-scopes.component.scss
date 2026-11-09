@@ -1,0 +1,103 @@
+@use '../aa-grid' as *;
+@include aa-grid;
+
+:host {
+  display: block;
+}
+
+.row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) 64px;
+}
+
+.role {
+  font-weight: var(--df-font-weight-medium);
+  white-space: nowrap;
+}
+
+// Disabled scopes recede; the toggle stays at full strength.
+.row.off .role,
+.row.off .inline-view .value {
+  color: var(--df-text-muted);
+}
+
+.inline-view {
+  align-items: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--df-radius-sm);
+  color: var(--df-text);
+  cursor: text;
+  display: flex;
+  font: inherit;
+  gap: var(--df-space-1);
+  height: 30px;
+  margin-left: -7px;
+  max-width: calc(100% + 7px);
+  padding: 0 6px;
+  text-align: left;
+
+  &.mono {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+  }
+
+  .value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.blank {
+      color: var(--df-text-faint);
+    }
+  }
+
+  .pen {
+    color: var(--df-text-faint);
+    flex-shrink: 0;
+    font-size: 14px;
+    height: 14px;
+    opacity: 0;
+    width: 14px;
+  }
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--df-border);
+
+    .pen {
+      opacity: 1;
+    }
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+}
+
+.inline-input {
+  background: var(--df-surface);
+  border: 1px solid var(--df-accent);
+  border-radius: var(--df-radius-sm);
+  box-shadow: var(--df-focus-ring);
+  box-sizing: border-box;
+  color: var(--df-text);
+  font: inherit;
+  height: 30px;
+  margin-left: -7px;
+  outline: none;
+  padding: 0 6px;
+  width: calc(100% + 7px);
+
+  &.mono {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+  }
+}
+
+.no-match {
+  color: var(--df-text-muted);
+  margin: 0;
+  padding: var(--df-space-5) var(--df-space-2);
+  text-align: center;
+}

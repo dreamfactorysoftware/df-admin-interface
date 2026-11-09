@@ -1,0 +1,156 @@
+<form class="send" (ngSubmit)="send()" data-testid="aa-try-form">
+  <mat-select
+    class="method"
+    name="method"
+    [(ngModel)]="store.method"
+    [aria-label]="'aauth.try.method' | transloco"
+    data-testid="aa-try-method">
+    <mat-option *ngFor="let m of methods" [value]="m">{{ m }}</mat-option>
+  </mat-select>
+
+  <label class="url" data-testid="aa-try-url">
+    <span class="origin" *ngIf="origin">{{ origin }}</span>
+    <input
+      name="path"
+      [(ngModel)]="store.path"
+      autocomplete="off"
+      spellcheck="false"
+      [attr.aria-label]="'aauth.try.path' | transloco"
+      data-testid="aa-try-path" />
+  </label>
+
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    class="send-btn"
+    [disabled]="!canSend"
+    data-testid="aa-try-send">
+    <mat-icon>send</mat-icon>
+    {{ 'aauth.try.send' | transloco }}
+  </button>
+  <button
+    mat-icon-button
+    type="button"
+    class="reset"
+    (click)="store.reset()"
+    [attr.aria-label]="'aauth.try.reset' | transloco"
+    [matTooltip]="'aauth.try.reset' | transloco"
+    data-testid="aa-try-reset">
+    <mat-icon>restart_alt</mat-icon>
+  </button>
+
+  <mat-form-field
+    *ngIf="store.bodyAllowed"
+    class="body"
+    appearance="outline"
+    subscriptSizing="dynamic">
+    <mat-label>{{ 'aauth.try.body' | transloco }}</mat-label>
+    <textarea
+      matInput
+      name="body"
+      rows="5"
+      spellcheck="false"
+      [(ngModel)]="store.body"
+      data-testid="aa-try-body"></textarea>
+  </mat-form-field>
+</form>
+
+<ng-container *ngIf="store.run as run">
+  <!-- A person must approve: the one thing to do right now. -->
+  <section
+    class="approve"
+    *ngIf="run.status === 'waiting' && run.pending as p"
+    role="status"
+    aria-live="polite"
+    data-testid="aa-approve-card">
+    <div class="approve-state">
+      <span class="pulse" aria-hidden="true"></span>
+      {{ 'aauth.try.waiting' | transloco }}
+    </div>
+    <div class="approve-main">
+      <div class="code-wrap">
+        <span class="code-label">{{ 'aauth.try.code' | transloco }}</span>
+        <span class="code mono" data-testid="aa-approve-code">{{
+          p.code
+        }}</span>
+      </div>
+      <df-aa-copy
+        class="code-copy"
+        [text]="p.code"
+        [label]="'aauth.try.copyCode' | transloco"
+        testId="aa-approve-copy"></df-aa-copy>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        class="approve-btn"
+        (click)="approve()"
+        data-testid="aa-approve">
+        <mat-icon>open_in_new</mat-icon>
+        {{ 'aauth.try.approve' | transloco }}
+      </button>
+    </div>
+  </section>
+
+  <ol class="timeline" data-testid="aa-timeline">
+    <li
+      *ngFor="let s of run.steps; let i = index; trackBy: trackStep"
+      class="tl-item">
+      <span class="tl-dot" aria-hidden="true">{{ i + 1 }}</span>
+      <df-aa-step
+        [step]="s"
+        [index]="i"
+        [expanded]="isOpen(i)"
+        (toggled)="toggle(i)"></df-aa-step>
+    </li>
+
+    <li class="tl-item" *ngIf="run.status === 'running'">
+      <span class="tl-dot busy" aria-hidden="true">
+        <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+      </span>
+      <div class="tl-note" data-testid="aa-run-running">
+        {{ 'aauth.try.running' | transloco }}
+      </div>
+    </li>
+
+    <li class="tl-item" *ngIf="run.status === 'failed'">
+      <span class="tl-dot fail" aria-hidden="true">
+        <mat-icon>close</mat-icon>
+      </span>
+      <div class="tl-error" role="alert" data-testid="aa-run-error">
+        <strong>{{ 'aauth.try.failed' | transloco }}</strong>
+        <span *ngIf="run.error">{{ run.error }}</span>
+      </div>
+    </li>
+
+    <li class="tl-item result" *ngIf="run.result as r">
+      <span
+        class="tl-dot"
+        [class.ok]="statusVariant(r.status) === 'success'"
+        [class.fail]="statusVariant(r.status) === 'danger'"
+        aria-hidden="true">
+        <mat-icon>{{
+          statusVariant(r.status) === 'success' ? 'check' : 'flag'
+        }}</mat-icon>
+      </span>
+      <section class="result-card" data-testid="aa-run-result">
+        <header>
+          <span class="result-label">{{ 'aauth.try.result' | transloco }}</span>
+          <df-badge
+            [variant]="statusVariant(r.status)"
+            [label]="'' + r.status"
+            data-testid="aa-run-result-status"></df-badge>
+        </header>
+        <df-aa-json
+          *ngIf="r.body; else empty"
+          [value]="r.body"
+          [label]="'aauth.try.result' | transloco"
+          testId="aa-result-copy"></df-aa-json>
+        <ng-template #empty>
+          <p class="nobody">{{ 'aauth.try.noBody' | transloco }}</p>
+        </ng-template>
+      </section>
+    </li>
+  </ol>
+</ng-container>

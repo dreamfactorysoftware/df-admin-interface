@@ -1,0 +1,120 @@
+<div class="aa">
+  <div class="aa-bar">
+    <!-- Until the overview answers, a placeholder: never a guessed state. -->
+    <span
+      *ngIf="!store.overview && !store.loadFailed"
+      class="aa-bar-skeleton"
+      aria-hidden="true"
+      data-testid="aa-bar-loading"></span>
+
+    <ng-container *ngIf="store.overview as o">
+      <mat-slide-toggle
+        class="aa-enabled"
+        [checked]="o.enabled"
+        [disabled]="(!o.issuerOk && !o.enabled) || store.enabledSaving"
+        (change)="store.setEnabled($event.checked)"
+        data-testid="aa-enabled">
+        {{ 'aauth.enabled' | transloco }}
+      </mat-slide-toggle>
+
+      <div class="aa-issuer" *ngIf="o.issuer" data-testid="aa-issuer">
+        <span class="aa-issuer-label">{{ 'aauth.issuer' | transloco }}</span>
+        <code class="aa-issuer-url">{{ o.issuer }}</code>
+        <df-aa-copy [text]="o.issuer" testId="aa-issuer-copy"></df-aa-copy>
+        <a
+          *ngIf="o.enabled && o.urls?.resourceMetadata as meta"
+          mat-icon-button
+          class="aa-meta"
+          [href]="meta"
+          target="_blank"
+          rel="noopener"
+          [attr.aria-label]="'aauth.metadata' | transloco"
+          [matTooltip]="'aauth.metadata' | transloco"
+          data-testid="aa-metadata">
+          <mat-icon>open_in_new</mat-icon>
+        </a>
+      </div>
+    </ng-container>
+  </div>
+
+  <p
+    class="aa-issuer-error"
+    *ngIf="store.overview && !store.overview.issuerOk"
+    role="alert"
+    data-testid="aa-issuer-error">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
+    {{ 'aauth.issuerMissing' | transloco }}
+  </p>
+
+  <!-- Phones: the six tabs become one select, so none hides off-screen. -->
+  <mat-form-field
+    class="aa-tab-select"
+    appearance="outline"
+    subscriptSizing="dynamic">
+    <mat-select
+      [value]="tab"
+      (valueChange)="setTab($event)"
+      [aria-label]="'aauth.tabs.label' | transloco"
+      data-testid="aa-tab-select">
+      <mat-option *ngFor="let t of tabs" [value]="t"
+        >{{ 'aauth.tabs.' + t | transloco
+        }}<ng-container *ngIf="count(t) !== null">
+          · {{ count(t) }}</ng-container
+        ></mat-option
+      >
+    </mat-select>
+  </mat-form-field>
+
+  <nav
+    mat-tab-nav-bar
+    class="aa-tabs"
+    mat-stretch-tabs="false"
+    mat-align-tabs="start"
+    [disablePagination]="true"
+    [tabPanel]="panel">
+    <a
+      mat-tab-link
+      *ngFor="let t of tabs"
+      [active]="tab === t"
+      [routerLink]="[]"
+      [queryParams]="tabQuery(t)"
+      queryParamsHandling="merge"
+      [replaceUrl]="true"
+      [attr.data-testid]="'aa-tab-' + t">
+      {{ 'aauth.tabs.' + t | transloco }}
+      <span
+        class="aa-tab-count df-numeric"
+        *ngIf="count(t) !== null"
+        [attr.data-testid]="'aa-count-' + t"
+        >{{ count(t) }}</span
+      >
+    </a>
+  </nav>
+
+  <mat-tab-nav-panel #panel class="aa-panel">
+    <df-skeleton
+      *ngIf="store.loading; else body"
+      variant="table-row"
+      [count]="8"></df-skeleton>
+    <ng-template #body>
+      <df-empty-state
+        *ngIf="store.loadFailed; else tabBody"
+        icon="cloud_off"
+        [title]="'aauth.empty.loadFailed' | transloco"
+        [description]="store.loadError ?? undefined"
+        [actionLabel]="'aauth.retry' | transloco"
+        (action)="store.load()"
+        data-testid="aa-load-failed"></df-empty-state>
+    </ng-template>
+    <ng-template #tabBody>
+      <ng-container [ngSwitch]="tab">
+        <df-aa-scopes *ngSwitchCase="'scopes'"></df-aa-scopes>
+        <df-aa-servers *ngSwitchCase="'servers'"></df-aa-servers>
+        <df-aa-agents *ngSwitchCase="'agents'"></df-aa-agents>
+        <df-aa-activity *ngSwitchCase="'activity'"></df-aa-activity>
+        <df-aa-grants *ngSwitchCase="'grants'"></df-aa-grants>
+        <df-aa-try *ngSwitchCase="'try'"></df-aa-try>
+      </ng-container>
+    </ng-template>
+  </mat-tab-nav-panel>
+</div>

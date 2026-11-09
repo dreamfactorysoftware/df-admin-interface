@@ -1,0 +1,111 @@
+<div class="step" [class.open]="expanded" [attr.data-kind]="step.kind">
+  <button
+    type="button"
+    class="summary"
+    [disabled]="!hasDetail"
+    [attr.aria-expanded]="hasDetail ? expanded : null"
+    (click)="toggled.emit()"
+    [title]="step.title"
+    data-testid="aa-step">
+    <span class="kind" data-testid="aa-step-kind">{{
+      'aauth.try.kind.' + step.kind | transloco
+    }}</span>
+    <span class="line mono">{{ line }}</span>
+    <df-badge
+      *ngIf="status"
+      class="status"
+      [variant]="variant"
+      [label]="'' + status"
+      data-testid="aa-step-status"></df-badge>
+    <mat-icon class="chev" *ngIf="hasDetail" aria-hidden="true"
+      >expand_more</mat-icon
+    >
+  </button>
+
+  <div
+    class="detail"
+    *ngIf="expanded && hasDetail"
+    data-testid="aa-step-detail">
+    <div class="exchange">
+      <section class="side" *ngIf="step.request as rq">
+        <h4>{{ 'aauth.try.request' | transloco }}</h4>
+        <p class="reqline mono">
+          <span class="method">{{ rq.method }}</span> {{ rq.url }}
+        </p>
+        <div class="headers" role="table" *ngIf="rq.headers?.length">
+          <div
+            class="h"
+            role="row"
+            *ngFor="let h of rq.headers; trackBy: trackHeader"
+            [class.proto]="protocol(h)">
+            <span role="cell" class="hn">{{ h[0] }}</span>
+            <span role="cell" class="hv">{{ h[1] }}</span>
+          </div>
+        </div>
+        <df-aa-json
+          *ngIf="rq.body"
+          [value]="rq.body"
+          [label]="'aauth.try.request' | transloco"></df-aa-json>
+      </section>
+
+      <section class="side" *ngIf="step.response as rs">
+        <h4>
+          {{ 'aauth.try.response' | transloco }}
+          <df-badge [variant]="variant" [label]="'' + rs.status"></df-badge>
+        </h4>
+        <div class="headers" role="table" *ngIf="rs.headers?.length">
+          <div
+            class="h"
+            role="row"
+            *ngFor="let h of rs.headers; trackBy: trackHeader"
+            [class.proto]="protocol(h)">
+            <span role="cell" class="hn">{{ h[0] }}</span>
+            <span role="cell" class="hv">{{ h[1] }}</span>
+          </div>
+        </div>
+        <df-aa-json
+          *ngIf="rs.body; else noBody"
+          [value]="rs.body"
+          [label]="'aauth.try.response' | transloco"></df-aa-json>
+        <ng-template #noBody>
+          <p class="nobody">{{ 'aauth.try.noBody' | transloco }}</p>
+        </ng-template>
+      </section>
+    </div>
+
+    <section class="tokens" *ngIf="tokens.length">
+      <h4>{{ 'aauth.try.tokens' | transloco }}</h4>
+      <article
+        class="token"
+        *ngFor="let t of tokens; let i = index"
+        data-testid="aa-token">
+        <header class="token-head">
+          <mat-icon aria-hidden="true">token</mat-icon>
+          <span class="typ mono">{{ t.typ || 'JWT' }}</span>
+          <span class="exp" *ngIf="expiry(t) as e">{{
+            e.key | transloco: { when: e.when }
+          }}</span>
+        </header>
+        <div class="token-parts">
+          <div class="part" *ngIf="t.header">
+            <span class="part-label">{{ 'aauth.try.header' | transloco }}</span>
+            <df-aa-json [value]="t.header"></df-aa-json>
+          </div>
+          <div class="part" *ngIf="t.payload">
+            <span class="part-label">{{
+              'aauth.try.payload' | transloco
+            }}</span>
+            <df-aa-json [value]="t.payload"></df-aa-json>
+          </div>
+        </div>
+        <details class="raw">
+          <summary>{{ 'aauth.try.raw' | transloco }}</summary>
+          <div class="raw-body">
+            <code class="mono">{{ t.raw }}</code>
+            <df-aa-copy [text]="t.raw" testId="aa-token-copy"></df-aa-copy>
+          </div>
+        </details>
+      </article>
+    </section>
+  </div>
+</div>

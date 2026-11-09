@@ -1,0 +1,122 @@
+<df-empty-state
+  *ngIf="!store.scopes?.length; else body"
+  icon="admin_panel_settings"
+  [title]="'aauth.scopes.empty' | transloco"
+  [actionLabel]="'aauth.scopes.openRoles' | transloco"
+  (action)="openRoles()"
+  data-testid="aa-scopes-empty"></df-empty-state>
+
+<ng-template #body>
+  <div class="toolbar">
+    <label class="field search">
+      <mat-icon aria-hidden="true">search</mat-icon>
+      <input
+        type="search"
+        [(ngModel)]="query"
+        [attr.aria-label]="'aauth.scopes.search' | transloco"
+        [placeholder]="'aauth.scopes.search' | transloco"
+        data-testid="aa-scopes-search" />
+    </label>
+  </div>
+
+  <div class="grid" role="table" data-testid="aa-scopes">
+    <div class="row head" role="row">
+      <span role="columnheader">{{ 'aauth.scopes.role' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.scopes.scope' | transloco }}</span>
+      <span role="columnheader">{{
+        'aauth.scopes.description' | transloco
+      }}</span>
+      <span role="columnheader" class="end">{{
+        'aauth.scopes.enabled' | transloco
+      }}</span>
+    </div>
+
+    <div
+      class="row"
+      role="row"
+      *ngFor="let s of rows; trackBy: trackRole"
+      [class.off]="!s.enabled"
+      [attr.data-testid]="'aa-scope-' + s.roleId">
+      <span role="cell" class="cell role" [title]="s.roleName">{{
+        s.roleName
+      }}</span>
+
+      <span role="cell" class="cell">
+        <input
+          *ngIf="isEditing(s, 'scope'); else scopeView"
+          #editInput
+          class="inline-input mono"
+          [(ngModel)]="draft"
+          maxlength="64"
+          spellcheck="false"
+          autocomplete="off"
+          [attr.aria-label]="'aauth.scopes.scope' | transloco"
+          (keydown.enter)="commit(s)"
+          (keydown.escape)="cancel()"
+          (blur)="commit(s)"
+          data-testid="aa-scope-input" />
+        <ng-template #scopeView>
+          <button
+            type="button"
+            class="inline-view mono"
+            (click)="edit(s, 'scope')"
+            [attr.aria-label]="
+              ('aauth.scopes.edit' | transloco) +
+              ' ' +
+              ('aauth.scopes.scope' | transloco) +
+              ': ' +
+              s.scope
+            "
+            data-testid="aa-scope-name">
+            <span class="value">{{ s.scope }}</span>
+            <mat-icon class="pen" aria-hidden="true">edit</mat-icon>
+          </button>
+        </ng-template>
+      </span>
+
+      <span role="cell" class="cell">
+        <input
+          *ngIf="isEditing(s, 'description'); else descView"
+          #editInput
+          class="inline-input"
+          [(ngModel)]="draft"
+          maxlength="255"
+          autocomplete="off"
+          [attr.aria-label]="'aauth.scopes.description' | transloco"
+          (keydown.enter)="commit(s)"
+          (keydown.escape)="cancel()"
+          (blur)="commit(s)"
+          data-testid="aa-scope-desc-input" />
+        <ng-template #descView>
+          <button
+            type="button"
+            class="inline-view"
+            (click)="edit(s, 'description')"
+            [attr.aria-label]="
+              ('aauth.scopes.edit' | transloco) +
+              ' ' +
+              ('aauth.scopes.description' | transloco)
+            "
+            data-testid="aa-scope-desc">
+            <span class="value" [class.blank]="!s.description">{{
+              s.description || '—'
+            }}</span>
+            <mat-icon class="pen" aria-hidden="true">edit</mat-icon>
+          </button>
+        </ng-template>
+      </span>
+
+      <span role="cell" class="end">
+        <mat-slide-toggle
+          [checked]="s.enabled"
+          (change)="toggle(s, $event.checked)"
+          [aria-label]="('aauth.scopes.enabled' | transloco) + ' ' + s.scope"
+          data-testid="aa-scope-toggle"></mat-slide-toggle>
+      </span>
+    </div>
+
+    <p class="no-match" *ngIf="!rows.length" data-testid="aa-scopes-nomatch">
+      {{ 'aauth.scopes.noMatch' | transloco }}
+    </p>
+  </div>
+</ng-template>

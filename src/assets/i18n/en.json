@@ -633,6 +633,10 @@
           "header": "{{nav.api-security.authentication.create.nav}}"
         }
       },
+      "aauth": {
+        "nav": "AAuth",
+        "header": "{{nav.api-security.aauth.nav}}"
+      },
       "role-based-access": {
         "nav": "Role-Based Access",
         "header": "{{nav.api-security.role-based-access.nav}}"

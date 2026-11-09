@@ -1,0 +1,22 @@
+@use '../aa-grid' as *;
+@include aa-grid;
+
+:host {
+  display: block;
+}
+
+.row {
+  grid-template-columns:
+    minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr)
+    110px 88px;
+}
+
+.name {
+  font-weight: var(--df-font-weight-medium);
+}
+
+.revoke {
+  --mdc-outlined-button-label-text-color: var(--df-danger);
+  --mdc-outlined-button-outline-color: var(--df-danger-border);
+  height: 30px;
+}

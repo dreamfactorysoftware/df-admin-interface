@@ -1,0 +1,92 @@
+<df-empty-state
+  *ngIf="store.failed.has('activity') && !store.activity; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'aauth.empty.sliceFailed' | transloco"
+  [actionLabel]="'aauth.retry' | transloco"
+  (action)="store.loadActivity()"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!store.activity; else body"
+    variant="table-row"
+    [count]="6"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <div class="toolbar end-bar">
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="store.loadActivity()"
+      [disabled]="store.activityRefreshing"
+      data-testid="aa-activity-refresh">
+      <mat-icon>refresh</mat-icon>
+      {{ 'aauth.activity.refresh' | transloco }}
+    </button>
+  </div>
+
+  <df-empty-state
+    *ngIf="!store.activity?.length; else table"
+    icon="history"
+    [title]="'aauth.activity.empty' | transloco"
+    data-testid="aa-activity-empty"></df-empty-state>
+</ng-template>
+
+<ng-template #table>
+  <div class="grid" role="table" data-testid="aa-activity">
+    <div class="row head" role="row">
+      <span role="columnheader">{{ 'aauth.activity.time' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.activity.agent' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.activity.person' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.activity.scope' | transloco }}</span>
+      <span role="columnheader">{{
+        'aauth.activity.request' | transloco
+      }}</span>
+      <span role="columnheader">{{ 'aauth.activity.result' | transloco }}</span>
+    </div>
+    <div
+      class="row"
+      role="row"
+      *ngFor="let r of store.activity; trackBy: trackRow"
+      data-testid="aa-activity-row">
+      <span role="cell" class="cell muted nowrap">
+        <time [attr.datetime]="r.createdAt" [matTooltip]="when(r.createdAt)">{{
+          relTime(r.createdAt)
+        }}</time>
+      </span>
+      <span role="cell" class="cell nowrap" [title]="r.agentId">{{
+        r.agentName || r.agentId
+      }}</span>
+      <span role="cell" class="cell nowrap" [class.muted]="!r.person">{{
+        r.person || '—'
+      }}</span>
+      <span role="cell" class="cell">
+        <span class="chip" *ngIf="r.scope; else none">{{ r.scope }}</span>
+        <ng-template #none><span class="muted">—</span></ng-template>
+      </span>
+      <span
+        role="cell"
+        class="cell mono nowrap request"
+        [title]="r.method + ' ' + r.path"
+        ><span class="method">{{ r.method }}</span> {{ r.path }}</span
+      >
+      <span role="cell" class="cell result" [title]="r.detail || ''">
+        <df-badge
+          [variant]="variant(r.outcome)"
+          [label]="'aauth.activity.outcome.' + r.outcome | transloco"
+          data-testid="aa-activity-outcome"></df-badge>
+        <span class="status mono df-numeric">{{ r.status }}</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="more" *ngIf="store.activityHasMore">
+    <button
+      mat-button
+      type="button"
+      (click)="store.loadOlderActivity()"
+      [disabled]="store.activityLoadingOlder"
+      data-testid="aa-activity-more">
+      {{ 'aauth.activity.more' | transloco }}
+    </button>
+  </div>
+</ng-template>

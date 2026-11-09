@@ -1,0 +1,66 @@
+<df-empty-state
+  *ngIf="store.failed.has('grants') && !store.grants; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'aauth.empty.sliceFailed' | transloco"
+  [actionLabel]="'aauth.retry' | transloco"
+  (action)="store.loadGrants()"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!store.grants; else body"
+    variant="table-row"
+    [count]="3"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <df-empty-state
+    *ngIf="!store.grants?.length; else table"
+    icon="handshake"
+    [title]="'aauth.grants.empty' | transloco"
+    data-testid="aa-grants-empty"></df-empty-state>
+</ng-template>
+
+<ng-template #table>
+  <div class="grid" role="table" data-testid="aa-grants">
+    <div class="row head" role="row">
+      <span role="columnheader">{{ 'aauth.grants.person' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.grants.agent' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.grants.resource' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.grants.scopes' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.grants.created' | transloco }}</span>
+      <span role="columnheader"></span>
+    </div>
+    <div
+      class="row"
+      role="row"
+      *ngFor="let g of store.grants; trackBy: trackGrant"
+      [attr.data-testid]="'aa-grant-' + g.id">
+      <span role="cell" class="cell nowrap name" [title]="g.userEmail || ''">{{
+        person(g)
+      }}</span>
+      <span role="cell" class="cell nowrap" [title]="g.agentSub">{{
+        agent(g)
+      }}</span>
+      <span role="cell" class="cell nowrap" [title]="g.resource">{{
+        g.resourceName || hostOf(g.resource)
+      }}</span>
+      <span role="cell" class="cell chips">
+        <span class="chip" *ngFor="let x of splitScopes(g.scope)">{{ x }}</span>
+      </span>
+      <span role="cell" class="cell muted nowrap">
+        <time [attr.datetime]="g.createdAt" [matTooltip]="g.createdAt">{{
+          relTime(g.createdAt)
+        }}</time>
+      </span>
+      <span role="cell" class="end">
+        <button
+          mat-stroked-button
+          type="button"
+          class="revoke"
+          (click)="revoke(g)"
+          data-testid="aa-grant-revoke">
+          {{ 'aauth.grants.revoke' | transloco }}
+        </button>
+      </span>
+    </div>
+  </div>
+</ng-template>

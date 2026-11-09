@@ -1,0 +1,129 @@
+<form class="toolbar add" (ngSubmit)="add()" data-testid="aa-server-add-form">
+  <label class="field issuer-field">
+    <input
+      name="issuer"
+      type="url"
+      inputmode="url"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="https://"
+      [(ngModel)]="issuer"
+      [disabled]="store.addingServer"
+      [attr.aria-label]="'aauth.servers.issuerInput' | transloco"
+      data-testid="aa-server-issuer" />
+  </label>
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    [disabled]="!canAdd || store.addingServer"
+    data-testid="aa-server-add">
+    <mat-icon>add</mat-icon>
+    {{ 'aauth.servers.add' | transloco }}
+  </button>
+</form>
+
+<df-empty-state
+  *ngIf="store.failed.has('servers') && !store.servers; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'aauth.empty.sliceFailed' | transloco"
+  [actionLabel]="'aauth.retry' | transloco"
+  (action)="store.loadServers()"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!store.servers; else body"
+    variant="table-row"
+    [count]="3"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <df-empty-state
+    *ngIf="!rows.length; else table"
+    icon="verified_user"
+    [title]="'aauth.servers.empty' | transloco"
+    data-testid="aa-servers-empty"></df-empty-state>
+</ng-template>
+
+<ng-template #table>
+  <div class="grid" role="table" data-testid="aa-servers">
+    <div class="row head" role="row">
+      <span role="columnheader">{{ 'aauth.servers.name' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.servers.issuer' | transloco }}</span>
+      <span role="columnheader">{{ 'aauth.servers.scopes' | transloco }}</span>
+      <span role="columnheader" class="end">{{
+        'aauth.servers.enabled' | transloco
+      }}</span>
+      <span role="columnheader"></span>
+    </div>
+
+    <div
+      class="row"
+      role="row"
+      *ngFor="let s of rows; trackBy: trackServer"
+      [class.local]="s.isLocal"
+      [attr.data-testid]="'aa-server-' + s.id">
+      <span role="cell" class="cell name">
+        <mat-icon class="local-icon" *ngIf="s.isLocal" aria-hidden="true"
+          >home</mat-icon
+        >
+        {{ displayName(s) }}
+      </span>
+      <span role="cell" class="cell mono" [title]="s.issuer">{{
+        s.issuer
+      }}</span>
+      <span role="cell" class="cell">
+        <mat-form-field
+          class="scope-select"
+          appearance="outline"
+          subscriptSizing="dynamic">
+          <mat-select
+            multiple
+            [value]="selected(s)"
+            (valueChange)="pick(s, $event)"
+            (openedChange)="closed(s, $event)"
+            [placeholder]="'aauth.servers.allScopes' | transloco"
+            [aria-label]="
+              ('aauth.servers.scopes' | transloco) + ' ' + displayName(s)
+            "
+            panelClass="aa-scope-panel"
+            data-testid="aa-server-scopes">
+            <mat-select-trigger>
+              <span class="chips">
+                <span class="chip" *ngFor="let x of selected(s)">{{ x }}</span>
+              </span>
+            </mat-select-trigger>
+            <mat-option *ngFor="let x of options(s)" [value]="x">
+              <span class="opt mono">{{ x }}</span>
+            </mat-option>
+            <mat-option *ngIf="!options(s).length" disabled>{{
+              'aauth.servers.noScopes' | transloco
+            }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </span>
+      <span role="cell" class="end">
+        <mat-slide-toggle
+          [checked]="s.enabled"
+          (change)="store.updateServer(s.id, { enabled: $event.checked })"
+          [aria-label]="
+            ('aauth.servers.enabled' | transloco) + ' ' + displayName(s)
+          "
+          data-testid="aa-server-toggle"></mat-slide-toggle>
+      </span>
+      <span role="cell" class="end del">
+        <button
+          *ngIf="!s.isLocal"
+          mat-icon-button
+          type="button"
+          (click)="remove(s)"
+          [attr.aria-label]="
+            ('aauth.servers.remove' | transloco) + ' ' + displayName(s)
+          "
+          [matTooltip]="'aauth.servers.remove' | transloco"
+          data-testid="aa-server-remove">
+          <mat-icon>delete_outline</mat-icon>
+        </button>
+      </span>
+    </div>
+  </div>
+</ng-template>

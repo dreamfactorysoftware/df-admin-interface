@@ -44,6 +44,7 @@ export enum ROUTES {
   DATA_MASKING = 'data-masking',
   COMPLIANCE = 'compliance',
   AUTHENTICATION = 'authentication',
+  AAUTH = 'aauth',
   SYSTEM_SETTINGS = 'system-settings',
   CONFIG = 'config',
   SCHEDULER = 'scheduler',

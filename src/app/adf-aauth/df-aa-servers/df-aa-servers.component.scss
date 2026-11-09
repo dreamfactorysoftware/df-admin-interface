@@ -1,0 +1,76 @@
+@use '../aa-grid' as *;
+@include aa-grid;
+
+:host {
+  display: block;
+}
+
+.add {
+  flex-wrap: nowrap;
+  max-width: 560px;
+}
+
+.issuer-field {
+  flex: 1;
+  min-width: 0;
+
+  input {
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-sm);
+  }
+}
+
+.row {
+  grid-template-columns:
+    minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr)
+    64px 40px;
+}
+
+.name {
+  align-items: center;
+  display: flex;
+  font-weight: var(--df-font-weight-medium);
+  gap: var(--df-space-2);
+  white-space: nowrap;
+}
+
+.local-icon {
+  color: var(--df-accent);
+  flex-shrink: 0;
+  font-size: 16px;
+  height: 16px;
+  width: 16px;
+}
+
+.scope-select {
+  --mat-form-field-container-height: 32px;
+  --mat-form-field-container-vertical-padding: 4px;
+  --mdc-outlined-text-field-outline-color: transparent;
+  width: 100%;
+
+  &:hover {
+    --mdc-outlined-text-field-outline-color: var(--df-border);
+  }
+
+  ::ng-deep .mat-mdc-form-field-infix {
+    min-height: 32px;
+  }
+
+  ::ng-deep .mat-mdc-select-placeholder {
+    color: var(--df-text-muted);
+  }
+}
+
+.opt {
+  font-size: var(--df-font-size-xs);
+}
+
+@media (max-width: 600px) {
+  .add {
+    max-width: none;
+  }
+
+  .row:not(.head) > .del {
+    grid-row: 2;
+  }
+}

@@ -205,6 +205,14 @@ export class ActionRegistryService {
       keywords: 'throttle quota 429 security',
     },
     {
+      id: 'jump.aauth',
+      kind: 'doc',
+      label: 'AAuth',
+      path: `/${ROUTES.API_SECURITY}/${ROUTES.AAUTH}`,
+      keywords:
+        'agent agents ai auth authorization oauth delegation consent grants scopes signature http message signatures jwt jwks ed25519 mcp person server',
+    },
+    {
       id: 'jump.data-masking',
       kind: 'doc',
       label: 'Data Masking',

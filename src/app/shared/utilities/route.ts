@@ -101,7 +101,8 @@ export function accessibleRoutes(
         allowed.push(ROUTES.USERS);
         break;
       case 'roles':
-        allowed.push(ROUTES.ROLE_BASED_ACCESS);
+        // AAuth scopes are roles.
+        allowed.push(ROUTES.ROLE_BASED_ACCESS, ROUTES.AAUTH);
         break;
       case 'services':
         allowed.push(

@@ -379,6 +379,16 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
       {
+        // Agent authorization (AAuth). Not a commercial feature: no
+        // paywall, no resolver.
+        path: ROUTES.AAUTH,
+        loadComponent: () =>
+          import('./adf-aauth/df-aauth/df-aauth.component').then(
+            m => m.DfAauthComponent
+          ),
+        providers: [provideTranslocoScope('aauth')],
+      },
+      {
         path: ROUTES.RATE_LIMITING,
         children: [
           {

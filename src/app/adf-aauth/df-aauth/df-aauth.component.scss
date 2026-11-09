@@ -1,0 +1,132 @@
+:host {
+  display: block;
+}
+
+.aa {
+  margin: 0 auto;
+  max-width: var(--df-content-max);
+}
+
+// The one control row: Enabled on the left, the issuer beside it.
+.aa-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-2) var(--df-space-6);
+  margin-bottom: var(--df-space-2);
+  min-height: 40px;
+}
+
+.aa-bar-skeleton {
+  background: var(--df-surface-2);
+  border-radius: var(--df-radius-sm);
+  display: inline-block;
+  height: 28px;
+  width: 360px;
+  max-width: 100%;
+}
+
+.aa-enabled {
+  font-size: var(--df-font-size-sm);
+  font-weight: var(--df-font-weight-medium);
+}
+
+.aa-issuer {
+  align-items: center;
+  color: var(--df-text-2);
+  display: flex;
+  gap: var(--df-space-2);
+  min-width: 0;
+}
+
+.aa-issuer-label {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+}
+
+.aa-issuer-url {
+  color: var(--df-text);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aa-meta {
+  --mdc-icon-button-state-layer-size: 28px;
+  --mdc-icon-button-icon-size: 16px;
+  color: var(--df-text-2);
+  height: 28px;
+  padding: 6px;
+  width: 28px;
+
+  mat-icon {
+    font-size: 16px;
+    height: 16px;
+    width: 16px;
+  }
+}
+
+.aa-issuer-error {
+  align-items: center;
+  background: var(--df-danger-soft);
+  border: 1px solid var(--df-danger-border);
+  border-radius: var(--df-radius-sm);
+  color: var(--df-danger);
+  display: inline-flex;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-2);
+  margin: 0 0 var(--df-space-3);
+  padding: var(--df-space-2) var(--df-space-3);
+
+  mat-icon {
+    font-size: 18px;
+    height: 18px;
+    width: 18px;
+  }
+}
+
+.aa-tabs {
+  border-bottom: 1px solid var(--df-border-2);
+  margin-bottom: var(--df-space-5);
+
+  ::ng-deep .mdc-tab-indicator__content--underline {
+    border-color: var(--df-accent) !important;
+  }
+}
+
+.aa-tab-count {
+  background: var(--df-surface-2);
+  border-radius: 999px;
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  line-height: 18px;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 6px;
+  text-align: center;
+}
+
+// Phones: the tab bar gives way to one select (six labels do not fit).
+.aa-tab-select {
+  display: none;
+  margin-bottom: var(--df-space-4);
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .aa-tabs {
+    display: none;
+  }
+
+  .aa-tab-select {
+    display: block;
+  }
+
+  .aa-issuer {
+    width: 100%;
+  }
+}

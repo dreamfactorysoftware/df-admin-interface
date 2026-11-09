@@ -1,0 +1,141 @@
+{
+  "cancel": "Cancel",
+  "retry": "Retry",
+  "copy": "Copy",
+  "copied": "Copied",
+  "enabled": "Enabled",
+  "issuer": "Issuer",
+  "issuerMissing": "Set DF_AAUTH_ISSUER to an https URL",
+  "metadata": "Resource metadata",
+  "tabs": {
+    "label": "Section",
+    "scopes": "Scopes",
+    "servers": "Person Servers",
+    "agents": "Agents",
+    "activity": "Activity",
+    "grants": "Grants",
+    "try": "Try it"
+  },
+  "empty": {
+    "loadFailed": "Couldn't load AAuth",
+    "sliceFailed": "Couldn't load this list"
+  },
+  "scopes": {
+    "search": "Search roles",
+    "role": "Role",
+    "scope": "Scope",
+    "description": "Description",
+    "enabled": "Enabled",
+    "edit": "Edit",
+    "empty": "No roles",
+    "openRoles": "Open Roles",
+    "noMatch": "No matching roles",
+    "invalid": "Scopes use lowercase letters, digits and . _ : - (up to 64)",
+    "taken": "{{scope}} is already used by another role"
+  },
+  "servers": {
+    "add": "Add",
+    "issuerInput": "Person Server issuer",
+    "name": "Name",
+    "issuer": "Issuer",
+    "scopes": "Scopes",
+    "allScopes": "All scopes",
+    "noScopes": "No enabled scopes",
+    "enabled": "Enabled",
+    "local": "This DreamFactory",
+    "remove": "Remove",
+    "lastUsed": "Last used",
+    "empty": "No Person Servers",
+    "confirmRemove": {
+      "title": "Remove {{name}}?",
+      "message": "Tokens from this Person Server will stop working.",
+      "confirm": "Remove"
+    }
+  },
+  "agents": {
+    "name": "Name",
+    "agent": "Agent",
+    "provider": "Provider",
+    "lastSeen": "Last seen",
+    "requests": "Requests",
+    "blocked": "Blocked",
+    "empty": "No agents yet"
+  },
+  "activity": {
+    "time": "Time",
+    "agent": "Agent",
+    "person": "Person",
+    "scope": "Scope",
+    "request": "Request",
+    "result": "Result",
+    "refresh": "Refresh",
+    "more": "Load more",
+    "empty": "No activity yet",
+    "outcome": {
+      "allowed": "Allowed",
+      "person_required": "Person token required",
+      "auth_required": "Auth token required",
+      "denied": "Denied",
+      "blocked": "Blocked",
+      "error": "Error"
+    }
+  },
+  "grants": {
+    "person": "Person",
+    "agent": "Agent",
+    "resource": "Resource",
+    "scopes": "Scopes",
+    "created": "Created",
+    "revoke": "Revoke",
+    "empty": "No standing grants",
+    "confirmRevoke": {
+      "title": "Revoke this grant?",
+      "message": "{{agent}} will need {{person}} to approve again.",
+      "confirm": "Revoke"
+    }
+  },
+  "try": {
+    "method": "Method",
+    "path": "Path",
+    "body": "Body",
+    "send": "Send",
+    "reset": "Forget tokens",
+    "badJson": "The body isn't valid JSON",
+    "code": "Code",
+    "approve": "Approve",
+    "copyCode": "Copy code",
+    "waiting": "Waiting for approval",
+    "running": "Running",
+    "failed": "Failed",
+    "result": "Response",
+    "request": "Request",
+    "response": "Response",
+    "headers": "Headers",
+    "tokens": "Tokens",
+    "header": "Header",
+    "payload": "Payload",
+    "raw": "Raw token",
+    "expires": "Expires {{when}}",
+    "expired": "Expired {{when}}",
+    "noBody": "Empty body",
+    "kind": {
+      "agent_token": "Agent token",
+      "call": "Call",
+      "discover": "Discovery",
+      "person_token": "Person token",
+      "poll": "Poll",
+      "auth_token": "Auth token",
+      "reuse": "Cached tokens"
+    }
+  },
+  "toast": {
+    "enabled": "AAuth is on",
+    "disabled": "AAuth is off",
+    "serverAdded": "Added {{name}}",
+    "serverRemoved": "Removed {{name}}",
+    "agentBlocked": "Blocked {{name}}",
+    "agentAllowed": "Unblocked {{name}}",
+    "grantRevoked": "Grant revoked",
+    "reset": "Tokens forgotten"
+  }
+}

@@ -1,0 +1,37 @@
+@use '../aa-grid' as *;
+@include aa-grid;
+
+:host {
+  display: block;
+}
+
+.end-bar {
+  justify-content: flex-end;
+}
+
+.row {
+  grid-template-columns:
+    120px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr)
+    minmax(0, 2fr) 200px;
+}
+
+.request .method {
+  color: var(--df-accent-strong);
+  font-weight: var(--df-font-weight-heading);
+}
+
+.result {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-2);
+}
+
+.status {
+  color: var(--df-text-muted);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: var(--df-space-3) 0;
+}
