@@ -7,7 +7,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfConfirmDialogComponent } from '../../shared/components/df-confirm-dialog/df-confirm-dialog.component';
-import { DfServerSettingsService } from '../../shared/services/df-server-settings.service';
+import {
+  DfServerSettingsService,
+  ServerSettingSaved,
+} from '../../shared/services/df-server-settings.service';
 import { ROUTES } from '../../shared/types/routes';
 import { ServerSetting } from '../../shared/types/server-setting';
 
@@ -35,8 +38,12 @@ interface SettingRow {
 export class DfServerSettingsComponent implements OnInit {
   rows: SettingRow[] = [];
   loading = true;
+  /** The backend has no system/server_setting (older server version). */
+  unavailable = false;
   error: string | null = null;
   saved = false;
+  /** Saved, but the environment refresh failed: other pages may be stale. */
+  stale = false;
   systemInfoLink = `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.SYSTEM_INFO}`;
 
   constructor(
@@ -45,16 +52,25 @@ export class DfServerSettingsComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.service.getAll().subscribe({
+    this.service.load().subscribe({
       next: settings => {
-        this.rows = settings.map(setting => ({
-          setting,
-          draft: setting.value,
-        }));
+        if (settings === null) {
+          this.unavailable = true;
+        } else {
+          this.rows = settings.map(setting => ({
+            setting,
+            draft: setting.value,
+          }));
+        }
         this.loading = false;
       },
-      error: () => {
-        this.error = 'serverSettings.loadError';
+      error: err => {
+        // 403: an admin role saved before this feature existed has no
+        // server_setting access yet.
+        this.error =
+          err?.status === 403
+            ? 'serverSettings.forbidden'
+            : 'serverSettings.loadError';
         this.loading = false;
       },
     });
@@ -65,13 +81,9 @@ export class DfServerSettingsComponent implements OnInit {
   }
 
   save(row: SettingRow) {
-    this.error = null;
-    this.saved = false;
+    this.clearStatus();
     this.service.update(row.setting.name, row.draft).subscribe({
-      next: setting => {
-        this.swap(row, setting);
-        this.saved = true;
-      },
+      next: result => this.applySaved(row, result),
       error: () => {
         row.draft = row.setting.value;
         this.error = 'serverSettings.saveError';
@@ -80,8 +92,7 @@ export class DfServerSettingsComponent implements OnInit {
   }
 
   reset(row: SettingRow) {
-    this.error = null;
-    this.saved = false;
+    this.clearStatus();
     this.dialog
       .open(DfConfirmDialogComponent, {
         data: {
@@ -93,17 +104,24 @@ export class DfServerSettingsComponent implements OnInit {
       .subscribe(confirmed => {
         if (!confirmed) return;
         this.service.reset(row.setting.name).subscribe({
-          next: setting => {
-            this.swap(row, setting);
-            this.saved = true;
-          },
+          next: result => this.applySaved(row, result),
           error: () => (this.error = 'serverSettings.saveError'),
         });
       });
   }
 
-  private swap(row: SettingRow, setting: ServerSetting) {
-    row.setting = setting;
-    row.draft = setting.value;
+  private clearStatus() {
+    this.error = null;
+    this.saved = false;
+    this.stale = false;
+  }
+
+  // The write succeeded whatever happened to the environment refresh, so the
+  // row always takes the saved value; `stale` only adds a note.
+  private applySaved(row: SettingRow, result: ServerSettingSaved) {
+    row.setting = result.setting;
+    row.draft = result.setting.value;
+    this.saved = true;
+    this.stale = !result.environmentRefreshed;
   }
 }

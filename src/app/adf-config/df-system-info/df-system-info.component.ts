@@ -9,9 +9,8 @@ import { CheckResponse } from 'src/app/shared/types/check';
 import { DfLicenseCheckService } from 'src/app/shared/services/df-license-check.service';
 import { TrialInfo } from 'src/app/shared/types/trial';
 import { trialFromEnvironment } from 'src/app/shared/utilities/trial';
-import { DfUserDataService } from 'src/app/shared/services/df-user-data.service';
+import { DfServerSettingsService } from 'src/app/shared/services/df-server-settings.service';
 import { ROUTES } from 'src/app/shared/types/routes';
-import { canManageServerSettings } from 'src/app/shared/utilities/server-settings-access';
 
 @UntilDestroy({ checkProperties: true })
 @Component({
@@ -29,19 +28,14 @@ export class DfSystemInfoComponent implements OnInit {
     public breakpointService: DfBreakpointService,
     private systemConfigDataService: DfSystemConfigDataService,
     private licenseCheckService: DfLicenseCheckService,
-    private userDataService: DfUserDataService
+    private serverSettingsService: DfServerSettingsService
   ) {}
 
   serverSettingsLink = `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.SERVER_SETTINGS}`;
 
-  private tabs: Array<string> = [];
-  private tabsSub = this.userDataService.restrictedAccess$.subscribe(
-    tabs => (this.tabs = tabs)
-  );
-
-  get canEditServerSettings(): boolean {
-    return canManageServerSettings(this.userDataService.userData, this.tabs);
-  }
+  // One boolean is all this page needs: may this user open Server Settings
+  // on this backend. Same rule as the nav entry and the overview card.
+  canEditServerSettings$ = this.serverSettingsService.canOpen$;
 
   /** Docker trial block (platform.trial, or top-level pre-login); null otherwise. */
   get trial(): TrialInfo | null {

@@ -14,7 +14,7 @@ const row = (over: Partial<ServerSetting> = {}): ServerSetting => ({
 
 // Pure-class spec: the transloco TestBed is quarantined under ESM.
 describe('DfServerSettingsComponent', () => {
-  let service: { getAll: jest.Mock; update: jest.Mock; reset: jest.Mock };
+  let service: { load: jest.Mock; update: jest.Mock; reset: jest.Mock };
   let dialog: { open: jest.Mock };
   let component: DfServerSettingsComponent;
 
@@ -23,7 +23,7 @@ describe('DfServerSettingsComponent', () => {
 
   beforeEach(() => {
     service = {
-      getAll: jest.fn(() => of([row()])),
+      load: jest.fn(() => of([row()])),
       update: jest.fn(),
       reset: jest.fn(),
     };
@@ -46,7 +46,10 @@ describe('DfServerSettingsComponent', () => {
 
   it('save calls update then swaps the row', () => {
     service.update.mockReturnValue(
-      of(row({ value: 'error', source: 'override' }))
+      of({
+        setting: row({ value: 'error', source: 'override' }),
+        environmentRefreshed: true,
+      })
     );
     component.rows[0].draft = 'error';
     component.save(component.rows[0]);
@@ -54,6 +57,39 @@ describe('DfServerSettingsComponent', () => {
     expect(component.rows[0].setting.source).toBe('override');
     expect(component.rows[0].setting.value).toBe('error');
     expect(component.saved).toBe(true);
+    expect(component.stale).toBe(false);
+    expect(component.error).toBeNull();
+  });
+
+  // Regression: this used to report "Could not save" and revert the draft.
+  it('a save whose environment refresh failed is still a save, flagged stale', () => {
+    service.update.mockReturnValue(
+      of({
+        setting: row({ value: 'error', source: 'override' }),
+        environmentRefreshed: false,
+      })
+    );
+    component.rows[0].draft = 'error';
+    component.save(component.rows[0]);
+    expect(component.rows[0].setting.value).toBe('error');
+    expect(component.rows[0].setting.source).toBe('override');
+    expect(component.rows[0].draft).toBe('error');
+    expect(component.saved).toBe(true);
+    expect(component.stale).toBe(true);
+    expect(component.error).toBeNull();
+  });
+
+  it('the stale note clears on the next successful save', () => {
+    service.update.mockReturnValue(
+      of({ setting: row({ value: 'error' }), environmentRefreshed: false })
+    );
+    component.save(component.rows[0]);
+    service.update.mockReturnValue(
+      of({ setting: row({ value: 'debug' }), environmentRefreshed: true })
+    );
+    component.save(component.rows[0]);
+    expect(component.saved).toBe(true);
+    expect(component.stale).toBe(false);
   });
 
   it('a failed save keeps the old value and sets the error', () => {
@@ -62,23 +98,70 @@ describe('DfServerSettingsComponent', () => {
     component.save(component.rows[0]);
     expect(component.rows[0].setting.value).toBe('info');
     expect(component.rows[0].draft).toBe('info');
-    expect(component.error).toBeTruthy();
+    expect(component.error).toBe('serverSettings.saveError');
+    expect(component.saved).toBe(false);
+    expect(component.stale).toBe(false);
   });
 
   it('reset asks for confirmation, then swaps the row back to env', () => {
     component.rows[0].setting = row({ source: 'override', value: 'error' });
-    service.reset.mockReturnValue(of(row()));
+    service.reset.mockReturnValue(
+      of({ setting: row(), environmentRefreshed: true })
+    );
     component.reset(component.rows[0]);
     expect(dialog.open).toHaveBeenCalled();
     expect(service.reset).toHaveBeenCalledWith('log_level');
     expect(component.rows[0].setting.source).toBe('env');
+    expect(component.saved).toBe(true);
+    expect(component.stale).toBe(false);
+  });
+
+  it('a reset whose environment refresh failed still resets, flagged stale', () => {
+    component.rows[0].setting = row({ source: 'override', value: 'error' });
+    service.reset.mockReturnValue(
+      of({ setting: row(), environmentRefreshed: false })
+    );
+    component.reset(component.rows[0]);
+    expect(component.rows[0].setting.source).toBe('env');
+    expect(component.rows[0].draft).toBe('info');
+    expect(component.saved).toBe(true);
+    expect(component.stale).toBe(true);
+    expect(component.error).toBeNull();
+  });
+
+  it('a failed reset keeps the override and sets the error', () => {
+    component.rows[0].setting = row({ source: 'override', value: 'error' });
+    service.reset.mockReturnValue(throwError(() => new Error('boom')));
+    component.reset(component.rows[0]);
+    expect(component.rows[0].setting.source).toBe('override');
+    expect(component.error).toBe('serverSettings.saveError');
+    expect(component.saved).toBe(false);
   });
 
   it('sets the error when loading fails', () => {
-    service.getAll.mockReturnValue(throwError(() => new Error('nope')));
+    service.load.mockReturnValue(throwError(() => new Error('nope')));
     component = make();
     component.ngOnInit();
-    expect(component.error).toBeTruthy();
+    expect(component.error).toBe('serverSettings.loadError');
+    expect(component.unavailable).toBe(false);
     expect(component.loading).toBe(false);
+  });
+
+  it('shows the not-available state on a backend without the resource', () => {
+    service.load.mockReturnValue(of(null));
+    component = make();
+    component.ngOnInit();
+    expect(component.unavailable).toBe(true);
+    expect(component.error).toBeNull();
+    expect(component.rows).toEqual([]);
+    expect(component.loading).toBe(false);
+  });
+
+  it('tells a restricted admin without the grant why loading was refused', () => {
+    service.load.mockReturnValue(throwError(() => ({ status: 403 })));
+    component = make();
+    component.ngOnInit();
+    expect(component.error).toBe('serverSettings.forbidden');
+    expect(component.unavailable).toBe(false);
   });
 });

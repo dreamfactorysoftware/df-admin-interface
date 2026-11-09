@@ -66,11 +66,16 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
     // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
-    // Runtime server settings (#552): service, access rule + guard, page, nav link.
+    // Runtime server settings (#552): service, access rule + guard, page, and
+    // the three entry points (nav, overview card, System Info link). The user
+    // data spec pins the restricted-admin tab logic the feature shares.
     '<rootDir>/src/app/shared/utilities/server-settings-access.spec.ts',
     '<rootDir>/src/app/shared/services/df-server-settings.service.spec.ts',
     '<rootDir>/src/app/shared/guards/admin.guard.spec.ts',
     '<rootDir>/src/app/adf-config/df-server-settings/df-server-settings.component.spec.ts',
-    '<rootDir>/src/app/adf-config/df-system-info/system-info-link.spec.ts',
+    '<rootDir>/src/app/adf-config/df-system-info/df-system-info.component.spec.ts',
+    '<rootDir>/src/app/shared/services/df-user-data.service.spec.ts',
+    '<rootDir>/src/app/shared/components/df-side-nav/df-side-nav.server-settings.spec.ts',
+    '<rootDir>/src/app/adf-section-overviews/df-system-overview.server-settings.spec.ts',
   ],
 };

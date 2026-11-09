@@ -28,6 +28,7 @@ import {
   generateBreadcrumb,
   recordLabelFromRouteData,
   transformRoutes,
+  withoutRoute,
 } from '../../utilities/route';
 import { Nav } from '../../types/nav';
 import { ROUTES } from '../../types/routes';
@@ -50,6 +51,7 @@ import { MatInputModule } from '@angular/material/input';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfPaywallService } from '../../services/df-paywall.service';
 import { DfSystemConfigDataService } from '../../services/df-system-config-data.service';
+import { DfServerSettingsService } from '../../services/df-server-settings.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -115,7 +117,8 @@ export class DfSideNavComponent implements OnInit {
     private paywallService: DfPaywallService,
     private systemConfigDataService: DfSystemConfigDataService,
     private commandPalette: DfCommandPaletteService,
-    private trialService: DfTrialService
+    private trialService: DfTrialService,
+    private serverSettingsService: DfServerSettingsService
   ) {}
 
   ngOnInit(): void {
@@ -156,13 +159,17 @@ export class DfSideNavComponent implements OnInit {
         })
       )
       .subscribe(accessByTabs => {
-        if (accessByTabs) {
-          this.nav = accessibleRoutes(transformRoutes(routes), accessByTabs);
-        } else {
-          this.nav = transformRoutes(routes);
-        }
-        this.navGroups = this.buildNavGroups(this.nav);
+        this.accessByTabs = accessByTabs;
+        this.rebuildNav();
       });
+    // Server Settings needs a backend that has system/server_setting. The
+    // entry stays out until that is known, then the nav is rebuilt once.
+    this.serverSettingsService.canOpen$.subscribe(canOpen => {
+      if (canOpen !== this.canOpenServerSettings) {
+        this.canOpenServerSettings = canOpen;
+        this.rebuildNav();
+      }
+    });
     this.search.valueChanges
       .pipe(
         debounceTime(1000),
@@ -179,6 +186,19 @@ export class DfSideNavComponent implements OnInit {
       .subscribe(license => (this.licenseType = license));
   }
   isDarkMode = this.themeService.darkMode$;
+
+  private accessByTabs: Array<string> | null = null;
+  private canOpenServerSettings = false;
+
+  private rebuildNav(): void {
+    const nav = this.accessByTabs
+      ? accessibleRoutes(transformRoutes(routes), this.accessByTabs)
+      : transformRoutes(routes);
+    this.nav = this.canOpenServerSettings
+      ? nav
+      : withoutRoute(nav, ROUTES.SERVER_SETTINGS);
+    this.navGroups = this.buildNavGroups(this.nav);
+  }
 
   /**
    * Pillar IA for the shell prototype: group the flat top-level nav into

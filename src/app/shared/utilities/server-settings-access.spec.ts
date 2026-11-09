@@ -37,7 +37,9 @@ describe('canManageServerSettings', () => {
 
   it('denies a non-admin and a missing session', () => {
     expect(
-      canManageServerSettings(user({ isSysAdmin: false, roleId: 3 }), ['config'])
+      canManageServerSettings(user({ isSysAdmin: false, roleId: 3 }), [
+        'config',
+      ])
     ).toBe(false);
     expect(canManageServerSettings(null, ['config'])).toBe(false);
   });

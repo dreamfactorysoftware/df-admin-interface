@@ -8,7 +8,30 @@
   }
 
   .error {
-    color: var(--df-danger, #b3261e);
+    color: var(--df-danger);
+  }
+
+  // Angular drops the whitespace between the note and the link after it.
+  .stale {
+    margin-right: 0.3em;
+  }
+
+  .unavailable {
+    max-width: 720px;
+    padding: 16px;
+    border: 1px solid var(--df-border);
+    border-radius: 8px;
+    color: var(--df-text-2);
+    font-size: 1.4rem;
+    line-height: 1.5;
+
+    strong {
+      color: var(--df-text);
+    }
+
+    p {
+      margin: 8px 0 12px;
+    }
   }
 
   .settings-list {
@@ -20,7 +43,7 @@
     max-width: 720px;
     margin-bottom: 16px;
     padding: 16px;
-    border: 1px solid var(--df-border, rgba(128, 128, 128, 0.3));
+    border: 1px solid var(--df-border);
     border-radius: 8px;
   }
 
@@ -35,7 +58,7 @@
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 1.2rem;
-    border: 1px solid var(--df-border, rgba(128, 128, 128, 0.4));
+    border: 1px solid var(--df-border);
 
     &.override {
       font-weight: 600;
@@ -51,6 +74,12 @@
 
     mat-select {
       width: 200px;
+    }
+
+    // The global .save-btn colors are !important, so a disabled Save looked
+    // enabled. Nothing to save must look like nothing to save.
+    .save-btn[disabled] {
+      opacity: 0.5;
     }
   }
 }

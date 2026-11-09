@@ -154,6 +154,17 @@ export function accessibleRoutes(
   });
 }
 
+/** Drops every nav entry for `route`, at any depth. Parents are kept. */
+export function withoutRoute(navs: Array<Nav>, route: ROUTES): Array<Nav> {
+  return navs
+    .filter(nav => nav.route !== route)
+    .map(nav =>
+      nav.subRoutes
+        ? { ...nav, subRoutes: withoutRoute(nav.subRoutes, route) }
+        : nav
+    );
+}
+
 export type Breadcrumb = {
   label: string;
   path?: string;

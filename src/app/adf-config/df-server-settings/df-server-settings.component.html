@@ -1,19 +1,44 @@
 <div class="server-settings-container">
-  <p>{{ 'serverSettings.description' | transloco }}</p>
-  <p class="hint">{{ 'serverSettings.hint' | transloco }}</p>
+  <div
+    *ngIf="unavailable"
+    class="unavailable"
+    role="status"
+    data-testid="server-settings-unavailable">
+    <strong>{{ 'serverSettings.unavailableTitle' | transloco }}</strong>
+    <p>{{ 'serverSettings.unavailable' | transloco }}</p>
+    <a [routerLink]="systemInfoLink">{{
+      'serverSettings.viewSystemInfo' | transloco
+    }}</a>
+  </div>
 
-  <p *ngIf="error" class="error" role="alert" data-testid="server-settings-error">
+  <p *ngIf="!unavailable">{{ 'serverSettings.description' | transloco }}</p>
+  <p *ngIf="!unavailable" class="hint">
+    {{ 'serverSettings.hint' | transloco }}
+  </p>
+
+  <p
+    *ngIf="error"
+    class="error"
+    role="alert"
+    data-testid="server-settings-error">
     {{ error | transloco }}
   </p>
-  <p *ngIf="saved" class="saved" role="status" data-testid="server-settings-saved">
+  <p
+    *ngIf="saved"
+    class="saved"
+    role="status"
+    data-testid="server-settings-saved">
     {{ 'serverSettings.saved' | transloco }}
+    <span *ngIf="stale" class="stale" data-testid="server-settings-stale">{{
+      'serverSettings.savedStale' | transloco
+    }}</span>
     <a [routerLink]="systemInfoLink" data-testid="server-settings-view-info">{{
       'serverSettings.viewSystemInfo' | transloco
     }}</a>
   </p>
 
   <p *ngIf="loading">{{ 'serverSettings.loading' | transloco }}</p>
-  <p *ngIf="!loading && !rows.length && !error">
+  <p *ngIf="!loading && !rows.length && !error && !unavailable">
     {{ 'serverSettings.empty' | transloco }}
   </p>
 

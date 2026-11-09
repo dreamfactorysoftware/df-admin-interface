@@ -15,9 +15,8 @@ import { GenericListResponse } from '../shared/types/generic-http';
 import { ROUTES } from '../shared/types/routes';
 import { ServiceType } from '../shared/types/service';
 import { DfSystemConfigDataService } from '../shared/services/df-system-config-data.service';
-import { DfUserDataService } from '../shared/services/df-user-data.service';
+import { DfServerSettingsService } from '../shared/services/df-server-settings.service';
 import { Environment } from '../shared/types/system';
-import { canManageServerSettings } from '../shared/utilities/server-settings-access';
 
 @Component({
   selector: 'df-system-overview',
@@ -39,9 +38,9 @@ import { canManageServerSettings } from '../shared/utilities/server-settings-acc
 export class DfSystemOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
   private systemConfigDataService = inject(DfSystemConfigDataService);
-  private userDataService = inject(DfUserDataService);
+  private serverSettingsService = inject(DfServerSettingsService);
   private destroyRef = inject(DestroyRef);
-  private tabs: Array<string> = [];
+  private canOpenServerSettings = false;
   private serviceTypes: ServiceType[] | null = null;
   environment = this.systemConfigDataService.environment;
 
@@ -81,11 +80,11 @@ export class DfSystemOverviewComponent implements OnInit {
     this.systemConfigDataService.environment$.subscribe(
       environment => (this.environment = environment)
     );
-    this.userDataService.restrictedAccess$
+    this.serverSettingsService.canOpen$
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(tabs => {
-        this.tabs = tabs;
-        this.memoGroupsTypes = undefined; // rebuild the cards: Server Settings depends on the tabs
+      .subscribe(canOpen => {
+        this.canOpenServerSettings = canOpen;
+        this.memoGroupsTypes = undefined; // rebuild the cards: Server Settings depends on it
       });
     this.serviceTypeService
       .getAll<GenericListResponse<ServiceType>>({ limit: 500 })
@@ -172,8 +171,9 @@ export class DfSystemOverviewComponent implements OnInit {
             action: 'View system info',
             category: 'system',
           },
-          // Same rule as the route guard and the nav entry.
-          ...(canManageServerSettings(this.userDataService.userData, this.tabs)
+          // Same rule as the nav entry and the System Info link: the user
+          // may open it and this backend has system/server_setting.
+          ...(this.canOpenServerSettings
             ? [
                 {
                   icon: 'tune',

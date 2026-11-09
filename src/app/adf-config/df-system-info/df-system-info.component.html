@@ -57,7 +57,7 @@
           {{ 'systemInfo.instance.logLevel' | transloco }}:
           {{ environment.platform?.logLevel }}
           <a
-            *ngIf="canEditServerSettings"
+            *ngIf="canEditServerSettings$ | async"
             [routerLink]="serverSettingsLink"
             data-testid="system-info-log-level-change"
             >{{ 'systemInfo.instance.logLevelChange' | transloco }}</a
