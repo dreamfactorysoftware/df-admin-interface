@@ -11,6 +11,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { UserProfile } from 'src/app/shared/types/user';
 import { of } from 'rxjs';
 
@@ -71,6 +72,7 @@ describe('DfUserDetailsComponent - create', () => {
         DfUserDetailsComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       declarations: [],
       providers: [
@@ -198,6 +200,7 @@ describe('DfUserDetailsComponent - edit', () => {
         DfUserDetailsComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       declarations: [],
       providers: [

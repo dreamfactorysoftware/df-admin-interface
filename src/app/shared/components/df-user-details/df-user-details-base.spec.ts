@@ -4,6 +4,7 @@ import { DfUserDetailsBaseComponent } from './df-user-details-base.component';
 import { ActivatedRoute, Data } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import {
   ReactiveFormsModule,
@@ -53,6 +54,7 @@ describe('DfUserDetailsBaseComponent', () => {
         ReactiveFormsModule,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       providers: [
         FormGroupDirective,

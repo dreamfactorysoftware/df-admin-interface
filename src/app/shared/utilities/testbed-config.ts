@@ -1,4 +1,5 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
@@ -12,7 +13,15 @@ export function createTestBedConfig(
   params?: any
 ): any {
   return {
-    imports: [componentName, HttpClientTestingModule, NoopAnimationsModule],
+    imports: [
+      componentName,
+      HttpClientTestingModule,
+      NoopAnimationsModule,
+      // The app provides MatSnackBar at the root (main.ts imports
+      // MatSnackBarModule). DfSnackbarService needs it, and most detail and
+      // table components inject that service.
+      MatSnackBarModule,
+    ],
     declarations: [...declarations],
     providers: [
       provideTransloco({
