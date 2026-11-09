@@ -76,7 +76,7 @@ describe('DfFolderDialogComponent', () => {
     expect(crudServiceSpy).not.toHaveBeenCalled();
   });
 
-  it.only('should call save if form is valid', () => {
+  it('should call save if form is valid', () => {
     const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'create');
     component.dialogForm.controls['name'].setValue('test');
     component.save();
