@@ -141,6 +141,16 @@ export class DfApi {
     }
   }
 
+  /** Whether GET /api/v2/system lists the resource (false on older backends). */
+  async hasSystemResource(name: string): Promise<boolean> {
+    const resp = await this.ctx.get('/api/v2/system', {
+      headers: this.headers(),
+    });
+    expect(resp.ok(), `GET system -> HTTP ${resp.status()}`).toBe(true);
+    const rows: Array<{ name: string }> = (await resp.json())?.resource ?? [];
+    return rows.some(r => r.name === name);
+  }
+
   /** Effective log level as system/environment reports it. */
   async getEnvironmentLogLevel(): Promise<string> {
     const resp = await this.ctx.get('/api/v2/system/environment', {
