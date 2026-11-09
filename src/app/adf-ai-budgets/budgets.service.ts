@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { BASE_URL, URLS } from 'src/app/shared/constants/urls';
+import { PickerItem } from 'src/app/shared/components/df-picker-list/df-picker-list.component';
 import { silent, toastOff } from 'src/app/shared/utilities/http-contexts';
 
 export type BudgetDimension = 'global' | 'service' | 'role' | 'user' | 'app';
@@ -31,6 +32,11 @@ export interface BudgetList {
   resource: Budget[];
   /** Spend comes from usage logs, so with logging off no cap can trip. */
   usage_logging_enabled: boolean;
+  /**
+   * False when the server has alert webhooks turned off. Then it refuses a
+   * webhook URL with 400. Absent on servers that predate the switch.
+   */
+  alert_webhooks_enabled?: boolean;
 }
 
 export interface BudgetForm {
@@ -57,18 +63,26 @@ export interface ModelAlias {
   is_active: boolean;
 }
 
-export interface ScopeOption {
-  id: number;
-  label: string;
-}
+/** Scope types in form order. Labels are `aiBudgets.scope.<type>` keys. */
+export const SCOPE_TYPES: BudgetDimension[] = [
+  'global',
+  'service',
+  'role',
+  'user',
+  'app',
+];
 
-export const SCOPE_LABELS: Record<BudgetDimension, string> = {
-  global: 'All AI spend',
-  service: 'AI Connection',
-  role: 'Role',
-  user: 'User',
-  app: 'App',
-};
+export const BUDGET_PERIODS: BudgetPeriod[] = ['monthly', 'daily', 'hourly'];
+
+/** Records loaded up front for a scope picker. The rest is found by search. */
+export const SCOPE_LOAD_LIMIT = 100;
+const SCOPE_SEARCH_LIMIT = 50;
+
+export interface ScopePage {
+  items: PickerItem[];
+  /** True when the server holds more records than were loaded. */
+  truncated: boolean;
+}
 
 export function emptyBudgetForm(): BudgetForm {
   return {
@@ -101,8 +115,14 @@ export function budgetToForm(budget: Budget): BudgetForm {
   };
 }
 
-/** Request body. Never sends a blank auth header: blank means keep it. */
-export function budgetPayload(form: BudgetForm): Record<string, unknown> {
+/**
+ * Request body. Never sends a blank auth header: blank means keep it. With
+ * alert webhooks turned off on the server, no webhook field is sent at all.
+ */
+export function budgetPayload(
+  form: BudgetForm,
+  webhooksEnabled = true
+): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     label: form.label.trim(),
     dimension_type: form.dimension_type,
@@ -110,8 +130,11 @@ export function budgetPayload(form: BudgetForm): Record<string, unknown> {
     period: form.period,
     budget_usd: form.budget_usd,
     hard_stop: form.hard_stop,
-    alert_webhook_url: form.alert_webhook_url.trim() || null,
   };
+  if (!webhooksEnabled) {
+    return payload;
+  }
+  payload['alert_webhook_url'] = form.alert_webhook_url.trim() || null;
   if (form.clear_alert_webhook_auth) {
     payload['clear_alert_webhook_auth'] = true;
   } else if (form.alert_webhook_auth_header.trim()) {
@@ -172,51 +195,101 @@ export class BudgetsService {
     });
   }
 
-  /** Records a rule can be scoped to, by name. */
-  // ponytail: first 1000 records, searched in the browser. Search on the server
-  // if an install has more users than that.
-  scopeOptions(dimension: BudgetDimension): Observable<ScopeOption[]> {
-    const lookups: Record<
-      Exclude<BudgetDimension, 'global'>,
-      { url: string; fields: string; filter?: string }
-    > = {
-      service: {
-        url: `${BASE_URL}/system/service`,
-        fields: 'id,label,name',
-        filter: 'type=ai_connection',
-      },
-      role: { url: URLS.ROLES, fields: 'id,name' },
-      user: { url: `${BASE_URL}/system/user`, fields: 'id,name,email' },
-      app: { url: URLS.APP, fields: 'id,name' },
+  /**
+   * The first page of records a rule can be scoped to, by name. The picker
+   * shows a bounded list; `searchScope` finds records past the first page.
+   */
+  scopeOptions(dimension: BudgetDimension): Observable<ScopePage> {
+    if (dimension === 'global') {
+      return of({ items: [], truncated: false });
+    }
+    const lookup = SCOPE_LOOKUPS[dimension];
+    const params: Record<string, string> = {
+      fields: lookup.fields,
+      sort: 'name',
+      limit: String(SCOPE_LOAD_LIMIT),
+      include_count: 'true',
     };
+    if (lookup.filter) {
+      params['filter'] = lookup.filter;
+    }
+    return this.http
+      .get<ScopeResponse>(lookup.url, { params, context: silent() })
+      .pipe(
+        map(res => {
+          const rows = res.resource ?? [];
+          return {
+            items: rows.map(scopeItem),
+            truncated: (res.meta?.count ?? rows.length) > rows.length,
+          };
+        })
+      );
+  }
+
+  /** Server-side search for a scope record that the first page did not hold. */
+  searchScope(
+    dimension: BudgetDimension,
+    query: string
+  ): Observable<PickerItem[]> {
     if (dimension === 'global') {
       return of([]);
     }
-
-    const { url, fields, filter } = lookups[dimension];
-    const params: Record<string, string> = { fields, limit: '1000' };
-    if (filter) {
-      params['filter'] = filter;
-    }
-
+    const lookup = SCOPE_LOOKUPS[dimension];
+    const q = query.replace(/["\\%]/g, '');
+    const match = lookup.search
+      .map(field => `(${field} like "%${q}%")`)
+      .join(' or ');
+    const filter = lookup.filter ? `(${lookup.filter}) and (${match})` : match;
     return this.http
-      .get<{
-        resource: {
-          id: number;
-          name: string;
-          label?: string;
-          email?: string;
-        }[];
-      }>(url, { params, context: silent() })
-      .pipe(
-        map(r =>
-          r.resource.map(row => ({
-            id: row.id,
-            label: row.email
-              ? `${row.name} (${row.email})`
-              : row.label || row.name,
-          }))
-        )
-      );
+      .get<ScopeResponse>(lookup.url, {
+        params: {
+          fields: lookup.fields,
+          sort: 'name',
+          limit: String(SCOPE_SEARCH_LIMIT),
+          filter,
+        },
+        context: silent(),
+      })
+      .pipe(map(res => (res.resource ?? []).map(scopeItem)));
   }
+}
+
+interface ScopeRow {
+  id: number;
+  name: string;
+  label?: string;
+  email?: string;
+}
+
+interface ScopeResponse {
+  resource?: ScopeRow[];
+  meta?: { count?: number };
+}
+
+const SCOPE_LOOKUPS: Record<
+  Exclude<BudgetDimension, 'global'>,
+  { url: string; fields: string; search: string[]; filter?: string }
+> = {
+  service: {
+    url: `${BASE_URL}/system/service`,
+    fields: 'id,name,label',
+    search: ['name', 'label'],
+    filter: 'type = "ai_connection"',
+  },
+  role: { url: URLS.ROLES, fields: 'id,name', search: ['name'] },
+  user: {
+    url: `${BASE_URL}/system/user`,
+    fields: 'id,name,email',
+    search: ['name', 'email'],
+  },
+  app: { url: URLS.APP, fields: 'id,name', search: ['name'] },
+};
+
+function scopeItem(row: ScopeRow): PickerItem {
+  return {
+    id: row.id,
+    label: row.email ? `${row.name} (${row.email})` : row.label || row.name,
+    // The search box also matches the API name behind a display label.
+    keywords: row.name,
+  };
 }

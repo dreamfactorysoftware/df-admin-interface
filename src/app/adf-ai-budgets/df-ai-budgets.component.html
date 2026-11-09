@@ -1,262 +1,431 @@
-<div class="budgets">
+<div class="budgets" *transloco="let t; read: 'aiBudgets'">
   <header class="budgets__header">
     <div class="budgets__title">
       <fa-icon class="budgets__title-icon" [icon]="faScaleBalanced"></fa-icon>
-      <h2>AI Budgets</h2>
+      <h2>{{ t('title') }}</h2>
       <fa-icon
+        *ngIf="view === 'ready'"
         class="budgets__title-hint"
         [icon]="faCircleInfo"
-        matTooltip="Spend limits for AI requests. Periods follow calendar boundaries in the server time zone. A hard stop refuses the next request after spend reaches the cap, so the request that crosses the cap still completes."
+        [matTooltip]="t('hint')"
         matTooltipPosition="below"></fa-icon>
     </div>
 
     <div class="budgets__controls">
-      <a mat-stroked-button [routerLink]="usageLink">View usage</a>
-      <button
-        type="button"
-        mat-stroked-button
-        [disabled]="loading"
-        (click)="refresh()">
-        <fa-icon [icon]="faArrowsRotate"></fa-icon>
-        <span>Refresh</span>
-      </button>
-      <button
-        type="button"
-        mat-flat-button
-        color="primary"
-        data-testid="budget-new"
-        (click)="openCreate()">
-        <fa-icon [icon]="faPlus"></fa-icon>
-        <span>New budget</span>
-      </button>
+      <a mat-stroked-button [routerLink]="usageLink">{{ t('viewUsage') }}</a>
+      <ng-container *ngIf="view === 'ready'">
+        <button
+          type="button"
+          mat-stroked-button
+          data-testid="budget-refresh"
+          [disabled]="loading"
+          (click)="refresh()">
+          <fa-icon [icon]="faArrowsRotate"></fa-icon>
+          <span>{{ t('refresh') }}</span>
+        </button>
+        <button
+          type="button"
+          mat-flat-button
+          color="primary"
+          data-testid="budget-new"
+          (click)="openCreate()">
+          <fa-icon [icon]="faPlus"></fa-icon>
+          <span>{{ t('new') }}</span>
+        </button>
+      </ng-container>
     </div>
   </header>
 
-  <p *ngIf="errorMessage" class="budgets__error" role="alert">
-    {{ errorMessage }}
-  </p>
-
-  <p
-    *ngIf="!usageLoggingEnabled"
-    class="budgets__warning"
-    role="alert"
-    data-testid="budget-logging-off">
-    AI usage logging is off on this server. Spend is not recorded, so budgets
-    will not block requests or send alerts.
-  </p>
-
-  <mat-card *ngIf="form" class="budgets__form">
-    <mat-card-content>
-      <h3>{{ form.id ? 'Edit budget' : 'New budget' }}</h3>
-      <form class="budgets__fields" (ngSubmit)="save()">
-        <mat-form-field appearance="outline">
-          <mat-label>Label</mat-label>
-          <input
-            matInput
-            name="label"
-            maxlength="256"
-            required
-            data-testid="budget-label"
-            [(ngModel)]="form.label" />
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Applies to</mat-label>
-          <mat-select
-            name="dimension_type"
-            data-testid="budget-scope-type"
-            [(ngModel)]="form.dimension_type"
-            (selectionChange)="onScopeTypeChange()">
-            <mat-option *ngFor="let t of scopeTypes" [value]="t">
-              {{ scopeLabels[t] }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field
-          *ngIf="form.dimension_type !== 'global'"
-          appearance="outline">
-          <mat-label>{{ scopeLabels[form.dimension_type] }}</mat-label>
-          <mat-select
-            name="dimension_id"
-            required
-            data-testid="budget-scope-record"
-            [(ngModel)]="form.dimension_id">
-            <df-select-search #scopeSearch></df-select-search>
-            <mat-option
-              *ngFor="
-                let o of scopeOptions
-                  | dfSearch: scopeSearch.query : '' : 'label';
-                trackBy: trackById
-              "
-              [value]="o.id">
-              {{ o.label }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Period</mat-label>
-          <mat-select name="period" [(ngModel)]="form.period">
-            <mat-option *ngFor="let p of periods" [value]="p">
-              {{ p | titlecase }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline">
-          <mat-label>Cap (USD)</mat-label>
-          <input
-            matInput
-            type="number"
-            name="budget_usd"
-            min="0.0001"
-            step="0.01"
-            required
-            data-testid="budget-cap"
-            [(ngModel)]="form.budget_usd" />
-          <mat-hint
-            >A connection with no rates records $0, so set rates.</mat-hint
-          >
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="budgets__wide">
-          <mat-label>Alert webhook URL (optional)</mat-label>
-          <input
-            matInput
-            type="url"
-            name="alert_webhook_url"
-            maxlength="1024"
-            placeholder="https://"
-            [(ngModel)]="form.alert_webhook_url" />
-          <mat-hint>Receives a POST at 50, 80 and 100 percent.</mat-hint>
-        </mat-form-field>
-
-        <mat-form-field appearance="outline" class="budgets__wide">
-          <mat-label>Webhook Authorization header (optional)</mat-label>
-          <input
-            matInput
-            type="password"
-            name="alert_webhook_auth_header"
-            autocomplete="new-password"
-            [disabled]="form.clear_alert_webhook_auth"
-            [placeholder]="
-              form.has_alert_webhook_auth
-                ? 'Stored. Leave blank to keep it.'
-                : ''
-            "
-            [(ngModel)]="form.alert_webhook_auth_header" />
-        </mat-form-field>
-
-        <mat-slide-toggle
-          *ngIf="form.has_alert_webhook_auth"
-          class="budgets__wide"
-          name="clear_alert_webhook_auth"
-          [(ngModel)]="form.clear_alert_webhook_auth">
-          Remove the stored header
-        </mat-slide-toggle>
-
-        <mat-slide-toggle
-          class="budgets__wide"
-          name="hard_stop"
-          data-testid="budget-hard-stop"
-          [(ngModel)]="form.hard_stop">
-          Hard stop
-        </mat-slide-toggle>
-
-        <p
-          *ngIf="form.hard_stop"
-          class="budgets__warning budgets__wide"
-          role="alert"
-          data-testid="budget-hard-stop-warning">
-          Requests will be refused with HTTP 429 once spend reaches the cap,
-          until the period resets.
-        </p>
-
-        <p *ngIf="formError" class="budgets__error budgets__wide" role="alert">
-          {{ formError }}
-        </p>
-
-        <div class="budgets__form-actions budgets__wide">
-          <button type="button" mat-stroked-button (click)="closeForm()">
-            Cancel
-          </button>
-          <button
-            type="submit"
-            mat-flat-button
-            color="primary"
-            data-testid="budget-save"
-            [disabled]="!canSave">
-            Save
-          </button>
-        </div>
-      </form>
-    </mat-card-content>
-  </mat-card>
-
-  <div *ngIf="loading && !budgets.length" class="budgets__loading">
+  <div
+    *ngIf="view === 'checking'"
+    class="budgets__loading"
+    data-testid="budget-checking">
     <mat-spinner diameter="32"></mat-spinner>
   </div>
 
-  <p
-    *ngIf="!loading && !budgets.length && !errorMessage"
-    class="budgets__empty">
-    No budgets yet. Create one to set a spend limit.
-  </p>
+  <section
+    *ngIf="view === 'unsupported'"
+    class="budgets__state"
+    role="status"
+    data-testid="budget-unsupported">
+    <h3>{{ t('unsupported.title') }}</h3>
+    <p>{{ t('unsupported.message') }}</p>
+  </section>
 
-  <div *ngIf="budgets.length" class="budgets__table-wrap">
-    <table class="budgets__table" data-testid="budget-table">
-      <thead>
-        <tr>
-          <th scope="col">Label</th>
-          <th scope="col">Scope</th>
-          <th scope="col">Period</th>
-          <th scope="col" class="num">Cap</th>
-          <th scope="col" class="num">Spent</th>
-          <th scope="col" class="num">Used</th>
-          <th scope="col">Hard stop</th>
-          <th scope="col">Active</th>
-          <th scope="col"><span class="cdk-visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let b of budgets; trackBy: trackById">
-          <td>{{ b.label }}</td>
-          <td>{{ scopeText(b) }}</td>
-          <td>{{ b.period | titlecase }}</td>
-          <td class="num">
-            {{ b.budget_usd | currency: 'USD' : 'symbol' : '1.2-4' }}
-          </td>
-          <td class="num">{{ formatUsd(b.spent_usd) }}</td>
-          <td class="num">{{ percent(b) | number: '1.0-1' }}%</td>
-          <td>
-            {{ b.hard_stop ? 'On' : 'Off' }}
-            <span *ngIf="b.blocking" class="budgets__blocking">Blocking</span>
-          </td>
-          <td>
+  <section
+    *ngIf="view === 'forbidden'"
+    class="budgets__state"
+    role="status"
+    data-testid="budget-forbidden">
+    <h3>{{ t('forbidden.title') }}</h3>
+    <p>{{ t('forbidden.message') }}</p>
+    <p
+      *ngIf="forbiddenDetail"
+      class="budgets__muted"
+      data-testid="budget-forbidden-detail">
+      {{ t('forbidden.detail', { message: forbiddenDetail }) }}
+    </p>
+  </section>
+
+  <section
+    *ngIf="view === 'error'"
+    class="budgets__state"
+    role="alert"
+    data-testid="budget-check-error">
+    <h3>{{ t('checkError.title') }}</h3>
+    <p>{{ t('checkError.message') }}</p>
+    <button
+      type="button"
+      mat-stroked-button
+      data-testid="budget-check-retry"
+      (click)="retryCheck()">
+      {{ t('retry') }}
+    </button>
+  </section>
+
+  <ng-container *ngIf="view === 'ready'">
+    <p
+      *ngIf="errorMessage"
+      class="budgets__error"
+      role="alert"
+      data-testid="budget-error">
+      {{ errorMessage | transloco }}
+    </p>
+
+    <p
+      *ngIf="!usageLoggingEnabled"
+      class="budgets__warning"
+      role="alert"
+      data-testid="budget-logging-off">
+      {{ t('loggingOff') }}
+    </p>
+
+    <mat-card *ngIf="form" class="budgets__form" data-testid="budget-form">
+      <mat-card-content>
+        <h3>{{ form.id ? t('form.editTitle') : t('form.newTitle') }}</h3>
+        <form class="budgets__fields" (ngSubmit)="save()">
+          <mat-form-field appearance="outline">
+            <mat-label>{{ t('form.label') }}</mat-label>
+            <input
+              matInput
+              name="label"
+              maxlength="256"
+              required
+              data-testid="budget-label"
+              [(ngModel)]="form.label" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>{{ t('form.appliesTo') }}</mat-label>
+            <mat-select
+              name="dimension_type"
+              data-testid="budget-scope-type"
+              [(ngModel)]="form.dimension_type"
+              (selectionChange)="onScopeTypeChange()">
+              <mat-option
+                *ngFor="let type of scopeTypes; trackBy: trackByValue"
+                [value]="type">
+                {{ t('scope.' + type) }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ t('form.period') }}</mat-label>
+            <mat-select
+              name="period"
+              data-testid="budget-period"
+              [(ngModel)]="form.period">
+              <mat-option
+                *ngFor="let period of periods; trackBy: trackByValue"
+                [value]="period">
+                {{ t('period.' + period) }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>{{ t('form.periodHint') }}</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>{{ t('form.cap') }}</mat-label>
+            <input
+              matInput
+              type="number"
+              name="budget_usd"
+              min="0.0001"
+              [max]="maxBudgetUsd"
+              step="0.01"
+              required
+              data-testid="budget-cap"
+              [(ngModel)]="form.budget_usd" />
+            <mat-hint>{{ t('form.capHint') }}</mat-hint>
+          </mat-form-field>
+
+          <div
+            *ngIf="form.dimension_type !== 'global'"
+            class="budgets__wide budgets__scope"
+            data-testid="budget-scope-record">
+            <div class="budgets__scope-head">
+              <span class="budgets__scope-label">
+                {{ t('scope.' + form.dimension_type) }}
+              </span>
+              <span
+                class="budgets__scope-selected"
+                data-testid="budget-scope-selected">
+                <ng-container *ngIf="form.dimension_id !== null; else noScope">
+                  {{
+                    t('form.scopeSelected', {
+                      name:
+                        scopeSelectedLabel ??
+                        t('deletedScope', { id: form.dimension_id }),
+                    })
+                  }}
+                </ng-container>
+                <ng-template #noScope>{{ t('form.scopeNone') }}</ng-template>
+              </span>
+            </div>
+            <df-picker-list
+              testId="budget-scope"
+              [items]="scopeItems"
+              [selected]="scopeSelected"
+              [loading]="scopeLoading"
+              [noun]="t('scopeNoun.' + form.dimension_type)"
+              [truncated]="scopeTruncated"
+              [remoteSearch]="searchScope"
+              (toggle)="pickScope($event)"></df-picker-list>
+            <p
+              *ngIf="!scopeLoading && !scopeItems.length"
+              class="budgets__muted"
+              data-testid="budget-scope-empty">
+              {{ t('form.scopeEmpty') }}
+            </p>
+          </div>
+
+          <ng-container *ngIf="alertWebhooksEnabled; else webhooksOff">
+            <mat-form-field
+              appearance="outline"
+              class="budgets__wide"
+              subscriptSizing="dynamic">
+              <mat-label>{{ t('form.webhookUrl') }}</mat-label>
+              <input
+                matInput
+                type="url"
+                name="alert_webhook_url"
+                maxlength="1024"
+                placeholder="https://"
+                data-testid="budget-webhook"
+                [(ngModel)]="form.alert_webhook_url" />
+              <mat-hint>{{ t('form.webhookHint') }}</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="budgets__wide">
+              <mat-label>{{ t('form.webhookAuth') }}</mat-label>
+              <input
+                matInput
+                type="password"
+                name="alert_webhook_auth_header"
+                autocomplete="new-password"
+                maxlength="4096"
+                [disabled]="form.clear_alert_webhook_auth"
+                [placeholder]="
+                  form.has_alert_webhook_auth ? t('form.webhookAuthStored') : ''
+                "
+                [(ngModel)]="form.alert_webhook_auth_header" />
+            </mat-form-field>
+
             <mat-slide-toggle
-              [checked]="b.is_active"
-              [attr.aria-label]="'Active: ' + b.label"
-              (change)="toggleActive(b, $event)"></mat-slide-toggle>
-          </td>
-          <td class="budgets__row-actions">
+              *ngIf="form.has_alert_webhook_auth"
+              class="budgets__wide"
+              name="clear_alert_webhook_auth"
+              [(ngModel)]="form.clear_alert_webhook_auth">
+              {{ t('form.webhookAuthClear') }}
+            </mat-slide-toggle>
+          </ng-container>
+          <ng-template #webhooksOff>
+            <p
+              class="budgets__muted budgets__wide"
+              data-testid="budget-webhooks-off">
+              {{ t('form.webhooksOff') }}
+            </p>
+          </ng-template>
+
+          <mat-slide-toggle
+            class="budgets__wide"
+            name="hard_stop"
+            data-testid="budget-hard-stop"
+            [(ngModel)]="form.hard_stop">
+            {{ t('form.hardStop') }}
+          </mat-slide-toggle>
+
+          <p
+            *ngIf="form.hard_stop"
+            class="budgets__warning budgets__wide"
+            role="alert"
+            data-testid="budget-hard-stop-warning">
+            {{ t('form.hardStopWarning') }}
+          </p>
+
+          <p
+            *ngIf="formError"
+            class="budgets__error budgets__wide"
+            role="alert"
+            data-testid="budget-form-error">
+            {{ formError | transloco }}
+          </p>
+
+          <div class="budgets__form-actions budgets__wide">
+            <span
+              *ngIf="formProblem"
+              class="budgets__muted budgets__form-problem"
+              data-testid="budget-form-problem">
+              {{ formProblem | transloco }}
+            </span>
             <button
               type="button"
-              mat-icon-button
-              [attr.aria-label]="'Edit ' + b.label"
-              (click)="openEdit(b)">
-              <fa-icon [icon]="faPenToSquare"></fa-icon>
+              mat-stroked-button
+              data-testid="budget-cancel"
+              [disabled]="saving"
+              (click)="closeForm()">
+              {{ t('form.cancel') }}
             </button>
             <button
-              type="button"
-              mat-icon-button
-              [attr.aria-label]="'Delete ' + b.label"
-              (click)="confirmDelete(b)">
-              <fa-icon [icon]="faTrash"></fa-icon>
+              type="submit"
+              mat-flat-button
+              color="primary"
+              data-testid="budget-save"
+              [disabled]="!canSave">
+              {{ saving ? t('form.saving') : t('form.save') }}
             </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <div
+      *ngIf="loading && !budgets.length"
+      class="budgets__loading"
+      data-testid="budget-loading">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+
+    <p
+      *ngIf="!loading && !budgets.length && !errorMessage"
+      class="budgets__empty"
+      data-testid="budget-empty">
+      {{ t('empty') }}
+    </p>
+
+    <ng-container *ngIf="budgets.length">
+      <div class="budgets__toolbar">
+        <input
+          *ngIf="budgets.length > 10"
+          type="search"
+          class="budgets__filter"
+          autocomplete="off"
+          data-testid="budget-filter"
+          [placeholder]="t('filter')"
+          [attr.aria-label]="t('filter')"
+          [ngModel]="filterQuery"
+          (ngModelChange)="onFilter($event)" />
+        <span class="budgets__muted" data-testid="budget-count">
+          {{ t('count', { shown: visible.length, total: matches.length }) }}
+        </span>
+      </div>
+
+      <div class="budgets__table-wrap">
+        <table class="budgets__table" data-testid="budget-table">
+          <thead>
+            <tr>
+              <th scope="col">{{ t('table.label') }}</th>
+              <th scope="col">{{ t('table.scope') }}</th>
+              <th scope="col">{{ t('table.period') }}</th>
+              <th scope="col" class="num">{{ t('table.cap') }}</th>
+              <th scope="col" class="num">{{ t('table.spent') }}</th>
+              <th scope="col" class="num">{{ t('table.used') }}</th>
+              <th scope="col">{{ t('table.hardStop') }}</th>
+              <th scope="col">{{ t('table.active') }}</th>
+              <th scope="col">
+                <span class="cdk-visually-hidden">{{
+                  t('table.actions')
+                }}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let b of visible; trackBy: trackById"
+              data-testid="budget-row">
+              <td class="budgets__label">{{ b.label }}</td>
+              <td>
+                {{ t('scope.' + b.dimension_type)
+                }}<ng-container *ngIf="b.dimension_type !== 'global'"
+                  >:
+                  {{
+                    b.dimension_name ??
+                      t('deletedScope', { id: b.dimension_id })
+                  }}</ng-container
+                >
+              </td>
+              <td>{{ t('period.' + b.period) }}</td>
+              <td class="num">{{ capText(b) }}</td>
+              <td class="num">{{ spentText(b) }}</td>
+              <td class="num">{{ usedText(b) }}</td>
+              <td>
+                {{ b.hard_stop ? t('table.on') : t('table.off') }}
+                <span
+                  *ngIf="b.blocking"
+                  class="budgets__blocking"
+                  data-testid="budget-blocking"
+                  >{{ t('table.blocking') }}</span
+                >
+              </td>
+              <td>
+                <mat-slide-toggle
+                  [checked]="b.is_active"
+                  [disabled]="isBusy(b)"
+                  [attr.aria-label]="t('table.activeFor', { label: b.label })"
+                  (change)="toggleActive(b, $event)"></mat-slide-toggle>
+              </td>
+              <td class="budgets__row-actions">
+                <button
+                  type="button"
+                  mat-icon-button
+                  data-testid="budget-edit"
+                  [disabled]="isBusy(b)"
+                  [attr.aria-label]="t('table.edit', { label: b.label })"
+                  (click)="openEdit(b)">
+                  <fa-icon [icon]="faPenToSquare"></fa-icon>
+                </button>
+                <button
+                  type="button"
+                  mat-icon-button
+                  data-testid="budget-delete"
+                  [disabled]="isBusy(b)"
+                  [attr.aria-label]="t('table.delete', { label: b.label })"
+                  (click)="confirmDelete(b)">
+                  <fa-icon [icon]="faTrash"></fa-icon>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p
+        *ngIf="!visible.length"
+        class="budgets__muted"
+        data-testid="budget-nomatch">
+        {{ t('noMatch') }}
+      </p>
+
+      <button
+        *ngIf="hiddenCount > 0"
+        type="button"
+        mat-stroked-button
+        class="budgets__more"
+        data-testid="budget-more"
+        (click)="showMore()">
+        {{ t('showMore', { count: nextPage }) }}
+      </button>
+    </ng-container>
+  </ng-container>
 </div>
