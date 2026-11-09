@@ -950,7 +950,14 @@
       "full": "Full access",
       "filtered": "Row or field filtered",
       "none": "No access"
-    }
+    },
+    "searchPlaceholder": "Search roles…",
+    "withAccess": "With access ({{count}})",
+    "allRoles": "All roles ({{count}})",
+    "shownOf": "{{shown}} of {{total}} roles shown",
+    "showMore": "Show {{count}} more",
+    "noMatch": "No roles match “{{query}}”.",
+    "noneReach": "No role can reach this service yet. Switch to all roles to see every role."
   },
   "scopeMap": {
     "unresolvedTitle": "No identity selected",

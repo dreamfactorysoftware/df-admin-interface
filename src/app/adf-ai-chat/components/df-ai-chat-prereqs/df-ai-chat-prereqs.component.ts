@@ -13,15 +13,19 @@ import { MatButtonModule } from '@angular/material/button';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   faCheck,
-  faCircleCheck,
   faCircleExclamation,
   faPlus,
   faRobot,
   faShieldHalved,
 } from '@fortawesome/free-solid-svg-icons';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import {
+  DfPickerListComponent,
+  PickerId,
+  PickerItem,
+} from 'src/app/shared/components/df-picker-list/df-picker-list.component';
 
 interface AiConnectionRow {
   id: number;
@@ -34,10 +38,18 @@ interface RoleRow {
   name: string;
 }
 
+const toRoleItem = (r: RoleRow): PickerItem => ({ id: r.id, label: r.name });
+
 @Component({
   selector: 'df-ai-chat-prereqs',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, FontAwesomeModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    FontAwesomeModule,
+    DfPickerListComponent,
+  ],
   template: `
     <div class="prereqs">
       <header class="prereqs__header">
@@ -84,21 +96,16 @@ interface RoleRow {
           class="prereqs__pick-hint">
           Click one to use it for this chat service:
         </p>
-        <ul *ngIf="connections.length" class="prereqs__list">
-          <li *ngFor="let c of connections; trackBy: trackById">
-            <button
-              type="button"
-              class="prereqs__chip"
-              [class.prereqs__chip--selected]="c.id === selectedConnectionId"
-              (click)="selectConnection.emit(c.id)">
-              <fa-icon
-                *ngIf="c.id === selectedConnectionId"
-                [icon]="faCircleCheck"
-                class="prereqs__chip-check"></fa-icon>
-              <span class="prereqs__name">{{ c.label || c.name }}</span>
-            </button>
-          </li>
-        </ul>
+        <df-picker-list
+          *ngIf="connections.length"
+          class="prereqs__picker"
+          noun="connections"
+          testId="prereqs-connections"
+          [items]="connectionItems"
+          [selected]="
+            selectedConnectionId == null ? [] : [selectedConnectionId]
+          "
+          (toggle)="selectConnection.emit(asNumber($event))"></df-picker-list>
 
         <p *ngIf="!loading && connections.length === 0" class="prereqs__hint">
           No AI Connections yet. The chat service can't run without one. Use the
@@ -120,7 +127,7 @@ interface RoleRow {
           <span class="prereqs__count">
             <ng-container *ngIf="loading">loading…</ng-container>
             <ng-container *ngIf="!loading">
-              {{ roles.length }} available
+              {{ rolesTotal ?? roles.length }} available
             </ng-container>
           </span>
           <a
@@ -137,30 +144,18 @@ interface RoleRow {
           class="prereqs__pick-hint">
           Click one to scope the AI's data access:
         </p>
-        <ul *ngIf="roles.length" class="prereqs__list">
-          <li *ngFor="let r of roles; trackBy: trackById">
-            <button
-              type="button"
-              class="prereqs__chip"
-              [class.prereqs__chip--selected]="r.id === selectedRoleId"
-              (click)="selectRole.emit(r.id)">
-              <fa-icon
-                *ngIf="r.id === selectedRoleId"
-                [icon]="faCircleCheck"
-                class="prereqs__chip-check"></fa-icon>
-              <span class="prereqs__name">{{ r.name }}</span>
-            </button>
-            <a
-              [routerLink]="[
-                '/api-connections/role-based-access',
-                r.id,
-                'scope',
-              ]"
-              class="prereqs__link"
-              >what can this role see?</a
-            >
-          </li>
-        </ul>
+        <df-picker-list
+          *ngIf="roles.length"
+          class="prereqs__picker"
+          noun="roles"
+          testId="prereqs-roles"
+          [items]="roleItems"
+          [selected]="selectedRoleId == null ? [] : [selectedRoleId]"
+          [truncated]="rolesTruncated"
+          [remoteSearch]="searchRoles"
+          [itemLink]="roleScopeLink"
+          itemLinkLabel="what can this role see?"
+          (toggle)="selectRole.emit(asNumber($event))"></df-picker-list>
 
         <p *ngIf="!loading && roles.length === 0" class="prereqs__hint">
           No Roles configured. The AI operates under a Role that limits what
@@ -260,55 +255,9 @@ interface RoleRow {
           min-height: 32px !important;
         }
 
-        &__list {
-          list-style: none;
-          margin: 0.625rem 0 0;
-          padding: 0;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem 0.625rem;
-
-          li {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-          }
-        }
-
-        &__chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.55rem 1.05rem;
-          background: var(--df-surface-2);
-          border: 1px solid var(--df-border);
-          border-radius: 999px;
-          font: inherit;
-          font-size: 16px;
-          color: inherit;
-          cursor: pointer;
-          transition:
-            border-color 120ms ease,
-            background 120ms ease;
-
-          &:hover {
-            border-color: rgba(96, 165, 250, 0.6);
-            background: rgba(96, 165, 250, 0.08);
-          }
-
-          &--selected {
-            border-color: #60a5fa;
-            background: rgba(96, 165, 250, 0.18);
-            color: var(--df-text);
-          }
-        }
-
-        &__chip-check {
-          color: #60a5fa;
-        }
-
-        &__name {
-          font-weight: 500;
+        &__picker {
+          display: block;
+          margin-top: 0.625rem;
         }
 
         &__pick-hint {
@@ -316,17 +265,6 @@ interface RoleRow {
           font-size: 14px;
           color: var(--df-text-2);
           font-style: italic;
-        }
-
-        &__link {
-          font-size: 12px;
-          color: var(--df-text-muted);
-          text-decoration: none;
-
-          &:hover {
-            color: #60a5fa;
-            text-decoration: underline;
-          }
         }
 
         &__hint {
@@ -363,9 +301,14 @@ export class DfAiChatPrereqsComponent implements OnInit {
   loading = true;
   connections: AiConnectionRow[] = [];
   roles: RoleRow[] = [];
+  connectionItems: PickerItem[] = [];
+  roleItems: PickerItem[] = [];
+  /** meta.count of the role load; null until known. */
+  rolesTotal: number | null = null;
+  /** True when the server capped the role load; the picker then searches server-side. */
+  rolesTruncated = false;
 
   faCheck = faCheck;
-  faCircleCheck = faCircleCheck;
   faCircleExclamation = faCircleExclamation;
   faPlus = faPlus;
   faRobot = faRobot;
@@ -383,15 +326,56 @@ export class DfAiChatPrereqsComponent implements OnInit {
         })
         .pipe(catchError(() => of({ resource: [] }))),
       roles: this.http
-        .get<{ resource: RoleRow[] }>(`${BASE_URL}/system/role`, {
-          params: { fields: 'id,name', sort: 'name' },
-        })
-        .pipe(catchError(() => of({ resource: [] }))),
+        .get<{ resource: RoleRow[]; meta?: { count?: number } }>(
+          `${BASE_URL}/system/role`,
+          {
+            params: { fields: 'id,name', sort: 'name', include_count: 'true' },
+          }
+        )
+        .pipe(
+          catchError(() =>
+            of({
+              resource: [] as RoleRow[],
+              meta: undefined as { count?: number } | undefined,
+            })
+          )
+        ),
     }).subscribe(({ conn, roles }) => {
       this.connections = conn.resource ?? [];
       this.roles = roles.resource ?? [];
+      this.connectionItems = this.connections.map(c => ({
+        id: c.id,
+        label: c.label || c.name,
+      }));
+      this.roleItems = this.roles.map(toRoleItem);
+      const total = roles.meta?.count ?? this.roles.length;
+      this.rolesTotal = total;
+      this.rolesTruncated = total > this.roles.length;
       this.loading = false;
     });
+  }
+
+  /** Server-side role search for instances whose role list exceeded the load cap. */
+  searchRoles = (query: string): Observable<PickerItem[]> =>
+    this.http
+      .get<{ resource: RoleRow[] }>(`${BASE_URL}/system/role`, {
+        params: {
+          fields: 'id,name',
+          sort: 'name',
+          limit: '50',
+          filter: `name like "%${query.replace(/["\\%]/g, '')}%"`,
+        },
+      })
+      .pipe(map(res => (res.resource ?? []).map(toRoleItem)));
+
+  roleScopeLink = (item: PickerItem): unknown[] => [
+    '/api-connections/role-based-access',
+    item.id,
+    'scope',
+  ];
+
+  asNumber(id: PickerId): number {
+    return Number(id);
   }
 
   trackById(_: number, row: { id: number }): number {

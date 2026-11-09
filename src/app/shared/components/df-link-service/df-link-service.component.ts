@@ -207,12 +207,17 @@ export class DfLinkServiceComponent implements OnInit, OnChanges {
       { emitEvent: false }
     );
 
-    if (service.type === 'github' && savedRepo) {
+    if (service.type === 'github') {
+      // Always fetch the repo list for a GitHub service so the Repository
+      // autocomplete works without re-selecting the service. Only scripts
+      // saved with a repo can also restore the explorer position.
       this.loadRepositories();
-      const parentPath = savedPath.includes('/')
-        ? savedPath.substring(0, savedPath.lastIndexOf('/'))
-        : '';
-      this.loadPath(parentPath);
+      if (savedRepo) {
+        const parentPath = savedPath.includes('/')
+          ? savedPath.substring(0, savedPath.lastIndexOf('/'))
+          : '';
+        this.loadPath(parentPath);
+      }
     }
   }
 
