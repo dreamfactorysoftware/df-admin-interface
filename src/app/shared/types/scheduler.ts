@@ -2,11 +2,15 @@ import { Service } from 'src/app/shared/types/service';
 
 export type RunSummary = {
   id: number;
-  startedAt: string;
+  startedAt: string | null;
   finishedAt: string | null;
   statusCode: number | null;
 };
 
+/**
+ * Appended to every task by a df-scheduler that keeps per-run history.
+ * Absent on older backends: that absence is how the UI detects support.
+ */
 export type RunStatus = {
   isRunning: boolean;
   lastRun: RunSummary | null;

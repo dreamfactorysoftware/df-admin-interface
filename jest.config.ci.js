@@ -70,5 +70,7 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-picker-list/df-picker-list.component.spec.ts',
     // df-scheduler#41: last-run / running-state helpers.
     '<rootDir>/src/app/adf-scheduler/utils/run-status.spec.ts',
+    // df-scheduler#41: the list's Last run column in each backend state.
+    '<rootDir>/src/app/adf-scheduler/df-manage-scheduler/df-manage-scheduler-table.spec.ts',
   ],
 };
