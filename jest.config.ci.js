@@ -68,5 +68,7 @@ module.exports = {
     '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
     // 2026-10-29 bounded df-ai-* pickers: search, paging, selected-first, remote search.
     '<rootDir>/src/app/shared/components/df-picker-list/df-picker-list.component.spec.ts',
+    // 2026-11-09 HTTP service Backend Authentication panel (outbound OAuth2).
+    '<rootDir>/src/app/adf-services/df-service-details/df-service-details.backend-auth.spec.ts',
   ],
 };
