@@ -20,6 +20,24 @@ const undated = (): DimensionSeriesPoint =>
     requests: 0,
   }) as unknown as DimensionSeriesPoint;
 
+/**
+ * Make the local-time getters answer as they do at the given UTC offset,
+ * whatever timezone the runner is in. Jest cannot switch TZ per test.
+ */
+function emulateUtcOffset(hours: number): void {
+  const shifted = (d: Date) => new Date(d.getTime() + hours * 3_600_000);
+  jest.spyOn(Date.prototype, 'getDate').mockImplementation(function (
+    this: Date
+  ) {
+    return shifted(this).getUTCDate();
+  });
+  jest.spyOn(Date.prototype, 'getMonth').mockImplementation(function (
+    this: Date
+  ) {
+    return shifted(this).getUTCMonth();
+  });
+}
+
 describe('DfCostByDimensionComponent', () => {
   let fixture: ComponentFixture<DfCostByDimensionComponent>;
   let component: DfCostByDimensionComponent;
@@ -70,9 +88,8 @@ describe('DfCostByDimensionComponent', () => {
 
     expect(component.layers.map(l => l.label)).toEqual(['alice']);
     expect(component.layers[0].totalCost).toBe(6);
-    expect(component.xTicks).toHaveLength(2);
+    expect(component.xTicks.map(t => t.label)).toEqual(['11/3', '11/4']);
     for (const tick of component.xTicks) {
-      expect(tick.label).toMatch(/^\d{1,2}\/\d{1,2}$/);
       expect(Number.isFinite(tick.x)).toBe(true);
     }
     expect(emptyState()).toBeNull();
@@ -97,5 +114,48 @@ describe('DfCostByDimensionComponent', () => {
     expect(component.layers.map(l => l.label)).toEqual(['alice', 'Other']);
     expect(component.xTicks).toHaveLength(1);
     expect(component.yTicks).toHaveLength(3);
+  });
+
+  // Regression: the day came from new Date('YYYY-MM-DD'), which is midnight
+  // UTC, read back with the local getters. West of UTC every label was one
+  // day early (11-03 to 11-06 showed as 11/2 to 11/5 in Denver).
+  describe('day labels', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const week = ['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'].map(
+      (date, i) => point(date, 'alice', i + 1)
+    );
+
+    it.each([
+      ['west of UTC (Denver, UTC-7)', -7],
+      ['east of UTC (Tokyo, UTC+9)', 9],
+      ['far east of UTC (Kiritimati, UTC+14)', 14],
+    ])('show the calendar day of each point %s', (_zone, offset) => {
+      emulateUtcOffset(offset);
+
+      render(week);
+
+      expect(component.xTicks.map(t => t.label)).toEqual([
+        '11/3',
+        '11/4',
+        '11/5',
+        '11/6',
+      ]);
+    });
+
+    it('show the calendar day in the timezone of the runner', () => {
+      render([
+        point('2026-01-01', 'alice', 1),
+        point('2026-12-31', 'alice', 1),
+      ]);
+
+      expect(component.xTicks.map(t => t.label)).toEqual(['1/1', '12/31']);
+    });
+
+    it('fall back to the text after the year for a non-date key', () => {
+      render([point('2026-W45', 'alice', 1)]);
+
+      expect(component.xTicks.map(t => t.label)).toEqual(['W45']);
+    });
   });
 });

@@ -16,7 +16,23 @@ const bucket = (
     costUsd: 0,
   }) as TimeBucket;
 
-const DAY_LABEL = /^\d{1,2}\/\d{1,2}$/;
+/**
+ * Make the local-time getters answer as they do at the given UTC offset,
+ * whatever timezone the runner is in. Jest cannot switch TZ per test.
+ */
+function emulateUtcOffset(hours: number): void {
+  const shifted = (d: Date) => new Date(d.getTime() + hours * 3_600_000);
+  jest.spyOn(Date.prototype, 'getDate').mockImplementation(function (
+    this: Date
+  ) {
+    return shifted(this).getUTCDate();
+  });
+  jest.spyOn(Date.prototype, 'getMonth').mockImplementation(function (
+    this: Date
+  ) {
+    return shifted(this).getUTCMonth();
+  });
+}
 
 describe('DfUsageStackedAreaComponent', () => {
   let fixture: ComponentFixture<DfUsageStackedAreaComponent>;
@@ -59,13 +75,7 @@ describe('DfUsageStackedAreaComponent', () => {
     ).not.toThrow();
 
     expect(component.hasData).toBe(true);
-    // Local-time labels: assert the shape, not the day, so the spec does
-    // not depend on the runner's timezone.
-    const labels = component.xTicks.map(t => t.label);
-    expect(labels).toHaveLength(3);
-    expect(labels[0]).toMatch(DAY_LABEL);
-    expect(labels[1]).toBe('');
-    expect(labels[2]).toMatch(DAY_LABEL);
+    expect(component.xTicks.map(t => t.label)).toEqual(['11/3', '', '11/5']);
     expect(fixture.nativeElement.textContent).not.toContain('NaN');
     expect(emptyState()).toBeNull();
   });
@@ -77,10 +87,44 @@ describe('DfUsageStackedAreaComponent', () => {
       ['Input', 400],
       ['Output', 150],
     ]);
-    expect(component.xTicks).toHaveLength(2);
-    for (const tick of component.xTicks) {
-      expect(tick.label).toMatch(DAY_LABEL);
-    }
+    expect(component.xTicks.map(t => t.label)).toEqual(['11/3', '11/4']);
     expect(component.yTicks.map(t => t.label)).toEqual(['0', '200', '400']);
+  });
+
+  // Regression: the day came from new Date('YYYY-MM-DD'), which is midnight
+  // UTC, read back with the local getters. West of UTC every label was one
+  // day early (11-03 to 11-06 showed as 11/2 to 11/5 in Denver).
+  describe('day labels', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const week = [
+      bucket('2026-11-03', 100, 50),
+      bucket('2026-11-04', 300, 100),
+      bucket('2026-11-05', 200, 80),
+      bucket('2026-11-06', 100, 40),
+    ];
+
+    it.each([
+      ['west of UTC (Denver, UTC-7)', -7],
+      ['east of UTC (Tokyo, UTC+9)', 9],
+      ['far east of UTC (Kiritimati, UTC+14)', 14],
+    ])('show the calendar day of each bucket %s', (_zone, offset) => {
+      emulateUtcOffset(offset);
+
+      render(week);
+
+      expect(component.xTicks.map(t => t.label)).toEqual([
+        '11/3',
+        '11/4',
+        '11/5',
+        '11/6',
+      ]);
+    });
+
+    it('show the calendar day in the timezone of the runner', () => {
+      render([bucket('2026-01-01', 1, 1), bucket('2026-12-31', 1, 1)]);
+
+      expect(component.xTicks.map(t => t.label)).toEqual(['1/1', '12/31']);
+    });
   });
 });

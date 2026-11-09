@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
+import { dayLabel } from '../../utils/calendar-date';
 import { USD_2DP } from '../../utils/cost';
 
 /**
@@ -379,7 +380,8 @@ export class DfCostByDimensionComponent implements OnChanges {
         dates.length === 1
           ? this.paddingX + innerW / 2
           : this.paddingX + (idx / (dates.length - 1)) * innerW;
-      ticks.push({ x, label: shortDate(dates[idx]) });
+      // Not a date at all: show what follows the year rather than nothing.
+      ticks.push({ x, label: dayLabel(dates[idx]) || dates[idx].slice(5) });
     }
     return ticks;
   }
@@ -410,14 +412,6 @@ function pathArea(
   }
   parts.push('Z');
   return parts.join(' ');
-}
-
-function shortDate(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    return iso.slice(5); // fall back to MM-DD from YYYY-MM-DD strings
-  }
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function formatUsd(v: number): string {

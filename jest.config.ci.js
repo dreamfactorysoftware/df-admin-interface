@@ -71,5 +71,6 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-usage/df-ai-usage.component.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/components/df-cost-by-dimension/df-cost-by-dimension.component.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/components/df-usage-stacked-area/df-usage-stacked-area.component.spec.ts',
+    '<rootDir>/src/app/adf-ai-usage/utils/calendar-date.spec.ts',
   ],
 };
