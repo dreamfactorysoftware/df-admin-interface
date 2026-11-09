@@ -86,6 +86,8 @@
   "rate": "Rate",
   "counter": "Counter",
   "user": "User",
+  "use": "Use",
+  "function": "Function",
   "service": "Service",
   "time": "Time",
   "serviceId": "Service ID",
@@ -548,7 +550,11 @@
         },
         "api-builder": {
           "nav": "API Builder",
-          "header": "{{nav.api-connections.api-types.api-builder.nav}}"
+          "header": "{{nav.api-connections.api-types.api-builder.nav}}",
+          "create": {
+            "nav": "Create API",
+            "header": "{{nav.api-connections.api-types.api-builder.create.nav}}"
+          }
         }
       },
       "role-based-access": {
@@ -697,7 +703,11 @@
       },
       "df-platform-apis": {
         "nav": "DreamFactory Platform APIs",
-        "header": "{{nav.system-settings.df-platform-apis.nav}}"
+        "header": "{{nav.system-settings.df-platform-apis.nav}}",
+        "create": {
+          "nav": "Create Platform API",
+          "header": "{{nav.system-settings.df-platform-apis.create.nav}}"
+        }
       }
     },
     "admin-settings": {
