@@ -66,6 +66,9 @@ jobs:
           # checkout pins the commit that started the run, and a run that
           # waited in the queue would build old source.
           ref: ${{ github.ref }}
+          # Keep the write token out of .git/config. npm ci and the build run
+          # third-party code. Only the commit step below gets the token.
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -84,8 +87,12 @@ jobs:
         run: scripts/verify-dist.sh dist
 
       - name: Commit dist if it changed
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           built="$(git rev-parse HEAD)"
+          # Checkout stored no credentials, so pass the token on the URL.
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
@@ -102,12 +109,12 @@ jobs:
 
           # No rebase and no force. A fast-forward succeeds only if the branch
           # still points at the commit we built.
-          if git push origin "HEAD:refs/heads/${BRANCH}"; then
+          if git push "$remote" "HEAD:refs/heads/${BRANCH}"; then
             echo "::notice::Pushed dist built from ${built}."
             exit 0
           fi
 
-          git fetch --quiet origin "refs/heads/${BRANCH}"
+          git fetch --quiet "$remote" "refs/heads/${BRANCH}"
           tip="$(git rev-parse FETCH_HEAD)"
           if [ "$tip" != "$built" ]; then
             echo "::notice::${BRANCH} moved from ${built} to ${tip} during the build. Nothing pushed. The run for the newer push builds the new tip."
