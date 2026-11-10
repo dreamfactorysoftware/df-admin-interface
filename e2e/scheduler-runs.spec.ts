@@ -98,9 +98,16 @@ test('Scheduler: Last run column and Run history tab for a never-run task', asyn
     await expect(
       page.getByRole('columnheader', { name: 'Last run' })
     ).toBeVisible({ timeout: 15_000 });
-    await expect(
-      page.getByRole('row').filter({ hasText: name }).getByText('Never')
-    ).toBeVisible();
+    // The scheduler list has no search box and shows 10 rows a page, so on an
+    // instance that already has tasks the new one sits on a later page.
+    const row = page.getByRole('row').filter({ hasText: name });
+    const next = page.getByRole('button', { name: 'Next page' });
+    for (let i = 0; i < 20 && !(await row.isVisible()); i++) {
+      if (!(await next.isEnabled())) break;
+      await next.click();
+      await page.waitForLoadState('networkidle');
+    }
+    await expect(row.getByText('Never')).toBeVisible();
 
     await page.goto(`/dreamfactory/dist/#/system-settings/scheduler/${id}`);
     const tab = page.getByRole('tab', { name: 'Run history' });
