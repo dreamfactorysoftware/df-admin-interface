@@ -9,6 +9,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { Subscription } from 'rxjs';
+import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-paywall.component';
 import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-skeleton.component';
 import { DfEmptyStateComponent } from 'src/app/shared/components/df-empty-state/df-empty-state.component';
 import { AauthStore } from '../aauth.store';
@@ -50,7 +51,8 @@ const TAB_COUNT: Partial<Record<AaTab, keyof AauthCounts>> = {
  * AAuth page shell (/api-security/aauth). The admin chrome already prints
  * the H1, so the shell carries the one primary control (Enabled), the
  * issuer, and the tab bar. The tab lives in ?tab= so links and reloads
- * keep it.
+ * keep it. Without the df-aauth package (GOLD) the route resolves to
+ * 'paywall' and the shell shows only the standard paywall.
  */
 @Component({
   selector: 'df-aauth',
@@ -68,6 +70,7 @@ const TAB_COUNT: Partial<Record<AaTab, keyof AauthCounts>> = {
     MatTabsModule,
     MatTooltipModule,
     TranslocoPipe,
+    DfPaywallComponent,
     DfSkeletonComponent,
     DfEmptyStateComponent,
     DfAaCopyComponent,
@@ -88,19 +91,26 @@ export class DfAauthComponent implements OnInit, OnDestroy {
   private router = inject(Router);
 
   readonly tabs = AA_TABS;
+  paywall = false;
   tab: AaTab = 'scopes';
-  private sub?: Subscription;
+  private subs: Subscription[] = [];
 
   ngOnInit(): void {
-    if (!this.store.overview) this.store.load();
-    this.sub = this.route.queryParamMap.subscribe(q => {
-      const t = q.get('tab') as AaTab | null;
-      this.tab = t && AA_TABS.includes(t) ? t : 'scopes';
-    });
+    this.subs.push(
+      this.route.data.subscribe(d => {
+        this.paywall = d?.['data'] === 'paywall';
+        if (this.paywall) return;
+        if (!this.store.overview) this.store.load();
+      }),
+      this.route.queryParamMap.subscribe(q => {
+        const t = q.get('tab') as AaTab | null;
+        this.tab = t && AA_TABS.includes(t) ? t : 'scopes';
+      })
+    );
   }
 
   ngOnDestroy(): void {
-    this.sub?.unsubscribe();
+    this.subs.forEach(s => s.unsubscribe());
     this.store.stopPolling();
   }
 

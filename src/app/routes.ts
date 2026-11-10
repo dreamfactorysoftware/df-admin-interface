@@ -16,6 +16,7 @@ import {
 import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
 import { dataMaskingResolver } from './adf-data-masking/data-masking.resolver';
 import { complianceResolver } from './adf-compliance/compliance.resolver';
+import { aauthResolver } from './adf-aauth/aauth.resolver';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
 import { DfPasswordService } from './adf-user-management/services/df-password.service';
@@ -379,13 +380,14 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
       {
-        // Agent authorization (AAuth). Not a commercial feature: no
-        // paywall, no resolver.
+        // Agent authorization (AAuth, df-aauth, GOLD). The standard
+        // paywall whenever the aauth system resource is missing.
         path: ROUTES.AAUTH,
         loadComponent: () =>
           import('./adf-aauth/df-aauth/df-aauth.component').then(
             m => m.DfAauthComponent
           ),
+        resolve: { data: aauthResolver },
         providers: [provideTranslocoScope('aauth')],
       },
       {

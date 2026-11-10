@@ -5,10 +5,18 @@ import {
   flush,
   tick,
 } from '@angular/core/testing';
+import { Component, Input } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { Router, provideRouter } from '@angular/router';
+import {
+  ActivatedRoute,
+  Router,
+  convertToParamMap,
+  provideRouter,
+} from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
+import { DfPaywallComponent } from 'src/app/shared/components/df-paywall/df-paywall.component';
 import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfAauthComponent } from './df-aauth.component';
 import { DfAauthApiService } from '../aauth-api.service';
@@ -170,5 +178,69 @@ describe('DfAauthComponent', () => {
     toggle.click();
     fixture.detectChanges();
     expect(api.updateScope).toHaveBeenCalledWith(3, { enabled: true });
+  });
+});
+
+/** The shared paywall tracks a hit and boots Calendly: stubbed here. */
+@Component({ selector: 'df-paywall', standalone: true, template: '' })
+class StubPaywallComponent {
+  @Input() serviceName = '';
+}
+
+describe('DfAauthComponent (paywall)', () => {
+  let api: ReturnType<typeof fakeAauthApi>;
+
+  function create(data: 'paywall' | 'ok') {
+    api = fakeAauthApi();
+    TestBed.configureTestingModule({
+      imports: [DfAauthComponent, aauthTransloco(), NoopAnimationsModule],
+      providers: [
+        provideRouter([]),
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            data: of({ data }),
+            queryParamMap: of(convertToParamMap({})),
+          },
+        },
+        { provide: DfAauthApiService, useValue: api },
+        {
+          provide: DfSnackbarService,
+          useValue: { openSnackBar: jest.fn(), openError: jest.fn() },
+        },
+      ],
+    });
+    TestBed.overrideComponent(DfAauthComponent, {
+      remove: { imports: [DfPaywallComponent] },
+      add: { imports: [StubPaywallComponent] },
+    });
+    const fixture = TestBed.createComponent(DfAauthComponent);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('without the aauth resource shows the shared paywall, on any license', () => {
+    const fixture = create('paywall');
+    const paywall = fixture.debugElement.query(
+      By.directive(StubPaywallComponent)
+    );
+    expect(paywall).toBeTruthy();
+    expect(paywall.componentInstance.serviceName).toBe('AAuth');
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.aa')).toBeNull();
+    expect(el.querySelector('[data-testid="aa-enabled"]')).toBeNull();
+    // Nothing is asked of a backend that is not there.
+    expect(api.overview).not.toHaveBeenCalled();
+    expect(api.scopes).not.toHaveBeenCalled();
+  });
+
+  it('with the resource opens the page, no paywall', () => {
+    const fixture = create('ok');
+    expect(
+      fixture.debugElement.query(By.directive(StubPaywallComponent))
+    ).toBeNull();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.aa')).toBeTruthy();
+    expect(api.overview).toHaveBeenCalled();
   });
 });

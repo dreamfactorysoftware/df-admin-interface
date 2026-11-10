@@ -125,4 +125,32 @@ describe('DfSecurityOverviewComponent masking status', () => {
     create('GOLD');
     expect(maskingCard().meta).toBeUndefined();
   });
+
+  it('lists AAuth after Authentication, in nav order, four to a row', () => {
+    create('GOLD');
+    const cards = fixture.componentInstance.groups[0].cards;
+    expect(cards.map(c => c.route)).toEqual([
+      '/api-security/authentication',
+      '/api-security/aauth',
+      '/api-security/rate-limiting',
+      '/api-security/data-masking',
+      '/api-security/compliance',
+      '/api-connections/role-based-access',
+      '/api-connections/api-keys',
+    ]);
+    const link = (fixture.nativeElement as HTMLElement).querySelector(
+      'a.section-card[aria-label="AAuth"]'
+    );
+    expect(link?.getAttribute('href')).toBe('/api-security/aauth');
+    expect(link?.textContent).toContain('Manage AAuth');
+    // No status line and no request of its own.
+    expect(cards[1].meta).toBeUndefined();
+    expect(activatePaywall).not.toHaveBeenCalledWith('aauth');
+    const grid = (fixture.nativeElement as HTMLElement).querySelector(
+      '.section-landing__cards--fixed'
+    ) as HTMLElement | null;
+    expect(grid?.style.getPropertyValue('--section-landing-card-cols')).toBe(
+      '4'
+    );
+  });
 });

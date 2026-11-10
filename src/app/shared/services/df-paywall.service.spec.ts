@@ -96,3 +96,41 @@ describe('DfPaywallService: Data Masking and Compliance', () => {
     }
   });
 });
+
+/** AAuth (df-aauth) is GOLD only: locked in the nav like Data Masking. */
+describe('DfPaywallService: AAuth nav lock', () => {
+  const svc = () => {
+    TestBed.configureTestingModule({
+      providers: [
+        DfPaywallService,
+        { provide: DfSystemConfigDataService, useValue: {} },
+        { provide: DfErrorService, useValue: {} },
+        { provide: HttpClient, useValue: {} },
+      ],
+    });
+    return TestBed.inject(DfPaywallService);
+  };
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('locks AAuth on open source and silver, not on GOLD', () => {
+    const s = svc();
+    const route = '/api-security/aauth';
+    expect(s.isFeatureLocked(route, 'OPEN SOURCE')).toBe(true);
+    expect(s.isFeatureLocked(route, 'SILVER')).toBe(true);
+    expect(s.isFeatureLocked(route, 'GOLD')).toBe(false);
+  });
+
+  it('leaves its neighbours as they were', () => {
+    const s = svc();
+    for (const license of ['OPEN SOURCE', 'SILVER']) {
+      expect(s.isFeatureLocked('/api-security', license)).toBe(false);
+      expect(s.isFeatureLocked('/api-security/authentication', license)).toBe(
+        false
+      );
+      expect(
+        s.isFeatureLocked('/api-security/authentication/create', license)
+      ).toBe(false);
+    }
+  });
+});

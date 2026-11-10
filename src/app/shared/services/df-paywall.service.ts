@@ -16,6 +16,7 @@ export class DfPaywallService {
     'reporting',
     'data-masking',
     'compliance',
+    'aauth',
   ];
 
   private silverLockedFeatures = [
@@ -24,6 +25,7 @@ export class DfPaywallService {
     'reporting',
     'data-masking',
     'compliance',
+    'aauth',
   ];
 
   isFeatureLocked(route: string, licenseType: string): boolean {
