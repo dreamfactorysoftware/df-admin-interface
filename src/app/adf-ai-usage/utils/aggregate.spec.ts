@@ -145,8 +145,8 @@ describe('aggregate', () => {
 
     // Regression: with "all" the first day came from new Date('YYYY-MM-DD'),
     // midnight UTC. West of UTC that is the previous local day, so the
-    // series opened with an empty day nobody had data for. Only a runner
-    // west of UTC can catch it: run with TZ=America/Denver.
+    // series opened with an empty day nobody had data for. CI pins
+    // TZ=America/Denver (jest.tz-setup.js) so this can fail.
     it('starts "all" on the first local day that has data', () => {
       const first = new Date(2026, 3, 25, 10); // local time, any timezone
       const last = new Date(2026, 3, 27, 10);

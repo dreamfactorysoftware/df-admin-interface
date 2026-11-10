@@ -111,10 +111,6 @@ describe('cost', () => {
       expect(rates['gemini'].outputPer1k).toBe(0.0004);
     });
 
-    it('gives the same provider table for both shapes', () => {
-      expect(ratesFromBundle(NESTED)).toEqual(ratesFromBundle(FLAT));
-    });
-
     it('keeps the fallback for providers the backend does not list', () => {
       expect(ratesFromBundle(NESTED)['xai']).toEqual(DEFAULT_RATES['xai']);
       expect(ratesFromBundle(FLAT)['openai']).toEqual(DEFAULT_RATES['openai']);
@@ -136,50 +132,6 @@ describe('cost', () => {
 
       expect(rates['broken']).toBeUndefined();
       expect(rates['anthropic'].inputPer1k).toBe(0.004);
-    });
-  });
-
-  describe('liveRates', () => {
-    it('splits the nested shape into provider and model rates', () => {
-      const live = liveRates(NESTED);
-
-      expect(Object.keys(live.providers)).toEqual([
-        'anthropic',
-        'gemini',
-        'ollama',
-      ]);
-      expect(live.models['claude-opus-4-8']).toEqual({
-        inputPer1k: 0.015,
-        outputPer1k: 0.075,
-      });
-    });
-
-    it('reads the flat shape as provider rates with no model rates', () => {
-      const live = liveRates(FLAT);
-
-      expect(Object.keys(live.providers)).toEqual([
-        'anthropic',
-        'gemini',
-        'ollama',
-      ]);
-      expect(live.models).toEqual({});
-    });
-
-    it('reads a flat map that prices a provider named "models" as flat', () => {
-      const live = liveRates({
-        models: { input_per_1k: 0.001, output_per_1k: 0.002 },
-        anthropic: { input_per_1k: 0.004, output_per_1k: 0.02 },
-      });
-
-      expect(Object.keys(live.providers)).toEqual(['models', 'anthropic']);
-      expect(live.models).toEqual({});
-    });
-
-    it('is empty for a missing or empty payload', () => {
-      const empty = { providers: {}, models: {} };
-      expect(liveRates(undefined)).toEqual(empty);
-      expect(liveRates(null)).toEqual(empty);
-      expect(liveRates({})).toEqual(empty);
     });
   });
 

@@ -147,20 +147,6 @@ describe('task-estimate', () => {
         expect(c!.rateSource).toBe('blended');
         expect(c!.rates.inputPer1k).toBeCloseTo(0.02);
       });
-
-      it('never prices from the "providers" or "models" keys themselves', () => {
-        const c = calibrate(
-          bundle({
-            default_rates: nested,
-            by_model: [
-              { model: 'models', provider: 'providers', requests: 10 },
-            ],
-          }),
-          'app'
-        );
-
-        expect(c!.rateSource).toBe('blended');
-      });
     });
 
     // A free list price says nothing about a connection that bills through

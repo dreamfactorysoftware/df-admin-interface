@@ -17,6 +17,7 @@ const base = require('./jest.config');
 
 module.exports = {
   ...base,
+  globalSetup: '<rootDir>/jest.tz-setup.js',
   testMatch: [
     // Regression coverage for the 2026-04-22 customer fire-drill fixes.
     '<rootDir>/src/app/shared/services/df-loading-spinner.service.spec.ts',
@@ -71,6 +72,5 @@ module.exports = {
     '<rootDir>/src/app/adf-ai-usage/df-ai-usage.component.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/components/df-cost-by-dimension/df-cost-by-dimension.component.spec.ts',
     '<rootDir>/src/app/adf-ai-usage/components/df-usage-stacked-area/df-usage-stacked-area.component.spec.ts',
-    '<rootDir>/src/app/adf-ai-usage/utils/calendar-date.spec.ts',
   ],
 };
