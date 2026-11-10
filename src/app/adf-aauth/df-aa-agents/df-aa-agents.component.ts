@@ -31,6 +31,15 @@ export class DfAaAgentsComponent implements OnInit {
   readonly relTime = relTime;
   readonly hostOf = hostOf;
 
+  /** The agent id without "@<provider host>" when the Provider column already shows that host. */
+  localId(a: AauthAgent): string {
+    const id = a.agentId ?? '';
+    const host = hostOf(a.issuer);
+    return host && id.endsWith(`@${host}`)
+      ? id.slice(0, -(host.length + 1))
+      : id;
+  }
+
   ngOnInit(): void {
     this.store.loadAgents(!!this.store.agents);
   }

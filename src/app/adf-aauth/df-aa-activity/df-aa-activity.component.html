@@ -54,7 +54,7 @@
         }}</time>
       </span>
       <span role="cell" class="cell nowrap" [title]="r.agentId">{{
-        r.agentName || r.agentId
+        r.agentName || r.agentId || '—'
       }}</span>
       <span role="cell" class="cell nowrap" [class.muted]="!r.person">{{
         r.person || '—'

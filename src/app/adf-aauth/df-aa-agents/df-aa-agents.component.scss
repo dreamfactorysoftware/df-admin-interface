@@ -11,6 +11,12 @@
     110px 80px 64px;
 }
 
+.agent-id {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .name {
   font-weight: var(--df-font-weight-medium);
   white-space: nowrap;

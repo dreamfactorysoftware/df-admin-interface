@@ -436,10 +436,14 @@ export class AauthStore implements OnDestroy {
   }
 
   private applyRun(run: PlaygroundRun): void {
+    const was = this.run?.runId === run?.runId ? this.run?.status : undefined;
     this.run = {
       ...run,
       steps: Array.isArray(run?.steps) ? run.steps : [],
     };
+    // A finished run can add agents, activity and grants: keep the tab counts current.
+    const ended = run?.status === 'done' || run?.status === 'failed';
+    if (ended && was !== run.status) this.refreshOverview();
   }
 
   /** Polls `advance` every 2 s while the run is running or waiting. */
