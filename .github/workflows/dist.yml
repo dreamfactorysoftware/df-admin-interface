@@ -50,15 +50,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Two jobs so the write token never sits next to third-party code. npm ci and
+  # the build run npm packages and their scripts (husky's prepare hook sets
+  # core.hooksPath, and any package could write hooks or url.*.insteadOf into
+  # .git/config). This job has a read-only token and hands over only dist/.
   build:
     # A manual run can be pointed at a tag. Only a branch can take a commit.
     if: github.ref_type == 'branch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write
-    env:
-      BRANCH: ${{ github.ref_name }}
+      contents: read
+    outputs:
+      built: ${{ steps.sha.outputs.built }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,9 +70,10 @@ jobs:
           # checkout pins the commit that started the run, and a run that
           # waited in the queue would build old source.
           ref: ${{ github.ref }}
-          # Keep the write token out of .git/config. npm ci and the build run
-          # third-party code. Only the commit step below gets the token.
           persist-credentials: false
+
+      - id: sha
+        run: echo "built=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -86,15 +91,46 @@ jobs:
       - name: Verify the build
         run: scripts/verify-dist.sh dist
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+
+  # Never runs npm. Starts from a fresh checkout of the built commit, so nothing
+  # the build did to .git exists here. Only this job gets the write token.
+  commit:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      BRANCH: ${{ github.ref_name }}
+      BUILT: ${{ needs.build.outputs.built }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.built }}
+          # The token goes on the push URL below, not into .git/config.
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: ${{ runner.temp }}/built-dist
+
       - name: Commit dist if it changed
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          built="$(git rev-parse HEAD)"
-          # Checkout stored no credentials, so pass the token on the URL.
+          built="${BUILT}"
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          rm -rf dist
+          cp -a "${RUNNER_TEMP}/built-dist" dist
 
           # --all stages deleted chunks as well as new ones.
           # --force keeps this working if dist/ is ever added to .gitignore.
