@@ -81,7 +81,7 @@
             [value]="selected(s)"
             (valueChange)="pick(s, $event)"
             (openedChange)="closed(s, $event)"
-            [placeholder]="'aauth.servers.allScopes' | transloco"
+            [placeholder]="'aauth.servers.none' | transloco"
             [aria-label]="
               ('aauth.servers.scopes' | transloco) + ' ' + displayName(s)
             "
@@ -89,9 +89,19 @@
             data-testid="aa-server-scopes">
             <mat-select-trigger>
               <span class="chips">
-                <span class="chip" *ngFor="let x of selected(s)">{{ x }}</span>
+                <span
+                  class="chip"
+                  *ngFor="let x of selected(s)"
+                  [class.all]="x === ALL"
+                  >{{ chipLabel(x) }}</span
+                >
               </span>
             </mat-select-trigger>
+            <mat-option [value]="ALL" data-testid="aa-server-all-scopes">
+              <span class="opt">{{
+                'aauth.servers.allScopes' | transloco
+              }}</span>
+            </mat-option>
             <mat-option *ngFor="let x of options(s)" [value]="x">
               <span class="opt mono">{{ x }}</span>
             </mat-option>

@@ -63,12 +63,18 @@
         <span class="chip" *ngIf="r.scope; else none">{{ r.scope }}</span>
         <ng-template #none><span class="muted">—</span></ng-template>
       </span>
-      <span
-        role="cell"
-        class="cell mono nowrap request"
-        [title]="r.method + ' ' + r.path"
-        ><span class="method">{{ r.method }}</span> {{ r.path }}</span
-      >
+      <span role="cell" class="cell request" [title]="r.method + ' ' + r.path">
+        <span class="req-line mono nowrap"
+          ><span class="method">{{ r.method }}</span> {{ r.path }}</span
+        >
+        <span
+          class="detail"
+          *ngIf="r.detail && r.outcome !== 'allowed'"
+          [title]="r.detail"
+          data-testid="aa-activity-detail"
+          >{{ r.detail }}</span
+        >
+      </span>
       <span role="cell" class="cell result" [title]="r.detail || ''">
         <df-badge
           [variant]="variant(r.outcome)"

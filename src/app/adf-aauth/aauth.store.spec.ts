@@ -165,6 +165,7 @@ describe('AauthStore', () => {
           isLocal: false,
           enabled: true,
           scopes: [],
+          allScopes: false,
           lastUsedAt: null,
         })
       );
@@ -184,6 +185,7 @@ describe('AauthStore', () => {
           isLocal: true,
           enabled: true,
           scopes: [],
+          allScopes: false,
           lastUsedAt: null,
         },
         {
@@ -193,6 +195,7 @@ describe('AauthStore', () => {
           isLocal: false,
           enabled: true,
           scopes: [],
+          allScopes: false,
           lastUsedAt: null,
         },
       ];
@@ -239,13 +242,22 @@ describe('AauthStore', () => {
         id: 500 - i,
       }));
       api.activity
-        .mockReturnValueOnce(of(page))
-        .mockReturnValueOnce(of([{ id: 1 }]));
+        .mockReturnValueOnce(of({ rows: page, hasMore: true }))
+        .mockReturnValueOnce(of({ rows: [{ id: 1 }], hasMore: false }));
       store.loadActivity();
       expect(store.activityHasMore).toBe(true);
       store.loadOlderActivity();
       expect(api.activity).toHaveBeenLastCalledWith(ACTIVITY_PAGE, 401);
       expect(store.activity!.length).toBe(ACTIVITY_PAGE + 1);
+      expect(store.activityHasMore).toBe(false);
+    });
+
+    it('trusts has_more, not the page length', () => {
+      const page = Array.from({ length: ACTIVITY_PAGE }, (_, i) => ({
+        id: 500 - i,
+      }));
+      api.activity.mockReturnValueOnce(of({ rows: page, hasMore: false }));
+      store.loadActivity();
       expect(store.activityHasMore).toBe(false);
     });
 

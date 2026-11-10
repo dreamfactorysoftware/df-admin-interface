@@ -104,6 +104,17 @@
   height: 36px;
 }
 
+// Dark theme: the compiled Material primary is a dark navy that disappears
+// on the dark panel; the main actions use the theme accent instead
+// (#7571a9 on #1c1b21 is about 3.8:1, white label on it about 4.5:1).
+:host-context(.dark-theme) {
+  .send-btn:not([disabled]),
+  .approve-btn {
+    --mdc-filled-button-container-color: var(--df-accent);
+    --mdc-filled-button-label-text-color: var(--df-accent-contrast);
+  }
+}
+
 .body {
   grid-column: 1 / -1;
 

@@ -313,10 +313,10 @@ export class AauthStore implements OnDestroy {
     if (this.activityRefreshing) return;
     this.activityRefreshing = true;
     this.api.activity(ACTIVITY_PAGE).subscribe({
-      next: rows => {
+      next: page => {
         this.activityRefreshing = false;
-        this.activity = rows;
-        this.activityHasMore = rows.length >= ACTIVITY_PAGE;
+        this.activity = page.rows;
+        this.activityHasMore = page.hasMore;
         this.failed.delete('activity');
       },
       error: () => {
@@ -332,11 +332,11 @@ export class AauthStore implements OnDestroy {
     this.activityLoadingOlder = true;
     const beforeId = rows[rows.length - 1].id;
     this.api.activity(ACTIVITY_PAGE, beforeId).subscribe({
-      next: older => {
+      next: page => {
         this.activityLoadingOlder = false;
         const seen = new Set(rows.map(r => r.id));
-        this.activity = [...rows, ...older.filter(r => !seen.has(r.id))];
-        this.activityHasMore = older.length >= ACTIVITY_PAGE;
+        this.activity = [...rows, ...page.rows.filter(r => !seen.has(r.id))];
+        this.activityHasMore = page.hasMore;
       },
       error: () => (this.activityLoadingOlder = false),
     });

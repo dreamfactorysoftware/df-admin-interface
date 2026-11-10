@@ -16,6 +16,7 @@ import {
   AauthGrant,
   AauthOverview,
   AauthScope,
+  ActivityPage,
   ActivityRow,
   AgentStatus,
   PersonServer,
@@ -115,15 +116,14 @@ export class DfAauthApiService {
     limit: number,
     beforeId?: number,
     quiet = false
-  ): Observable<ActivityRow[]> {
+  ): Observable<ActivityPage> {
     let params = new HttpParams().set('limit', limit);
     if (beforeId) params = params.set('before_id', beforeId);
     return this.http
-      .get<ListResponse<ActivityRow>>(`${AAUTH_URL}/activity`, {
-        params,
-        ...quietly(quiet),
-      })
-      .pipe(map(list));
+      .get<
+        ListResponse<ActivityRow> & { hasMore?: boolean }
+      >(`${AAUTH_URL}/activity`, { params, ...quietly(quiet) })
+      .pipe(map(r => ({ rows: list(r), hasMore: !!r?.hasMore })));
   }
 
   grants(quiet = false): Observable<AauthGrant[]> {

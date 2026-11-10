@@ -56,6 +56,13 @@
           mat-stroked-button
           type="button"
           class="revoke"
+          [attr.aria-label]="
+            ('aauth.grants.revoke' | transloco) +
+            ' ' +
+            agent(g) +
+            ' / ' +
+            (g.userName || g.userEmail || '')
+          "
           (click)="revoke(g)"
           data-testid="aa-grant-revoke">
           {{ 'aauth.grants.revoke' | transloco }}

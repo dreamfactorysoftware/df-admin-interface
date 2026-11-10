@@ -50,7 +50,8 @@
       "title": "Remove {{name}}?",
       "message": "Tokens from this Person Server will stop working.",
       "confirm": "Remove"
-    }
+    },
+    "none": "No scopes"
   },
   "agents": {
     "name": "Name",
@@ -59,7 +60,9 @@
     "lastSeen": "Last seen",
     "requests": "Requests",
     "blocked": "Blocked",
-    "empty": "No agents yet"
+    "empty": "No agents yet",
+    "allowed": "Allowed",
+    "blockNote": "Turning an agent off blocks it here and at this DreamFactory's Person Server. For tokens from an external Person Server, the block covers the signing keys DreamFactory has seen for that agent."
   },
   "activity": {
     "time": "Time",

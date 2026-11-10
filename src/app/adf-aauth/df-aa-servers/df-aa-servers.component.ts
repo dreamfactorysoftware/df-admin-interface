@@ -17,9 +17,12 @@ import { DfAaConfirmDialogComponent } from '../df-aauth/df-aa-confirm-dialog.com
 
 /**
  * Person Servers the resource trusts: this DreamFactory (always first)
- * and any external ones added by issuer. Each can be limited to a subset
- * of the enabled scopes.
+ * and any external ones added by issuer. Each is trusted for "All scopes"
+ * (explicit option) or for a list; an empty list means none. A newly
+ * added external server starts with none.
  */
+export const ALL_SCOPES = '__all__';
+
 @Component({
   selector: 'df-aa-servers',
   standalone: true,
@@ -67,18 +70,29 @@ export class DfAaServersComponent implements OnInit {
     this.store.addServer(this.issuer, () => (this.issuer = ''));
   }
 
+  readonly ALL = ALL_SCOPES;
+
   /** Enabled scopes, plus any this server still lists that were disabled. */
   options(s: PersonServer): string[] {
     const enabled = this.store.enabledScopes.map(x => x.scope);
     return [...enabled, ...s.scopes.filter(x => !enabled.includes(x))];
   }
 
+  /** Current selection: [ALL] when trusted for every scope, else the list (empty = none). */
   selected(s: PersonServer): string[] {
-    return this.drafts.get(s.id) ?? s.scopes;
+    return this.drafts.get(s.id) ?? (s.allScopes ? [ALL_SCOPES] : s.scopes);
   }
 
+  /** "All scopes" and single scopes exclude each other: the latest click wins. */
   pick(s: PersonServer, scopes: string[]): void {
-    this.drafts.set(s.id, scopes);
+    const before = this.selected(s);
+    const hadAll = before.includes(ALL_SCOPES);
+    const hasAll = scopes.includes(ALL_SCOPES);
+    let next = scopes;
+    if (hasAll && !hadAll) next = [ALL_SCOPES];
+    else if (hasAll && hadAll && scopes.length > 1)
+      next = scopes.filter(x => x !== ALL_SCOPES);
+    this.drafts.set(s.id, next);
   }
 
   /** Saves once the select closes, not on every click. */
@@ -87,10 +101,20 @@ export class DfAaServersComponent implements OnInit {
     const draft = this.drafts.get(s.id);
     this.drafts.delete(s.id);
     if (!draft) return;
+    if (draft.includes(ALL_SCOPES)) {
+      if (!s.allScopes) this.store.updateServer(s.id, { allScopes: true });
+      return;
+    }
     const same =
+      !s.allScopes &&
       draft.length === s.scopes.length &&
       draft.every(x => s.scopes.includes(x));
-    if (!same) this.store.updateServer(s.id, { scopes: draft });
+    if (!same)
+      this.store.updateServer(s.id, { scopes: draft, allScopes: false });
+  }
+
+  chipLabel(x: string): string {
+    return x === ALL_SCOPES ? this.store.t('servers.allScopes') : x;
   }
 
   displayName(s: PersonServer): string {

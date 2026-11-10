@@ -30,7 +30,7 @@
         'aauth.agents.requests' | transloco
       }}</span>
       <span role="columnheader" class="end">{{
-        'aauth.agents.blocked' | transloco
+        'aauth.agents.allowed' | transloco
       }}</span>
     </div>
     <div
@@ -57,14 +57,17 @@
       <span role="cell" class="cell num df-numeric">{{ a.requestCount }}</span>
       <span role="cell" class="end">
         <mat-slide-toggle
-          class="block-toggle"
-          [checked]="a.status === 'blocked'"
-          (change)="store.setAgentBlocked(a.id, $event.checked)"
+          class="allow-toggle"
+          [checked]="a.status !== 'blocked'"
+          (change)="store.setAgentBlocked(a.id, !$event.checked)"
           [aria-label]="
-            ('aauth.agents.blocked' | transloco) + ' ' + (a.name || a.agentId)
+            ('aauth.agents.allowed' | transloco) + ' ' + (a.name || a.agentId)
           "
           data-testid="aa-agent-block"></mat-slide-toggle>
       </span>
     </div>
   </div>
+  <p class="note muted" data-testid="aa-agents-note">
+    {{ 'aauth.agents.blockNote' | transloco }}
+  </p>
 </ng-template>

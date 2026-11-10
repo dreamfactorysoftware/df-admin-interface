@@ -36,6 +36,7 @@ export function fakeAauthApi() {
           isLocal: false,
           enabled: true,
           scopes: ['sales.read'],
+          allScopes: false,
           lastUsedAt: null,
         },
         {
@@ -45,6 +46,7 @@ export function fakeAauthApi() {
           isLocal: true,
           enabled: true,
           scopes: [],
+          allScopes: true,
           lastUsedAt: null,
         },
       ])
@@ -68,22 +70,25 @@ export function fakeAauthApi() {
     ),
     setAgentStatus: jest.fn(() => of({})),
     activity: jest.fn(() =>
-      of([
-        {
-          id: 10,
-          createdAt: new Date().toISOString(),
-          agentId: 'aauth:reports@agent.example',
-          agentName: 'Acme Reports',
-          person: 'admin@example.com',
-          psIssuer: 'https://df.example.test',
-          scope: 'sales.read',
-          method: 'GET',
-          path: '/api/v2/sales/_table/orders',
-          status: 200,
-          outcome: 'allowed',
-          detail: null,
-        },
-      ])
+      of({
+        hasMore: false,
+        rows: [
+          {
+            id: 10,
+            createdAt: new Date().toISOString(),
+            agentId: 'aauth:reports@agent.example',
+            agentName: 'Acme Reports',
+            person: 'admin@example.com',
+            psIssuer: 'https://df.example.test',
+            scope: 'sales.read',
+            method: 'GET',
+            path: '/api/v2/sales/_table/orders',
+            status: 200,
+            outcome: 'allowed',
+            detail: null,
+          },
+        ],
+      })
     ),
     grants: jest.fn(() =>
       of([

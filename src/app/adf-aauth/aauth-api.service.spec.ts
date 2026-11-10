@@ -81,12 +81,14 @@ describe('DfAauthApiService', () => {
     del.flush(null);
   });
 
-  it('pages activity with limit and before_id', () => {
-    api.activity(100, 42).subscribe();
+  it('pages activity with limit and before_id, keeping has_more', () => {
+    let page: unknown;
+    api.activity(100, 42).subscribe(p => (page = p));
     const req = http.expectOne(r => r.url === `${AAUTH_URL}/activity`);
     expect(req.request.params.get('limit')).toBe('100');
     expect(req.request.params.get('before_id')).toBe('42');
-    req.flush({ resource: [] });
+    req.flush({ resource: [{ id: 1 }], hasMore: true });
+    expect(page).toEqual({ rows: [{ id: 1 }], hasMore: true });
   });
 
   it('blocks agents and revokes grants', () => {

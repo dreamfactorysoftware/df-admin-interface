@@ -35,3 +35,22 @@
   justify-content: center;
   padding: var(--df-space-3) 0;
 }
+
+// Why a request failed, visible without a hover tooltip.
+.request {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.req-line,
+.request .detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.request .detail {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+}

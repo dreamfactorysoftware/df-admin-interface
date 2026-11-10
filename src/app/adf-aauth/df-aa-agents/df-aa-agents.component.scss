@@ -22,18 +22,23 @@
   white-space: nowrap;
 }
 
-// A blocked agent reads as stopped: name and switch in danger red.
+// A blocked agent reads as stopped: name in danger red, its Allowed switch off.
 .row.blocked .name {
   color: var(--df-danger);
 }
 
-.block-toggle {
-  --mdc-switch-selected-handle-color: var(--df-danger);
-  --mdc-switch-selected-hover-handle-color: var(--df-danger);
-  --mdc-switch-selected-focus-handle-color: var(--df-danger);
-  --mdc-switch-selected-pressed-handle-color: var(--df-danger);
-  --mdc-switch-selected-track-color: var(--df-danger-soft);
-  --mdc-switch-selected-hover-track-color: var(--df-danger-soft);
-  --mdc-switch-selected-focus-track-color: var(--df-danger-soft);
-  --mdc-switch-selected-pressed-track-color: var(--df-danger-soft);
+.note {
+  margin: var(--df-space-3) var(--df-space-2) 0;
+  font-size: var(--df-font-size-sm, 13px);
+  color: var(--df-text-muted);
+}
+
+// Phone: the shared grid puts .num and .end in the same cell; give the
+// request count its own line under the Allowed switch.
+@media (max-width: 600px) {
+  .row:not(.head) > .num {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+  }
 }

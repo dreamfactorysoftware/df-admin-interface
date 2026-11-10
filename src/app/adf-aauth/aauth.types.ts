@@ -47,13 +47,21 @@ export interface PersonServer {
   name: string | null;
   isLocal: boolean;
   enabled: boolean;
+  /** Allow-list; empty means none unless allScopes. */
   scopes: string[];
+  /** Trusted for every enabled scope (explicit opt-in; the local PS has it). */
+  allScopes: boolean;
   lastUsedAt: string | null;
 }
 
 export type PersonServerPatch = Partial<
-  Pick<PersonServer, 'enabled' | 'scopes'>
+  Pick<PersonServer, 'enabled' | 'scopes' | 'allScopes'>
 >;
+
+export interface ActivityPage {
+  rows: ActivityRow[];
+  hasMore: boolean;
+}
 
 export type AgentStatus = 'allowed' | 'blocked';
 
