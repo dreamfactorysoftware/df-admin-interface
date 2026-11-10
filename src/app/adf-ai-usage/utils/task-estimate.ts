@@ -1,5 +1,5 @@
 import { ProviderRates } from '../types/usage';
-import { DefaultRatesRaw, estimateCost, liveRates, rateFor } from './cost';
+import { DefaultRatesRaw, estimateCost, liveRates } from './cost';
 
 /**
  * Pure math for the task cost estimator: calibrate per-call token averages
@@ -100,7 +100,7 @@ export function calibrate(
   // provider's. Reads both served shapes of default_rates.
   const served = liveRates(bundle.default_rates);
   const live =
-    rateFor(served.models, top?.model) ?? rateFor(served.providers, provider);
+    served.models[top?.model ?? ''] ?? served.providers[provider ?? ''];
   // A zero list price (ollama, openai_compatible) cannot describe a window
   // that was billed: the connection carries its own rates. Blend instead.
   const unpricedButBilled =

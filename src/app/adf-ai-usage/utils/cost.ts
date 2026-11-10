@@ -70,7 +70,9 @@ function ratePair(v: unknown): RatePair | null {
 }
 
 function collectRates(map: unknown): Record<string, RatePair> {
-  const out: Record<string, RatePair> = {};
+  // No prototype, so a model named "constructor" never resolves to an
+  // inherited member.
+  const out: Record<string, RatePair> = Object.create(null);
   if (!map || typeof map !== 'object') {
     return out;
   }
@@ -100,17 +102,6 @@ export function liveRates(raw: DefaultRatesRaw | null | undefined): LiveRates {
         models: collectRates(r['models']),
       }
     : { providers: collectRates(r), models: {} };
-}
-
-/** Own-key lookup, so a model named like an Object.prototype member
- *  ("constructor") never resolves to the inherited one. */
-export function rateFor(
-  rates: Record<string, RatePair>,
-  name: string | null | undefined
-): RatePair | undefined {
-  return name != null && Object.prototype.hasOwnProperty.call(rates, name)
-    ? rates[name]
-    : undefined;
 }
 
 /**

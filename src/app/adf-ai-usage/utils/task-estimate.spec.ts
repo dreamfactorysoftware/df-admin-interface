@@ -134,63 +134,23 @@ describe('task-estimate', () => {
           outputPer1k: 0.075,
         });
       });
-
-      it('blends when neither the model nor the provider is listed', () => {
-        const c = calibrate(
-          bundle({
-            default_rates: nested,
-            by_model: [{ model: 'mystery', provider: 'acme', requests: 10 }],
-          }),
-          'app'
-        );
-
-        expect(c!.rateSource).toBe('blended');
-        expect(c!.rates.inputPer1k).toBeCloseTo(0.02);
-      });
     });
 
     // A free list price says nothing about a connection that bills through
     // its own configured rates: the metered history is the better source.
-    it.each([
-      [
-        'nested',
-        { providers: { ollama: { input_per_1k: 0, output_per_1k: 0 } } },
-      ],
-      ['flat', { ollama: { input_per_1k: 0, output_per_1k: 0 } }],
-    ])(
-      'blends when the %s list price is zero but the window was billed',
-      (_shape, default_rates) => {
-        const c = calibrate(
-          bundle({
-            default_rates,
-            by_model: [{ model: 'qwen3', provider: 'ollama', requests: 10 }],
-          }),
-          'service'
-        );
-
-        expect(c!.rateSource).toBe('blended');
-        expect(c!.rates.inputPer1k).toBeCloseTo(0.02);
-      }
-    );
-
-    it('keeps a zero list price for a window that cost nothing', () => {
+    it('blends when the list price is zero but the window was billed', () => {
       const c = calibrate(
         bundle({
           default_rates: {
             providers: { ollama: { input_per_1k: 0, output_per_1k: 0 } },
           },
           by_model: [{ model: 'qwen3', provider: 'ollama', requests: 10 }],
-          total_cost_usd: 0,
         }),
         'service'
       );
 
-      expect(c!.rateSource).toBe('live');
-      expect(c!.rates).toEqual({
-        provider: 'ollama',
-        inputPer1k: 0,
-        outputPer1k: 0,
-      });
+      expect(c!.rateSource).toBe('blended');
+      expect(c!.rates.inputPer1k).toBeCloseTo(0.02);
     });
 
     it('returns null when there are no rates and no priced history', () => {

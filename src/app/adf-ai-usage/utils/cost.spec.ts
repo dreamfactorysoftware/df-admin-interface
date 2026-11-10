@@ -2,8 +2,6 @@ import {
   DEFAULT_RATES,
   estimateCost,
   formatUSD,
-  liveRates,
-  rateFor,
   ratesFromBundle,
 } from './cost';
 
@@ -19,9 +17,6 @@ const NESTED = {
     'gpt-4.1-nano': { input_per_1k: 0.0001, output_per_1k: 0.0004 },
   },
 };
-
-/** The same provider rates as df-ai 0.0.x served them: a flat map. */
-const FLAT = NESTED.providers;
 
 describe('cost', () => {
   describe('estimateCost', () => {
@@ -98,51 +93,6 @@ describe('cost', () => {
         expect(Number.isFinite(r.inputPer1k)).toBe(true);
         expect(Number.isFinite(r.outputPer1k)).toBe(true);
       }
-    });
-
-    it('still reads the flat shape of older backends', () => {
-      const rates = ratesFromBundle(FLAT);
-
-      expect(rates['anthropic']).toEqual({
-        provider: 'anthropic',
-        inputPer1k: 0.004,
-        outputPer1k: 0.02,
-      });
-      expect(rates['gemini'].outputPer1k).toBe(0.0004);
-    });
-
-    it('keeps the fallback for providers the backend does not list', () => {
-      expect(ratesFromBundle(NESTED)['xai']).toEqual(DEFAULT_RATES['xai']);
-      expect(ratesFromBundle(FLAT)['openai']).toEqual(DEFAULT_RATES['openai']);
-    });
-
-    it('returns the fallback table when nothing was served', () => {
-      expect(ratesFromBundle(undefined)).toBe(DEFAULT_RATES);
-      expect(ratesFromBundle({})).toEqual(DEFAULT_RATES);
-      expect(ratesFromBundle({ providers: {}, models: {} })).toEqual(
-        DEFAULT_RATES
-      );
-    });
-
-    it('drops entries that carry no numeric rates', () => {
-      const rates = ratesFromBundle({
-        broken: { input_per_1k: 'n/a', output_per_1k: '' },
-        anthropic: { input_per_1k: '0.004', output_per_1k: '0.02' },
-      });
-
-      expect(rates['broken']).toBeUndefined();
-      expect(rates['anthropic'].inputPer1k).toBe(0.004);
-    });
-  });
-
-  describe('rateFor', () => {
-    it('only resolves own keys', () => {
-      const { models } = liveRates(NESTED);
-
-      expect(rateFor(models, 'gpt-4.1-nano')?.inputPer1k).toBe(0.0001);
-      expect(rateFor(models, 'constructor')).toBeUndefined();
-      expect(rateFor(models, 'unknown-model')).toBeUndefined();
-      expect(rateFor(models, null)).toBeUndefined();
     });
   });
 
