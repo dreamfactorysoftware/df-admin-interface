@@ -15,7 +15,9 @@ import {
   AauthGrant,
   AauthOverview,
   AauthScope,
+  ActivityFilter,
   ActivityRow,
+  FILTER_OUTCOMES,
   HttpMethod,
   PersonServer,
   PersonServerPatch,
@@ -35,6 +37,20 @@ export const DEFAULT_PATH = '/api/v2/sales/_table/orders?limit=5';
 
 export function errorMessage(e: unknown): string {
   return (isAppError(e) ? e : normalizeError(e)).message;
+}
+
+/**
+ * Rows that belong under a filter. The server filters already; this also
+ * keeps the list right against a backend that predates the outcome filter.
+ */
+export function matchingRows(
+  rows: ActivityRow[],
+  filter: ActivityFilter
+): ActivityRow[] {
+  const outcomes = FILTER_OUTCOMES[filter];
+  return outcomes.length
+    ? rows.filter(r => outcomes.includes(r.outcome))
+    : rows;
 }
 
 @Injectable()
@@ -59,6 +75,7 @@ export class AauthStore implements OnDestroy {
   activityHasMore = false;
   activityLoadingOlder = false;
   activityRefreshing = false;
+  activityFilter: ActivityFilter = 'all';
 
   /**
    * Scopes tab row order, fixed when the list loads (enabled first, then
@@ -309,37 +326,70 @@ export class AauthStore implements OnDestroy {
 
   // ------------------------------------------------------------- activity
 
-  loadActivity(): void {
-    if (this.activityRefreshing) return;
+  /**
+   * Newest page for the current filter. A filter change supersedes a load
+   * in flight (`force`); a plain refresh while one is in flight is a no-op.
+   */
+  loadActivity(force = false): void {
+    if (this.activityRefreshing && !force) return;
     this.activityRefreshing = true;
-    this.api.activity(ACTIVITY_PAGE).subscribe({
-      next: page => {
-        this.activityRefreshing = false;
-        this.activity = page.rows;
-        this.activityHasMore = page.hasMore;
-        this.failed.delete('activity');
-      },
-      error: () => {
-        this.activityRefreshing = false;
-        this.failed.add('activity');
-      },
-    });
+    const filter = this.activityFilter;
+    const n = this.nextSeq('activity');
+    this.api
+      .activity(ACTIVITY_PAGE, undefined, false, FILTER_OUTCOMES[filter])
+      .subscribe({
+        next: page => {
+          if (!this.isLatest('activity', n)) return;
+          this.activityRefreshing = false;
+          this.activityLoadingOlder = false;
+          this.activity = matchingRows(page.rows, filter);
+          this.activityHasMore = page.hasMore;
+          this.failed.delete('activity');
+        },
+        error: () => {
+          if (!this.isLatest('activity', n)) return;
+          this.activityRefreshing = false;
+          this.activityLoadingOlder = false;
+          this.failed.add('activity');
+        },
+      });
+  }
+
+  /** Narrows the rows on screen at once, then reloads from the server. */
+  setActivityFilter(filter: ActivityFilter): void {
+    if (filter === this.activityFilter) return;
+    this.activityFilter = filter;
+    if (this.activity) this.activity = matchingRows(this.activity, filter);
+    this.activityHasMore = false;
+    this.activityLoadingOlder = false;
+    this.loadActivity(true);
   }
 
   loadOlderActivity(): void {
     const rows = this.activity;
     if (!rows?.length || this.activityLoadingOlder) return;
     this.activityLoadingOlder = true;
+    const filter = this.activityFilter;
+    const n = this.seq.get('activity');
     const beforeId = rows[rows.length - 1].id;
-    this.api.activity(ACTIVITY_PAGE, beforeId).subscribe({
-      next: page => {
-        this.activityLoadingOlder = false;
-        const seen = new Set(rows.map(r => r.id));
-        this.activity = [...rows, ...page.rows.filter(r => !seen.has(r.id))];
-        this.activityHasMore = page.hasMore;
-      },
-      error: () => (this.activityLoadingOlder = false),
-    });
+    this.api
+      .activity(ACTIVITY_PAGE, beforeId, false, FILTER_OUTCOMES[filter])
+      .subscribe({
+        next: page => {
+          // A newer load (refresh or filter change) owns the list now.
+          if (this.seq.get('activity') !== n) return;
+          this.activityLoadingOlder = false;
+          const seen = new Set(rows.map(r => r.id));
+          const older = matchingRows(page.rows, filter).filter(
+            r => !seen.has(r.id)
+          );
+          this.activity = [...rows, ...older];
+          this.activityHasMore = page.hasMore;
+        },
+        error: () => {
+          if (this.seq.get('activity') === n) this.activityLoadingOlder = false;
+        },
+      });
   }
 
   // --------------------------------------------------------------- grants

@@ -87,8 +87,20 @@ describe('DfAauthApiService', () => {
     const req = http.expectOne(r => r.url === `${AAUTH_URL}/activity`);
     expect(req.request.params.get('limit')).toBe('100');
     expect(req.request.params.get('before_id')).toBe('42');
+    expect(req.request.params.has('outcome')).toBe(false);
     req.flush({ resource: [{ id: 1 }], hasMore: true });
     expect(page).toEqual({ rows: [{ id: 1 }], hasMore: true });
+  });
+
+  it('narrows activity to outcomes only when asked', () => {
+    api
+      .activity(100, undefined, true, ['denied', 'blocked', 'error'])
+      .subscribe();
+    const req = http.expectOne(r => r.url === `${AAUTH_URL}/activity`);
+    expect(req.request.params.get('outcome')).toBe('denied,blocked,error');
+    expect(req.request.params.has('before_id')).toBe(false);
+    expect(req.request.context.get(ERROR_HANDLING)).toBe('silent');
+    req.flush({ resource: [] });
   });
 
   it('blocks agents and revokes grants', () => {

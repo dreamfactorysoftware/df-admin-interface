@@ -62,56 +62,52 @@
       *ngFor="let s of rows; trackBy: trackServer"
       [class.local]="s.isLocal"
       [attr.data-testid]="'aa-server-' + s.id">
-      <span role="cell" class="cell name">
-        <mat-icon class="local-icon" *ngIf="s.isLocal" aria-hidden="true"
-          >home</mat-icon
-        >
-        {{ displayName(s) }}
+      <span role="cell" class="cell who name" [title]="displayName(s)">
+        <df-aa-agent-mark
+          [self]="s.isLocal"
+          [name]="displayName(s)"></df-aa-agent-mark>
+        <span class="who-name">{{ displayName(s) }}</span>
       </span>
-      <span role="cell" class="cell mono" [title]="s.issuer">{{
+      <span role="cell" class="cell mono issuer" [title]="s.issuer">{{
         s.issuer
       }}</span>
-      <span role="cell" class="cell">
-        <mat-form-field
+      <span role="cell" class="cell scopes">
+        <!-- One control: the chosen scopes and the caret that changes them. -->
+        <mat-select
           class="scope-select"
-          appearance="outline"
-          subscriptSizing="dynamic">
-          <mat-select
-            multiple
-            [value]="selected(s)"
-            (valueChange)="pick(s, $event)"
-            (openedChange)="closed(s, $event)"
-            [placeholder]="'aauth.servers.none' | transloco"
-            [aria-label]="
-              ('aauth.servers.scopes' | transloco) + ' ' + displayName(s)
-            "
-            panelClass="aa-scope-panel"
-            data-testid="aa-server-scopes">
-            <mat-select-trigger>
-              <span class="chips">
-                <span
-                  class="chip"
-                  *ngFor="let x of selected(s)"
-                  [class.all]="x === ALL"
-                  >{{ chipLabel(x) }}</span
-                >
-              </span>
-            </mat-select-trigger>
-            <mat-option [value]="ALL" data-testid="aa-server-all-scopes">
-              <span class="opt">{{
-                'aauth.servers.allScopes' | transloco
-              }}</span>
-            </mat-option>
-            <mat-option *ngFor="let x of options(s)" [value]="x">
-              <span class="opt mono">{{ x }}</span>
-            </mat-option>
-            <mat-option *ngIf="!options(s).length" disabled>{{
-              'aauth.servers.noScopes' | transloco
-            }}</mat-option>
-          </mat-select>
-        </mat-form-field>
+          multiple
+          [value]="selected(s)"
+          (valueChange)="pick(s, $event)"
+          (openedChange)="closed(s, $event)"
+          [placeholder]="'aauth.servers.none' | transloco"
+          [aria-label]="
+            ('aauth.servers.scopes' | transloco) + ' ' + displayName(s)
+          "
+          [panelWidth]="null"
+          panelClass="aa-scope-panel"
+          data-testid="aa-server-scopes">
+          <mat-select-trigger>
+            <span class="chips">
+              <span
+                class="chip"
+                *ngFor="let x of selected(s)"
+                [class.all]="x === ALL"
+                >{{ chipLabel(x) }}</span
+              >
+            </span>
+          </mat-select-trigger>
+          <mat-option [value]="ALL" data-testid="aa-server-all-scopes">
+            <span class="opt">{{ 'aauth.servers.allScopes' | transloco }}</span>
+          </mat-option>
+          <mat-option *ngFor="let x of options(s)" [value]="x">
+            <span class="opt mono">{{ x }}</span>
+          </mat-option>
+          <mat-option *ngIf="!options(s).length" disabled>{{
+            'aauth.servers.noScopes' | transloco
+          }}</mat-option>
+        </mat-select>
       </span>
-      <span role="cell" class="end">
+      <span role="cell" class="end toggle">
         <mat-slide-toggle
           [checked]="s.enabled"
           (change)="store.updateServer(s.id, { enabled: $event.checked })"

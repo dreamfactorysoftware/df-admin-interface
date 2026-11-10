@@ -168,3 +168,68 @@
     }
   }
 }
+
+// An agent: its tile, then its name (ellipsis, never wraps).
+@mixin aa-who {
+  .who {
+    align-items: center;
+    display: flex;
+    gap: var(--df-space-2);
+    min-width: 0;
+  }
+
+  .who-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &.mono {
+      font-family: var(--df-font-mono);
+      font-size: var(--df-font-size-xs);
+    }
+  }
+}
+
+// Single-select pill filter (the platform's Data Masking activity filter).
+@mixin aa-filters {
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--df-space-1);
+  }
+
+  .filter {
+    background: transparent;
+    border: 1px solid var(--df-border);
+    border-radius: 999px;
+    color: var(--df-text-2);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+    height: 30px;
+    padding: 0 var(--df-space-3);
+    white-space: nowrap;
+
+    &:hover {
+      background: var(--df-hover);
+    }
+
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+
+    &.is-on {
+      background: var(--df-accent-soft);
+      border-color: transparent;
+      color: var(--df-accent-strong);
+      font-weight: var(--df-font-weight-medium);
+    }
+  }
+
+  .refresh {
+    --mdc-outlined-button-container-height: 30px;
+    flex: none;
+  }
+}

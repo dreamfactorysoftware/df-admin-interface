@@ -84,6 +84,23 @@ export type ActivityOutcome =
   | 'blocked'
   | 'error';
 
+/** The Activity tab's single-select filter; each groups outcomes. */
+export type ActivityFilter = 'all' | 'allowed' | 'approval' | 'rejected';
+
+export const ACTIVITY_FILTERS: ActivityFilter[] = [
+  'all',
+  'allowed',
+  'approval',
+  'rejected',
+];
+
+export const FILTER_OUTCOMES: Record<ActivityFilter, ActivityOutcome[]> = {
+  all: [],
+  allowed: ['allowed'],
+  approval: ['person_required', 'auth_required'],
+  rejected: ['denied', 'blocked', 'error'],
+};
+
 export interface ActivityRow {
   id: number;
   createdAt: string;

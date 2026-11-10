@@ -16,6 +16,7 @@ import {
   AauthGrant,
   AauthOverview,
   AauthScope,
+  ActivityOutcome,
   ActivityPage,
   ActivityRow,
   AgentStatus,
@@ -112,13 +113,16 @@ export class DfAauthApiService {
     );
   }
 
+  /** `outcomes` narrows the page to those outcomes; empty or absent lists every outcome. */
   activity(
     limit: number,
     beforeId?: number,
-    quiet = false
+    quiet = false,
+    outcomes: readonly ActivityOutcome[] = []
   ): Observable<ActivityPage> {
     let params = new HttpParams().set('limit', limit);
     if (beforeId) params = params.set('before_id', beforeId);
+    if (outcomes.length) params = params.set('outcome', outcomes.join(','));
     return this.http
       .get<
         ListResponse<ActivityRow> & { hasMore?: boolean }

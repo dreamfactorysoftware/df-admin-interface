@@ -1,23 +1,48 @@
 @use '../aa-grid' as *;
 @include aa-grid;
+@include aa-filters;
+@include aa-who;
 
 :host {
   display: block;
 }
 
-.end-bar {
-  justify-content: flex-end;
+.bar {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+}
+
+.filter-select {
+  display: none;
 }
 
 .row {
   grid-template-columns:
-    120px minmax(0, 1.3fr) minmax(0, 1.1fr) minmax(0, 0.7fr)
-    minmax(0, 1.8fr) 200px;
+    104px minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 0.75fr)
+    minmax(0, 1.8fr) 196px;
+  // Every row's main line sits in the same track; a reason adds a line.
+  align-content: start;
+  grid-template-rows: var(--df-row-height);
+  row-gap: 0;
+
+  &.has-reason {
+    padding-bottom: var(--df-space-2);
+  }
 }
 
-.request .method {
-  color: var(--df-accent-strong);
-  font-weight: var(--df-font-weight-heading);
+.dash {
+  color: var(--df-text-faint);
+}
+
+.request {
+  color: var(--df-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  .method {
+    color: var(--df-accent-strong);
+    font-weight: var(--df-font-weight-heading);
+  }
 }
 
 .result {
@@ -30,27 +55,137 @@
   color: var(--df-text-muted);
 }
 
+// Why it was not allowed: a full-width second line under the row, wrapped
+// (two lines at most), the AAuth error code after the sentence.
+.reason {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--df-text-2);
+  display: -webkit-box;
+  font-size: var(--df-font-size-xs);
+  grid-column: 2 / -1;
+  line-height: 18px;
+  margin-top: -6px;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.reason-code {
+  color: var(--df-text-muted);
+  font-family: var(--df-font-mono);
+  font-size: 11px;
+  margin-left: var(--df-space-2);
+}
+
 .more {
   display: flex;
   justify-content: center;
   padding: var(--df-space-3) 0;
 }
 
-// Why a request failed, visible without a hover tooltip.
-.request {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+// Phones: one compact filter select and an icon Refresh share a line.
+// Each row reads request, result and when, then who (with the scope),
+// the person, and the reason; empty placeholders drop out.
+@media (max-width: 600px) {
+  .filters {
+    display: none;
+  }
 
-.req-line,
-.request .detail {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .filter-select {
+    align-items: center;
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    box-sizing: border-box;
+    color: var(--df-text-muted);
+    display: inline-flex;
+    font-size: var(--df-font-size-sm);
+    height: 30px;
+    padding: 0 var(--df-space-2) 0 var(--df-space-3);
+    width: auto;
 
-.request .detail {
-  color: var(--df-text-muted);
-  font-size: var(--df-font-size-xs);
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+
+    ::ng-deep .mat-mdc-select-value {
+      color: var(--df-text);
+      max-width: none;
+      width: auto;
+    }
+
+    ::ng-deep .mat-mdc-select-trigger {
+      gap: var(--df-space-1);
+      width: auto;
+    }
+  }
+
+  .refresh {
+    min-width: 0;
+    padding: 0 var(--df-space-2);
+
+    mat-icon {
+      margin: 0;
+    }
+  }
+
+  .refresh-label {
+    display: none;
+  }
+
+  .row:not(.head) {
+    grid-template-areas:
+      'request request'
+      'result time'
+      'who scope'
+      'person person'
+      'reason reason';
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-rows: auto;
+    row-gap: 4px;
+
+    > .cell {
+      grid-column: auto;
+    }
+
+    > .request {
+      grid-area: request;
+    }
+
+    > .result {
+      grid-area: result;
+    }
+
+    > .time {
+      grid-area: time;
+      justify-self: end;
+    }
+
+    > .who {
+      grid-area: who;
+    }
+
+    > .scope {
+      grid-area: scope;
+      justify-self: end;
+    }
+
+    > .person {
+      grid-area: person;
+    }
+
+    > .blank {
+      display: none;
+    }
+
+    > .reason {
+      grid-area: reason;
+      margin-top: 0;
+    }
+
+    &.has-reason {
+      padding-bottom: var(--df-space-3);
+    }
+  }
 }

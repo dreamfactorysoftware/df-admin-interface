@@ -7,10 +7,12 @@ import { DfEmptyStateComponent } from 'src/app/shared/components/df-empty-state/
 import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-skeleton.component';
 import { relTime } from 'src/app/adf-data-masking/dm-time';
 import { AauthStore } from '../aauth.store';
+import { injectOpenTab } from '../open-tab';
 import { AauthAgent } from '../aauth.types';
 import { hostOf } from '../jwt-view';
+import { DfAaAgentMarkComponent } from '../df-aa-agent-mark/df-aa-agent-mark.component';
 
-/** Agents that have called this DreamFactory, with a Blocked switch. */
+/** Agents that have called this DreamFactory, with an Allowed switch. */
 @Component({
   selector: 'df-aa-agents',
   standalone: true,
@@ -22,14 +24,20 @@ import { hostOf } from '../jwt-view';
     TranslocoPipe,
     DfEmptyStateComponent,
     DfSkeletonComponent,
+    DfAaAgentMarkComponent,
   ],
   templateUrl: './df-aa-agents.component.html',
   styleUrls: ['./df-aa-agents.component.scss'],
 })
 export class DfAaAgentsComponent implements OnInit {
   readonly store = inject(AauthStore);
+  readonly openTab = injectOpenTab();
   readonly relTime = relTime;
   readonly hostOf = hostOf;
+
+  get issuer(): string | null {
+    return this.store.overview?.issuer ?? null;
+  }
 
   /** The agent id without "@<provider host>" when the Provider column already shows that host. */
   localId(a: AauthAgent): string {

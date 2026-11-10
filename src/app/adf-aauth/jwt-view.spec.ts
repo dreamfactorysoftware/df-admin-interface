@@ -2,6 +2,7 @@ import {
   decodeJwt,
   hostOf,
   isProtocolHeader,
+  jwtsIn,
   originOf,
   pathOf,
   prettyBody,
@@ -87,6 +88,22 @@ describe('jwt-view', () => {
     expect(isProtocolHeader('Signature-Input')).toBe(true);
     expect(isProtocolHeader('AAuth-Requirement')).toBe(true);
     expect(isProtocolHeader('Content-Type')).toBe(false);
+  });
+
+  it('finds the JWTs carried inside header values', () => {
+    const agent = jwt({ typ: 'aa-agent+jwt' }, { sub: 'aauth:bot' });
+    const resource = jwt({ typ: 'aa-resource+jwt' }, { scope: 'sales.read' });
+    expect(jwtsIn(`sig=jwt;jwt="${agent}"`).map(t => t.typ)).toEqual([
+      'aa-agent+jwt',
+    ]);
+    expect(
+      jwtsIn(`requirement=auth-token; resource-token="${resource}"`)[0]
+        .payload?.['scope']
+    ).toBe('sales.read');
+    expect(jwtsIn('sig=jwt;jwt="eyJ..."')).toEqual([]);
+    expect(jwtsIn('eyJub3Q.anNvbg.x')).toEqual([]);
+    expect(jwtsIn('application/json')).toEqual([]);
+    expect(jwtsIn(null)).toEqual([]);
   });
 
   it('validates scope names like the server', () => {

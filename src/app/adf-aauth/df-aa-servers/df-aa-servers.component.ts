@@ -3,7 +3,6 @@ import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -14,6 +13,7 @@ import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-sk
 import { AauthStore } from '../aauth.store';
 import { PersonServer } from '../aauth.types';
 import { DfAaConfirmDialogComponent } from '../df-aauth/df-aa-confirm-dialog.component';
+import { DfAaAgentMarkComponent } from '../df-aa-agent-mark/df-aa-agent-mark.component';
 
 /**
  * Person Servers the resource trusts: this DreamFactory (always first)
@@ -32,7 +32,6 @@ export const ALL_SCOPES = '__all__';
     FormsModule,
     MatButtonModule,
     MatDialogModule,
-    MatFormFieldModule,
     MatIconModule,
     MatSelectModule,
     MatSlideToggleModule,
@@ -40,6 +39,7 @@ export const ALL_SCOPES = '__all__';
     TranslocoPipe,
     DfEmptyStateComponent,
     DfSkeletonComponent,
+    DfAaAgentMarkComponent,
   ],
   templateUrl: './df-aa-servers.component.html',
   styleUrls: ['./df-aa-servers.component.scss'],

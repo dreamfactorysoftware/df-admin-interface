@@ -23,7 +23,7 @@ import { JsonToken, prettyBody, prettyJson, tokenizeJson } from '../jwt-view';
       <pre
         [attr.aria-label]="
           label || null
-        "><code><ng-container *ngIf="json; else plain"><span *ngFor="let t of tokens" [class]="'j-' + t.kind">{{ t.text }}</span></ng-container><ng-template #plain>{{ text }}</ng-template></code></pre>
+        "><code><ng-container *ngIf="json; else plain"><span *ngFor="let t of tokens; trackBy: trackToken" [class]="'j-' + t.kind">{{ t.text }}</span></ng-container><ng-template #plain>{{ text }}</ng-template></code></pre>
       <df-aa-copy class="copy" [text]="text" [testId]="testId"></df-aa-copy>
     </div>
   `,
@@ -48,8 +48,8 @@ import { JsonToken, prettyBody, prettyJson, tokenizeJson } from '../jwt-view';
         overflow: auto;
         padding: var(--df-space-3) var(--df-space-8) var(--df-space-3)
           var(--df-space-3);
-        white-space: pre-wrap;
-        word-break: break-word;
+        /* Code keeps its lines (no breaks inside a value); it scrolls. */
+        white-space: pre;
       }
       .copy {
         color: var(--df-code-text);
@@ -84,8 +84,12 @@ export class DfAaJsonComponent implements OnChanges {
   json = false;
   text = '';
   tokens: JsonToken[] = [];
+  /** Same body as last time (polling re-sends it): keep the spans. */
+  private last: { value: unknown } | null = null;
 
   ngOnChanges(): void {
+    if (this.last && this.last.value === this.value) return;
+    this.last = { value: this.value };
     if (typeof this.value === 'string' || this.value == null) {
       const p = prettyBody(this.value as string | null);
       this.json = p.json;
@@ -96,4 +100,6 @@ export class DfAaJsonComponent implements OnChanges {
     }
     this.tokens = this.json ? tokenizeJson(this.text) : [];
   }
+
+  trackToken = (i: number) => i;
 }

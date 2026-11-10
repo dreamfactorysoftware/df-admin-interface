@@ -1,4 +1,11 @@
 :host {
+  // Sequence diagram geometry (see below): strip width, lane x positions.
+  --seq-strip: 192px;
+  --seq-gap: var(--df-space-3);
+  --seq-line: var(--df-border);
+  --x-agent: 20px;
+  --x-api: 90px;
+  --x-ps: 160px;
   display: block;
 }
 
@@ -73,11 +80,11 @@
     background: var(--df-surface-2);
     border-right: 1px solid var(--df-border-2);
     color: var(--df-text-muted);
-    display: flex;
-    align-items: center;
+    display: block;
     flex-shrink: 1;
     font-family: var(--df-font-mono);
     font-size: var(--df-font-size-xs);
+    line-height: 34px;
     max-width: 45%;
     overflow: hidden;
     padding: 0 var(--df-space-2) 0 var(--df-space-3);
@@ -113,6 +120,12 @@
     --mdc-filled-button-container-color: var(--df-accent);
     --mdc-filled-button-label-text-color: var(--df-accent-contrast);
   }
+
+  // Material's disabled fill is a light-theme grey that vanishes here.
+  .send-btn[disabled] {
+    --mdc-filled-button-disabled-container-color: var(--df-surface-2);
+    --mdc-filled-button-disabled-label-text-color: var(--df-text-faint);
+  }
 }
 
 .body {
@@ -125,7 +138,317 @@
   }
 }
 
-// The approval card: the code people type, large, and the one button.
+// ------------------------------------------------------ sequence diagram
+//
+// Three lifelines (Agent, API, Person Server) run down a strip at the left
+// of every row. A step's arrow leaves the Agent lane and lands on the lane
+// it called; the response status colours the head and the target dot.
+// The geometry lives in custom properties so phone widths can swap it.
+
+@mixin lifelines {
+  background:
+    linear-gradient(var(--seq-line), var(--seq-line)) var(--x-agent) 0 / 1px
+      100% no-repeat,
+    linear-gradient(var(--seq-line), var(--seq-line)) var(--x-api) 0 / 1px 100%
+      no-repeat,
+    linear-gradient(var(--seq-line), var(--seq-line)) var(--x-ps) 0 / 1px 100%
+      no-repeat;
+}
+
+// Lane names, once, pinned over the strip while the steps scroll (the
+// cards beside it stay uncovered).
+.lanes {
+  background: var(--df-surface);
+  height: 28px;
+  width: calc(var(--seq-strip) + var(--seq-gap));
+  position: sticky;
+  top: 0;
+  z-index: 2;
+
+  &::before {
+    @include lifelines;
+    bottom: 0;
+    content: '';
+    left: 0;
+    position: absolute;
+    top: 20px;
+    width: var(--seq-strip);
+  }
+}
+
+.lane-name {
+  color: var(--df-text-2);
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  line-height: 16px;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+
+  &[data-lane='agent'] {
+    left: calc(var(--x-agent) + 0.5px);
+  }
+
+  &[data-lane='api'] {
+    left: calc(var(--x-api) + 0.5px);
+  }
+
+  &[data-lane='ps'] {
+    left: calc(var(--x-ps) + 0.5px);
+  }
+}
+
+// Before the first Send: the lifelines, waiting.
+.idle {
+  @include lifelines;
+  height: 72px;
+  -webkit-mask-image: linear-gradient(#000, transparent);
+  mask-image: linear-gradient(#000, transparent);
+  width: var(--seq-strip);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  // Centre line of the row's first 40px: where its arrow runs.
+  --y: 20px;
+  column-gap: var(--seq-gap);
+  display: grid;
+  grid-template-columns: var(--seq-strip) minmax(0, 1fr);
+  padding-bottom: var(--df-space-2);
+  position: relative;
+
+  // Lifelines span the whole row, gap included, so they never break.
+  &::before {
+    @include lifelines;
+    bottom: 0;
+    content: '';
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: var(--seq-strip);
+  }
+
+  // The lifelines end where the run ends.
+  &:last-child::before {
+    bottom: auto;
+    height: var(--y);
+  }
+
+  &.wait {
+    --y: 26px;
+  }
+
+  &.result {
+    --y: 24px;
+  }
+}
+
+.strip {
+  --from: var(--x-agent);
+  --to: var(--x-agent);
+  --tone: var(--df-text-muted);
+  display: block;
+  min-height: 40px;
+  position: relative;
+
+  &[data-lane='api'] {
+    --to: var(--x-api);
+  }
+
+  &[data-lane='ps'] {
+    --to: var(--x-ps);
+  }
+
+  &[data-tone='success'] {
+    --tone: var(--df-success);
+  }
+
+  &[data-tone='warning'] {
+    --tone: var(--df-warning);
+  }
+
+  &[data-tone='danger'] {
+    --tone: var(--df-danger);
+  }
+
+  &[data-tone='accent'] {
+    --tone: var(--df-accent);
+  }
+}
+
+.from,
+.shaft,
+.head,
+.to {
+  display: block;
+  position: absolute;
+}
+
+// The agent sends from here...
+.from {
+  background: var(--df-text-muted);
+  border-radius: 50%;
+  height: 5px;
+  left: calc(var(--from) - 2px);
+  top: calc(var(--y) - 2.5px);
+  width: 5px;
+}
+
+.shaft {
+  background: var(--df-text-muted);
+  height: 1.5px;
+  left: calc(var(--from) + 3px);
+  top: calc(var(--y) - 0.75px);
+  transform-origin: left center;
+  width: calc(var(--to) - var(--from) - 13px);
+}
+
+.head {
+  background: var(--tone);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  height: 8px;
+  left: calc(var(--to) - 10.5px);
+  top: calc(var(--y) - 4px);
+  width: 7px;
+}
+
+// ...and lands here, in the colour of the answer.
+.to {
+  background: var(--tone);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--df-surface);
+  height: 8px;
+  left: calc(var(--to) - 3.5px);
+  top: calc(var(--y) - 4px);
+  width: 8px;
+}
+
+// A step that calls nothing (token minted, cached tokens) is a dot on the
+// Agent lane.
+.strip[data-lane='agent'] {
+  .from,
+  .shaft,
+  .head {
+    display: none;
+  }
+
+  .to {
+    height: 9px;
+    left: calc(var(--to) - 4px);
+    top: calc(var(--y) - 4.5px);
+    width: 9px;
+  }
+}
+
+// Phones: a three-dot indicator instead (Agent, API, Person Server).
+.dots {
+  display: none;
+}
+
+// The Approve card hangs off the Person Server lane: that is where the
+// person acts.
+.hook {
+  background: var(--df-surface);
+  border: 2px solid var(--df-accent);
+  border-radius: 50%;
+  box-sizing: border-box;
+  height: 11px;
+  left: calc(var(--x-ps) - 5px);
+  position: absolute;
+  top: calc(var(--y) - 5.5px);
+  width: 11px;
+}
+
+.hook-line {
+  border-top: 1.5px dashed var(--df-accent);
+  left: calc(var(--x-ps) + 6px);
+  position: absolute;
+  top: calc(var(--y) - 0.75px);
+  width: calc(var(--seq-strip) - var(--x-ps) - 6px + var(--seq-gap));
+}
+
+// Where a run stops: on the Agent lane, what it ended with.
+.node {
+  align-items: center;
+  background: var(--df-surface);
+  border: 1px solid var(--tone);
+  border-radius: 50%;
+  box-sizing: border-box;
+  color: var(--tone);
+  display: flex;
+  height: 20px;
+  justify-content: center;
+  left: calc(var(--x-agent) - 9.5px);
+  position: absolute;
+  top: calc(var(--y) - 10px);
+  width: 20px;
+
+  mat-icon {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+  }
+
+  &.busy {
+    border-color: var(--df-border);
+  }
+}
+
+// The newest step draws in once: the arrow from the agent, then the
+// answer. Nothing else moves.
+.strip.enter {
+  // backwards, not both: a transform left in place after the draw-in
+  // promotes the shaft to its own layer and it rasterizes heavier.
+  .shaft {
+    animation: aa-seq-draw 250ms var(--df-ease-emphasized) backwards;
+  }
+
+  .head,
+  .to {
+    animation: aa-seq-land 140ms var(--df-ease-standard) 190ms backwards;
+  }
+
+  &[data-lane='agent'] .to {
+    animation-delay: 0ms;
+    animation-duration: 200ms;
+  }
+}
+
+@keyframes aa-seq-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes aa-seq-land {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip.enter * {
+    animation: none !important;
+  }
+}
+
+// ------------------------------------------------------------ the cards
+
 .approve {
   background: var(--df-accent-soft);
   border: 1px solid var(--df-accent);
@@ -133,8 +456,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--df-space-3);
-  margin-bottom: var(--df-space-5);
-  padding: var(--df-space-4) var(--df-space-5);
+  min-width: 0;
+  padding: var(--df-space-4) var(--df-space-5) var(--df-space-4)
+    var(--df-space-4);
 }
 
 .approve-state {
@@ -144,65 +468,42 @@
   font-size: var(--df-font-size-sm);
   font-weight: var(--df-font-weight-medium);
   gap: var(--df-space-2);
+  line-height: 20px;
+  margin-top: -1px;
 }
 
-.pulse {
-  animation: aa-pulse 1.4s var(--df-ease-standard) infinite;
-  background: var(--df-accent);
+.ring {
+  border: 2px solid var(--df-accent);
   border-radius: 50%;
-  height: 8px;
-  width: 8px;
-}
-
-@keyframes aa-pulse {
-  0% {
-    box-shadow: 0 0 0 0 var(--df-accent);
-  }
-  70% {
-    box-shadow: 0 0 0 8px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pulse {
-    animation: none;
-  }
+  box-sizing: border-box;
+  height: 9px;
+  width: 9px;
 }
 
 .approve-main {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--df-space-3) var(--df-space-4);
+  gap: var(--df-space-3) var(--df-space-2);
 }
 
-.code-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.code-label {
-  color: var(--df-text-muted);
-  font-size: var(--df-font-size-xs);
-  font-weight: var(--df-font-weight-medium);
-}
-
+// The code people match on the consent page: same chip, larger.
 .code {
+  background: var(--df-surface);
+  border: 1px solid var(--df-border);
+  border-radius: var(--df-radius-sm);
   color: var(--df-text);
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  line-height: 1.1;
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-2xl);
+  font-weight: var(--df-font-weight-heading);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 8px 12px 8px 14px;
+  white-space: nowrap;
 }
 
 .code-copy {
-  align-self: flex-end;
   color: var(--df-text-2);
-  margin-bottom: 4px;
 }
 
 .approve-btn {
@@ -211,76 +512,10 @@
   padding: 0 var(--df-space-5);
 }
 
-// Timeline: numbered dots on a rail, one step per row.
-.timeline {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  position: relative;
-}
-
-.tl-item {
-  display: grid;
-  gap: var(--df-space-3);
-  grid-template-columns: 24px minmax(0, 1fr);
-  padding-bottom: var(--df-space-2);
-  position: relative;
-
-  // The rail between dots.
-  &:not(:last-child)::before {
-    background: var(--df-border-2);
-    bottom: 0;
-    content: '';
-    left: 11px;
-    position: absolute;
-    top: 30px;
-    width: 2px;
-  }
-}
-
-.tl-dot {
-  align-items: center;
-  background: var(--df-surface-2);
-  border: 1px solid var(--df-border);
-  border-radius: 50%;
-  box-sizing: border-box;
-  color: var(--df-text-2);
-  display: flex;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--df-font-weight-heading);
-  height: 24px;
-  justify-content: center;
-  margin-top: 8px;
-  width: 24px;
-
-  mat-icon {
-    font-size: 14px;
-    height: 14px;
-    width: 14px;
-  }
-
-  &.ok {
-    background: var(--df-success-soft);
-    border-color: var(--df-success-border);
-    color: var(--df-success);
-  }
-
-  &.fail {
-    background: var(--df-danger-soft);
-    border-color: var(--df-danger-border);
-    color: var(--df-danger);
-  }
-
-  &.busy {
-    background: var(--df-surface);
-  }
-}
-
 .tl-note {
   color: var(--df-text-muted);
   font-size: var(--df-font-size-sm);
-  padding: 10px 0;
+  line-height: 40px;
 }
 
 .tl-error {
@@ -292,7 +527,10 @@
   flex-direction: column;
   font-size: var(--df-font-size-sm);
   gap: 2px;
+  justify-content: center;
+  min-height: 40px;
   padding: var(--df-space-2) var(--df-space-3);
+  box-sizing: border-box;
 
   span {
     color: var(--df-text);
@@ -314,6 +552,7 @@
     align-items: center;
     display: flex;
     gap: var(--df-space-2);
+    min-height: 24px;
   }
 }
 
@@ -328,17 +567,75 @@
   margin: 0;
 }
 
+// ---------------------------------------------------------------- phone
+
+@media (max-width: 719px) {
+  :host {
+    --seq-strip: 26px;
+    --seq-gap: var(--df-space-2);
+  }
+
+  .lanes,
+  .idle,
+  .row::before,
+  .from,
+  .shaft,
+  .head,
+  .to,
+  .hook,
+  .hook-line {
+    display: none;
+  }
+
+  .dots {
+    display: flex;
+    gap: 4px;
+    left: 0;
+    position: absolute;
+    top: calc(var(--y) - 3px);
+
+    span {
+      border: 1px solid var(--df-border);
+      border-radius: 50%;
+      box-sizing: border-box;
+      height: 6px;
+      width: 6px;
+    }
+  }
+
+  // The filled dot is the lane the step called.
+  .strip[data-lane='agent'] [data-dot='agent'],
+  .strip[data-lane='api'] [data-dot='api'],
+  .strip[data-lane='ps'] [data-dot='ps'] {
+    background: var(--tone);
+    border-color: var(--tone);
+  }
+
+  .strip.enter .dots span {
+    animation: aa-seq-land 200ms var(--df-ease-standard) backwards;
+  }
+
+  .node {
+    left: 3px;
+  }
+}
+
 @media (max-width: 600px) {
   .send {
     grid-template-columns: 100px minmax(0, 1fr) auto;
   }
 
+  // The issuer is above already; the path gets the whole field.
   .url {
     grid-column: 1 / -1;
     grid-row: 2;
 
     .origin {
-      max-width: 40%;
+      display: none;
+    }
+
+    input {
+      padding-left: var(--df-space-3);
     }
   }
 
@@ -354,11 +651,11 @@
   }
 
   .approve {
-    padding: var(--df-space-4);
+    padding: var(--df-space-3);
   }
 
   .code {
-    font-size: 26px;
+    font-size: var(--df-font-size-xl);
   }
 
   .approve-btn {

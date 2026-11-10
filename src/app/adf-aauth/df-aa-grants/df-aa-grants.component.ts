@@ -11,6 +11,8 @@ import { AauthStore } from '../aauth.store';
 import { AauthGrant } from '../aauth.types';
 import { DfAaConfirmDialogComponent } from '../df-aauth/df-aa-confirm-dialog.component';
 import { hostOf, splitScopes } from '../jwt-view';
+import { injectOpenTab } from '../open-tab';
+import { DfAaAgentMarkComponent } from '../df-aa-agent-mark/df-aa-agent-mark.component';
 
 /** Standing "Always allow" grants people gave agents, with Revoke. */
 @Component({
@@ -25,6 +27,7 @@ import { hostOf, splitScopes } from '../jwt-view';
     TranslocoPipe,
     DfEmptyStateComponent,
     DfSkeletonComponent,
+    DfAaAgentMarkComponent,
   ],
   templateUrl: './df-aa-grants.component.html',
   styleUrls: ['./df-aa-grants.component.scss'],
@@ -32,12 +35,17 @@ import { hostOf, splitScopes } from '../jwt-view';
 export class DfAaGrantsComponent implements OnInit {
   readonly store = inject(AauthStore);
   private dialog = inject(MatDialog);
+  readonly openTab = injectOpenTab();
   readonly relTime = relTime;
   readonly hostOf = hostOf;
   readonly splitScopes = splitScopes;
 
   ngOnInit(): void {
     this.store.loadGrants(!!this.store.grants);
+  }
+
+  get issuer(): string | null {
+    return this.store.overview?.issuer ?? null;
   }
 
   person(g: AauthGrant): string {

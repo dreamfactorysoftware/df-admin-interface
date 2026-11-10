@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, DoCheck, OnDestroy, OnInit, inject } from '@angular/core';
 import { NgFor, NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -11,17 +11,19 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.component';
 import { AauthStore } from '../aauth.store';
-import { HttpMethod, PlaygroundStep } from '../aauth.types';
+import { HttpMethod, PlaygroundRun, PlaygroundStep } from '../aauth.types';
 import { DfAaCopyComponent } from '../df-aa-copy/df-aa-copy.component';
 import { DfAaJsonComponent } from '../df-aa-json/df-aa-json.component';
 import { DfAaStepComponent } from '../df-aa-step/df-aa-step.component';
 import { originOf, statusVariant } from '../jwt-view';
+import { Lane, StepEntrance, Tone, laneOf, toneOf } from './lanes';
 
 /**
  * Try it: the built-in playground agent calls this DreamFactory with
- * signed requests (server side), and the page shows every exchange. While
- * a person must approve, a card shows the code and an Approve button; the
- * run is polled every 2 s until it moves on.
+ * signed requests (server side), and the page draws every exchange as a
+ * sequence diagram across Agent, API and Person Server. While a person
+ * must approve, a card on the Person Server lane shows the code and an
+ * Approve button; the run is polled every 2 s until it moves on.
  */
 @Component({
   selector: 'df-aa-try',
@@ -46,18 +48,29 @@ import { originOf, statusVariant } from '../jwt-view';
   templateUrl: './df-aa-try.component.html',
   styleUrls: ['./df-aa-try.component.scss'],
 })
-export class DfAaTryComponent implements OnInit, OnDestroy {
+export class DfAaTryComponent implements OnInit, DoCheck, OnDestroy {
   readonly store = inject(AauthStore);
   readonly methods: HttpMethod[] = ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'];
   readonly statusVariant = statusVariant;
+  readonly lane: (s: PlaygroundStep) => Lane = laneOf;
+  readonly tone: (s: PlaygroundStep) => Tone = toneOf;
+
+  /** The newest step draws in; nothing else moves. */
+  readonly entrance = new StepEntrance();
 
   /** Expanded timeline rows, by index, for the run on screen. */
   private open = new Set<number>();
   private openRun: string | null = null;
 
   ngOnInit(): void {
+    // Back on the tab: what is already drawn stays still.
+    this.entrance.update(this.store.run, true);
     // Came back to the tab mid-run: pick the polling up again.
     if (this.store.runActive) this.store.startPolling();
+  }
+
+  ngDoCheck(): void {
+    this.entrance.update(this.store.run);
   }
 
   ngOnDestroy(): void {
@@ -100,6 +113,16 @@ export class DfAaTryComponent implements OnInit, OnDestroy {
       this.open.clear();
       this.openRun = id;
     }
+  }
+
+  /**
+   * The step whose response is the run's result: its expanded detail
+   * leaves the body to the Response card below.
+   */
+  bodyBelow(run: PlaygroundRun, i: number): boolean {
+    return (
+      !!run.result && i === run.steps.length - 1 && run.steps[i].kind === 'call'
+    );
   }
 
   approve(): void {

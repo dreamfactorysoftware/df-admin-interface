@@ -1,5 +1,6 @@
 @use '../aa-grid' as *;
 @include aa-grid;
+@include aa-who;
 
 :host {
   display: block;
@@ -7,38 +8,79 @@
 
 .row {
   grid-template-columns:
-    minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 1.1fr)
+    minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(0, 1.1fr)
     110px 80px 64px;
+}
+
+.who-name {
+  font-weight: var(--df-font-weight-medium);
 }
 
 .agent-id {
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.name {
-  font-weight: var(--df-font-weight-medium);
-  white-space: nowrap;
 }
 
 // A blocked agent reads as stopped: name in danger red, its Allowed switch off.
-.row.blocked .name {
+.row.blocked .who-name {
   color: var(--df-danger);
 }
 
-.note {
-  margin: var(--df-space-3) var(--df-space-2) 0;
-  font-size: var(--df-font-size-sm, 13px);
-  color: var(--df-text-muted);
+// The column header names the count on wide screens; phones say it inline.
+.unit {
+  display: none;
 }
 
-// Phone: the shared grid puts .num and .end in the same cell; give the
-// request count its own line under the Allowed switch.
+// Phones: one card per agent. Name and its switch lead; id and provider
+// sit under the name; last seen and the request count share the last line.
 @media (max-width: 600px) {
-  .row:not(.head) > .num {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
+  .row:not(.head) {
+    grid-template-areas:
+      'who allow'
+      'id id'
+      'provider provider'
+      'seen requests';
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    row-gap: 2px;
+
+    > .cell {
+      grid-column: auto;
+    }
+
+    > .who {
+      grid-area: who;
+    }
+
+    > .allow {
+      grid-area: allow;
+    }
+
+    > .agent-id,
+    > .provider,
+    > .seen {
+      // Under the name, past the tile (24px) and its gap.
+      padding-left: calc(24px + var(--df-space-2));
+    }
+
+    > .agent-id {
+      grid-area: id;
+    }
+
+    > .provider {
+      grid-area: provider;
+    }
+
+    > .seen {
+      grid-area: seen;
+    }
+
+    > .requests {
+      color: var(--df-text-muted);
+      grid-area: requests;
+      justify-self: end;
+    }
+  }
+
+  .unit {
+    display: inline;
   }
 }

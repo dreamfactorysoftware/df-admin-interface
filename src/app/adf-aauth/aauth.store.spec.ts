@@ -247,9 +247,92 @@ describe('AauthStore', () => {
       store.loadActivity();
       expect(store.activityHasMore).toBe(true);
       store.loadOlderActivity();
-      expect(api.activity).toHaveBeenLastCalledWith(ACTIVITY_PAGE, 401);
+      expect(api.activity).toHaveBeenLastCalledWith(
+        ACTIVITY_PAGE,
+        401,
+        false,
+        []
+      );
       expect(store.activity!.length).toBe(ACTIVITY_PAGE + 1);
       expect(store.activityHasMore).toBe(false);
+    });
+
+    describe('activity filter', () => {
+      const row = (id: number, outcome: string) => ({ id, outcome }) as never;
+
+      it("asks the server for the filter's outcomes and narrows the rows at once", () => {
+        api.activity.mockReturnValueOnce(
+          of({
+            rows: [row(3, 'allowed'), row(2, 'error'), row(1, 'denied')],
+            hasMore: false,
+          })
+        );
+        store.loadActivity();
+        const pending = new Subject<{ rows: never[]; hasMore: boolean }>();
+        api.activity.mockReturnValueOnce(pending);
+        store.setActivityFilter('rejected');
+        expect(api.activity).toHaveBeenLastCalledWith(
+          ACTIVITY_PAGE,
+          undefined,
+          false,
+          ['denied', 'blocked', 'error']
+        );
+        // Before the server answers, the rows on screen already match.
+        expect(store.activity?.map(r => r.id)).toEqual([2, 1]);
+        expect(store.activityRefreshing).toBe(true);
+        pending.next({
+          rows: [row(2, 'error'), row(1, 'denied')],
+          hasMore: true,
+        });
+        expect(store.activityRefreshing).toBe(false);
+        expect(store.activityHasMore).toBe(true);
+      });
+
+      it('keeps the list right against a server that ignores the filter', () => {
+        store.activityFilter = 'approval';
+        api.activity.mockReturnValueOnce(
+          of({
+            rows: [
+              row(4, 'allowed'),
+              row(3, 'auth_required'),
+              row(2, 'person_required'),
+              row(1, 'error'),
+            ],
+            hasMore: false,
+          })
+        );
+        store.loadActivity();
+        expect(store.activity?.map(r => r.id)).toEqual([3, 2]);
+      });
+
+      it('drops an answer for a filter that is no longer selected', () => {
+        const slow = new Subject<{ rows: never[]; hasMore: boolean }>();
+        api.activity
+          .mockReturnValueOnce(slow)
+          .mockReturnValueOnce(
+            of({ rows: [row(5, 'allowed')], hasMore: false })
+          );
+        store.loadActivity();
+        store.setActivityFilter('allowed');
+        slow.next({ rows: [row(9, 'error')], hasMore: true });
+        expect(store.activity?.map(r => r.id)).toEqual([5]);
+        expect(store.activityHasMore).toBe(false);
+      });
+
+      it('pages older rows with the same filter', () => {
+        store.activityFilter = 'allowed';
+        api.activity
+          .mockReturnValueOnce(of({ rows: [row(7, 'allowed')], hasMore: true }))
+          .mockReturnValueOnce(
+            of({ rows: [row(3, 'allowed')], hasMore: false })
+          );
+        store.loadActivity();
+        store.loadOlderActivity();
+        expect(api.activity).toHaveBeenLastCalledWith(ACTIVITY_PAGE, 7, false, [
+          'allowed',
+        ]);
+        expect(store.activity?.map(r => r.id)).toEqual([7, 3]);
+      });
     });
 
     it('trusts has_more, not the page length', () => {

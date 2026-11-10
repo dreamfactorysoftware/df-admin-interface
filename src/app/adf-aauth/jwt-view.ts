@@ -51,6 +51,19 @@ export function decodeJwt(raw: string): DecodedJwt {
   };
 }
 
+const JWT_IN_TEXT = /eyJ[\w-]*\.[\w-]+\.[\w-]*/g;
+
+/**
+ * Compact JWTs carried inside a header value, e.g. Signature-Key
+ * `sig=jwt;jwt="eyJ..."` or AAuth-Requirement `resource-token="eyJ..."`.
+ * Only those whose header segment decodes.
+ */
+export function jwtsIn(value: string | null | undefined): DecodedJwt[] {
+  return (value?.match(JWT_IN_TEXT) ?? [])
+    .map(decodeJwt)
+    .filter(t => t.header !== null);
+}
+
 export type JsonTokenKind =
   | 'key'
   | 'string'

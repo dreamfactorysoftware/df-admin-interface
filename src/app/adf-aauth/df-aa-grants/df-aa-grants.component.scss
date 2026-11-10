@@ -1,5 +1,6 @@
 @use '../aa-grid' as *;
 @include aa-grid;
+@include aa-who;
 
 :host {
   display: block;
@@ -7,7 +8,7 @@
 
 .row {
   grid-template-columns:
-    minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr)
+    minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1.2fr)
     110px 88px;
 }
 
@@ -15,8 +16,58 @@
   font-weight: var(--df-font-weight-medium);
 }
 
-.revoke {
+// Outranks the platform's dark re-ink of unthemed outlined buttons.
+.revoke.mat-mdc-outlined-button {
+  --mdc-outlined-button-container-height: 30px;
   --mdc-outlined-button-label-text-color: var(--df-danger);
   --mdc-outlined-button-outline-color: var(--df-danger-border);
-  height: 30px;
+}
+
+// Phones: the person and Revoke lead; the agent (with its tile), the
+// resource and the scopes follow, then when it was given.
+@media (max-width: 600px) {
+  .row:not(.head) {
+    grid-template-areas:
+      'person act'
+      'who who'
+      'resource resource'
+      'scopes scopes'
+      'created created';
+    row-gap: 2px;
+
+    > .cell {
+      grid-column: auto;
+    }
+
+    > .name {
+      grid-area: person;
+    }
+
+    > .act {
+      grid-area: act;
+    }
+
+    > .who {
+      grid-area: who;
+      margin-top: var(--df-space-1);
+    }
+
+    > .resource,
+    > .scopes,
+    > .created {
+      padding-left: calc(24px + var(--df-space-2));
+    }
+
+    > .resource {
+      grid-area: resource;
+    }
+
+    > .scopes {
+      grid-area: scopes;
+    }
+
+    > .created {
+      grid-area: created;
+    }
+  }
 }

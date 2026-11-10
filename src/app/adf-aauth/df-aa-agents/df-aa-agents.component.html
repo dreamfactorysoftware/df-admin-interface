@@ -16,6 +16,8 @@
     *ngIf="!store.agents?.length; else table"
     icon="smart_toy"
     [title]="'aauth.agents.empty' | transloco"
+    [actionLabel]="'aauth.tabs.try' | transloco"
+    (action)="openTab('try')"
     data-testid="aa-agents-empty"></df-empty-state>
 </ng-template>
 
@@ -39,14 +41,20 @@
       *ngFor="let a of store.agents; trackBy: trackAgent"
       [class.blocked]="a.status === 'blocked'"
       [attr.data-testid]="'aa-agent-' + a.id">
-      <span role="cell" class="cell name">{{ a.name || a.agentId }}</span>
+      <span role="cell" class="cell who" [title]="a.name || a.agentId">
+        <df-aa-agent-mark
+          [agentId]="a.agentId"
+          [name]="a.name"
+          [issuer]="issuer"></df-aa-agent-mark>
+        <span class="who-name">{{ a.name || a.agentId }}</span>
+      </span>
       <span role="cell" class="cell mono agent-id" [title]="a.agentId">{{
         localId(a)
       }}</span>
-      <span role="cell" class="cell mono muted" [title]="a.issuer">{{
+      <span role="cell" class="cell mono muted provider" [title]="a.issuer">{{
         hostOf(a.issuer)
       }}</span>
-      <span role="cell" class="cell muted nowrap">
+      <span role="cell" class="cell muted nowrap seen">
         <time
           *ngIf="a.lastSeenAt"
           [attr.datetime]="a.lastSeenAt"
@@ -54,8 +62,19 @@
           >{{ relTime(a.lastSeenAt) }}</time
         >
       </span>
-      <span role="cell" class="cell num df-numeric">{{ a.requestCount }}</span>
-      <span role="cell" class="end">
+      <span
+        role="cell"
+        class="cell num requests nowrap"
+        data-testid="aa-agent-requests"
+        ><span class="df-numeric">{{ a.requestCount }}</span
+        ><span class="unit">
+          {{
+            'aauth.agents.unit.' + (a.requestCount === 1 ? 'one' : 'other')
+              | transloco
+          }}</span
+        ></span
+      >
+      <span role="cell" class="end allow">
         <mat-slide-toggle
           class="allow-toggle"
           [checked]="a.status !== 'blocked'"

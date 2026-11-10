@@ -7,18 +7,22 @@
   font-family: var(--df-font-mono);
 }
 
+// The row: number, kind, request line, status, chevron. 40px tall so the
+// diagram strip beside it can put its arrow on the row's centre line.
 .summary {
   align-items: center;
   background: var(--df-surface);
   border: 1px solid var(--df-border-2);
   border-radius: var(--df-radius);
+  box-sizing: border-box;
   color: var(--df-text);
   cursor: pointer;
   display: flex;
   font: inherit;
   gap: var(--df-space-3);
   min-height: 40px;
-  padding: var(--df-space-2) var(--df-space-3);
+  padding: var(--df-space-1) var(--df-space-2) var(--df-space-1)
+    var(--df-space-3);
   text-align: left;
   width: 100%;
 
@@ -41,12 +45,27 @@
   border-bottom-right-radius: 0;
 }
 
+.num {
+  color: var(--df-text-faint);
+  flex-shrink: 0;
+  font-size: var(--df-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--df-font-weight-heading);
+  min-width: 14px;
+  text-align: right;
+}
+
 .kind {
   color: var(--df-text-muted);
   flex-shrink: 0;
   font-size: var(--df-font-size-xs);
   font-weight: var(--df-font-weight-medium);
-  min-width: 96px;
+  min-width: 92px;
+}
+
+// The Playground agent's tile: DreamFactory's gear.
+.mark {
+  margin-right: calc(var(--df-space-1) * -1);
 }
 
 .line {
@@ -86,14 +105,12 @@
 
 h4 {
   align-items: center;
-  color: var(--df-text-muted);
+  color: var(--df-text-2);
   display: flex;
-  font-size: var(--df-font-size-xs);
+  font-size: var(--df-font-size-sm);
   font-weight: var(--df-font-weight-heading);
   gap: var(--df-space-2);
-  letter-spacing: 0.02em;
-  margin: 0 0 var(--df-space-2);
-  text-transform: uppercase;
+  margin: 0 0 var(--df-space-1);
 }
 
 .exchange {
@@ -124,20 +141,16 @@ h4 {
 .headers {
   border: 1px solid var(--df-border-2);
   border-radius: var(--df-radius-sm);
-  font-family: var(--df-font-mono);
   font-size: var(--df-font-size-xs);
   overflow: hidden;
 }
 
 .h {
   display: grid;
+  font-family: var(--df-font-mono);
   gap: var(--df-space-3);
   grid-template-columns: minmax(110px, 34%) minmax(0, 1fr);
   padding: 5px var(--df-space-2);
-
-  & + .h {
-    border-top: 1px solid var(--df-border-2);
-  }
 
   &.proto {
     background: var(--df-accent-soft);
@@ -149,6 +162,11 @@ h4 {
   }
 }
 
+.h + .h,
+.h-token + .h {
+  border-top: 1px solid var(--df-border-2);
+}
+
 .hn {
   color: var(--df-text-2);
   overflow-wrap: anywhere;
@@ -156,8 +174,87 @@ h4 {
 
 .hv {
   color: var(--df-text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--df-space-1);
+  min-width: 0;
+}
+
+.hv-text {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+
+  // Signature-Key and friends: three lines until opened.
+  &.clamped {
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+}
+
+.hv-tools {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-1);
+}
+
+.jwt,
+.more {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--df-border);
+  border-radius: 4px;
+  color: var(--df-text-2);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  height: 22px;
+  justify-content: center;
+
+  mat-icon {
+    font-size: 14px;
+    height: 14px;
+    width: 14px;
+  }
+
+  &:hover {
+    background: var(--df-hover);
+    color: var(--df-text);
+  }
+
+  &:focus-visible {
+    box-shadow: var(--df-focus-ring);
+    outline: none;
+  }
+}
+
+.jwt {
+  gap: var(--df-space-1);
+  padding: 0 var(--df-space-2) 0 6px;
+
+  span {
+    font-size: 11px;
+  }
+
+  &.on {
+    background: var(--df-surface);
+    border-color: var(--df-accent);
+    color: var(--df-accent-strong);
+  }
+}
+
+.more {
+  padding: 0;
+  width: 24px;
+}
+
+// A JWT from a header, decoded under its row across both columns.
+.h-token {
+  background: var(--df-surface);
+  border-top: 1px solid var(--df-border-2);
+  padding: var(--df-space-2);
 }
 
 .nobody {
@@ -222,6 +319,16 @@ h4 {
   }
 }
 
+// Inside a half-width header table the parts stack.
+.token.stack {
+  border: 0;
+  padding: 0;
+
+  .token-parts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .part {
   display: flex;
   flex-direction: column;
@@ -269,12 +376,50 @@ h4 {
   }
 }
 
-@media (max-width: 600px) {
+// Phones: number, kind, status on the first line; the request line gets
+// the full width beneath.
+@media (max-width: 719px) {
+  .summary {
+    flex-wrap: wrap;
+    gap: 2px var(--df-space-2);
+    padding-bottom: 6px;
+    padding-top: 6px;
+  }
+
   .kind {
     min-width: 0;
   }
 
+  .mark {
+    margin-right: 0;
+  }
+
+  .status,
+  .chev {
+    margin-left: auto;
+  }
+
+  .status + .chev {
+    margin-left: 0;
+  }
+
+  // One line, like the desktop row; the full URL is in the detail.
+  .line {
+    flex-basis: 100%;
+    order: 1;
+    padding-left: calc(14px + var(--df-space-2));
+  }
+
+  .detail {
+    padding: var(--df-space-3);
+  }
+
   .exchange {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .h {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
   }
 }

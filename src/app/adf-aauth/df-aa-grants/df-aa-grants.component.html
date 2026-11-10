@@ -16,6 +16,8 @@
     *ngIf="!store.grants?.length; else table"
     icon="handshake"
     [title]="'aauth.grants.empty' | transloco"
+    [actionLabel]="'aauth.tabs.try' | transloco"
+    (action)="openTab('try')"
     data-testid="aa-grants-empty"></df-empty-state>
 </ng-template>
 
@@ -37,21 +39,25 @@
       <span role="cell" class="cell nowrap name" [title]="g.userEmail || ''">{{
         person(g)
       }}</span>
-      <span role="cell" class="cell nowrap" [title]="g.agentSub">{{
-        agent(g)
-      }}</span>
-      <span role="cell" class="cell nowrap" [title]="g.resource">{{
+      <span role="cell" class="cell who" [title]="g.agentSub">
+        <df-aa-agent-mark
+          [agentId]="g.agentSub"
+          [name]="g.agentName"
+          [issuer]="issuer"></df-aa-agent-mark>
+        <span class="who-name">{{ agent(g) }}</span>
+      </span>
+      <span role="cell" class="cell nowrap resource" [title]="g.resource">{{
         g.resourceName || hostOf(g.resource)
       }}</span>
-      <span role="cell" class="cell chips">
+      <span role="cell" class="cell chips scopes">
         <span class="chip" *ngFor="let x of splitScopes(g.scope)">{{ x }}</span>
       </span>
-      <span role="cell" class="cell muted nowrap">
+      <span role="cell" class="cell muted nowrap created">
         <time [attr.datetime]="g.createdAt" [matTooltip]="g.createdAt">{{
           relTime(g.createdAt)
         }}</time>
       </span>
-      <span role="cell" class="end">
+      <span role="cell" class="end act">
         <button
           mat-stroked-button
           type="button"

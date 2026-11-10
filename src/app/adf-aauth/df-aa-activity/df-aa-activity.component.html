@@ -1,3 +1,47 @@
+<div class="toolbar bar">
+  <div
+    class="filters"
+    role="group"
+    [attr.aria-label]="'aauth.activity.filter' | transloco"
+    data-testid="aa-activity-filters">
+    <button
+      *ngFor="let f of filters"
+      type="button"
+      class="filter"
+      [class.is-on]="store.activityFilter === f"
+      [attr.aria-pressed]="store.activityFilter === f"
+      [attr.data-testid]="'aa-activity-filter-' + f"
+      (click)="setFilter(f)">
+      {{ 'aauth.activity.filters.' + f | transloco }}
+    </button>
+  </div>
+  <!-- Phones: the four filters do not fit one line, so one compact select. -->
+  <mat-select
+    class="filter-select"
+    [value]="store.activityFilter"
+    (valueChange)="setFilter($event)"
+    [aria-label]="'aauth.activity.filter' | transloco"
+    [panelWidth]="null"
+    data-testid="aa-activity-filter-select">
+    <mat-option *ngFor="let f of filters" [value]="f">{{
+      'aauth.activity.filters.' + f | transloco
+    }}</mat-option>
+  </mat-select>
+  <button
+    mat-stroked-button
+    type="button"
+    class="refresh"
+    (click)="store.loadActivity()"
+    [disabled]="store.activityRefreshing"
+    [attr.aria-label]="'aauth.activity.refresh' | transloco"
+    data-testid="aa-activity-refresh">
+    <mat-icon>refresh</mat-icon>
+    <span class="refresh-label">{{
+      'aauth.activity.refresh' | transloco
+    }}</span>
+  </button>
+</div>
+
 <df-empty-state
   *ngIf="store.failed.has('activity') && !store.activity; else loadingOrBody"
   icon="cloud_off"
@@ -6,93 +50,136 @@
   (action)="store.loadActivity()"></df-empty-state>
 <ng-template #loadingOrBody>
   <df-skeleton
-    *ngIf="!store.activity; else body"
+    *ngIf="loadingRows; else body"
     variant="table-row"
     [count]="6"></df-skeleton>
 </ng-template>
 
 <ng-template #body>
-  <div class="toolbar end-bar">
-    <button
-      mat-stroked-button
-      type="button"
-      (click)="store.loadActivity()"
-      [disabled]="store.activityRefreshing"
-      data-testid="aa-activity-refresh">
-      <mat-icon>refresh</mat-icon>
-      {{ 'aauth.activity.refresh' | transloco }}
-    </button>
-  </div>
-
-  <df-empty-state
-    *ngIf="!store.activity?.length; else table"
-    icon="history"
-    [title]="'aauth.activity.empty' | transloco"
-    data-testid="aa-activity-empty"></df-empty-state>
-</ng-template>
-
-<ng-template #table>
-  <div class="grid" role="table" data-testid="aa-activity">
-    <div class="row head" role="row">
-      <span role="columnheader">{{ 'aauth.activity.time' | transloco }}</span>
-      <span role="columnheader">{{ 'aauth.activity.agent' | transloco }}</span>
-      <span role="columnheader">{{ 'aauth.activity.person' | transloco }}</span>
-      <span role="columnheader">{{ 'aauth.activity.scope' | transloco }}</span>
-      <span role="columnheader">{{
-        'aauth.activity.request' | transloco
-      }}</span>
-      <span role="columnheader">{{ 'aauth.activity.result' | transloco }}</span>
-    </div>
+  <ng-container *ngIf="store.activity?.length; else empty">
     <div
-      class="row"
-      role="row"
-      *ngFor="let r of store.activity; trackBy: trackRow"
-      data-testid="aa-activity-row">
-      <span role="cell" class="cell muted nowrap">
-        <time [attr.datetime]="r.createdAt" [matTooltip]="when(r.createdAt)">{{
-          relTime(r.createdAt)
-        }}</time>
-      </span>
-      <span role="cell" class="cell nowrap" [title]="r.agentId">{{
-        r.agentName || r.agentId || '—'
-      }}</span>
-      <span role="cell" class="cell nowrap" [class.muted]="!r.person">{{
-        r.person || '—'
-      }}</span>
-      <span role="cell" class="cell">
-        <span class="chip" *ngIf="r.scope; else none">{{ r.scope }}</span>
-        <ng-template #none><span class="muted">—</span></ng-template>
-      </span>
-      <span role="cell" class="cell request" [title]="r.method + ' ' + r.path">
-        <span class="req-line mono nowrap"
+      class="grid"
+      role="table"
+      [attr.aria-busy]="store.activityRefreshing || null"
+      data-testid="aa-activity">
+      <div class="row head" role="row">
+        <span role="columnheader">{{ 'aauth.activity.time' | transloco }}</span>
+        <span role="columnheader">{{
+          'aauth.activity.agent' | transloco
+        }}</span>
+        <span role="columnheader">{{
+          'aauth.activity.person' | transloco
+        }}</span>
+        <span role="columnheader">{{
+          'aauth.activity.scope' | transloco
+        }}</span>
+        <span role="columnheader">{{
+          'aauth.activity.request' | transloco
+        }}</span>
+        <span role="columnheader">{{
+          'aauth.activity.result' | transloco
+        }}</span>
+        <span role="columnheader" class="cdk-visually-hidden">{{
+          'aauth.activity.reasonHeader' | transloco
+        }}</span>
+      </div>
+      <div
+        class="row"
+        role="row"
+        *ngFor="let r of store.activity; trackBy: trackRow"
+        [class.has-reason]="!!reason(r)"
+        data-testid="aa-activity-row">
+        <span role="cell" class="cell time muted nowrap">
+          <time
+            [attr.datetime]="r.createdAt"
+            [matTooltip]="when(r.createdAt)"
+            >{{ relTime(r.createdAt) }}</time
+          >
+        </span>
+        <span
+          role="cell"
+          class="cell who"
+          [class.blank]="!r.agentName && !r.agentId"
+          [title]="r.agentId || ''">
+          <ng-container *ngIf="r.agentName || r.agentId; else dash">
+            <df-aa-agent-mark
+              size="sm"
+              [agentId]="r.agentId"
+              [name]="r.agentName"
+              [issuer]="issuer"></df-aa-agent-mark>
+            <span class="who-name" [class.mono]="!r.agentName">{{
+              r.agentName || r.agentId
+            }}</span>
+          </ng-container>
+        </span>
+        <span
+          role="cell"
+          class="cell person nowrap"
+          [class.blank]="!r.person"
+          [title]="r.person || ''">
+          <ng-container *ngIf="r.person; else dash">{{
+            r.person
+          }}</ng-container>
+        </span>
+        <span role="cell" class="cell scope" [class.blank]="!r.scope">
+          <span class="chip" *ngIf="r.scope; else dash">{{ r.scope }}</span>
+        </span>
+        <span
+          role="cell"
+          class="cell request mono nowrap"
+          [title]="r.method + ' ' + r.path"
           ><span class="method">{{ r.method }}</span> {{ r.path }}</span
         >
+        <span role="cell" class="cell result">
+          <df-badge
+            [variant]="variant(r.outcome)"
+            [label]="'aauth.activity.outcome.' + r.outcome | transloco"
+            data-testid="aa-activity-outcome"></df-badge>
+          <span class="status mono df-numeric">{{ r.status }}</span>
+        </span>
         <span
-          class="detail"
-          *ngIf="r.detail && r.outcome !== 'allowed'"
+          role="cell"
+          class="reason"
+          *ngIf="reason(r) as why"
           [title]="r.detail"
           data-testid="aa-activity-detail"
-          >{{ r.detail }}</span
+          ><span class="reason-text">{{
+            why.key ? ('aauth.' + why.text | transloco) : why.text
+          }}</span>
+          <code class="reason-code" *ngIf="why.code">{{ why.code }}</code></span
         >
-      </span>
-      <span role="cell" class="cell result" [title]="r.detail || ''">
-        <df-badge
-          [variant]="variant(r.outcome)"
-          [label]="'aauth.activity.outcome.' + r.outcome | transloco"
-          data-testid="aa-activity-outcome"></df-badge>
-        <span class="status mono df-numeric">{{ r.status }}</span>
-      </span>
+      </div>
     </div>
-  </div>
 
-  <div class="more" *ngIf="store.activityHasMore">
-    <button
-      mat-button
-      type="button"
-      (click)="store.loadOlderActivity()"
-      [disabled]="store.activityLoadingOlder"
-      data-testid="aa-activity-more">
-      {{ 'aauth.activity.more' | transloco }}
-    </button>
-  </div>
+    <div class="more" *ngIf="store.activityHasMore">
+      <button
+        mat-button
+        type="button"
+        (click)="store.loadOlderActivity()"
+        [disabled]="store.activityLoadingOlder"
+        data-testid="aa-activity-more">
+        {{ 'aauth.activity.more' | transloco }}
+      </button>
+    </div>
+  </ng-container>
 </ng-template>
+
+<ng-template #empty>
+  <df-empty-state
+    *ngIf="store.activityFilter === 'all'; else emptyFiltered"
+    icon="history"
+    [title]="'aauth.activity.empty' | transloco"
+    [actionLabel]="'aauth.tabs.try' | transloco"
+    (action)="openTab('try')"
+    data-testid="aa-activity-empty"></df-empty-state>
+  <ng-template #emptyFiltered>
+    <df-empty-state
+      icon="filter_alt_off"
+      [title]="'aauth.activity.emptyFor.' + store.activityFilter | transloco"
+      [actionLabel]="'aauth.activity.showAll' | transloco"
+      (action)="setFilter('all')"
+      data-testid="aa-activity-empty-filtered"></df-empty-state>
+  </ng-template>
+</ng-template>
+
+<ng-template #dash><span class="dash" aria-hidden="true">—</span></ng-template>

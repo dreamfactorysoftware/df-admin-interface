@@ -61,7 +61,11 @@
     "requests": "Requests",
     "blocked": "Blocked",
     "empty": "No agents yet",
-    "allowed": "Allowed"
+    "allowed": "Allowed",
+    "unit": {
+      "one": "request",
+      "other": "requests"
+    }
   },
   "activity": {
     "time": "Time",
@@ -73,6 +77,27 @@
     "refresh": "Refresh",
     "more": "Load more",
     "empty": "No activity yet",
+    "filter": "Result",
+    "filters": {
+      "all": "All",
+      "allowed": "Allowed",
+      "approval": "Needs approval",
+      "rejected": "Rejected"
+    },
+    "emptyFor": {
+      "allowed": "No allowed requests",
+      "approval": "No requests need approval",
+      "rejected": "No rejected requests"
+    },
+    "showAll": "Show all",
+    "reasonHeader": "Reason",
+    "reason": {
+      "stepUp": "Auth token does not cover this scope",
+      "untrustedPs": "Person Server is not trusted",
+      "personInactive": "Person is inactive or deleted",
+      "roleRevoked": "Person no longer holds this role",
+      "roleUnavailable": "Role is unavailable"
+    },
     "outcome": {
       "allowed": "Allowed",
       "person_required": "Person token required",
@@ -120,6 +145,13 @@
     "expires": "Expires {{when}}",
     "expired": "Expired {{when}}",
     "noBody": "Empty body",
+    "showAll": "Show all",
+    "showLess": "Show less",
+    "lane": {
+      "agent": "Agent",
+      "api": "API",
+      "ps": "Person Server"
+    },
     "kind": {
       "agent_token": "Agent token",
       "call": "Call",

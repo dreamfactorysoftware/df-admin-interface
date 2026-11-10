@@ -178,6 +178,165 @@ describe('DfAaTryComponent', () => {
     expect(q('aa-run-result')?.textContent).toContain('"resource"');
   });
 
+  it('draws each step on its lane, coloured by the answer', () => {
+    store.run = waitingRun();
+    fixture.detectChanges();
+    expect(
+      Array.from(qa('aa-lanes')[0].querySelectorAll('.lane-name')).map(e =>
+        e.textContent?.trim()
+      )
+    ).toEqual(['Agent', 'API', 'Person Server']);
+    const strips = Array.from(qa('aa-lane')) as HTMLElement[];
+    expect(strips.map(s => s.dataset['lane'])).toEqual(['agent', 'api']);
+    expect(strips.map(s => s.dataset['tone'])).toEqual(['neutral', 'warning']);
+    // The Playground agent shows DreamFactory's gear on step 1 only.
+    expect(qa('aa-agent-mark').length).toBe(1);
+    expect(q('aa-lanes-idle')).toBeNull();
+  });
+
+  it('hangs the Approve card off the Person Server lane', () => {
+    store.run = waitingRun();
+    fixture.detectChanges();
+    const row = q('aa-approve-card')?.closest('li');
+    expect(row?.querySelector('.strip')?.getAttribute('data-lane')).toBe('ps');
+    expect(row?.parentElement?.getAttribute('data-testid')).toBe('aa-timeline');
+  });
+
+  it('shows the idle lifelines before the first Send', () => {
+    expect(q('aa-lanes-idle')).toBeTruthy();
+    expect(q('aa-timeline')).toBeNull();
+  });
+
+  it('draws in only the newest step', () => {
+    store.run = waitingRun();
+    fixture.detectChanges();
+    const entering = () =>
+      Array.from(qa('aa-lane')).map(s => s.classList.contains('enter'));
+    expect(entering()).toEqual([false, true]);
+
+    // The next poll adds a step: it, and only it, draws in.
+    const next = waitingRun();
+    next.steps.push({
+      kind: 'discover',
+      title: 'Person server metadata',
+      request: {
+        method: 'GET',
+        url: 'https://df.example.test/.well-known/aauth-person.json',
+        headers: [],
+        body: null,
+      },
+      response: { status: 200, headers: [], body: '{}' },
+      tokens: [],
+    });
+    store.run = next;
+    fixture.detectChanges();
+    expect(entering()).toEqual([false, false, true]);
+    expect((qa('aa-lane')[2] as HTMLElement).dataset['lane']).toBe('ps');
+  });
+
+  it('replays nothing when the tab opens on a run already drawn', () => {
+    store.run = waitingRun();
+    const again = TestBed.createComponent(DfAaTryComponent);
+    again.detectChanges();
+    const strips = (again.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="aa-lane"].enter'
+    );
+    expect(strips.length).toBe(0);
+    again.destroy();
+  });
+
+  it("leaves the final call's body to the Response card", () => {
+    const done = waitingRun();
+    done.status = 'done';
+    done.pending = null;
+    done.steps.push({
+      kind: 'call',
+      title: 'Signed call',
+      request: {
+        method: 'GET',
+        url: 'https://df.example.test/api/v2/sales/_table/orders?limit=5',
+        headers: [],
+        body: null,
+      },
+      response: {
+        status: 200,
+        headers: [['AAuth-Scope', 'sales.read']],
+        body: '{"resource":[{"id":1}]}',
+      },
+      tokens: [],
+    });
+    done.result = { status: 200, body: '{"resource":[{"id":1}]}' };
+    store.run = done;
+    fixture.detectChanges();
+
+    const steps = qa('aa-step');
+    (steps[2] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    let detail = qa('aa-step-detail')[0];
+    expect(detail.textContent).toContain('AAuth-Scope');
+    expect(detail.querySelector('[data-testid="aa-step-response-body"]')).toBe(
+      null
+    );
+    expect(detail.textContent).not.toContain('Empty body');
+    expect(q('aa-run-result')?.textContent).toContain('"resource"');
+
+    // Earlier calls still show theirs.
+    (steps[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    detail = qa('aa-step-detail')[0];
+    expect(
+      detail.querySelector('[data-testid="aa-step-response-body"]')
+    ).toBeTruthy();
+  });
+
+  it('clamps long header values and decodes the JWT inside Signature-Key', () => {
+    const presented = jwt(
+      { alg: 'EdDSA', typ: 'aa-auth+jwt', kid: 'ps' },
+      {
+        iss: 'https://df.example.test',
+        sub: 'jordan',
+        scope: 'sales.read',
+        pad: 'x'.repeat(200),
+      }
+    );
+    const r = waitingRun();
+    r.steps[1] = {
+      ...r.steps[1],
+      request: {
+        method: 'GET',
+        url: 'https://df.example.test/api/v2/sales/_table/orders?limit=5',
+        headers: [
+          ['Signature-Key', `sig=jwt;jwt="${presented}"`],
+          ['Accept', 'application/json'],
+        ],
+        body: null,
+      },
+    };
+    store.run = r;
+    fixture.detectChanges();
+    (qa('aa-step')[1] as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const values = qa('aa-header-value');
+    expect(values[0].classList.contains('clamped')).toBe(true);
+    expect(values[1].classList.contains('clamped')).toBe(false);
+    expect(qa('aa-header-more').length).toBe(1);
+
+    (q('aa-header-more') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(qa('aa-header-value')[0].classList.contains('clamped')).toBe(false);
+
+    const chip = q('aa-header-jwt') as HTMLButtonElement;
+    expect(chip.textContent).toContain('aa-auth+jwt');
+    expect(chip.getAttribute('aria-expanded')).toBe('false');
+    chip.click();
+    fixture.detectChanges();
+    expect(chip.getAttribute('aria-expanded')).toBe('true');
+    const decoded = q('aa-header-token');
+    expect(decoded?.textContent).toContain('"scope"');
+    expect(decoded?.textContent).toContain('sales.read');
+  });
+
   it('shows a failed run with its error', () => {
     store.run = run({ status: 'failed', error: 'Person Server unreachable' });
     fixture.detectChanges();
