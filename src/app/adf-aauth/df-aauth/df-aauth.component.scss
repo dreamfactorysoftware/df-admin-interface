@@ -1,5 +1,45 @@
+// AAuth's own tones, resolved here (below the theme class on <body>) so
+// every tab inherits the theme's values:
+// - --aa-accent-ink: accent text on the accent wash (chips, the selected
+//   filter, protocol headers). Dark lifts it so it holds AA on the wash.
+// - --aa-pending*: "one more step" (202, a token challenge). Same as the
+//   accent, except in phosphor, where accent and success are both green:
+//   there it takes the theme's cyan so 202 never reads as 200.
+// - --aa-fill: the filled primary actions (Send, Approve). Dark deepens
+//   the accent so the white label clears AA.
 :host {
+  --aa-accent-ink: var(--df-accent-strong);
+  --aa-pending: var(--df-accent);
+  --aa-pending-ink: var(--df-accent-strong);
+  --aa-pending-soft: var(--df-accent-soft);
   display: block;
+}
+
+:host-context(.dark-theme) {
+  --aa-accent-ink: var(--df-tint-build-fg);
+  --aa-pending-ink: var(--df-tint-build-fg);
+  --aa-fill: #6a66a0;
+}
+
+:host-context(.phosphor-theme) {
+  --aa-accent-ink: var(--df-accent-strong);
+  --aa-pending: #4dd8e6;
+  --aa-pending-ink: #4dd8e6;
+  --aa-pending-soft: rgba(77, 216, 230, 0.12);
+  --aa-fill: var(--df-accent);
+}
+
+// "One more step" badges (202, token required) are outlined with a hollow
+// dot, so they differ from the filled "done" ones by shape as well as hue.
+:host ::ng-deep .df-badge.df-badge--accent {
+  --_badge-bg: transparent;
+  --_badge-fg: var(--aa-pending-ink);
+  box-shadow: inset 0 0 0 1px var(--aa-pending);
+
+  .df-badge__dot {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px currentColor;
+  }
 }
 
 .aa {

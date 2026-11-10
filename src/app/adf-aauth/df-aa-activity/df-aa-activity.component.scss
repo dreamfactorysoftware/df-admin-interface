@@ -40,7 +40,7 @@
   text-overflow: ellipsis;
 
   .method {
-    color: var(--df-accent-strong);
+    color: var(--aa-accent-ink, var(--df-accent-strong));
     font-weight: var(--df-font-weight-heading);
   }
 }
@@ -171,8 +171,11 @@
       justify-self: end;
     }
 
+    // Under the agent's name, past its tile (20px) and the gap, as the
+    // Agents cards do.
     > .person {
       grid-area: person;
+      padding-left: calc(20px + var(--df-space-2));
     }
 
     > .blank {

@@ -47,7 +47,19 @@
     }
 
     > .who {
+      align-items: flex-start;
       grid-area: who;
+    }
+
+    // The name gets two lines before it gives way to an ellipsis.
+    .who-name {
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      display: -webkit-box;
+      line-height: 20px;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
 
     > .allow {

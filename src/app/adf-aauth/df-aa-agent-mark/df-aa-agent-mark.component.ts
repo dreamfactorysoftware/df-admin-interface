@@ -49,7 +49,9 @@ export function agentInitial(
 
 /**
  * An agent's tile. DreamFactory's own Playground agent carries the
- * DreamFactory gear; every other agent gets a neutral monogram. Never an
+ * DreamFactory mark (the gear with the database inside, as in the wordmark
+ * and favicon; never df-cog.svg, which is the platform's loading spinner);
+ * every other agent gets a neutral monogram. Never an
  * agent-supplied logo (impersonation and tracking risk). Decorative: the
  * agent's name always sits beside it. Person Servers use the same tile
  * (`self` for this DreamFactory) so every party reads the same way.
@@ -62,7 +64,7 @@ export function agentInitial(
   template: `<img
       *ngIf="playground; else monogram"
       class="gear"
-      src="assets/img/df-cog.svg"
+      src="assets/img/df-mark.svg"
       alt=""
       data-testid="aa-agent-mark-gear" /><ng-template #monogram>{{
       initial
@@ -95,13 +97,13 @@ export function agentInitial(
 
       .gear {
         display: block;
-        height: 16px;
-        width: 16px;
+        height: 18px;
+        width: 18px;
       }
 
       :host(.sm) .gear {
-        height: 14px;
-        width: 14px;
+        height: 15px;
+        width: 15px;
       }
 
       /* Phosphor repaints the platform wordmark green; the gear follows. */

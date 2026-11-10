@@ -112,12 +112,12 @@
 }
 
 // Dark theme: the compiled Material primary is a dark navy that disappears
-// on the dark panel; the main actions use the theme accent instead
-// (#7571a9 on #1c1b21 is about 3.8:1, white label on it about 4.5:1).
+// on the dark panel; the main actions take --aa-fill instead (set by the
+// AAuth shell: a deeper accent, white label about 5.2:1).
 :host-context(.dark-theme) {
   .send-btn:not([disabled]),
   .approve-btn {
-    --mdc-filled-button-container-color: var(--df-accent);
+    --mdc-filled-button-container-color: var(--aa-fill, var(--df-accent));
     --mdc-filled-button-label-text-color: var(--df-accent-contrast);
   }
 
@@ -279,7 +279,7 @@
   }
 
   &[data-tone='accent'] {
-    --tone: var(--df-accent);
+    --tone: var(--aa-pending, var(--df-accent));
   }
 }
 
@@ -330,6 +330,33 @@
   width: 8px;
 }
 
+// 202 (accepted, the answer comes later): an open arrowhead and a hollow
+// target, the sequence-diagram mark for an asynchronous reply. It differs
+// from 200 by shape, not only by hue.
+.strip[data-tone='accent'] {
+  // the shaft runs into the open head
+  .shaft {
+    width: calc(var(--to) - var(--from) - 9px);
+  }
+
+  .head {
+    clip-path: polygon(0 0, 100% 50%, 0 100%, 0 76%, 60% 50%, 0 24%);
+    height: 9px;
+    top: calc(var(--y) - 4.5px);
+    width: 8px;
+  }
+
+  .to {
+    background: var(--df-surface);
+    border: 2px solid var(--tone);
+    box-sizing: border-box;
+    height: 9px;
+    left: calc(var(--to) - 4px);
+    top: calc(var(--y) - 4.5px);
+    width: 9px;
+  }
+}
+
 // A step that calls nothing (token minted, cached tokens) is a dot on the
 // Agent lane.
 .strip[data-lane='agent'] {
@@ -356,7 +383,7 @@
 // person acts.
 .hook {
   background: var(--df-surface);
-  border: 2px solid var(--df-accent);
+  border: 2px solid var(--aa-pending, var(--df-accent));
   border-radius: 50%;
   box-sizing: border-box;
   height: 11px;
@@ -367,7 +394,7 @@
 }
 
 .hook-line {
-  border-top: 1.5px dashed var(--df-accent);
+  border-top: 1.5px dashed var(--aa-pending, var(--df-accent));
   left: calc(var(--x-ps) + 6px);
   position: absolute;
   top: calc(var(--y) - 0.75px);
@@ -450,8 +477,8 @@
 // ------------------------------------------------------------ the cards
 
 .approve {
-  background: var(--df-accent-soft);
-  border: 1px solid var(--df-accent);
+  background: var(--aa-pending-soft, var(--df-accent-soft));
+  border: 1px solid var(--aa-pending, var(--df-accent));
   border-radius: var(--df-radius);
   display: flex;
   flex-direction: column;
@@ -463,7 +490,7 @@
 
 .approve-state {
   align-items: center;
-  color: var(--df-accent-strong);
+  color: var(--aa-pending-ink, var(--df-accent-strong));
   display: flex;
   font-size: var(--df-font-size-sm);
   font-weight: var(--df-font-weight-medium);
@@ -473,7 +500,7 @@
 }
 
 .ring {
-  border: 2px solid var(--df-accent);
+  border: 2px solid var(--aa-pending, var(--df-accent));
   border-radius: 50%;
   box-sizing: border-box;
   height: 9px;
@@ -571,7 +598,7 @@
 
 @media (max-width: 719px) {
   :host {
-    --seq-strip: 26px;
+    --seq-strip: 31px;
     --seq-gap: var(--df-space-2);
   }
 
@@ -587,23 +614,37 @@
     display: none;
   }
 
+  // Three lanes on a hairline track; the empty stops stay visible.
   .dots {
     display: flex;
-    gap: 4px;
+    gap: 5px;
     left: 0;
     position: absolute;
-    top: calc(var(--y) - 3px);
+    top: calc(var(--y) - 3.5px);
+
+    &::before {
+      background: var(--df-border);
+      content: '';
+      height: 1px;
+      left: 3px;
+      position: absolute;
+      right: 3px;
+      top: 3px;
+    }
 
     span {
-      border: 1px solid var(--df-border);
+      background: var(--df-surface);
+      border: 1px solid var(--df-text-faint);
       border-radius: 50%;
       box-sizing: border-box;
-      height: 6px;
-      width: 6px;
+      height: 7px;
+      position: relative;
+      width: 7px;
     }
   }
 
-  // The filled dot is the lane the step called.
+  // The filled dot is the lane the step called (hollow and thicker for a
+  // 202, like the target on wide screens).
   .strip[data-lane='agent'] [data-dot='agent'],
   .strip[data-lane='api'] [data-dot='api'],
   .strip[data-lane='ps'] [data-dot='ps'] {
@@ -611,12 +652,19 @@
     border-color: var(--tone);
   }
 
+  .strip[data-tone='accent'][data-lane='api'] [data-dot='api'],
+  .strip[data-tone='accent'][data-lane='ps'] [data-dot='ps'] {
+    background: var(--df-surface);
+    border-width: 2px;
+  }
+
   .strip.enter .dots span {
     animation: aa-seq-land 200ms var(--df-ease-standard) backwards;
   }
 
+  // Centred on the three dots (31px).
   .node {
-    left: 3px;
+    left: 5.5px;
   }
 }
 

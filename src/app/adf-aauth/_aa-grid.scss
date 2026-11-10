@@ -137,7 +137,7 @@
   .chip {
     background: var(--df-accent-soft);
     border-radius: 999px;
-    color: var(--df-accent-strong);
+    color: var(--aa-accent-ink, var(--df-accent-strong));
     font-family: var(--df-font-mono);
     font-size: var(--df-font-size-xs);
     line-height: 20px;
@@ -223,7 +223,7 @@
     &.is-on {
       background: var(--df-accent-soft);
       border-color: transparent;
-      color: var(--df-accent-strong);
+      color: var(--aa-accent-ink, var(--df-accent-strong));
       font-weight: var(--df-font-weight-medium);
     }
   }

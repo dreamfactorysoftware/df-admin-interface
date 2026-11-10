@@ -109,6 +109,7 @@
       </span>
       <span role="cell" class="end toggle">
         <mat-slide-toggle
+          color="primary"
           [checked]="s.enabled"
           (change)="store.updateServer(s.id, { enabled: $event.checked })"
           [aria-label]="

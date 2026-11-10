@@ -79,7 +79,7 @@ describe('DfAauthComponent list tabs', () => {
       expect(filters.map(b => b.textContent?.trim())).toEqual([
         'All',
         'Allowed',
-        'Needs approval',
+        'Token required',
         'Rejected',
       ]);
       expect(filters[0].getAttribute('aria-pressed')).toBe('true');

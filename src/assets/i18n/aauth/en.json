@@ -81,12 +81,12 @@
     "filters": {
       "all": "All",
       "allowed": "Allowed",
-      "approval": "Needs approval",
+      "approval": "Token required",
       "rejected": "Rejected"
     },
     "emptyFor": {
       "allowed": "No allowed requests",
-      "approval": "No requests need approval",
+      "approval": "No token challenges",
       "rejected": "No rejected requests"
     },
     "showAll": "Show all",

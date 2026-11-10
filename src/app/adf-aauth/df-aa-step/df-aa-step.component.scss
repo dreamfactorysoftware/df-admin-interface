@@ -132,7 +132,7 @@ h4 {
   word-break: break-all;
 
   .method {
-    color: var(--df-accent-strong);
+    color: var(--aa-accent-ink, var(--df-accent-strong));
     font-weight: var(--df-font-weight-heading);
   }
 }
@@ -156,7 +156,7 @@ h4 {
     background: var(--df-accent-soft);
 
     .hn {
-      color: var(--df-accent-strong);
+      color: var(--aa-accent-ink, var(--df-accent-strong));
       font-weight: var(--df-font-weight-heading);
     }
   }
@@ -241,7 +241,7 @@ h4 {
   &.on {
     background: var(--df-surface);
     border-color: var(--df-accent);
-    color: var(--df-accent-strong);
+    color: var(--aa-accent-ink, var(--df-accent-strong));
   }
 }
 

@@ -76,6 +76,7 @@
       >
       <span role="cell" class="end allow">
         <mat-slide-toggle
+          color="primary"
           class="allow-toggle"
           [checked]="a.status !== 'blocked'"
           (change)="store.setAgentBlocked(a.id, !$event.checked)"

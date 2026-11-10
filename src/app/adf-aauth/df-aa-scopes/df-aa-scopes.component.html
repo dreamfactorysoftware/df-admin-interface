@@ -108,6 +108,7 @@
 
       <span role="cell" class="end">
         <mat-slide-toggle
+          color="primary"
           [checked]="s.enabled"
           (change)="toggle(s, $event.checked)"
           [aria-label]="('aauth.scopes.enabled' | transloco) + ' ' + s.scope"

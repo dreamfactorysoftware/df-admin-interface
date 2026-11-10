@@ -56,7 +56,8 @@ describe('DfAaAgentMarkComponent', () => {
       issuer: ISSUER,
     });
     const img = el.querySelector('img');
-    expect(img?.getAttribute('src')).toBe('assets/img/df-cog.svg');
+    // The brand mark (gear + database), not df-cog.svg: that is the spinner.
+    expect(img?.getAttribute('src')).toBe('assets/img/df-mark.svg');
     expect(img?.getAttribute('alt')).toBe('');
     expect(el.classList).toContain('is-playground');
     expect(el.getAttribute('aria-hidden')).toBe('true');

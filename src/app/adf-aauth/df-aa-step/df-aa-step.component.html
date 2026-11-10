@@ -167,11 +167,17 @@
     <div class="token-parts">
       <div class="part" *ngIf="t.header">
         <span class="part-label">{{ 'aauth.try.header' | transloco }}</span>
-        <df-aa-json [value]="t.header"></df-aa-json>
+        <df-aa-json
+          [value]="t.header"
+          [wrap]="true"
+          [label]="'aauth.try.header' | transloco"></df-aa-json>
       </div>
       <div class="part" *ngIf="t.payload">
         <span class="part-label">{{ 'aauth.try.payload' | transloco }}</span>
-        <df-aa-json [value]="t.payload"></df-aa-json>
+        <df-aa-json
+          [value]="t.payload"
+          [wrap]="true"
+          [label]="'aauth.try.payload' | transloco"></df-aa-json>
       </div>
     </div>
     <details class="raw">

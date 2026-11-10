@@ -9,6 +9,7 @@
 
     <ng-container *ngIf="store.overview as o">
       <mat-slide-toggle
+        color="primary"
         class="aa-enabled"
         [checked]="o.enabled"
         [disabled]="(!o.issuerOk && !o.enabled) || store.enabledSaving"
