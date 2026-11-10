@@ -249,6 +249,17 @@ $red-palette: mat.define-palette(mat.$red-palette);
         display: block;
       }
 
+      // This file @uses src/theme, so theme.scss's light-theme
+      // `.shell-brand-logo { filter: brightness(0) }` is re-emitted here with
+      // this component's encapsulation attribute. That copy is injected after
+      // the global stylesheet and beats theme.scss's global `.dark-theme`
+      // override, leaving a black wordmark on the dark sidebar. Restate the
+      // dark ink here; phosphor below comes later and still wins.
+      :host-context(.dark-theme) & .shell-brand-logo {
+        filter: brightness(0) invert(1);
+        opacity: 0.9;
+      }
+
       // Wordmark goes 16-bit green in phosphor (item 18): tint to the
       // phosphor glyph color and render chunky. Reduced height + pixelated
       // upscale gives the raster wordmark hard pixel edges.
