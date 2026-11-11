@@ -48,6 +48,14 @@ const BASELINE: HttpAllowance[] = [
       'backend image; the lists hide the "last used" column when it is',
   },
   {
+    status: 404,
+    method: 'GET',
+    url: /^\/_internal\/ai\/aliases\/?$/,
+    reason:
+      'capability probe: a backend without the AI budgets API answers 404 ' +
+      'once per admin login; the app hides the budgets entry points',
+  },
+  {
     status: 400,
     method: 'GET',
     url: /^\/api\/v2\/system\/lookup\?filter=name(=|%3D)%22intercom_widget_enabled%22/,
