@@ -1,5 +1,5 @@
 import { ProviderRates } from '../types/usage';
-import { estimateCost } from './cost';
+import { DefaultRatesRaw, estimateCost, liveRates } from './cost';
 
 /**
  * Pure math for the task cost estimator: calibrate per-call token averages
@@ -36,10 +36,7 @@ export interface CalibrationBundle {
     requests: number | string;
   }[];
   by_provider?: { provider?: string }[];
-  default_rates?: Record<
-    string,
-    { input_per_1k: number; output_per_1k: number }
-  >;
+  default_rates?: DefaultRatesRaw;
 }
 
 /** Which usage window produced the calibration: the routed agent's backing
@@ -56,7 +53,8 @@ export interface TaskCalibration {
   model: string | null;
   provider: string | null;
   rates: ProviderRates;
-  /** 'live' = the meter's default_rates for the dominant provider;
+  /** 'live' = the meter's default_rates for the dominant model, or for
+   *  its provider when the model has no rate of its own;
    *  'blended' = $/1k derived from the window's own cost/token totals
    *  (data-driven fallback — never a third hardcoded rate table). */
   rateSource: 'live' | 'blended';
@@ -98,19 +96,22 @@ export function calibrate(
   }
   const provider = top?.provider ?? bundle.by_provider?.[0]?.provider ?? null;
 
-  const live = provider ? bundle.default_rates?.[provider] : undefined;
+  // Same order the meter prices a call: the model's rate, then its
+  // provider's. Reads both served shapes of default_rates.
+  const served = liveRates(bundle.default_rates);
+  const live =
+    served.models[top?.model ?? ''] ?? served.providers[provider ?? ''];
+  // A zero list price (ollama, openai_compatible) cannot describe a window
+  // that was billed: the connection carries its own rates. Blend instead.
+  const unpricedButBilled =
+    !!live &&
+    live.inputPer1k === 0 &&
+    live.outputPer1k === 0 &&
+    num(bundle.total_cost_usd) > 0;
   let rates: ProviderRates;
   let rateSource: TaskCalibration['rateSource'];
-  if (
-    live &&
-    Number.isFinite(Number(live.input_per_1k)) &&
-    Number.isFinite(Number(live.output_per_1k))
-  ) {
-    rates = {
-      provider: provider as string,
-      inputPer1k: Number(live.input_per_1k),
-      outputPer1k: Number(live.output_per_1k),
-    };
+  if (live && !unpricedButBilled) {
+    rates = { provider: provider ?? (top?.model as string), ...live };
     rateSource = 'live';
   } else {
     const totalTokens =

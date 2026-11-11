@@ -88,6 +88,71 @@ describe('task-estimate', () => {
       expect(c!.rateSource).toBe('live');
     });
 
+    // Regression: df-ai 0.1.0 and later serve default_rates as
+    // { providers, models }. It was read as a flat provider map, so no
+    // provider ever matched and every estimate silently fell to 'blended'.
+    describe('with the nested default_rates shape', () => {
+      const nested = {
+        providers: {
+          anthropic: { input_per_1k: 0.003, output_per_1k: 0.015 },
+          openai: { input_per_1k: 0.0025, output_per_1k: 0.01 },
+          openai_compatible: { input_per_1k: 0, output_per_1k: 0 },
+        },
+        models: {
+          'claude-opus-4-8': { input_per_1k: 0.015, output_per_1k: 0.075 },
+        },
+      };
+
+      it('prices from the provider rate when the model has none', () => {
+        const c = calibrate(bundle({ default_rates: nested }), 'app');
+
+        expect(c!.model).toBe('claude-sonnet-4-5');
+        expect(c!.rateSource).toBe('live');
+        expect(c!.rates).toEqual({
+          provider: 'anthropic',
+          inputPer1k: 0.003,
+          outputPer1k: 0.015,
+        });
+      });
+
+      it('prefers the rate of the dominant model over its provider', () => {
+        const c = calibrate(
+          bundle({
+            default_rates: nested,
+            by_model: [
+              { model: 'claude-opus-4-8', provider: 'anthropic', requests: 9 },
+              { model: 'gpt-4o', provider: 'openai', requests: 1 },
+            ],
+          }),
+          'app'
+        );
+
+        expect(c!.rateSource).toBe('live');
+        expect(c!.rates).toEqual({
+          provider: 'anthropic',
+          inputPer1k: 0.015,
+          outputPer1k: 0.075,
+        });
+      });
+    });
+
+    // A free list price says nothing about a connection that bills through
+    // its own configured rates: the metered history is the better source.
+    it('blends when the list price is zero but the window was billed', () => {
+      const c = calibrate(
+        bundle({
+          default_rates: {
+            providers: { ollama: { input_per_1k: 0, output_per_1k: 0 } },
+          },
+          by_model: [{ model: 'qwen3', provider: 'ollama', requests: 10 }],
+        }),
+        'service'
+      );
+
+      expect(c!.rateSource).toBe('blended');
+      expect(c!.rates.inputPer1k).toBeCloseTo(0.02);
+    });
+
     it('returns null when there are no rates and no priced history', () => {
       expect(
         calibrate(

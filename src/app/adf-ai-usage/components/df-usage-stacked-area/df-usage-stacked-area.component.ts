@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { TimeBucket } from '../../types/usage';
+import { dayLabel } from '../../utils/calendar-date';
 
 interface Layer {
   d: string;
@@ -242,7 +243,8 @@ export class DfUsageStackedAreaComponent implements OnChanges {
       const idx = Math.round((i * (n - 1)) / Math.max(1, xTickCount - 1));
       this.xTicks.push({
         x: xAt(idx),
-        label: shortDate(this.data[idx].date),
+        // A bucket with no usable date gets no label, not "NaN/NaN".
+        label: dayLabel(this.data[idx].date),
       });
     }
 
@@ -304,11 +306,6 @@ function sumKey(data: TimeBucket[], k: keyof TimeBucket): number {
     }
   }
   return total;
-}
-
-function shortDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 function formatK(n: number): string {
