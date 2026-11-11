@@ -9,6 +9,7 @@ import { faPlus, faPlug } from '@fortawesome/free-solid-svg-icons';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
+import { ROUTES } from 'src/app/shared/types/routes';
 import {
   DfPickerListComponent,
   PickerId,
@@ -50,7 +51,7 @@ const toItem = (s: McpServerRow): PickerItem => ({
         </span>
         <a
           mat-stroked-button
-          [routerLink]="['/api-connections/api-types/database']"
+          [routerLink]="mcpCreateLink"
           class="mcp-servers__action">
           <fa-icon [icon]="faPlus"></fa-icon>
           <span>Create MCP service</span>
@@ -166,6 +167,10 @@ export class DfAiMcpServersComponent implements OnInit {
 
   faPlug = faPlug;
   faPlus = faPlus;
+
+  /** The AI > MCP section's create route (/ai/mcp/create): the only create
+   *  route df-mcp-route-shim renders the MCP create page for. */
+  readonly mcpCreateLink = `/${ROUTES.AI}/${ROUTES.AI_MCP}/${ROUTES.CREATE}`;
 
   ngOnInit(): void {
     this.http
