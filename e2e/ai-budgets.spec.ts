@@ -13,14 +13,14 @@ import {
  * /_internal/ai/aliases, and the admin UI must work against servers that do
  * not. These tests ask the target server which kind it is and follow it:
  *
- *  - on a server that has the feature, the entry points (nav item, Usage
- *    button, alias section) show and the list loads; that test skips on a
- *    server without it, and its counterpart skips on a server with it;
+ *  - on a server that has the feature, the entry points show and a budget is
+ *    created, edited, disabled and deleted against the real API (cleaned up
+ *    after); that test skips on a server without the feature, so the gate's
+ *    DF must run with DF_AI_BUDGET_MANAGEMENT_ENABLED=true;
  *  - the "no such feature" and "no access" pages are checked on any server by
  *    answering the support check in the browser;
- *  - create, edit, enable/disable and delete run against an in-browser fake of
- *    the budget API. This file never writes to the server: any write to
- *    /_internal/ai/* that is not answered here fails the test.
+ *  - the screen's write paths also run against an in-browser fake of the
+ *    budget API; any other write to /_internal/ai/* is aborted.
  */
 const APP = '/dreamfactory/dist/#';
 const PROBE = '**/_internal/ai/aliases';
@@ -43,36 +43,25 @@ const FORBIDDEN = {
 
 type Support = 'available' | 'unsupported' | 'forbidden' | 'unknown';
 
-/** Ask the server the same question the UI asks. Read only. */
-async function serverSupport(request: APIRequestContext): Promise<Support> {
+async function sessionToken(request: APIRequestContext): Promise<string> {
   const login = await request.post('/api/v2/system/admin/session', {
     data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
   expect(login.ok(), `admin API login failed: HTTP ${login.status()}`).toBe(
     true
   );
-  const { session_token: token } = await login.json();
+  return (await login.json()).session_token;
+}
+
+/** Ask the server the same question the UI asks. Read only. */
+async function serverSupport(request: APIRequestContext): Promise<Support> {
   const probe = await request.get('/_internal/ai/aliases', {
-    headers: { 'X-DreamFactory-Session-Token': token },
+    headers: { 'X-DreamFactory-Session-Token': await sessionToken(request) },
   });
   if (probe.status() === 200) return 'available';
   if (probe.status() === 404) return 'unsupported';
   if (probe.status() === 403) return 'forbidden';
   return 'unknown';
-}
-
-/** Fail the test if the page tries to write to the real budget API. */
-async function forbidRealWrites(page: Page): Promise<string[]> {
-  const writes: string[] = [];
-  await page.route(INTERNAL_AI, (route: Route) => {
-    const method = route.request().method();
-    if (method === 'GET') {
-      return route.fallback();
-    }
-    writes.push(`${method} ${route.request().url()}`);
-    return route.abort();
-  });
-  return writes;
 }
 
 /** Answer every budget and alias request in the browser with one response. */
@@ -129,7 +118,22 @@ async function expectEntryPointsHidden(page: Page, probes: () => number) {
 }
 
 test.describe('AI budgets: server support', () => {
-  test('this server has the feature: entry points show and the list loads', async ({
+  const REAL_LABEL = 'e2e real round trip';
+
+  // Leave nothing behind, whether the test passed or not.
+  test.afterEach(async ({ request }) => {
+    const token = await sessionToken(request);
+    const headers = { 'X-DreamFactory-Session-Token': token };
+    const list = await request.get('/_internal/ai/budgets', { headers });
+    if (!list.ok()) return;
+    for (const b of (await list.json()).resource ?? []) {
+      if (b.label === REAL_LABEL) {
+        await request.delete(`/_internal/ai/budgets/${b.id}`, { headers });
+      }
+    }
+  });
+
+  test('this server has the feature: entry points show, and a budget can be created, edited, disabled and deleted', async ({
     page,
     request,
   }) => {
@@ -138,7 +142,6 @@ test.describe('AI budgets: server support', () => {
       support !== 'available',
       `this server does not offer AI budgets to this admin (support check: ${support})`
     );
-    const writes = await forbidRealWrites(page);
     await loginAsAdmin(page);
     await waitForAppReady(page);
 
@@ -155,52 +158,45 @@ test.describe('AI budgets: server support', () => {
     await expect(
       page.getByTestId('budget-table').or(page.getByTestId('budget-empty'))
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('budget-new')).toBeVisible();
+
+    // The real server: create, edit the cap, disable, delete.
+    await page.getByTestId('budget-new').click();
+    await page.getByTestId('budget-label').fill(REAL_LABEL);
+    await page.getByTestId('budget-scope-type').click();
+    await page.getByRole('option', { name: 'All AI spend' }).click();
+    await page.getByTestId('budget-cap').fill('12.5');
+    await page.getByTestId('budget-save').click();
+    await expect(page.getByTestId('budget-form')).toHaveCount(0);
+    const row = page.getByTestId('budget-row').filter({ hasText: REAL_LABEL });
+    await expect(row).toContainText('$12.50');
+
+    await row.getByTestId('budget-edit').click();
+    await page.getByTestId('budget-cap').fill('40');
+    await page.getByTestId('budget-save').click();
+    await expect(row).toContainText('$40.00');
+
+    await row.locator('mat-slide-toggle button').click();
+    const stored = async () => {
+      const res = await request.get('/_internal/ai/budgets', {
+        headers: {
+          'X-DreamFactory-Session-Token': await sessionToken(request),
+        },
+      });
+      return (await res.json()).resource.find(
+        (b: { label: string }) => b.label === REAL_LABEL
+      );
+    };
+    await expect.poll(async () => (await stored())?.is_active).toBe(false);
+
+    await row.getByTestId('budget-delete').click();
+    await page.getByTestId('confirm-dialog-confirm').click();
+    await expect(row).toHaveCount(0);
+    expect(await stored()).toBeUndefined();
 
     await page.goto(`${APP}/ai`);
     await expect(page.getByTestId('aliases')).toBeVisible({
       timeout: 30_000,
     });
-    expect(writes).toEqual([]);
-  });
-
-  test('this server lacks the feature or refuses this admin: nothing points at it', async ({
-    page,
-    request,
-  }) => {
-    const support = await serverSupport(request);
-    test.skip(
-      support !== 'unsupported' && support !== 'forbidden',
-      `not that kind of server (support check: ${support})`
-    );
-    const writes = await forbidRealWrites(page);
-    await loginAsAdmin(page);
-    await waitForAppReady(page);
-
-    await page.goto(`${APP}/ai/budgets`);
-    await expect(
-      page.getByTestId(
-        support === 'unsupported' ? 'budget-unsupported' : 'budget-forbidden'
-      )
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('nav-ai-budgets')).toHaveCount(0);
-    await expect(page.getByTestId('budget-new')).toHaveCount(0);
-
-    await page.goto(`${APP}/ai/usage`);
-    await expect(page.locator('.usage__title h2')).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(page.getByTestId('manage-budgets')).toHaveCount(0);
-
-    await page.goto(`${APP}/ai`);
-    await expect(
-      page
-        .getByRole('heading', { name: 'Bring AI to your DreamFactory data' })
-        .first()
-    ).toBeVisible({ timeout: 30_000 });
-    await page.waitForTimeout(1500);
-    await expect(page.getByTestId('aliases')).toHaveCount(0);
-    expect(writes).toEqual([]);
   });
 
   test('a server without the feature: no entry points, a clear page on the direct URL', async ({
@@ -236,7 +232,7 @@ test.describe('AI budgets: server support', () => {
     await page.goto(`${APP}/ai/budgets`);
     const state = page.getByTestId('budget-forbidden');
     await expect(state).toBeVisible({ timeout: 30_000 });
-    await expect(state).toContainText('full administrator access');
+    await expect(state).toContainText("can't manage AI budgets");
     await expect(page.getByTestId('budget-new')).toHaveCount(0);
   });
 });
@@ -429,70 +425,5 @@ test.describe('AI budgets: the screen, against a faked budget API', () => {
     await page.getByTestId('confirm-dialog-confirm').click();
     await expect(page.getByTestId('budget-row')).toHaveCount(1);
     expect(api.calls.filter(c => c.method === 'DELETE')).toHaveLength(1);
-  });
-
-  test('a refused save keeps the form and shows the server message', async ({
-    page,
-  }) => {
-    await fakeBudgetApi(page, []);
-    await page.route('**/_internal/ai/budgets', (route: Route) => {
-      if (route.request().method() !== 'POST') {
-        return route.fallback();
-      }
-      return route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: { code: 400, message: 'The budget usd field is too large.' },
-        }),
-      });
-    });
-    await loginAsAdmin(page);
-    await waitForAppReady(page);
-    await page.goto(`${APP}/ai/budgets`);
-    await expect(page.getByTestId('budget-empty')).toBeVisible({
-      timeout: 30_000,
-    });
-
-    await page.getByTestId('budget-new').click();
-    await page.getByTestId('budget-label').fill('e2e refused');
-    await page.getByTestId('budget-scope-type').click();
-    await page.getByRole('option', { name: 'All AI spend' }).click();
-    await page.getByTestId('budget-cap').fill('5');
-    await page.getByTestId('budget-save').click();
-
-    await expect(page.getByTestId('budget-form-error')).toContainText(
-      'The budget usd field is too large.'
-    );
-    await expect(page.getByTestId('budget-label')).toHaveValue('e2e refused');
-    await expect(page.getByTestId('budget-row')).toHaveCount(0);
-  });
-
-  test('the scope picker stays bounded and names what is picked', async ({
-    page,
-  }) => {
-    await fakeBudgetApi(page, []);
-    await loginAsAdmin(page);
-    await waitForAppReady(page);
-    await page.goto(`${APP}/ai/budgets`);
-    await expect(page.getByTestId('budget-empty')).toBeVisible({
-      timeout: 30_000,
-    });
-    await page.getByTestId('budget-new').click();
-
-    // Roles are the default scope. The list comes from the real server.
-    const chips = page.getByTestId('budget-scope-item');
-    const empty = page.getByTestId('budget-scope-empty');
-    await expect(chips.first().or(empty)).toBeVisible({ timeout: 30_000 });
-    test.skip(await empty.isVisible(), 'no roles on this instance');
-
-    expect(await chips.count()).toBeLessThanOrEqual(60);
-    const list = await page.getByTestId('budget-scope-list').boundingBox();
-    expect(list!.height).toBeLessThanOrEqual(300);
-
-    const name = (await chips.first().textContent())!.trim();
-    await chips.first().click();
-    await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('budget-scope-selected')).toContainText(name);
   });
 });

@@ -180,14 +180,20 @@ describe('DfAiBudgetsComponent', () => {
       expect(text()).not.toContain('Could not find a service');
     });
 
-    it('says full administrator access is needed on a 403', () => {
-      availability.forbiddenMessage = 'Admin access required.';
+    it('on a 403 shows the server reason and does not blame admin rights', () => {
+      // A full admin on a too-low license gets this 403: the copy must not
+      // tell them to ask a full administrator.
+      availability.forbiddenMessage =
+        'AI budget management requires a GOLD license.';
       create('forbidden');
       expect(q('budget-forbidden')?.textContent).toContain(
-        'Budgets need full administrator access on this server'
+        "This account can't manage AI budgets on this server"
       );
       expect(q('budget-forbidden-detail')?.textContent).toContain(
-        'Admin access required.'
+        'requires a GOLD license'
+      );
+      expect(q('budget-forbidden')?.textContent).not.toContain(
+        'full administrator'
       );
       expect(api.list).not.toHaveBeenCalled();
     });

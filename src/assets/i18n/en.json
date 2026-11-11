@@ -1095,8 +1095,8 @@
       "message": "This server version does not include them, or an administrator has not turned them on. Usage reporting is not affected."
     },
     "forbidden": {
-      "title": "Budgets need full administrator access on this server",
-      "message": "The server has AI budgets, and it does not let this account manage them. Ask a full administrator.",
+      "title": "This account can't manage AI budgets on this server",
+      "message": "The server has AI budgets, and it does not let this account manage them.",
       "detail": "Server message: {{message}}"
     },
     "checkError": {
