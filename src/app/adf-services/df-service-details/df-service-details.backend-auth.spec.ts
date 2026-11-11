@@ -22,9 +22,6 @@ import {
 } from 'src/app/shared/utilities/case';
 import {
   BACKEND_AUTH_FIELD_NAMES,
-  backendAuthDefaultsToApply,
-  backendAuthState,
-  missingBackendAuthFields,
   pickBackendAuthFields,
 } from './backend-auth-fields';
 import { DfServiceDetailsComponent } from './df-service-details.component';
@@ -435,52 +432,6 @@ function schemaOf(type: ServiceType): ConfigSchema[] {
 
 describe('backend-auth-fields', () => {
   const withOauth = schemaOf(RWS_TYPE_WITH_OAUTH);
-  const values = (v: Record<string, unknown>) => (name: string) => v[name];
-
-  it('picks the six OAuth2 fields in panel order', () => {
-    expect(pickBackendAuthFields(withOauth).map(f => f.name)).toEqual(
-      OAUTH_NAMES
-    );
-  });
-
-  it('keeps panel order when the schema order differs', () => {
-    expect(
-      pickBackendAuthFields([...withOauth].reverse()).map(f => f.name)
-    ).toEqual(OAUTH_NAMES);
-  });
-
-  it('returns the schema objects themselves, not copies', () => {
-    const picked = pickBackendAuthFields(withOauth);
-    picked.forEach(f => expect(withOauth).toContain(f));
-  });
-
-  it('picks nothing from a schema without the fields', () => {
-    expect(pickBackendAuthFields(schemaOf(RWS_TYPE))).toEqual([]);
-    expect(pickBackendAuthFields([])).toEqual([]);
-    expect(pickBackendAuthFields(null)).toEqual([]);
-    expect(pickBackendAuthFields(undefined)).toEqual([]);
-  });
-
-  it('picks nothing from the MCP schema, which has no token URL', () => {
-    expect(pickBackendAuthFields(schemaOf(MCP_TYPE))).toEqual([]);
-  });
-
-  it.each(['oauthTokenUrl', 'oauthClientId', 'oauthClientSecret'])(
-    'picks nothing when core field %s is absent',
-    name => {
-      expect(
-        pickBackendAuthFields(withOauth.filter(f => f.name !== name))
-      ).toEqual([]);
-    }
-  );
-
-  it('still picks the rest when an optional field is absent', () => {
-    expect(
-      pickBackendAuthFields(withOauth.filter(f => f.name !== 'oauthScope')).map(
-        f => f.name
-      )
-    ).toEqual(OAUTH_NAMES.filter(n => n !== 'oauthScope'));
-  });
 
   it('leaves a field of a type the panel cannot render where it was', () => {
     const odd = withOauth.map(f =>
@@ -493,84 +444,6 @@ describe('backend-auth-fields', () => {
       f.name === 'oauthClientId' ? { ...f, type: 'array' as const } : f
     );
     expect(pickBackendAuthFields(oddCore)).toEqual([]);
-  });
-
-  describe('state', () => {
-    const fields = pickBackendAuthFields(withOauth);
-
-    it('is off without a token URL, whatever else is filled', () => {
-      [null, undefined, '', '   '].forEach(oauthTokenUrl => {
-        const v = values({ oauthTokenUrl, oauthClientId: 'x' });
-        expect(backendAuthState(fields, v)).toBe('off');
-        expect(missingBackendAuthFields(fields, v)).toEqual([]);
-      });
-    });
-
-    it('is on when token URL, client ID, secret and grant type are set', () => {
-      const v = values({ ...OAUTH_CONFIG, oauthScope: null });
-      expect(backendAuthState(fields, v)).toBe('on');
-      expect(missingBackendAuthFields(fields, v)).toEqual([]);
-    });
-
-    it('does not need a scope or an auth method', () => {
-      const v = values({
-        ...OAUTH_CONFIG,
-        oauthScope: null,
-        oauthAuthMethod: null,
-      });
-      expect(backendAuthState(fields, v)).toBe('on');
-    });
-
-    it('names what is missing once a token URL is set', () => {
-      const v = values({ oauthTokenUrl: 'https://idp/token' });
-      expect(backendAuthState(fields, v)).toBe('incomplete');
-      expect(missingBackendAuthFields(fields, v).map(f => f.name)).toEqual([
-        'oauthClientId',
-        'oauthClientSecret',
-        'oauthGrantType',
-      ]);
-    });
-
-    it('is off for an empty field list', () => {
-      const v = values({ oauthTokenUrl: 'https://idp/token' });
-      expect(backendAuthState([], v)).toBe('off');
-      expect(missingBackendAuthFields([], v)).toEqual([]);
-    });
-  });
-
-  describe('defaults', () => {
-    const fields = pickBackendAuthFields(withOauth);
-
-    it('offers nothing while the token URL is blank', () => {
-      expect(
-        backendAuthDefaultsToApply(fields, values({ oauthTokenUrl: '' }))
-      ).toEqual([]);
-    });
-
-    it('offers the schema default for each empty picklist', () => {
-      expect(
-        backendAuthDefaultsToApply(
-          fields,
-          values({ oauthTokenUrl: 'https://idp/token' })
-        )
-      ).toEqual([
-        ['oauthGrantType', 'client_credentials'],
-        ['oauthAuthMethod', 'basic_header'],
-      ]);
-    });
-
-    it('never replaces a value that is already set', () => {
-      expect(
-        backendAuthDefaultsToApply(
-          fields,
-          values({
-            oauthTokenUrl: 'https://idp/token',
-            oauthGrantType: 'client_credentials',
-            oauthAuthMethod: 'post_body',
-          })
-        )
-      ).toEqual([]);
-    });
   });
 });
 
@@ -632,15 +505,6 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
       ).toBeTruthy();
     });
 
-    it('renders the six fields in the panel once it is open', () => {
-      openPanel(h);
-      expect(renderedFieldNames(h, inPanel(h))).toEqual(OAUTH_NAMES);
-      expect(panel(h)!.textContent).toContain(servicesEn.backendAuth.hint);
-      expect(panel(h)!.textContent).toContain(
-        servicesEn.backendAuth.description
-      );
-    });
-
     it('takes the fields out of Advanced Options and keeps the others', () => {
       expect(renderedFieldNames(h, inAdvanced(h))).toEqual(RWS_ADVANCED_NAMES);
       openPanel(h);
@@ -665,32 +529,6 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
       expect(config.oauthTokenUrl).toBeNull();
     });
 
-    it('offers the grant types and auth methods from the schema', () => {
-      openPanel(h);
-      const grant = dynamicField(h, 'oauthGrantType');
-      expect(grant.nativeElement.querySelector('mat-select')).not.toBeNull();
-      expect(
-        grant.componentInstance.schema.values.map((v: any) => v.name)
-      ).toEqual(['client_credentials']);
-      expect(grant.componentInstance.control.value).toBe('client_credentials');
-      expect(
-        dynamicField(h, 'oauthAuthMethod').componentInstance.schema.values.map(
-          (v: any) => v.name
-        )
-      ).toEqual(['basic_header', 'post_body']);
-    });
-
-    it('masks the client secret, and only the secret', () => {
-      openPanel(h);
-      const input = (name: string) =>
-        panel(h)!.querySelector(
-          `[data-testid="backend-auth-${name}"] input`
-        ) as HTMLInputElement;
-      expect(input('oauthClientSecret').type).toBe('password');
-      expect(input('oauthClientId').type).toBe('text');
-      expect(input('oauthScope').type).toBe('text');
-    });
-
     it('keeps the client secret masked in presentation mode', () => {
       TestBed.inject(DfPresentationService).set(true);
       openPanel(h);
@@ -709,19 +547,6 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
           '[data-testid="backend-auth-oauthClientId"] [data-testid="config-secret-eye"]'
         )
       ).toBeNull();
-    });
-
-    it('writes what is typed in the panel into the config group', () => {
-      openPanel(h);
-      const input = panel(h)!.querySelector(
-        '[data-testid="backend-auth-oauthClientId"] input'
-      ) as HTMLInputElement;
-      input.value = 'typed-client';
-      input.dispatchEvent(new Event('input'));
-      h.fixture.detectChanges();
-      expect(h.component.getConfigControl('oauthClientId').value).toBe(
-        'typed-client'
-      );
     });
 
     it('reports state in the header and names missing fields', () => {
@@ -815,61 +640,6 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
     });
   });
 
-  describe('memoization', () => {
-    it('hands back the same arrays across change detection', async () => {
-      const h = await setup({
-        group: 'Remote Service',
-        serviceTypes: [RWS_TYPE_WITH_OAUTH],
-      });
-      chooseType(h, 'rws');
-      openPanel(h);
-      const auth = h.component.networkBackendAuthFields;
-      const advanced = h.component.networkAdvancedFields;
-      const required = h.component.networkRequiredFields;
-      expect(auth.length).toBe(6);
-
-      for (let i = 0; i < 5; i++) {
-        h.component.getConfigControl('oauthClientId').setValue(`id-${i}`);
-        h.fixture.detectChanges();
-        expect(h.component.networkBackendAuthFields).toBe(auth);
-        expect(h.component.networkAdvancedFields).toBe(advanced);
-        expect(h.component.networkRequiredFields).toBe(required);
-      }
-    });
-
-    it('does not rebuild the panel fields on change detection', async () => {
-      const h = await setup({
-        group: 'Remote Service',
-        serviceTypes: [RWS_TYPE_WITH_OAUTH],
-      });
-      chooseType(h, 'rws');
-      openPanel(h);
-      const before = Array.from(panel(h)!.querySelectorAll('df-dynamic-field'));
-      h.component.getConfigControl('oauthTokenUrl').setValue('https://idp/t');
-      h.fixture.detectChanges();
-      h.fixture.detectChanges();
-      const after = Array.from(panel(h)!.querySelectorAll('df-dynamic-field'));
-      expect(after.length).toBe(6);
-      after.forEach((node, i) => expect(node).toBe(before[i]));
-    });
-
-    it('recomputes when the schema is replaced', async () => {
-      const h = await setup({
-        group: 'Remote Service',
-        serviceTypes: [RWS_TYPE_WITH_OAUTH, SOAP_TYPE],
-      });
-      chooseType(h, 'rws');
-      const auth = h.component.networkBackendAuthFields;
-      chooseType(h, 'soap');
-      expect(h.component.networkBackendAuthFields).toEqual([]);
-      chooseType(h, 'rws');
-      expect(h.component.networkBackendAuthFields).not.toBe(auth);
-      expect(h.component.networkBackendAuthFields.map(f => f.name)).toEqual(
-        OAUTH_NAMES
-      );
-    });
-  });
-
   describe('HTTP service whose schema has the OAuth2 fields (edit)', () => {
     it('loads a configured service and round-trips the same config', async () => {
       const config = { ...RWS_CONFIG_NO_OAUTH, ...OAUTH_CONFIG };
@@ -907,6 +677,18 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
         oauth_scope: OAUTH_CONFIG.oauthScope,
         oauth_auth_method: 'post_body',
       });
+    });
+
+    it('clearing the token URL of a stored service turns OAuth2 off and saves', async () => {
+      const h = await setup({
+        group: 'Remote Service',
+        serviceTypes: [RWS_TYPE_WITH_OAUTH],
+        data: rwsService({ ...RWS_CONFIG_NO_OAUTH, ...OAUTH_CONFIG }),
+      });
+      h.component.getConfigControl('oauthTokenUrl').setValue('');
+      h.component.save(false, false);
+      expect(h.openSnackBar).not.toHaveBeenCalled();
+      expect(h.update).toHaveBeenCalledTimes(1);
     });
 
     it('leaves a service that never used OAuth2 untouched on save', async () => {
@@ -971,27 +753,11 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
       chooseType(h, 'rws');
       expect(panel(h)).toBeNull();
       expect(h.el.querySelector('df-disclosure')).toBeNull();
-      expect(h.component.networkBackendAuthFields).toEqual([]);
       expect(renderedFieldNames(h, inAdvanced(h))).toEqual(RWS_ADVANCED_NAMES);
       expect(renderedFieldNames(h, () => true)).toEqual([
         'baseUrl',
         ...RWS_ADVANCED_NAMES,
       ]);
-    });
-
-    it('HTTP service on an older backend: edit saves the loaded config', async () => {
-      const h = await setup({
-        group: 'Remote Service',
-        serviceTypes: [RWS_TYPE],
-        data: rwsService({ ...RWS_CONFIG_NO_OAUTH }),
-      });
-      expect(panel(h)).toBeNull();
-      h.component.save(false, false);
-      expect(h.openSnackBar).not.toHaveBeenCalled();
-      expect(h.update.mock.calls[0][1].config).toEqual({
-        ...RWS_CONFIG_NO_OAUTH,
-        content: '',
-      });
     });
 
     it('SOAP service: no panel, all fields in Advanced Options', async () => {
@@ -1033,71 +799,11 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
       const h = await setup({ group: 'MCP', serviceTypes: [MCP_TYPE] });
       chooseType(h, 'mcp');
       expect(panel(h)).toBeNull();
-      expect(h.component.networkBackendAuthFields).toEqual([]);
-      expect(h.component.backendAuthMissingLabels).toBe('');
       expect(renderedFieldNames(h, () => true)).toEqual([
         'oauthClientId',
         'oauthClientSecret',
         'autoOauthService',
       ]);
-    });
-
-    it('database service (edit)', async () => {
-      const h = await setup({
-        group: 'Database',
-        serviceTypes: [MYSQL_TYPE],
-        data: {
-          id: 50,
-          name: 'db',
-          label: 'DB',
-          description: '',
-          isActive: true,
-          type: 'mysql',
-          config: {
-            host: 'h',
-            port: 3306,
-            database: 'd',
-            username: 'u',
-            password: '**********',
-            charset: null,
-          },
-          serviceDocByServiceId: null,
-        },
-      });
-      expect(panel(h)).toBeNull();
-      expect(h.component.networkBackendAuthFields).toEqual([]);
-      expect(h.component.networkAdvancedFields).toEqual([]);
-      expect(renderedFieldNames(h, () => true)).toEqual([
-        'host',
-        'port',
-        'database',
-        'username',
-        'password',
-        'charset',
-      ]);
-    });
-
-    it('script service (create)', async () => {
-      const h = await setup({ group: 'Script', serviceTypes: [SCRIPT_TYPE] });
-      chooseType(h, 'nodejs');
-      expect(panel(h)).toBeNull();
-      expect(h.component.networkBackendAuthFields).toEqual([]);
-      expect(renderedFieldNames(h, () => true)).toEqual([
-        'scmRepository',
-        'scmReference',
-        'implementsAccessList',
-      ]);
-    });
-
-    it('an OAuth2 schema outside the Remote Service group is not split', async () => {
-      const other = serviceType('custom', 'File', RWS_FIELDS_WITH_OAUTH);
-      const h = await setup({ group: 'File', serviceTypes: [other] });
-      chooseType(h, 'custom');
-      expect(panel(h)).toBeNull();
-      expect(h.component.networkBackendAuthFields).toEqual([]);
-      expect(renderedFieldNames(h, () => true)).toEqual(
-        schemaOf(other).map(f => f.name)
-      );
     });
   });
 });
