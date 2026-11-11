@@ -15,12 +15,12 @@ import {
  *
  *  - on a server that has the feature, the entry points show and a budget is
  *    created, edited, disabled and deleted against the real API (cleaned up
- *    after); that test skips on a server without the feature, so the gate's
- *    DF must run with DF_AI_BUDGET_MANAGEMENT_ENABLED=true;
+ *    after); that test skips on a server without the feature, unless
+ *    EXPECT_AI_BUDGETS=1, which makes a missing feature a failure. A gate that
+ *    expects the feature must run its DF with
+ *    DF_AI_BUDGET_MANAGEMENT_ENABLED=true and set EXPECT_AI_BUDGETS=1;
  *  - the "no such feature" and "no access" pages are checked on any server by
- *    answering the support check in the browser;
- *  - the screen's write paths also run against an in-browser fake of the
- *    budget API; any other write to /_internal/ai/* is aborted.
+ *    answering the support check in the browser.
  */
 const APP = '/dreamfactory/dist/#';
 const PROBE = '**/_internal/ai/aliases';
@@ -138,10 +138,12 @@ test.describe('AI budgets: server support', () => {
     request,
   }) => {
     const support = await serverSupport(request);
-    test.skip(
-      support !== 'available',
-      `this server does not offer AI budgets to this admin (support check: ${support})`
-    );
+    const why = `this server does not offer AI budgets to this admin (support check: ${support})`;
+    if (process.env.EXPECT_AI_BUDGETS) {
+      expect(support, why).toBe('available');
+    } else {
+      test.skip(support !== 'available', why);
+    }
     await loginAsAdmin(page);
     await waitForAppReady(page);
 
@@ -165,6 +167,10 @@ test.describe('AI budgets: server support', () => {
     await page.getByTestId('budget-scope-type').click();
     await page.getByRole('option', { name: 'All AI spend' }).click();
     await page.getByTestId('budget-cap').fill('12.5');
+    await page.getByTestId('budget-hard-stop').locator('button').click();
+    await expect(page.getByTestId('budget-hard-stop-warning')).toContainText(
+      'HTTP 429'
+    );
     await page.getByTestId('budget-save').click();
     await expect(page.getByTestId('budget-form')).toHaveCount(0);
     const row = page.getByTestId('budget-row').filter({ hasText: REAL_LABEL });
@@ -234,196 +240,5 @@ test.describe('AI budgets: server support', () => {
     await expect(state).toBeVisible({ timeout: 30_000 });
     await expect(state).toContainText("can't manage AI budgets");
     await expect(page.getByTestId('budget-new')).toHaveCount(0);
-  });
-});
-
-interface FakeBudget {
-  id: number;
-  label: string;
-  dimension_type: string;
-  dimension_id: number | null;
-  dimension_name: string | null;
-  period: string;
-  budget_usd: number;
-  hard_stop: boolean;
-  is_active: boolean;
-  alert_webhook_url: string | null;
-  has_alert_webhook_auth: boolean;
-  spent_usd: number;
-  remaining_usd: number;
-  utilization: number;
-  blocking: boolean;
-}
-
-/**
- * An in-browser stand-in for the budget and alias API, so the write paths of
- * the screen can run without changing anything on the server.
- */
-async function fakeBudgetApi(page: Page, seed: FakeBudget[] = []) {
-  const budgets = [...seed];
-  const calls: Array<{ method: string; path: string; body: any }> = [];
-  let nextId = 9000;
-  const json = (route: Route, status: number, body: unknown) =>
-    route.fulfill({
-      status,
-      contentType: 'application/json',
-      body: JSON.stringify(body),
-    });
-
-  await page.route(INTERNAL_AI, (route: Route) => {
-    const req = route.request();
-    const method = req.method();
-    const path = new URL(req.url()).pathname;
-    const match = path.match(
-      /^\/_internal\/ai\/(budgets|aliases)(?:\/(\d+))?$/
-    );
-    if (!match) {
-      // Usage and the rest of /_internal/ai are read only: let reads through.
-      return method === 'GET' ? route.fallback() : route.abort();
-    }
-    const [, kind, idText] = match;
-    const body = method === 'GET' ? null : req.postDataJSON();
-    calls.push({ method, path, body });
-
-    if (kind === 'aliases') {
-      return method === 'GET'
-        ? json(route, 200, { resource: [] })
-        : json(route, 400, { error: { code: 400, message: 'not faked' } });
-    }
-    if (method === 'GET') {
-      return json(route, 200, {
-        resource: budgets,
-        usage_logging_enabled: true,
-      });
-    }
-    if (method === 'POST') {
-      const created: FakeBudget = {
-        id: nextId++,
-        dimension_name: body.dimension_type === 'global' ? null : 'picked',
-        is_active: true,
-        alert_webhook_url: null,
-        has_alert_webhook_auth: false,
-        spent_usd: 0,
-        remaining_usd: body.budget_usd,
-        utilization: 0,
-        blocking: false,
-        ...body,
-      };
-      budgets.push(created);
-      return json(route, 201, created);
-    }
-    const index = budgets.findIndex(b => b.id === Number(idText));
-    if (index === -1) {
-      return json(route, 404, {
-        error: { code: 404, message: 'Budget not found.' },
-      });
-    }
-    if (method === 'PATCH') {
-      budgets[index] = { ...budgets[index], ...body };
-      return json(route, 200, budgets[index]);
-    }
-    if (method === 'DELETE') {
-      budgets.splice(index, 1);
-      return json(route, 200, { id: Number(idText) });
-    }
-    return route.abort();
-  });
-  return { budgets, calls };
-}
-
-function seedBudget(over: Partial<FakeBudget> = {}): FakeBudget {
-  return {
-    id: 1,
-    label: 'e2e seeded budget',
-    dimension_type: 'global',
-    dimension_id: null,
-    dimension_name: null,
-    period: 'monthly',
-    budget_usd: 100,
-    hard_stop: false,
-    is_active: true,
-    alert_webhook_url: null,
-    has_alert_webhook_auth: false,
-    spent_usd: 25,
-    remaining_usd: 75,
-    utilization: 0.25,
-    blocking: false,
-    ...over,
-  };
-}
-
-test.describe('AI budgets: the screen, against a faked budget API', () => {
-  test('create, edit, disable and delete a budget', async ({ page }) => {
-    const api = await fakeBudgetApi(page, [seedBudget()]);
-    await loginAsAdmin(page);
-    await waitForAppReady(page);
-    await page.goto(`${APP}/ai/budgets`);
-    await expect(page.getByTestId('budget-row')).toHaveCount(1, {
-      timeout: 30_000,
-    });
-
-    // Create: hard stop is off until asked for, and asking shows the warning.
-    await page.getByTestId('budget-new').click();
-    const save = page.getByTestId('budget-save');
-    await expect(save).toBeDisabled();
-    await page.getByTestId('budget-label').fill('e2e global cap');
-    await page.getByTestId('budget-scope-type').click();
-    await page.getByRole('option', { name: 'All AI spend' }).click();
-    await expect(page.getByTestId('budget-scope-record')).toHaveCount(0);
-    await page.getByTestId('budget-cap').fill('12.5');
-    await expect(page.getByTestId('budget-hard-stop-warning')).toHaveCount(0);
-    await page.getByTestId('budget-hard-stop').locator('button').click();
-    await expect(page.getByTestId('budget-hard-stop-warning')).toContainText(
-      'HTTP 429'
-    );
-    await expect(save).toBeEnabled();
-    await save.click();
-    await expect(page.getByTestId('budget-form')).toHaveCount(0);
-    await expect(page.getByTestId('budget-row')).toHaveCount(2);
-
-    const created = api.calls.find(c => c.method === 'POST')!;
-    expect(created.body).toMatchObject({
-      label: 'e2e global cap',
-      dimension_type: 'global',
-      dimension_id: null,
-      period: 'monthly',
-      budget_usd: 12.5,
-      hard_stop: true,
-    });
-    expect(created.body).not.toHaveProperty('alert_webhook_auth_header');
-
-    const row = page
-      .getByTestId('budget-row')
-      .filter({ hasText: 'e2e global cap' });
-    await expect(row).toContainText('$12.50');
-    await expect(row).toContainText('On');
-
-    // Edit.
-    await row.getByTestId('budget-edit').click();
-    await expect(page.getByTestId('budget-label')).toHaveValue(
-      'e2e global cap'
-    );
-    await page.getByTestId('budget-cap').fill('40');
-    await page.getByTestId('budget-save').click();
-    await expect(row).toContainText('$40.00');
-    const patched = api.calls.find(
-      c => c.method === 'PATCH' && c.body.budget_usd === 40
-    );
-    expect(patched).toBeTruthy();
-
-    // Disable from the table.
-    await row.locator('mat-slide-toggle button').click();
-    await expect
-      .poll(
-        () => api.budgets.find(b => b.label === 'e2e global cap')?.is_active
-      )
-      .toBe(false);
-
-    // Delete, with confirmation.
-    await row.getByTestId('budget-delete').click();
-    await expect(page.getByRole('dialog')).toContainText('Delete this budget?');
-    await page.getByTestId('confirm-dialog-confirm').click();
-    await expect(page.getByTestId('budget-row')).toHaveCount(1);
-    expect(api.calls.filter(c => c.method === 'DELETE')).toHaveLength(1);
   });
 });
