@@ -93,7 +93,10 @@ describe('DfSideNavComponent Server Settings entry', () => {
   // The component regroups the list it is given in place (API Builder, Agents
   // and Alerts move under their parents), so expectations go through the
   // same step.
-  const built = (nav: Array<Nav>) => {
+  // The AI Budgets entry stays hidden until the budgets API answers, which no
+  // test here does, so it is never part of the expected nav.
+  const built = (all: Array<Nav>) => {
+    const nav = withoutRoute(all, ROUTES.AI_BUDGETS);
     (
       component as unknown as { buildNavGroups(n: Array<Nav>): unknown }
     ).buildNavGroups(nav);
