@@ -1136,7 +1136,7 @@
       "webhookUrl": "Alert webhook URL (optional)",
       "webhookHint": "Receives a POST at 50, 80 and 100 percent.",
       "webhookAuth": "Webhook Authorization header (optional)",
-      "webhookAuthStored": "Stored. Leave blank to keep it. Changing the webhook host removes it.",
+      "webhookAuthStored": "Stored. Leave blank to keep it. Changing the webhook URL removes it.",
       "webhookAuthClear": "Remove the stored header",
       "webhooksOff": "Alert webhooks are turned off on this server, so this budget cannot send alerts.",
       "hardStop": "Hard stop",
