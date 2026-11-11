@@ -35,6 +35,20 @@
   }
 }
 
+// Backend Authentication panel (HTTP service): the line that names what is
+// still missing once a token URL is set.
+.backend-auth-incomplete {
+  margin: var(--df-space-4) 0 0;
+  max-width: 68ch;
+  padding: var(--df-space-2) var(--df-space-3);
+  border: 1px solid var(--df-danger-border);
+  border-radius: var(--df-radius-sm);
+  background: var(--df-danger-soft);
+  color: var(--df-text);
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
+}
+
 // ---- Departure type scale for in-form section headers ----
 .section-header h3,
 .basic-fields-section .section-title,

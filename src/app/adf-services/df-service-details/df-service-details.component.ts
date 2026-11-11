@@ -129,6 +129,12 @@ import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
 import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
 import { DfCurlImportDialogComponent } from 'src/app/shared/components/df-curl-import-dialog/df-curl-import-dialog.component';
 import { ParsedCurl } from 'src/app/shared/utilities/curl-parser';
+import {
+  backendAuthDefaultsToApply,
+  backendAuthState,
+  missingBackendAuthFields,
+  pickBackendAuthFields,
+} from './backend-auth-fields';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -1556,6 +1562,7 @@ export class DfServiceDetailsComponent implements OnInit {
         config.addControl('content', new FormControl(''));
         // Initialize serviceDefinitionType for JSON/YAML toggle
         this.serviceDefinitionType = '0'; // Default to JSON
+        this.wireBackendAuthDefaults(config);
       }
       if (this.isScriptService) {
         // Ensure script services have content field for script content
@@ -1567,7 +1574,27 @@ export class DfServiceDetailsComponent implements OnInit {
       }
     }
 
+    this.backendAuthOpen = false;
     this.serviceForm.setControl('config', config);
+  }
+
+  // Entering a token URL turns outbound OAuth2 on. A service saved before the
+  // OAuth2 columns existed loads its grant type and auth method as null, so
+  // fill the empty picklists from the schema defaults at that point. Nothing
+  // is touched while the token URL is blank, so a service that does not use
+  // the feature saves the same config as before.
+  private wireBackendAuthDefaults(config: FormGroup): void {
+    const fields = this.networkBackendAuthFields;
+    const tokenUrl = config.get('oauthTokenUrl');
+    if (!fields.length || !tokenUrl) {
+      return;
+    }
+    tokenUrl.valueChanges.subscribe(() => {
+      backendAuthDefaultsToApply(
+        fields,
+        name => config.get(name)?.value
+      ).forEach(([name, value]) => config.get(name)?.setValue(value));
+    });
   }
 
   get subscriptionRequired() {
@@ -1674,6 +1701,7 @@ export class DfServiceDetailsComponent implements OnInit {
   private memoAdvancedFields: Array<ConfigSchema> = [];
   private memoNetworkRequiredFields: Array<ConfigSchema> = [];
   private memoNetworkAdvancedFields: Array<ConfigSchema> = [];
+  private memoNetworkBackendAuthFields: Array<ConfigSchema> = [];
 
   private syncSchemaViews(): void {
     if (
@@ -1728,13 +1756,21 @@ export class DfServiceDetailsComponent implements OnInit {
     if (!this.isNetworkService) {
       this.memoNetworkRequiredFields = [];
       this.memoNetworkAdvancedFields = [];
+      this.memoNetworkBackendAuthFields = [];
     } else {
+      // Outbound OAuth2 fields get their own panel. The list is empty unless
+      // the schema carries them. When it is empty, Advanced Options keeps
+      // every field, as before.
+      const backendAuthFields = pickBackendAuthFields(viewSchema);
+      this.memoNetworkBackendAuthFields = backendAuthFields;
       this.memoNetworkRequiredFields = viewSchema.filter(field =>
         requiredFieldNames.includes(field.name)
       );
       this.memoNetworkAdvancedFields = viewSchema.filter(
         field =>
-          !requiredFieldNames.includes(field.name) && field.name !== 'content'
+          !requiredFieldNames.includes(field.name) &&
+          field.name !== 'content' &&
+          !backendAuthFields.includes(field)
       );
     }
   }
@@ -1776,6 +1812,38 @@ export class DfServiceDetailsComponent implements OnInit {
   get networkAdvancedFields() {
     this.syncSchemaViews();
     return this.memoNetworkAdvancedFields;
+  }
+
+  // Backend Authentication panel: the outbound OAuth2 fields of an HTTP
+  // service. Empty for every schema that does not carry them.
+  get networkBackendAuthFields() {
+    this.syncSchemaViews();
+    return this.memoNetworkBackendAuthFields;
+  }
+
+  /** Open state of the Backend Authentication disclosure. */
+  backendAuthOpen = false;
+
+  private readonly backendAuthValue = (name: string): unknown =>
+    this.serviceForm.get(`config.${name}`)?.value;
+
+  /** Transloco key for the one-line state in the panel header. */
+  get backendAuthSummaryKey(): string {
+    return `services.backendAuth.summary.${backendAuthState(
+      this.networkBackendAuthFields,
+      this.backendAuthValue
+    )}`;
+  }
+
+  /** Labels of the fields still empty although a token URL is set. Empty
+   *  string when the panel is complete, turned off, or not shown. */
+  get backendAuthMissingLabels(): string {
+    return missingBackendAuthFields(
+      this.networkBackendAuthFields,
+      this.backendAuthValue
+    )
+      .map(field => field.label)
+      .join(', ');
   }
 
   trackByName = (_: number, item: { name: string }): string => item.name;
@@ -1944,6 +2012,19 @@ export class DfServiceDetailsComponent implements OnInit {
     if (data.type === '' || data.name === '') {
       // Show validation errors instead of silently doing nothing.
       this.serviceForm.markAllAsTouched();
+      return;
+    }
+    // A token URL without the rest leaves outbound OAuth2 silently off in the
+    // backend. Only reachable when the Backend Authentication panel is shown.
+    const backendAuthMissing = this.backendAuthMissingLabels;
+    if (backendAuthMissing) {
+      this.backendAuthOpen = true;
+      this.snackbarService.openSnackBar(
+        this.transloco.translate('services.backendAuth.saveBlocked', {
+          fields: backendAuthMissing,
+        }),
+        'error'
+      );
       return;
     }
     if (!this.validateServiceName(data.name)) {
