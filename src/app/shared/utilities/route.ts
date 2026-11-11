@@ -133,7 +133,8 @@ export function accessibleRoutes(
           ROUTES.CONFIG_PACKAGE,
           ROUTES.EMAIL_TEMPLATES,
           ROUTES.GLOBAL_LOOKUP_KEYS,
-          ROUTES.INTERCOM
+          ROUTES.INTERCOM,
+          ROUTES.SERVER_SETTINGS
         );
         break;
       case 'limits':
@@ -151,6 +152,17 @@ export function accessibleRoutes(
     }
     return allowed.includes(nav.route);
   });
+}
+
+/** Drops every nav entry for `route`, at any depth. Parents are kept. */
+export function withoutRoute(navs: Array<Nav>, route: ROUTES): Array<Nav> {
+  return navs
+    .filter(nav => nav.route !== route)
+    .map(nav =>
+      nav.subRoutes
+        ? { ...nav, subRoutes: withoutRoute(nav.subRoutes, route) }
+        : nav
+    );
 }
 
 export type Breadcrumb = {

@@ -1,0 +1,21 @@
+{
+  "description": "Change server settings at runtime without editing .env or restarting. Only a short list of safe settings can be changed here.",
+  "hint": "Applies on the next request; long-running queue workers pick it up on restart.",
+  "loading": "Loading server settings…",
+  "empty": "No server settings are available to change.",
+  "loadError": "Could not load server settings.",
+  "forbidden": "Your admin role does not include server settings yet. Ask a root admin to save your admin account again to grant it.",
+  "unavailableTitle": "Not available on this server version",
+  "unavailable": "This DreamFactory server does not support changing server settings from the admin interface. Upgrade the server to use this page. Until then, the log level comes from the .env file.",
+  "saveError": "Could not save the change. The previous value is unchanged.",
+  "saved": "Saved.",
+  "savedStale": "System Info and the System overview may show the previous value until you reload the page.",
+  "viewSystemInfo": "View System Info",
+  "save": "Save",
+  "reset": "Reset to .env value",
+  "resetTitle": "Reset to .env value?",
+  "resetMessage": "The override will be removed and the value from .env will apply again.",
+  "sourceEnv": ".env",
+  "sourceOverride": "override",
+  "envValue": ".env value: {{ value }}"
+}
