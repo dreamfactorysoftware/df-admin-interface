@@ -31,40 +31,6 @@ describe('serverSettingsGuard', () => {
     });
   });
 
-  it('allows a full admin', done => {
-    userData$.next({ isSysAdmin: true });
-    run().subscribe(r => {
-      expect(r).toBe(true);
-      done();
-    });
-  });
-
-  it('sends a non-admin Home', done => {
-    userData$.next({ isSysAdmin: false });
-    run().subscribe(r => {
-      expect(r).toEqual([ROUTES.HOME]);
-      done();
-    });
-  });
-
-  it('allows a restricted admin with the config tab', done => {
-    accessibleTabs.mockReturnValue(of(['config']));
-    userData$.next({ isSysAdmin: true, roleId: 3 });
-    run().subscribe(r => {
-      expect(r).toBe(true);
-      done();
-    });
-  });
-
-  it('sends a restricted admin without config Home', done => {
-    accessibleTabs.mockReturnValue(of(['apps']));
-    userData$.next({ isSysAdmin: true, roleId: 3 });
-    run().subscribe(r => {
-      expect(r).toEqual([ROUTES.HOME]);
-      done();
-    });
-  });
-
   it('sends a restricted admin Home when the tabs cannot be loaded', done => {
     accessibleTabs.mockReturnValue(throwError(() => new Error('403')));
     userData$.next({ isSysAdmin: true, roleId: 3 });

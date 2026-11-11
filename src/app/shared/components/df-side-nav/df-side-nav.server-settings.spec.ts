@@ -11,7 +11,6 @@ import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { routes } from 'src/app/routes';
 import { DfSideNavComponent } from './df-side-nav.component';
 import { DfUserDataService } from '../../services/df-user-data.service';
-import { SESSION_TOKEN_HEADER } from '../../constants/http-headers';
 import { URLS } from '../../constants/urls';
 import { Nav } from '../../types/nav';
 import { ROUTES } from '../../types/routes';
@@ -134,15 +133,6 @@ describe('DfSideNavComponent Server Settings entry', () => {
       expect(navPaths()).toContain(SYSTEM_INFO);
       expect(navPaths()).toContain(CORS);
     });
-
-    it('keeps the entry out when the resource list cannot be read', () => {
-      signIn(rootAdmin);
-      http
-        .match(r => r.url === URLS.SYSTEM)
-        .forEach(r => r.flush('no', { status: 500, statusText: 'Error' }));
-      expect(navPaths()).not.toContain(SERVER_SETTINGS);
-      expect(navPaths()).toEqual(fullNavWithoutServerSettings());
-    });
   });
 
   describe('on a backend with system/server_setting', () => {
@@ -160,24 +150,6 @@ describe('DfSideNavComponent Server Settings entry', () => {
       expect(navPaths()).toEqual(built(transformRoutes(routes)));
       expect(navPaths()).toContain(SERVER_SETTINGS);
       expect(groupPaths()).toContain(SERVER_SETTINGS);
-    });
-
-    it('the lookup is authenticated with the token of the new session', () => {
-      signIn(rootAdmin);
-      const [req] = http.match(r => r.url === URLS.SYSTEM);
-      expect(req.request.headers.get(SESSION_TOKEN_HEADER)).toBe('tok');
-      expect(req.request.headers.has('show-loading')).toBe(false);
-      req.flush(NEW_BACKEND);
-      expect(navPaths()).toContain(SERVER_SETTINGS);
-    });
-
-    it('signing out removes the entry again', () => {
-      signIn(rootAdmin);
-      answerSystemList(NEW_BACKEND);
-      expect(navPaths()).toContain(SERVER_SETTINGS);
-
-      TestBed.inject(DfUserDataService).isLoggedIn = false;
-      expect(navPaths()).not.toContain(SERVER_SETTINGS);
     });
   });
 

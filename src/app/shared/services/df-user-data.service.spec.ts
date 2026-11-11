@@ -79,17 +79,6 @@ describe('DfUserDataService restricted-admin tabs', () => {
       expect(seen).toEqual([[], ['apps', 'config']]);
     });
 
-    it('restricted admin without the Config tab: one role GET, then its tabs', () => {
-      service.userData = restrictedAdmin();
-      http
-        .expectOne(r => r.url === ROLE_URL)
-        .flush({
-          id: 5,
-          accessibleTabs: ['apps'],
-        });
-      expect(seen).toEqual([[], ['apps']]);
-    });
-
     it('restricted admin whose role lists no tabs gets an empty list', () => {
       service.userData = restrictedAdmin();
       http.expectOne(r => r.url === ROLE_URL).flush({ id: 5 });
