@@ -5,7 +5,11 @@
     (alertClosed)="showAlert = false">
     {{ alertMsg | transloco }}
   </df-alert>
-  <mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
+  <mat-tab-group
+    dynamicHeight
+    mat-stretch-tabs="false"
+    mat-align-tabs="start"
+    (selectedIndexChange)="onTabIndexChange($event)">
     <mat-tab label="Basic">
       <h4>{{ 'scheduler.taskOverviewSubtitle' | transloco }}</h4>
       <form
@@ -149,6 +153,115 @@
           </button>
         </div>
       </form>
+    </mat-tab>
+    <mat-tab
+      *ngIf="scheduleToEdit && runsSupported"
+      [label]="'scheduler.run.historyTab' | transloco">
+      <div class="details-section run-history">
+        <p *ngIf="runStatus as rs" class="run-summary full-width">
+          {{ 'scheduler.run.lastSuccess' | transloco }}:
+          {{
+            rs.lastSuccess?.finishedAt
+              ? (rs.lastSuccess?.finishedAt | date: 'medium')
+              : ('scheduler.run.none' | transloco)
+          }}
+          &middot;
+          {{ 'scheduler.run.lastFailure' | transloco }}:
+          {{
+            rs.lastFailure?.finishedAt
+              ? (rs.lastFailure?.finishedAt | date: 'medium')
+              : ('scheduler.run.none' | transloco)
+          }}
+        </p>
+        <div
+          *ngIf="runsState === 'error'"
+          class="run-error full-width"
+          role="alert"
+          data-testid="run-error">
+          <p>
+            {{ 'scheduler.run.loadError' | transloco }}
+            {{ runsError | transloco }}
+          </p>
+          <button type="button" mat-stroked-button (click)="loadRuns()">
+            {{ 'retry' | transloco }}
+          </button>
+        </div>
+        <div
+          *ngIf="runsState === 'loaded' && !runs.length"
+          class="run-empty full-width"
+          data-testid="run-empty">
+          <p>{{ 'scheduler.run.emptyTitle' | transloco }}</p>
+          <p>
+            {{
+              'scheduler.run.emptyHint'
+                | transloco: { frequency: scheduleToEdit.frequency }
+            }}
+          </p>
+        </div>
+        <table *ngIf="runs.length" class="run-table full-width">
+          <thead>
+            <tr>
+              <th>{{ 'scheduler.run.started' | transloco }}</th>
+              <th>{{ 'scheduler.run.duration' | transloco }}</th>
+              <th>{{ 'scheduler.run.status' | transloco }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <ng-container *ngFor="let run of pagedRuns; trackBy: trackById">
+              <tr data-testid="run-row">
+                <td>
+                  {{ run.startedAt ? (run.startedAt | date: 'medium') : '-' }}
+                </td>
+                <td [ngSwitch]="run.phase">
+                  <ng-container *ngSwitchCase="'running'">{{
+                    'scheduler.run.inProgress' | transloco
+                  }}</ng-container>
+                  <ng-container *ngSwitchCase="'unfinished'">{{
+                    'scheduler.run.unfinishedNoTime' | transloco
+                  }}</ng-container>
+                  <ng-container *ngSwitchDefault>{{
+                    run.duration === null
+                      ? '-'
+                      : ('scheduler.run.seconds'
+                        | transloco: { seconds: run.duration })
+                  }}</ng-container>
+                </td>
+                <td>{{ run.statusCode ?? '-' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    mat-button
+                    *ngIf="run.output"
+                    [attr.aria-expanded]="expandedRuns.has(run.id)"
+                    (click)="toggleRun(run.id)">
+                    {{
+                      (expandedRuns.has(run.id)
+                        ? 'scheduler.run.hideOutput'
+                        : 'scheduler.run.showOutput'
+                      ) | transloco
+                    }}
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="expandedRuns.has(run.id)">
+                <td colspan="4">
+                  <pre class="run-output" data-testid="run-output">{{
+                    run.output
+                  }}</pre>
+                </td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+        <mat-paginator
+          *ngIf="runs.length > runPageSize"
+          [length]="runs.length"
+          [pageSize]="runPageSize"
+          [pageIndex]="runPage"
+          [hidePageSize]="true"
+          (page)="onRunPage($event)"></mat-paginator>
+      </div>
     </mat-tab>
     <mat-tab label="Log">
       <div class="details-section">
