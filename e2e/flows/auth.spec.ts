@@ -49,7 +49,7 @@ test('wrong password shows an inline error and does not log in', async ({
   });
   watch.allowConsole(
     /Invalid credentials supplied/,
-    'the app logs the refused login as an unhandled error'
+    'df-admin-interface#582: the app logs the refused login as an unhandled error'
   );
   await page.goto(`${APP}#/auth/login`);
   const res = await submitLogin(page, {
@@ -118,13 +118,13 @@ test('logout ends the session and protected pages ask for login again', async ({
     c => c.name === 'session_token'
   )!.value;
 
-  // Known defect F-02: logging out can fire requests with the session that
+  // df-admin-interface#580: logging out can fire requests with the session that
   // was just ended. Allowed so this test judges the logout itself.
   watch.allowHttp({
     status: [400, 401, 403],
     method: 'GET',
     url: /^\/(api\/v2\/system\/(role|service|service_type)|_internal\/ai\/usage)\b/,
-    reason: 'F-02: data requests sent during and after logout',
+    reason: 'df-admin-interface#580: data requests sent during and after logout',
     optional: true,
   });
   await page.locator('button.profile-icon').click();

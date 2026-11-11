@@ -28,7 +28,7 @@ export function allowAceModeDefect(watch: Watcher): void {
     status: 404,
     method: 'GET',
     url: /\/assets\/ace-builds\/mode-(rws|soap)\.js$/,
-    reason: 'known defect: Ace mode named after the service type',
+    reason: 'df-admin-interface#581: Ace mode named after the service type',
     optional: true,
   });
 }

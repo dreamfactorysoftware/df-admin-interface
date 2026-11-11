@@ -17,8 +17,9 @@ save, find, reload, read back from the API, edit, delete.
 | `scheduler.spec.ts`       | task round trip, validation, Log tab                           |
 | `system-pages.spec.ts`    | System Info shows what the backend reports                     |
 
-Known product bugs on develop are not tests here. The bug list lives outside
-the repo (`specs/ui-integration-2026-11/flow-known-failures/`).
+Known product bugs on develop are not tests here. Four that the flows meet on
+the way are allowed by name, each with its issue: df-admin-interface#579,
+#580, #581 and #582. Remove an allowance with its fix.
 
 ## Running
 

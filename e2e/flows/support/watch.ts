@@ -52,7 +52,7 @@ const BASELINE: HttpAllowance[] = [
     method: 'GET',
     url: /^\/api\/v2\/system\/lookup\?filter=name(=|%3D)%22intercom_widget_enabled%22/,
     reason:
-      'known defect F-01: the logged-out login page asks for a protected ' +
+      'df-admin-interface#579: the logged-out login page asks for a protected ' +
       'lookup key and gets 400 on every load',
   },
 ];
