@@ -5,9 +5,6 @@
 export const BASE_URL =
   process.env['PLAYWRIGHT_BASE_URL'] ?? 'http://localhost:8080';
 
-/** Optional: the real backend URL when the UI is served through a proxy. */
-const API_URL = process.env['DF_API_URL'] ?? '';
-
 export const APP = '/dreamfactory/dist/';
 
 export interface Credentials {
@@ -23,7 +20,7 @@ export const ROOT_ADMIN: Credentials = {
 /** Seeded records the flows read (never modify). */
 export const SEED = {
   /** Marker: an instance without this service is not the gate stack. */
-  sampleDbService: process.env['DF_SAMPLE_DB_SERVICE'] ?? 'gate_sample_db',
+  sampleDbService: 'gate_sample_db',
   appPrefix: 'gate_app_',
   userPrefix: 'gate_user_',
 };
@@ -39,18 +36,13 @@ function portOf(url: string): string {
   }
 }
 
-/** Throws when any known target URL is the shared dev stack. */
+/** Throws when the target URL is the shared dev stack. */
 export function assertWritableTarget(): void {
-  for (const [name, url] of [
-    ['PLAYWRIGHT_BASE_URL', BASE_URL],
-    ['DF_API_URL', API_URL],
-  ]) {
-    if (url && portOf(url) === FORBIDDEN_PORT) {
-      throw new Error(
-        `e2e/flows refuses to run: ${name}=${url} is port ${FORBIDDEN_PORT}, ` +
-          'the shared dev stack. The flow suite writes to the backend and ' +
-          'only runs against the seeded gate stack.'
-      );
-    }
+  if (portOf(BASE_URL) === FORBIDDEN_PORT) {
+    throw new Error(
+      `e2e/flows refuses to run: PLAYWRIGHT_BASE_URL=${BASE_URL} is port ` +
+        `${FORBIDDEN_PORT}, the shared dev stack. The flow suite writes to ` +
+        'the backend and only runs against the seeded gate stack.'
+    );
   }
 }

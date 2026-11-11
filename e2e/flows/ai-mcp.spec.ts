@@ -2,7 +2,7 @@ import { test, expect } from './support/test';
 import { loginAsRoot, waitForShell } from './support/login';
 import { uniqueName } from './support/names';
 import { SERVICE_ENDPOINT, SERVICE_LISTS } from './support/services';
-import { openRoute, routeOf } from './support/system';
+import { expectNoWrite, openRoute, routeOf } from './support/system';
 import { ListPage, expectRealText, expectSnackbar } from './support/ui';
 
 /**
@@ -116,6 +116,11 @@ test('MCP server: create with a service found by search, edit in Settings, deact
       res.ok(),
       `POST system/service -> HTTP ${res.status()}: ${(await res.text()).slice(0, 300)}`
     ).toBe(true);
+    // The UI always sends the picked services; the stored config may not
+    // keep them on a backend without the MCP exposure package.
+    expect(
+      res.request().postDataJSON().resource[0].config.exposed_services
+    ).toEqual([exposed]);
     id = (await res.json()).resource[0].id;
     await page.waitForURL(
       u => routeOf(u) === `${LIST}/${id}` && u.hash.includes('created=1')
@@ -137,11 +142,6 @@ test('MCP server: create with a service found by search, edit in Settings, deact
       type: 'mcp',
       is_active: true,
     });
-    // The exposure list exists on backends with the MCP exposure package;
-    // where the key is stored, it must hold exactly the picked service.
-    if (rec.config && 'exposed_services' in rec.config) {
-      expect(rec.config.exposed_services).toEqual([exposed]);
-    }
   });
 
   const dirtyBar = page.getByTestId('mcp-dirty-bar');
@@ -164,11 +164,17 @@ test('MCP server: create with a service found by search, edit in Settings, deact
   });
 
   await test.step('Discard restores the saved values and sends nothing', async () => {
-    const before = watch.writesTo(/\/api\/v2\/system\/service/).length;
+    const mark = watch.writes.length;
     await page.getByTestId('mcp-discard').click();
     await expect(dirtyBar).toHaveCount(0);
     await expect(setLabel).toHaveValue(label);
-    expect(watch.writesTo(/\/api\/v2\/system\/service/).length).toBe(before);
+    await expectNoWrite(
+      page,
+      watch,
+      mark,
+      /\/api\/v2\/system\/service/,
+      'Discard'
+    );
   });
 
   await test.step('Save: label and description are stored and survive a reload', async () => {

@@ -79,23 +79,27 @@ export const test = base.extend<FlowFixtures>({
     { auto: true },
   ],
 
-  api: async ({ playwright }, use) => {
-    // Own request context: the browser's cookies must not leak into API
-    // calls, and API logins must not log the browser in.
-    const ctx = await playwright.request.newContext({
-      baseURL: BASE_URL,
-      ignoreHTTPSErrors: true,
-    });
-    const api = await FlowApi.login(ctx);
-    await use(api);
-    const errors = await api.cleanup();
-    await ctx.dispose();
-    expect(
-      errors,
-      'cleanup of e2e_ records failed, the stack is left dirty:\n' +
-        errors.join('\n')
-    ).toEqual([]);
-  },
+  // Auto: every flow logs in through FlowApi, which checks the gate stack.
+  api: [
+    async ({ playwright }, use) => {
+      // Own request context: the browser's cookies must not leak into API
+      // calls, and API logins must not log the browser in.
+      const ctx = await playwright.request.newContext({
+        baseURL: BASE_URL,
+        ignoreHTTPSErrors: true,
+      });
+      const api = await FlowApi.login(ctx);
+      await use(api);
+      const errors = await api.cleanup();
+      await ctx.dispose();
+      expect(
+        errors,
+        'cleanup of e2e_ records failed, the stack is left dirty:\n' +
+          errors.join('\n')
+      ).toEqual([]);
+    },
+    { auto: true },
+  ],
 });
 
 export { expect };

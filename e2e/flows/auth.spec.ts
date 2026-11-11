@@ -6,7 +6,7 @@ import {
   submitLogin,
   waitForShell,
 } from './support/login';
-import { openRoute, routeOf } from './support/system';
+import { expectNoWrite, openRoute, routeOf } from './support/system';
 import { content, expectRealText } from './support/ui';
 
 /** Login, wrong password, form validation, logout, session expiry. */
@@ -85,6 +85,7 @@ test('empty and malformed input is rejected in the form, no request sent', async
   const form = loginForm(page);
   await expect(form.email).toBeVisible();
 
+  const mark = watch.writes.length;
   await form.submit.click();
   await expect(
     page.locator('form[name="login-form"] mat-error').first(),
@@ -103,10 +104,7 @@ test('empty and malformed input is rejected in the form, no request sent', async
     page.locator('form[name="login-form"] mat-error').first()
   ).toBeVisible();
 
-  expect(
-    watch.writesTo(/\/session/),
-    'an invalid form must not send a login request'
-  ).toEqual([]);
+  await expectNoWrite(page, watch, mark, /\/session/, 'an invalid login form');
   expect(routeOf(new URL(page.url()))).toBe('/auth/login');
 });
 

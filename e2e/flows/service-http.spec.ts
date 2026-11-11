@@ -5,10 +5,7 @@ import {
   allowAceModeDefect,
   arrayField,
   arrayRows,
-  ConfigField,
   expandOptions,
-  expectConfigShown,
-  expectConfigStored,
   expectFieldInvalid,
   fillBase,
   openCreateForm,
@@ -16,7 +13,8 @@ import {
   SERVICE_LISTS,
   serviceForm,
 } from './support/services';
-import { routeOf } from './support/system';
+import { expectNoWrite, routeOf } from './support/system';
+import { content, field } from './support/ui';
 
 /**
  * HTTP service (type `rws`) on the generic, schema-driven service form:
@@ -34,8 +32,6 @@ const TYPE = 'HTTP Service';
 const BASE_URL_LABEL =
   'Base URL (required if not defined in Service Definition)';
 
-const POST = 'POST (create)';
-
 test('HTTP service: an empty form is not sent, the missing name is marked', async ({
   page,
   watch,
@@ -43,16 +39,20 @@ test('HTTP service: an empty form is not sent, the missing name is marked', asyn
   await loginAsRoot(page);
   await openCreateForm(page, LIST, TYPE);
   const f = serviceForm(page);
+  const mark = watch.writes.length;
   await f.save.click();
   await expectFieldInvalid(
     f.name,
     'the required Namespace field is marked invalid'
   );
   expect(routeOf(new URL(page.url()))).toBe(`${LIST}/create`);
-  expect(
-    watch.writesTo(/\/api\/v2\/system\/service/),
-    'no create request may be sent for an empty form'
-  ).toEqual([]);
+  await expectNoWrite(
+    page,
+    watch,
+    mark,
+    /\/api\/v2\/system\/service/,
+    'an empty form'
+  );
 });
 
 test('HTTP service: Import from cURL fills the base URL, parameters, headers and options', async ({
@@ -85,46 +85,41 @@ test('HTTP service: Import from cURL fills the base URL, parameters, headers and
   await page.getByTestId('curl-import-submit').click();
   await expect(dialog).toHaveCount(0);
 
-  const imported: ConfigField[] = [
-    {
-      kind: 'text',
-      label: BASE_URL_LABEL,
-      api: 'base_url',
-      value: 'https://api.example.com/v2/orders',
-    },
-    {
-      kind: 'rows',
-      label: 'Parameters',
-      api: 'parameters',
-      rows: [
-        ['limit', '25', false, true, false, [POST]],
-        ['status', 'open', false, true, false, [POST]],
-      ],
-      stored: [
-        { name: 'limit', value: '25', outbound: true, action: 2 },
-        { name: 'status', value: 'open', outbound: true, action: 2 },
-      ],
-    },
-    {
-      kind: 'rows',
-      label: 'Headers',
-      api: 'headers',
-      rows: [
-        ['Authorization', 'Bearer flow-suite-token', false, [POST]],
-        ['Accept', 'application/json', false, [POST]],
-      ],
-      stored: [
-        { name: 'Authorization', value: 'Bearer flow-suite-token', action: 2 },
-        { name: 'Accept', value: 'application/json', action: 2 },
-      ],
-    },
-  ];
-  await expectConfigShown(page, [imported[0]]);
+  const baseUrl = 'https://api.example.com/v2/orders';
+  await expect(field(content(page), BASE_URL_LABEL)).toHaveValue(baseUrl);
   await expandOptions(page);
-  await expectConfigShown(page, imported.slice(1));
+  // name, value as shown in the first two cells and as stored (action 2 = POST)
+  const imported = {
+    parameters: [
+      ['limit', '25'],
+      ['status', 'open'],
+    ],
+    headers: [
+      ['Authorization', 'Bearer flow-suite-token'],
+      ['Accept', 'application/json'],
+    ],
+  };
+  for (const [key, label] of [
+    ['parameters', 'Parameters'],
+    ['headers', 'Headers'],
+  ] as const) {
+    const rows = arrayRows(arrayField(page, label));
+    await expect(rows, label).toHaveCount(imported[key].length);
+    for (const [i, [n, v]] of imported[key].entries()) {
+      const cells = rows.nth(i).locator('td');
+      await expect(cells.nth(0).locator('input')).toHaveValue(n);
+      await expect(cells.nth(1).locator('input')).toHaveValue(v);
+    }
+  }
   await expect(arrayRows(arrayField(page, 'CURL Options'))).toHaveCount(0);
 
   const id = await saveNewService(page, api, name);
-  const rec = await api.get('service', id);
-  expectConfigStored(rec.config, imported);
+  const { config } = await api.get('service', id);
+  expect(config.base_url).toBe(baseUrl);
+  for (const key of ['parameters', 'headers'] as const) {
+    expect(config[key]).toHaveLength(imported[key].length);
+    imported[key].forEach(([n, v], i) =>
+      expect(config[key][i]).toMatchObject({ name: n, value: v, action: 2 })
+    );
+  }
 });

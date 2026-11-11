@@ -10,7 +10,6 @@ import {
   reloadPage,
   saveButton,
   waitForRoute,
-  writesSince,
 } from './support/system';
 import {
   ListPage,
@@ -167,7 +166,7 @@ test('email template edit: an empty name blocks Update; Cancel discards', async 
   mark = watch.writes.length;
   await cancelButton(page).click();
   await waitForRoute(page, LIST);
-  expect(writesSince(watch, mark, WRITES)).toEqual([]);
+  expect(watch.writes.slice(mark).filter(w => WRITES.test(w.path))).toEqual([]);
   expect((await api.get('email_template', seeded.id)).subject).toBe(
     seeded.v.subject
   );

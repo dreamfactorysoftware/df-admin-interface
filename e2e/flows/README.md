@@ -24,10 +24,11 @@ the repo (`specs/ui-integration-2026-11/flow-known-failures/`).
 
 The suite WRITES to the backend. It runs only against the seeded gate stack.
 It refuses port 8081 and any instance without the `gate_sample_db` service
-(`support/env.ts`, `support/api.ts`).
+(`support/env.ts`, `support/api.ts`), for every test. `npm run e2e` skips this
+folder unless `E2E_FLOWS=1` is set.
 
 ```
-PLAYWRIGHT_BASE_URL=http://127.0.0.1:<proxy port> \
+E2E_FLOWS=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:<proxy port> \
 DF_ADMIN_EMAIL=... DF_ADMIN_PASSWORD=... \
 npx playwright test e2e/flows --workers=1
 ```

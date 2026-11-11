@@ -1,5 +1,5 @@
 import { APIRequestContext, APIResponse } from '@playwright/test';
-import { Credentials, ROOT_ADMIN, SEED, assertWritableTarget } from './env';
+import { ROOT_ADMIN, SEED, assertWritableTarget } from './env';
 import { E2E_PREFIX } from './names';
 
 /**
@@ -41,22 +41,19 @@ export class FlowApi {
     readonly token: string
   ) {}
 
-  /** Log in (root admin by default) after the two target checks. */
-  static async login(
-    ctx: APIRequestContext,
-    creds: Credentials = ROOT_ADMIN
-  ): Promise<FlowApi> {
+  /** Log in as root admin after the two target checks. */
+  static async login(ctx: APIRequestContext): Promise<FlowApi> {
     assertWritableTarget();
     const res = await ctx.post('/api/v2/system/admin/session', {
-      data: { email: creds.email, password: creds.password },
+      data: { email: ROOT_ADMIN.email, password: ROOT_ADMIN.password },
     });
     if (!res.ok()) {
       throw new Error(
-        `API login as ${creds.email} failed: HTTP ${res.status()} ${await res.text()}`
+        `API login as ${ROOT_ADMIN.email} failed: HTTP ${res.status()} ${await res.text()}`
       );
     }
     const api = new FlowApi(ctx, (await res.json()).session_token);
-    if (creds === ROOT_ADMIN) await api.assertGateStack();
+    await api.assertGateStack();
     return api;
   }
 
@@ -100,10 +97,9 @@ export class FlowApi {
   asClient(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
-    opts: { apiKey?: string; sessionToken?: string; data?: unknown } = {}
+    opts: { sessionToken?: string; data?: unknown } = {}
   ): Promise<APIResponse> {
     const headers: Record<string, string> = {};
-    if (opts.apiKey) headers['X-DreamFactory-API-Key'] = opts.apiKey;
     if (opts.sessionToken)
       headers['X-DreamFactory-Session-Token'] = opts.sessionToken;
     return this.ctx.fetch(path, { method, headers, data: opts.data as any });
@@ -120,13 +116,7 @@ export class FlowApi {
 
   async list(
     resource: SystemResource,
-    params: {
-      filter?: string;
-      fields?: string;
-      related?: string;
-      limit?: number;
-      order?: string;
-    } = {}
+    params: { filter?: string; fields?: string; related?: string } = {}
   ): Promise<any[]> {
     const q = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
@@ -168,8 +158,7 @@ export class FlowApi {
   /** Create one record through the API and track it for cleanup. */
   async create(
     resource: SystemResource,
-    record: Record<string, any>,
-    params = ''
+    record: Record<string, any>
   ): Promise<any> {
     const name = record[NAME_FIELD[resource]];
     if (!isE2eName(name)) {
@@ -178,11 +167,9 @@ export class FlowApi {
       );
     }
     this.track(resource, name);
-    const res = await this.raw(
-      'POST',
-      `/api/v2/system/${resource}?fields=*${params ? '&' + params : ''}`,
-      { resource: [record] }
-    );
+    const res = await this.raw('POST', `/api/v2/system/${resource}?fields=*`, {
+      resource: [record],
+    });
     const body = await this.json(res, `POST system/${resource}`);
     return body.resource?.[0] ?? body;
   }

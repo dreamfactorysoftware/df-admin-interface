@@ -85,21 +85,9 @@ export const pageHeading = (page: Page): Locator =>
   content(page).getByRole('heading', { level: 1 }).first();
 
 /**
- * Write requests the browser sent to `path` since `mark` (an index into
- * `watch.writes`, take it with `watch.writes.length` before the action).
+ * Assert that a click sent no write request to `path` since `mark` (take it
+ * with `watch.writes.length` before the action).
  */
-export function writesSince(
-  watch: Watcher,
-  mark: number,
-  path: RegExp,
-  method?: string
-): { method: string; path: string; status?: number }[] {
-  return watch.writes
-    .slice(mark)
-    .filter(w => path.test(w.path) && (!method || w.method === method));
-}
-
-/** Assert that a click sent no write request. */
 export async function expectNoWrite(
   page: Page,
   watch: Watcher,
@@ -117,7 +105,7 @@ export async function expectNoWrite(
   );
   await page.waitForLoadState('networkidle');
   expect(
-    writesSince(watch, mark, path),
+    watch.writes.slice(mark).filter(w => path.test(w.path)),
     `${what}: no write request may be sent`
   ).toEqual([]);
 }

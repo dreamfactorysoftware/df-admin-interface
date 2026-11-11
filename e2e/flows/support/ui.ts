@@ -22,23 +22,21 @@ export function expectRealText(text: string, what: string): void {
 /** The toast at the bottom of the screen. */
 export async function expectSnackbar(
   page: Page,
-  matching?: RegExp | string,
-  opts: { soft?: boolean } = {}
+  matching?: RegExp | string
 ): Promise<string> {
   const bar = page.locator('mat-snack-bar-container .alert-message').last();
   await expect(bar, 'a snackbar message must appear').toBeVisible({
     timeout: 30_000,
   });
   const text = (await bar.innerText()).trim();
-  const check = opts.soft ? expect.soft : expect;
-  check(
+  expect(
     RAW_KEY.test(text),
     `snackbar message is a raw i18n key, not text: "${text}"`
   ).toBe(false);
-  check(text.length, 'snackbar message is empty').toBeGreaterThan(0);
+  expect(text.length, 'snackbar message is empty').toBeGreaterThan(0);
   if (matching !== undefined) {
-    if (typeof matching === 'string') check(text).toContain(matching);
-    else check(text).toMatch(matching);
+    if (typeof matching === 'string') expect(text).toContain(matching);
+    else expect(text).toMatch(matching);
   }
   return text;
 }
@@ -235,8 +233,7 @@ export async function pickOption(
 export async function pickOptions(
   page: Page,
   select: Locator,
-  options: string[],
-  toggle = false
+  options: string[]
 ): Promise<void> {
   const panel = await openSelect(page, select);
   for (const o of options) {
@@ -245,38 +242,12 @@ export async function pickOptions(
       .filter({ hasText: new RegExp(`^\\s*${escapeRegExp(o)}`) })
       .first();
     await expect(item, `option "${o}" must be offered`).toBeVisible();
-    if (toggle || (await item.getAttribute('aria-selected')) !== 'true') {
+    if ((await item.getAttribute('aria-selected')) !== 'true') {
       await item.click();
     }
   }
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
-}
-
-/**
- * The labels selected in a `mat-select multiple`, read from the open panel
- * (the closed trigger abbreviates them).
- */
-export async function selectedOptions(
-  page: Page,
-  select: Locator
-): Promise<string[]> {
-  const panel = await openSelect(page, select);
-  const labels = await panel
-    .locator('mat-option[aria-selected="true"]')
-    .evaluateAll(els =>
-      els.map(el => {
-        const copy = el.cloneNode(true) as HTMLElement;
-        // Drop the "(+2 others)" helper some options carry.
-        copy
-          .querySelectorAll('.example-additional-selection')
-          .forEach(n => n.remove());
-        return (copy.textContent ?? '').trim();
-      })
-    );
-  await page.keyboard.press('Escape');
-  await expect(panel).toHaveCount(0);
-  return labels;
 }
 
 /** The text a closed `mat-select` shows for its current value. */

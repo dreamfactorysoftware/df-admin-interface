@@ -3,19 +3,11 @@ import { expect } from './expect';
 import { FlowApi } from './api';
 import { Watcher } from './watch';
 import { openRoute } from './system';
-import {
-  content,
-  escapeRegExp,
-  pickOption,
-  selectedOptions,
-  selectedText,
-} from './ui';
+import { content, escapeRegExp, pickOption, setToggle } from './ui';
 
 /**
  * Helpers for the generic service form (`df-service-details`): one template
- * that renders every service type from the backend's config schema. A flow
- * describes the expected fields as data (`ConfigField[]`); the same data
- * checks the form and the API record.
+ * that renders every service type from the backend's config schema.
  */
 
 export const SERVICE_ENDPOINT = '/api/v2/system/service';
@@ -90,17 +82,8 @@ export async function fillBase(page: Page, v: BaseValues): Promise<void> {
   await f.name.fill(v.name);
   await f.label.fill(v.label);
   await f.description.fill(v.description);
-  await setSwitch(f.active, v.active);
-}
-
-/** A `mat-slide-toggle` element: set it and verify. */
-async function setSwitch(toggle: Locator, on: boolean): Promise<void> {
-  const sw = toggle.getByRole('switch');
-  await expect(sw).toBeVisible();
-  if (((await sw.getAttribute('aria-checked')) === 'true') !== on) {
-    await sw.click();
-  }
-  await expect(sw).toHaveAttribute('aria-checked', String(on));
+  // Scoped to the Active toggle, so any accessible name will do.
+  await setToggle(f.active, /.*/, v.active);
 }
 
 /** Open every collapsed options panel of the form (Advanced Options, Options). */
@@ -131,34 +114,8 @@ export async function expectFieldInvalid(
   ).toHaveClass(/mat-form-field-invalid/);
 }
 
-type Cell = string | boolean | string[];
-
-export type ConfigField =
-  | { kind: 'text'; label: string; api: string; value: string }
-  | {
-      /** Array of rows: one cell per column, in column order. */
-      kind: 'rows';
-      label: string;
-      api: string;
-      rows: Cell[][];
-      /** The rows as the API stores them (subset match per row). */
-      stored: Record<string, unknown>[];
-    };
-
 const exact = (label: string) =>
   new RegExp(`^\\s*${escapeRegExp(label)}\\s*\\*?\\s*$`);
-
-/** A top-level schema field (not one inside an array row) by its label. */
-function dynamicField(page: Page, label: string): Locator {
-  return content(page)
-    .locator('df-dynamic-field:not(df-array-field df-dynamic-field)')
-    .filter({
-      has: page
-        .locator('mat-label, mat-slide-toggle label')
-        .filter({ hasText: exact(label) }),
-    })
-    .first();
-}
 
 /** The table of an array field, by its label. */
 export function arrayField(page: Page, label: string): Locator {
@@ -174,73 +131,6 @@ export function arrayField(page: Page, label: string): Locator {
 
 export const arrayRows = (field: Locator): Locator =>
   field.locator('tr[mat-row]');
-
-async function readCell(page: Page, cell: Locator): Promise<Cell> {
-  if (await cell.locator('mat-slide-toggle').count()) {
-    return (
-      (await cell.getByRole('switch').getAttribute('aria-checked')) === 'true'
-    );
-  }
-  const select = cell.locator('mat-select');
-  if (await select.count()) {
-    if (
-      /mat-mdc-select-multiple/.test((await select.getAttribute('class')) ?? '')
-    ) {
-      return selectedOptions(page, select);
-    }
-    return (await select.locator('.mat-mdc-select-value-text').count())
-      ? selectedText(select)
-      : '';
-  }
-  return cell.locator('input').inputValue();
-}
-
-/** The open form shows exactly these values. */
-export async function expectConfigShown(
-  page: Page,
-  fields: ConfigField[]
-): Promise<void> {
-  for (const f of fields) {
-    const what = `field "${f.label}"`;
-    if (f.kind === 'text') {
-      await expect(
-        dynamicField(page, f.label).locator('input'),
-        what
-      ).toHaveValue(f.value);
-      continue;
-    }
-    const rows = arrayRows(arrayField(page, f.label));
-    await expect(rows, what).toHaveCount(f.rows.length);
-    const shown: Cell[][] = [];
-    for (let r = 0; r < f.rows.length; r++) {
-      const cells: Cell[] = [];
-      for (let c = 0; c < f.rows[r].length; c++) {
-        cells.push(await readCell(page, rows.nth(r).locator('td').nth(c)));
-      }
-      shown.push(cells);
-    }
-    expect(shown, what).toEqual(f.rows);
-  }
-}
-
-/** The API record's `config` holds exactly these values. */
-export function expectConfigStored(
-  config: Record<string, any>,
-  fields: ConfigField[]
-): void {
-  for (const f of fields) {
-    const what = `config.${f.api} in the API record`;
-    const got = config[f.api];
-    if (f.kind === 'text') {
-      expect(got, what).toEqual(f.value);
-      continue;
-    }
-    expect(got, what).toHaveLength(f.stored.length);
-    f.stored.forEach((row, i) =>
-      expect(got[i], `${what}, row ${i + 1}`).toMatchObject(row)
-    );
-  }
-}
 
 const isServiceWrite = (methods: string[]) => (r: Response) =>
   methods.includes(r.request().method()) &&
