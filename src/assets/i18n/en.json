@@ -477,6 +477,10 @@
         "nav": "Usage",
         "header": "AI Usage Analytics"
       },
+      "budgets": {
+        "nav": "Budgets",
+        "header": "AI Budgets"
+      },
       "mcp": {
         "nav": "MCP",
         "header": "MCP Servers",
@@ -1083,6 +1087,122 @@
         "title": "Open API docs",
         "desc": "Browse and try every endpoint live in the console."
       }
+    }
+  },
+  "aiBudgets": {
+    "title": "AI Budgets",
+    "hint": "Spend limits for AI requests. Periods follow calendar boundaries in the server time zone. A hard stop refuses the next request after spend reaches the cap, so the request that crosses the cap still completes.",
+    "manage": "Manage budgets",
+    "viewUsage": "View usage",
+    "refresh": "Refresh",
+    "new": "New budget",
+    "retry": "Try again",
+    "empty": "No budgets yet. Create one to set a spend limit.",
+    "loggingOff": "AI usage logging is off on this server. Spend is not recorded, so budgets will not block requests or send alerts.",
+    "filter": "Filter budgets",
+    "count": "{{shown}} of {{total}} shown",
+    "noMatch": "No budgets match the filter.",
+    "showMore": "Show {{count}} more",
+    "deletedScope": "deleted #{{id}}",
+    "unsupported": {
+      "title": "AI budgets are not available on this server",
+      "message": "This server version does not include them, or an administrator has not turned them on. Usage reporting is not affected."
+    },
+    "forbidden": {
+      "title": "This account can't manage AI budgets on this server",
+      "message": "The server has AI budgets, and it does not let this account manage them.",
+      "detail": "Server message: {{message}}"
+    },
+    "checkError": {
+      "title": "Could not check this server for AI budgets",
+      "message": "The server did not answer the check. Nothing was changed."
+    },
+    "scope": {
+      "global": "All AI spend",
+      "service": "AI Connection",
+      "role": "Role",
+      "user": "User",
+      "app": "App"
+    },
+    "scopeNoun": {
+      "service": "AI connections",
+      "role": "roles",
+      "user": "users",
+      "app": "apps"
+    },
+    "period": {
+      "monthly": "Monthly",
+      "daily": "Daily",
+      "hourly": "Hourly"
+    },
+    "form": {
+      "newTitle": "New budget",
+      "editTitle": "Edit budget",
+      "label": "Label",
+      "appliesTo": "Applies to",
+      "period": "Period",
+      "periodHint": "Resets on calendar boundaries in the server time zone.",
+      "cap": "Cap (USD)",
+      "capHint": "A connection with no rates records $0, so set rates.",
+      "scopeSelected": "Selected: {{name}}",
+      "scopeNone": "Pick one from the list.",
+      "scopeEmpty": "Nothing to pick from yet.",
+      "webhookUrl": "Alert webhook URL (optional)",
+      "webhookHint": "Receives a POST at 50, 80 and 100 percent.",
+      "webhookAuth": "Webhook Authorization header (optional)",
+      "webhookAuthStored": "Stored. Leave blank to keep it. Changing the webhook host removes it.",
+      "webhookAuthClear": "Remove the stored header",
+      "webhooksOff": "Alert webhooks are turned off on this server, so this budget cannot send alerts.",
+      "hardStop": "Hard stop",
+      "hardStopWarning": "Requests will be refused with HTTP 429 once spend reaches the cap, until the period resets.",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving"
+    },
+    "validation": {
+      "label": "Enter a label.",
+      "scope": "Pick what the budget applies to.",
+      "cap": "Enter a cap greater than 0.",
+      "capMax": "The cap cannot be more than 99,999,999.9999.",
+      "webhook": "The webhook URL must start with http:// or https://."
+    },
+    "table": {
+      "label": "Label",
+      "scope": "Scope",
+      "period": "Period",
+      "cap": "Cap",
+      "spent": "Spent",
+      "used": "Used",
+      "hardStop": "Hard stop",
+      "active": "Active",
+      "actions": "Actions",
+      "on": "On",
+      "off": "Off",
+      "blocking": "Blocking",
+      "activeFor": "Active: {{label}}",
+      "edit": "Edit {{label}}",
+      "delete": "Delete {{label}}"
+    },
+    "delete": {
+      "title": "Delete this budget?",
+      "message": "Its cap and alerts stop applying. Past usage is not changed."
+    },
+    "aliases": {
+      "title": "Model aliases",
+      "hint": "Names that clients send as \"model\" to the OpenAI-compatible endpoint.",
+      "empty": "No aliases yet.",
+      "name": "Name",
+      "connection": "AI Connection",
+      "connectionNoun": "AI connections",
+      "connectionNone": "Pick one from the list.",
+      "connectionSelected": "Selected: {{name}}",
+      "connectionsEmpty": "No AI connections yet. Create one first.",
+      "model": "Model",
+      "active": "Active",
+      "activeFor": "Active: {{name}}",
+      "add": "Add alias",
+      "adding": "Adding",
+      "showMore": "Show {{count}} more"
     }
   },
   "agents": {

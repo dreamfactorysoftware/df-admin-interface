@@ -985,6 +985,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: ROUTES.AI_BUDGETS,
+        loadComponent: () =>
+          import('./adf-ai-budgets/df-ai-budgets.component').then(
+            m => m.DfAiBudgetsComponent
+          ),
+      },
+      {
         path: ROUTES.AI_CHAT_UI,
         children: [
           {

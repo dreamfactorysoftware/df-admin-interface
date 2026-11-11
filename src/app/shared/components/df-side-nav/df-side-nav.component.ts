@@ -52,6 +52,10 @@ import { DfSnackbarService } from 'src/app/shared/services/df-snackbar.service';
 import { DfPaywallService } from '../../services/df-paywall.service';
 import { DfSystemConfigDataService } from '../../services/df-system-config-data.service';
 import { DfServerSettingsService } from '../../services/df-server-settings.service';
+import {
+  AiBudgetsAvailabilityService,
+  withoutNavRoute,
+} from 'src/app/adf-ai-budgets/ai-budgets-availability.service';
 @UntilDestroy({ checkProperties: true })
 @Component({
   selector: 'df-side-nav',
@@ -118,7 +122,8 @@ export class DfSideNavComponent implements OnInit {
     private systemConfigDataService: DfSystemConfigDataService,
     private commandPalette: DfCommandPaletteService,
     private trialService: DfTrialService,
-    private serverSettingsService: DfServerSettingsService
+    private serverSettingsService: DfServerSettingsService,
+    private aiBudgetsAvailability: AiBudgetsAvailabilityService
   ) {}
 
   ngOnInit(): void {
@@ -170,6 +175,15 @@ export class DfSideNavComponent implements OnInit {
         this.rebuildNav();
       }
     });
+    // The Budgets entry shows only once the server is known to have the
+    // budget API and to accept this user. It starts hidden for everyone,
+    // root admins included, who skip the tab filter.
+    this.aiBudgetsAvailability.available$.subscribe(available => {
+      if (available !== this.aiBudgetsAvailable) {
+        this.aiBudgetsAvailable = available;
+        this.rebuildNav();
+      }
+    });
     this.search.valueChanges
       .pipe(
         debounceTime(1000),
@@ -189,14 +203,18 @@ export class DfSideNavComponent implements OnInit {
 
   private accessByTabs: Array<string> | null = null;
   private canOpenServerSettings = false;
+  private aiBudgetsAvailable = false;
 
   private rebuildNav(): void {
     const nav = this.accessByTabs
       ? accessibleRoutes(transformRoutes(routes), this.accessByTabs)
       : transformRoutes(routes);
-    this.nav = this.canOpenServerSettings
+    const withSettings = this.canOpenServerSettings
       ? nav
       : withoutRoute(nav, ROUTES.SERVER_SETTINGS);
+    this.nav = this.aiBudgetsAvailable
+      ? withSettings
+      : withoutNavRoute(withSettings, ROUTES.AI_BUDGETS);
     this.navGroups = this.buildNavGroups(this.nav);
   }
 
