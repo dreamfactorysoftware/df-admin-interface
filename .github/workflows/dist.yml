@@ -1,0 +1,160 @@
+# CI is the only writer of dist/ on the branches listed below.
+#
+# Why dist/ is tracked at all: DreamFactory installs this repo as a composer
+# package and serves dist/ as it is. Nothing builds at install time, so the
+# branch needs a built bundle in the tree.
+#
+# Why CI owns it: angular.json sets outputHashing: all, so a build renames
+# every chunk it changes. Branches that each carry a build conflict on every
+# file, and a merge without a rebuild ships a UI that lags the source. With one
+# writer there is nothing to conflict with and dist cannot fall behind.
+# guard-dist.yml is the other half: it flags pull requests that change dist/.
+#
+# How this stays correct:
+#
+#   Loops     The push below uses GITHUB_TOKEN. GitHub does not start workflows
+#             for pushes made with that token, so the bot commit triggers
+#             nothing. If you ever change the token (PAT, deploy key, App), add
+#             a loop guard first. Do not add [skip ci] to the bot commit: it is
+#             the head of the branch most of the time, and [skip ci] on a head
+#             commit also silences checks on pull requests and pushes that end
+#             on it (for example develop into main).
+#   No path   There is no paths-ignore on purpose. A push that only changes
+#   filter    dist/ (an old branch that still carries a build) must start a run
+#             too, so CI puts dist back to a build of the source.
+#   Races     Runs on one branch are serialized by the concurrency group. Each
+#             run builds the branch tip, not the commit that started it. The
+#             push is a plain fast-forward: if the branch moved during the
+#             build, the push is refused, nothing is written, and the run that
+#             the newer push started builds the new tip. So every bot commit is
+#             a build of exactly its parent, and the last run in the queue
+#             leaves dist equal to a build of the branch head.
+name: Build dist
+
+on:
+  push:
+    # ---- BRANCHES WHERE CI BUILDS dist/ ------------------------------------
+    # Add a branch here, and the same line in guard-dist.yml.
+    branches:
+      - develop
+      # Scratch branches for testing this workflow, for example dist-proof/1.
+      # A push to one runs the exact file that is on that branch.
+      - 'dist-proof/**'
+    # ------------------------------------------------------------------------
+  # Manual run. GitHub only offers this once this file is on the default
+  # branch (main). It works for any branch that has this file.
+  workflow_dispatch:
+
+concurrency:
+  group: dist-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Two jobs so the write token never sits next to third-party code. npm ci and
+  # the build run npm packages and their scripts (husky's prepare hook sets
+  # core.hooksPath, and any package could write hooks or url.*.insteadOf into
+  # .git/config). This job has a read-only token and hands over only dist/.
+  build:
+    # A manual run can be pointed at a tag. Only a branch can take a commit.
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      built: ${{ steps.sha.outputs.built }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Naming the ref makes checkout take the branch tip. Without it,
+          # checkout pins the commit that started the run, and a run that
+          # waited in the queue would build old source.
+          ref: ${{ github.ref }}
+          persist-credentials: false
+
+      - id: sha
+        run: echo "built=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build
+        run: |
+          # Start from nothing so no old chunk can survive the build.
+          rm -rf dist
+          npm run build
+
+      - name: Verify the build
+        run: scripts/verify-dist.sh dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+
+  # Never runs npm. Starts from a fresh checkout of the built commit, so nothing
+  # the build did to .git exists here. Only this job gets the write token.
+  commit:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      BRANCH: ${{ github.ref_name }}
+      BUILT: ${{ needs.build.outputs.built }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.built }}
+          # The token goes on the push URL below, not into .git/config.
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: ${{ runner.temp }}/built-dist
+
+      - name: Commit dist if it changed
+        run: |
+          built="${BUILT}"
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          rm -rf dist
+          cp -a "${RUNNER_TEMP}/built-dist" dist
+
+          # --all stages deleted chunks as well as new ones.
+          # --force keeps this working if dist/ is ever added to .gitignore.
+          git add --all --force -- dist
+          if git diff --cached --quiet; then
+            echo "::notice::dist already matches a build of ${built}. Nothing to commit."
+            exit 0
+          fi
+          git commit --quiet -m "chore: rebuild dist" \
+            -m "Automated build of ${built} by .github/workflows/dist.yml."
+          git show --shortstat --format='%h %an: %s' HEAD
+
+          # No rebase and no force. A fast-forward succeeds only if the branch
+          # still points at the commit we built.
+          if git push "$remote" "HEAD:refs/heads/${BRANCH}"; then
+            echo "::notice::Pushed dist built from ${built}."
+            exit 0
+          fi
+
+          git fetch --quiet "$remote" "refs/heads/${BRANCH}"
+          tip="$(git rev-parse FETCH_HEAD)"
+          if [ "$tip" != "$built" ]; then
+            echo "::notice::${BRANCH} moved from ${built} to ${tip} during the build. Nothing pushed. The run for the newer push builds the new tip."
+            exit 0
+          fi
+          echo "::error::Push refused although ${BRANCH} did not move. Check the token permissions (Set up job > GITHUB_TOKEN Permissions must show Contents: write) and any branch protection or ruleset on ${BRANCH}."
+          exit 1
