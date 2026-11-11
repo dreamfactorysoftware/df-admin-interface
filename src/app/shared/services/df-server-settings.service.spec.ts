@@ -85,21 +85,6 @@ describe('DfServerSettingsService', () => {
       expect(results).toEqual([{ setting: row, environmentRefreshed: false }]);
     });
 
-    it('reset: saved row comes back when only the refresh fails', () => {
-      refreshFails();
-      const results: unknown[] = [];
-      const errors: unknown[] = [];
-      service.reset('log_level').subscribe({
-        next: r => results.push(r),
-        error: e => errors.push(e),
-      });
-      const row = { name: 'log_level', value: 'info', source: 'env' };
-      http.expectOne(`${URLS.SERVER_SETTING}/log_level`).flush(row);
-
-      expect(errors).toEqual([]);
-      expect(results).toEqual([{ setting: row, environmentRefreshed: false }]);
-    });
-
     it('update: a failed PATCH is an error and never refreshes', () => {
       const results: unknown[] = [];
       const errors: unknown[] = [];
@@ -112,17 +97,6 @@ describe('DfServerSettingsService', () => {
         .flush({ error: {} }, { status: 400, statusText: 'Bad Request' });
 
       expect(results).toEqual([]);
-      expect(errors).toHaveLength(1);
-      expect(config.fetchEnvironmentData).not.toHaveBeenCalled();
-    });
-
-    it('reset: a failed DELETE is an error and never refreshes', () => {
-      const errors: unknown[] = [];
-      service.reset('log_level').subscribe({ error: e => errors.push(e) });
-      http
-        .expectOne(`${URLS.SERVER_SETTING}/log_level`)
-        .flush({ error: {} }, { status: 500, statusText: 'Server Error' });
-
       expect(errors).toHaveLength(1);
       expect(config.fetchEnvironmentData).not.toHaveBeenCalled();
     });

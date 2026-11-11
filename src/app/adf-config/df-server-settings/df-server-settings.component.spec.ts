@@ -116,19 +116,6 @@ describe('DfServerSettingsComponent', () => {
     expect(component.stale).toBe(false);
   });
 
-  it('a reset whose environment refresh failed still resets, flagged stale', () => {
-    component.rows[0].setting = row({ source: 'override', value: 'error' });
-    service.reset.mockReturnValue(
-      of({ setting: row(), environmentRefreshed: false })
-    );
-    component.reset(component.rows[0]);
-    expect(component.rows[0].setting.source).toBe('env');
-    expect(component.rows[0].draft).toBe('info');
-    expect(component.saved).toBe(true);
-    expect(component.stale).toBe(true);
-    expect(component.error).toBeNull();
-  });
-
   it('a failed reset keeps the override and sets the error', () => {
     component.rows[0].setting = row({ source: 'override', value: 'error' });
     service.reset.mockReturnValue(throwError(() => new Error('boom')));

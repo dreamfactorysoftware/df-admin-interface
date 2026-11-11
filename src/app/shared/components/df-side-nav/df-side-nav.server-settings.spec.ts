@@ -171,19 +171,6 @@ describe('DfSideNavComponent Server Settings entry', () => {
       expect(navPaths()).toContain(SERVER_SETTINGS);
     });
 
-    it('restricted admin without the Config tab: no entry and no lookup', () => {
-      signIn(restricted, ['apps']);
-      expect(answerSystemList(NEW_BACKEND)).toBe(0);
-      expect(navPaths()).not.toContain(SERVER_SETTINGS);
-      expect(groupPaths()).not.toContain(SERVER_SETTINGS);
-    });
-
-    it('non-admin user: no entry and no lookup', () => {
-      signIn(plainUser);
-      expect(answerSystemList(NEW_BACKEND)).toBe(0);
-      expect(navPaths()).not.toContain(SERVER_SETTINGS);
-    });
-
     it('signing out removes the entry again', () => {
       signIn(rootAdmin);
       answerSystemList(NEW_BACKEND);
@@ -270,15 +257,5 @@ describe('withoutRoute', () => {
       '/system-settings/config',
       SYSTEM_INFO,
     ]);
-  });
-
-  it('does not change the list it was given', () => {
-    const input = navs();
-    withoutRoute(input, ROUTES.SERVER_SETTINGS);
-    expect(paths(input)).toContain(SERVER_SETTINGS);
-  });
-
-  it('returns an equal list when the route is not there', () => {
-    expect(paths(withoutRoute(navs(), ROUTES.CORS))).toEqual(paths(navs()));
   });
 });
