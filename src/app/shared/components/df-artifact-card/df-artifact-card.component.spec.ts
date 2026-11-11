@@ -85,7 +85,7 @@ describe('DfArtifactCardComponent', () => {
   it('falls back to a placeholder and reports no key when apiKey is absent', () => {
     component.apiKey = undefined;
     component.keys = [];
-    expect(component.hasKey).toBeFalse();
+    expect(component.hasKey).toBe(false);
     expect(component.activeKey).toBe('YOUR_API_KEY');
     expect(component.curlSnippet).toContain('YOUR_API_KEY');
   });
@@ -103,7 +103,7 @@ describe('DfArtifactCardComponent', () => {
   });
 
   it('emits the copied block and sets the transient copied state', () => {
-    const spy = jasmine.createSpy('copied');
+    const spy = jest.fn();
     component.copied.subscribe(spy);
     component.onCopy('curl', component.curlSnippet);
     expect(spy).toHaveBeenCalledWith('curl');

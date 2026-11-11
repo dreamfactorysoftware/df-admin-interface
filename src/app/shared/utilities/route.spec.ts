@@ -20,9 +20,21 @@ describe('Route Utilities', () => {
       {
         path: '/test',
         route: 'test',
-        subRoutes: [{ path: '/test/child', route: 'child' }],
+        icon: '',
+        subRoutes: [{ path: '/test/child', route: 'child', icon: '' }],
       },
     ]);
+  });
+
+  it('should give an icon to top-level pillar routes only', () => {
+    const routes: Routes = [
+      { path: ROUTES.HOME, children: [{ path: ROUTES.HOME }] },
+    ];
+
+    const result = transformRoutes(routes);
+
+    expect(result[0].icon).toBe(`assets/img/nav/${ROUTES.HOME}.svg`);
+    expect(result[0].subRoutes?.[0].icon).toBe('');
   });
 
   it('should filter and transform routes based on allowed tabs', () => {

@@ -1,5 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { DfCacheTableComponent } from './df-cache-table.component';
+import {
+  DfCacheModal,
+  DfCacheTableComponent,
+} from './df-cache-table.component';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
@@ -62,6 +65,20 @@ describe('DfCacheTableComponent', () => {
   it('should flush system cache', () => {
     const crudServiceSpy = jest.spyOn(DfBaseCrudService.prototype, 'delete');
     component.clearCache({ name: 'system', label: 'System Management' });
-    expect(crudServiceSpy).toHaveBeenCalled();
+
+    // The row action only opens the confirm dialog. The flush happens when
+    // the user confirms in the dialog.
+    expect(crudServiceSpy).not.toHaveBeenCalled();
+    expect(component.dialog.openDialogs.length).toBe(1);
+    const modal = component.dialog.openDialogs[0]
+      .componentInstance as DfCacheModal;
+    expect(modal.row).toEqual({ name: 'system', label: 'System Management' });
+
+    modal.clearCache();
+    expect(crudServiceSpy).toHaveBeenCalledWith('system', {
+      snackbarSuccess: 'cache.serviceCacheFlushed',
+    });
+
+    component.dialog.closeAll();
   });
 });

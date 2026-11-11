@@ -7,6 +7,7 @@ import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { of } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   DfAccessUsageService,
   unavailableAccessUsage,
@@ -24,6 +25,7 @@ describe('DfManageAppsTableComponent', () => {
         DfManageAppsTableComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       providers: [
         provideTransloco({
@@ -59,6 +61,7 @@ describe('DfManageAppsTableComponent access usage column', () => {
         DfManageAppsTableComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       providers: [
         provideTransloco({
