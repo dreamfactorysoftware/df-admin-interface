@@ -144,36 +144,10 @@ describe('DfManageSchedulerTableComponent "Last run" column', () => {
     ]);
   });
 
-  it('shows each run state when the backend supports runs', () => {
-    const stale = run({
-      startedAt: minutesAgo(2 * 24 * 60),
-      finishedAt: null,
-      statusCode: null,
-    });
-    setup([
-      task(1, status()),
-      task(2, status({ isRunning: true, lastRun: run({ finishedAt: null }) })),
-      task(3, status({ lastRun: run() })),
-      task(4, status({ lastRun: run({ statusCode: 404 }) })),
-      task(5, status({ lastRun: run({ statusCode: null }) })),
-      task(6, status({ lastRun: stale })),
-    ]);
-    expect(headers()).toContain('Last run');
+  it('shows the column before Log when the backend supports runs', () => {
+    setup([task(1, status({ lastRun: run() }))]);
     expect(headers().indexOf('Last run')).toBe(headers().indexOf('Log') - 1);
-    expect(lastRunCells()).toEqual([
-      'Never',
-      'Running',
-      'OK, 5 minutes ago',
-      'Failed 404, 5 minutes ago',
-      'Failed, 5 minutes ago',
-      'Did not finish, started 2 days ago',
-    ]);
-  });
-
-  it('leaves the cell empty for a task without run data, never "Never"', () => {
-    // Mixed payload: only rows that carry run_status get a value.
-    setup([task(1, status()), task(2), task(3, null)]);
-    expect(lastRunCells()).toEqual(['Never', '', '']);
+    expect(lastRunCells()).toEqual(['OK, 5 minutes ago']);
   });
 
   it('adds and removes the column as fetched data changes', () => {

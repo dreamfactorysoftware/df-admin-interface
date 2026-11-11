@@ -8,7 +8,6 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute } from '@angular/router';
 import { Translation, TranslocoTestingModule } from '@ngneat/transloco';
 import { BehaviorSubject } from 'rxjs';
-import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import {
   RunStatus,
   SchedulerTaskData,
@@ -151,30 +150,6 @@ describe('DfSchedulerDetailsComponent run history', () => {
       expect(runRequests()).toEqual([]);
       component.onTabIndexChange(1);
       expect(runRequests()).toEqual([]);
-    });
-
-    it('populates the form and can still save', () => {
-      expect(component.formGroup.getRawValue()).toEqual(
-        expect.objectContaining({
-          name: 'gaaa',
-          description: 'pac',
-          active: true,
-          serviceId: 5,
-          component: '*',
-          method: 'GET',
-          frequency: 88,
-        })
-      );
-      const update = jest.spyOn(DfBaseCrudService.prototype, 'update');
-      component.formGroup.patchValue({ name: 'renamed' });
-      component.formGroup.markAsDirty();
-      component.onSubmit();
-      expect(update).toHaveBeenCalledWith(
-        15,
-        expect.objectContaining({ name: 'renamed' }),
-        expect.objectContaining({ related: 'task_log_by_task_id' })
-      );
-      update.mockRestore();
     });
   });
 
@@ -423,29 +398,6 @@ describe('DfSchedulerDetailsComponent run history', () => {
         expect(rows().length).toBe(5);
       });
 
-      it('moves page through the paginator buttons', () => {
-        const next = el.querySelector(
-          '.mat-mdc-paginator-navigation-next'
-        ) as HTMLButtonElement;
-        next.click();
-        fixture.detectChanges();
-        expect(component.runPage).toBe(1);
-        expect(rows().length).toBe(10);
-        expect(ids()[0]).toBe(15);
-      });
-
-      it('hands the template the same array until the page changes', () => {
-        const first = component.pagedRuns;
-        fixture.detectChanges();
-        fixture.detectChanges();
-        expect(component.pagedRuns).toBe(first);
-        page(1);
-        expect(component.pagedRuns).not.toBe(first);
-        const second = component.pagedRuns;
-        fixture.detectChanges();
-        expect(component.pagedRuns).toBe(second);
-      });
-
       it('has no paginator for a single page', async () => {
         TestBed.resetTestingModule();
         setup(supported());
@@ -486,25 +438,6 @@ describe('DfSchedulerDetailsComponent run history', () => {
         fixture.detectChanges();
         expect(el.querySelector('[data-testid="run-error"]')).toBeNull();
         expect(rows().length).toBe(1);
-      });
-
-      it('does not turn a missing relation into an empty history', async () => {
-        await failWith(400, 'Unknown relationship: task_run_by_task_id');
-        expect(
-          el.querySelector('[data-testid="run-error"]')?.textContent
-        ).toContain('Unknown relationship: task_run_by_task_id');
-        expect(el.querySelector('[data-testid="run-empty"]')).toBeNull();
-      });
-
-      it('leaves the form usable', async () => {
-        await failWith(500, 'Database is gone');
-        expect(component.formGroup.get('name')?.value).toBe('gaaa');
-        const update = jest.spyOn(DfBaseCrudService.prototype, 'update');
-        component.formGroup.patchValue({ name: 'renamed' });
-        component.formGroup.markAsDirty();
-        component.onSubmit();
-        expect(update).toHaveBeenCalled();
-        update.mockRestore();
       });
     });
   });

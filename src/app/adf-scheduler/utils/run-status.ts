@@ -7,25 +7,20 @@ import {
 
 /**
  * "5 minutes ago" wording from the app's shared relative-time helper (the
- * same one the "Last used" columns use). Null when the timestamp is missing
- * or unparseable, so callers can drop the time instead of printing a blank.
+ * same one the "Last used" columns use). The backend always sends the times
+ * this is called with.
  */
-export function formatAgo(
+const formatAgo = (
   value: string | null | undefined,
-  now: number = Date.now(),
-  locale = 'en'
-): string | null {
-  const date = parseDfDate(value);
-  return date ? formatRelativeTime(date, now, locale) : null;
-}
+  now: number,
+  locale: string
+): string => formatRelativeTime(parseDfDate(value) as Date, now, locale);
 
 /**
  * Transloco key + params for the "Last run" cell.
  *
  * Null means the backend sent no run data at all (a df-scheduler without
  * per-run history): the caller shows nothing rather than a false "Never".
- * Every other combination of status code and timestamps maps to a key whose
- * text needs exactly the params returned here.
  */
 export function describeLastRun(
   rs: RunStatus | null | undefined,
@@ -40,28 +35,18 @@ export function describeLastRun(
   // Open but not running: the process died or was killed. The backend only
   // closes such a row when the next run starts.
   if (!run.finishedAt) {
-    const since = formatAgo(run.startedAt, now, locale);
-    return since
-      ? { key: 'scheduler.run.unfinished', params: { ago: since } }
-      : { key: 'scheduler.run.unfinishedNoTime' };
+    return {
+      key: 'scheduler.run.unfinished',
+      params: { ago: formatAgo(run.startedAt, now, locale) },
+    };
   }
 
   const ago = formatAgo(run.finishedAt, now, locale);
-  if (isOk(run)) {
-    return ago
-      ? { key: 'scheduler.run.ok', params: { ago } }
-      : { key: 'scheduler.run.okNoTime' };
-  }
-  if (run.statusCode === null || run.statusCode === undefined) {
-    return ago
-      ? { key: 'scheduler.run.failed', params: { ago } }
-      : { key: 'scheduler.run.failedNoTime' };
-  }
-  return ago
-    ? { key: 'scheduler.run.failedCode', params: { ago, code: run.statusCode } }
+  return isOk(run)
+    ? { key: 'scheduler.run.ok', params: { ago } }
     : {
-        key: 'scheduler.run.failedCodeNoTime',
-        params: { code: run.statusCode },
+        key: 'scheduler.run.failedCode',
+        params: { ago, code: run.statusCode as number },
       };
 }
 
