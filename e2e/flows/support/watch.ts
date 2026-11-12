@@ -48,12 +48,13 @@ const BASELINE: HttpAllowance[] = [
       'backend image; the lists hide the "last used" column when it is',
   },
   {
-    status: 404,
+    status: [403, 404],
     method: 'GET',
     url: /^\/_internal\/ai\/aliases\/?$/,
     reason:
-      'capability probe: a backend without the AI budgets API answers 404 ' +
-      'once per admin login; the app hides the budgets entry points',
+      'capability probe, once per admin login: 404 when the backend has no ' +
+      'AI budgets API, 403 when it refuses this admin (a restricted admin ' +
+      'under the default manage_access); the app hides the budgets entry points',
   },
   {
     status: 400,
