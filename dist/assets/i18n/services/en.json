@@ -127,5 +127,18 @@
     "headers": "Headers",
     "curlOptions": "CURL Options",
     "import": "Import"
+  },
+  "backendAuth": {
+    "eyebrow": "OAuth2",
+    "title": "Backend Authentication",
+    "description": "DreamFactory gets an OAuth2 bearer token with the client credentials grant and sends it on every request to the remote API. It caches the token and renews it. API clients never see these credentials.",
+    "hint": "Set a token URL, a client ID and a client secret to turn this on. Leave the token URL blank to turn it off.",
+    "summary": {
+      "off": "Not configured",
+      "on": "OAuth2 client credentials",
+      "incomplete": "Incomplete"
+    },
+    "incomplete": "A token URL is set. Also fill in: {{fields}}.",
+    "saveBlocked": "Backend Authentication is incomplete. A token URL is set. Also fill in: {{fields}}."
   }
 }
