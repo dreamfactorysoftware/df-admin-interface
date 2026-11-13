@@ -142,6 +142,29 @@ describe('aggregate', () => {
       // Days with no data are present as zeros (sample one)
       expect(map['2026-04-26']).toBe(0);
     });
+
+    // Regression: with "all" the first day came from new Date('YYYY-MM-DD'),
+    // midnight UTC. West of UTC that is the previous local day, so the
+    // series opened with an empty day nobody had data for. CI pins
+    // TZ=America/Denver (jest.tz-setup.js) so this can fail.
+    it('starts "all" on the first local day that has data', () => {
+      const first = new Date(2026, 3, 25, 10); // local time, any timezone
+      const last = new Date(2026, 3, 27, 10);
+      const ts = timeSeries(
+        [
+          s({ updated_at: first.toISOString(), total_input_tokens: 50 }),
+          s({ updated_at: last.toISOString(), total_input_tokens: 100 }),
+        ],
+        'all',
+        new Date(2026, 3, 27, 12)
+      );
+
+      expect(ts.map(b => [b.date, b.inputTokens])).toEqual([
+        ['2026-04-25', 50],
+        ['2026-04-26', 0],
+        ['2026-04-27', 100],
+      ]);
+    });
   });
 
   describe('groupBy', () => {

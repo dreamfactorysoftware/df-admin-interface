@@ -57,7 +57,10 @@ import { globalLicenseGuard } from './shared/guards/global-license.guard';
 import { trialGuard } from './shared/guards/trial.guard';
 import { errorGuard } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
-import { rootAdminGuard } from './shared/guards/admin.guard';
+import {
+  rootAdminGuard,
+  serverSettingsGuard,
+} from './shared/guards/admin.guard';
 import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
 
 export const routes: Routes = [
@@ -464,6 +467,15 @@ export const routes: Routes = [
             resolve: {
               data: checkStatusResolver,
             },
+          },
+          {
+            path: ROUTES.SERVER_SETTINGS,
+            loadComponent: () =>
+              import('./adf-config/df-server-settings/df-server-settings.component').then(
+                m => m.DfServerSettingsComponent
+              ),
+            providers: [provideTranslocoScope('serverSettings')],
+            canActivate: [serverSettingsGuard],
           },
           {
             path: ROUTES.CORS,
@@ -970,6 +982,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./adf-ai-usage/df-ai-usage.component').then(
             m => m.DfAiUsageComponent
+          ),
+      },
+      {
+        path: ROUTES.AI_BUDGETS,
+        loadComponent: () =>
+          import('./adf-ai-budgets/df-ai-budgets.component').then(
+            m => m.DfAiBudgetsComponent
           ),
       },
       {

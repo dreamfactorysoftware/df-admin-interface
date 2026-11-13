@@ -36,4 +36,5 @@ export enum URLS {
   LOGS = `${BASE_URL}/logs`,
   SCHEMA_CONTRACT = `${BASE_URL}/system/schema_contract`,
   ACCESS_USAGE = `${BASE_URL}/system/access_usage`,
+  SERVER_SETTING = `${BASE_URL}/system/server_setting`,
 }

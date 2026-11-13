@@ -45,8 +45,11 @@ describe('DfEmptyStateComponent', () => {
   });
 
   it('omits the action bar when no labels are set', () => {
-    component.actionLabel = undefined;
-    component.secondaryLabel = undefined;
+    // The component is OnPush: an input written straight onto the instance
+    // does not mark the view dirty. setInput goes through the same path as a
+    // template binding.
+    fixture.componentRef.setInput('actionLabel', undefined);
+    fixture.componentRef.setInput('secondaryLabel', undefined);
     fixture.detectChanges();
 
     expect(

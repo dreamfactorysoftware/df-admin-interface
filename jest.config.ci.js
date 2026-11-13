@@ -1,72 +1,16 @@
 /**
  * CI Jest config.
  *
- * Extends the base jest.config.js but scopes the run to the specs that
- * currently pass. The rest of the suite (55 suites as of 2026-04-22)
- * fails because @ngneat/transloco now ships ESM-only (.mjs) and
- * jest-preset-angular 13 in the current setup can't resolve it without
- * a broader ESM migration.
+ * Extends the base jest.config.js and runs every spec, so a regression in any
+ * suite fails CI. Specs are no longer listed one by one: a new spec is picked
+ * up automatically.
  *
- * Tracking: "Jest ESM migration for transloco" — once done, this file
- * can be deleted and CI can call the default `npm test`.
- *
- * New tests should be added to the testMatch list below as they are
- * written, so they fail CI if they regress.
+ * Tests that fail on a real product defect rather than a stale test are marked
+ * `describe.skip` in the spec itself, with the issue number (currently #561 in
+ * df-email-template-details.component.spec.ts).
  */
 const base = require('./jest.config');
 
 module.exports = {
   ...base,
-  testMatch: [
-    // Regression coverage for the 2026-04-22 customer fire-drill fixes.
-    '<rootDir>/src/app/shared/services/df-loading-spinner.service.spec.ts',
-    '<rootDir>/src/app/shared/interceptors/case.interceptor.spec.ts',
-    '<rootDir>/src/app/adf-event-scripts/df-script-details/df-script-details.submit.spec.ts',
-    // Existing specs that currently pass. The rest of the suite is
-    // quarantined until the ESM/transloco migration; route.spec.ts is
-    // a separate pre-existing assertion mismatch.
-    '<rootDir>/src/app/shared/utilities/url.spec.ts',
-    '<rootDir>/src/app/shared/utilities/language.spec.ts',
-    '<rootDir>/src/app/shared/utilities/case.spec.ts',
-    '<rootDir>/src/app/shared/utilities/file.spec.ts',
-    '<rootDir>/src/app/shared/services/df-breakpoint.service.spec.ts',
-    '<rootDir>/src/app/shared/services/df-theme.service.spec.ts',
-    // 2026-04-27 AI admin UI: role-scope visualization, AI chat module,
-    // test-connection. Pure-class + HttpClientTestingModule patterns —
-    // no transloco TestBed setup required.
-    '<rootDir>/src/app/shared/components/df-role-scope/df-role-scope.component.spec.ts',
-    '<rootDir>/src/app/adf-ai-chat/services/ai-chat.service.spec.ts',
-    '<rootDir>/src/app/adf-ai-chat/components/df-chat-input/df-chat-input.component.spec.ts',
-    '<rootDir>/src/app/adf-ai-chat/components/df-chat-message/df-chat-message.component.spec.ts',
-    '<rootDir>/src/app/adf-ai-chat/components/df-chat-tool-result/df-chat-tool-result.component.spec.ts',
-    '<rootDir>/src/app/adf-ai-chat/components/df-ai-chat-prereqs/df-ai-chat-prereqs.component.spec.ts',
-    '<rootDir>/src/app/shared/components/df-ai-test-connection/df-ai-test-connection.component.spec.ts',
-    '<rootDir>/src/app/adf-ai-chat/df-ai-chat.poll.spec.ts',
-    '<rootDir>/src/app/adf-ai-usage/utils/aggregate.spec.ts',
-    '<rootDir>/src/app/adf-ai-usage/utils/cost.spec.ts',
-    // 2026-08-11 task cost estimator: pure calibration/estimate/delta math.
-    '<rootDir>/src/app/adf-ai-usage/utils/task-estimate.spec.ts',
-    '<rootDir>/src/app/shared/components/df-section-landing/df-section-landing.component.spec.ts',
-    '<rootDir>/src/app/adf-home/df-welcome-page/df-generate-api-card/df-generate-api-card.component.spec.ts',
-    // 2026-10-03 self-service Docker trial (TRIAL-DESIGN.md section 5):
-    // lock detection, countdown service, guard, interceptor branch, banner,
-    // expired page, engagement-banner gating, license-check skip.
-    '<rootDir>/src/app/shared/utilities/trial.spec.ts',
-    '<rootDir>/src/app/shared/utilities/app-error.spec.ts',
-    '<rootDir>/src/app/shared/services/df-trial.service.spec.ts',
-    '<rootDir>/src/app/shared/services/df-license-initializer.service.spec.ts',
-    '<rootDir>/src/app/shared/guards/trial.guard.spec.ts',
-    '<rootDir>/src/app/shared/interceptors/error.interceptor.spec.ts',
-    '<rootDir>/src/app/shared/components/df-trial-banner/df-trial-banner.component.spec.ts',
-    '<rootDir>/src/app/shared/components/df-trial-expired/df-trial-expired.component.spec.ts',
-    '<rootDir>/src/app/shared/components/df-engagement-banner/df-engagement-banner.component.spec.ts',
-    // 2026-09-29 presentation mode: mask API keys and tokens for screensharing.
-    '<rootDir>/src/app/shared/utilities/mask.spec.ts',
-    '<rootDir>/src/app/shared/services/df-presentation.service.spec.ts',
-    '<rootDir>/src/app/shared/components/df-secret/df-secret.component.spec.ts',
-    // 2026-10-05 searchable pickers (#534): dfSearch filter + componentTypes.
-    '<rootDir>/src/app/shared/components/df-select-search/df-select-search.spec.ts',
-    // 2026-10-29 bounded df-ai-* pickers: search, paging, selected-first, remote search.
-    '<rootDir>/src/app/shared/components/df-picker-list/df-picker-list.component.spec.ts',
-  ],
 };

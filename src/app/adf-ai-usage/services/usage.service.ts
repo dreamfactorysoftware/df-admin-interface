@@ -4,6 +4,7 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
+import { DefaultRatesRaw } from '../utils/cost';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
 
@@ -78,13 +79,10 @@ export interface UsageResponse {
   /** Per-service month-to-date spend vs configured budget. Calendar-month
    *  bound, NOT bound to the dashboard's period filter. */
   budgets: BudgetRowRaw[];
-  /** Per-provider fallback rates from the backend's UsageRates::DEFAULT_RATES.
-   *  Frontend reads from here so we don't have to maintain a duplicate
-   *  hardcoded pricing table. */
-  default_rates: Record<
-    string,
-    { input_per_1k: number; output_per_1k: number }
-  >;
+  /** Fallback rates from the backend's UsageRates tables. Frontend reads
+   *  from here so we don't have to maintain a duplicate hardcoded pricing
+   *  table. Nested or flat, depending on the df-ai version. */
+  default_rates: DefaultRatesRaw;
   /** Top-line totals for the immediately-preceding window of equal length.
    *  Only present when the request was made with compare=1. */
   previous?: PreviousSummaryRaw;

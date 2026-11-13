@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, map, of } from 'rxjs';
 import {
   DfSectionLandingComponent,
@@ -14,6 +15,7 @@ import { GenericListResponse } from '../shared/types/generic-http';
 import { ROUTES } from '../shared/types/routes';
 import { ServiceType } from '../shared/types/service';
 import { DfSystemConfigDataService } from '../shared/services/df-system-config-data.service';
+import { DfServerSettingsService } from '../shared/services/df-server-settings.service';
 import { Environment } from '../shared/types/system';
 
 @Component({
@@ -36,6 +38,9 @@ import { Environment } from '../shared/types/system';
 export class DfSystemOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
   private systemConfigDataService = inject(DfSystemConfigDataService);
+  private serverSettingsService = inject(DfServerSettingsService);
+  private destroyRef = inject(DestroyRef);
+  private canOpenServerSettings = false;
   private serviceTypes: ServiceType[] | null = null;
   environment = this.systemConfigDataService.environment;
 
@@ -75,6 +80,12 @@ export class DfSystemOverviewComponent implements OnInit {
     this.systemConfigDataService.environment$.subscribe(
       environment => (this.environment = environment)
     );
+    this.serverSettingsService.canOpen$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(canOpen => {
+        this.canOpenServerSettings = canOpen;
+        this.memoGroupsTypes = undefined; // rebuild the cards: Server Settings depends on it
+      });
     this.serviceTypeService
       .getAll<GenericListResponse<ServiceType>>({ limit: 500 })
       .pipe(
@@ -160,6 +171,20 @@ export class DfSystemOverviewComponent implements OnInit {
             action: 'View system info',
             category: 'system',
           },
+          // Same rule as the nav entry and the System Info link: the user
+          // may open it and this backend has system/server_setting.
+          ...(this.canOpenServerSettings
+            ? [
+                {
+                  icon: 'tune',
+                  title: 'Server Settings',
+                  text: 'Change the log level at runtime without editing .env or restarting.',
+                  route: `/${ROUTES.SYSTEM_SETTINGS}/${ROUTES.CONFIG}/${ROUTES.SERVER_SETTINGS}`,
+                  action: 'Edit server settings',
+                  category: 'system' as const,
+                },
+              ]
+            : []),
           {
             icon: 'cached',
             title: 'Cache',

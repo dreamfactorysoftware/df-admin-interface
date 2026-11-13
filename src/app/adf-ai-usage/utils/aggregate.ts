@@ -6,6 +6,7 @@ import {
   UsageSessionRow,
   UsageSummary,
 } from '../types/usage';
+import { calendarDateToLocal } from './calendar-date';
 
 /** Truncate an ISO datetime to YYYY-MM-DD in local time. */
 function dayBucket(iso: string | undefined | null): string | null {
@@ -147,7 +148,9 @@ function earliestDate(buckets: Map<string, TimeBucket>): Date | null {
       earliest = k;
     }
   }
-  return earliest ? new Date(earliest) : null;
+  // Keys are calendar days. new Date('YYYY-MM-DD') would be midnight UTC,
+  // which is the previous local day west of UTC.
+  return calendarDateToLocal(earliest);
 }
 
 /** Group sessions by user / role / service and compute totals. */

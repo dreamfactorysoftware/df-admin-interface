@@ -1,5 +1,25 @@
 import { Service } from 'src/app/shared/types/service';
 
+export type RunSummary = {
+  id: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  statusCode: number | null;
+};
+
+/**
+ * Appended to every task by a df-scheduler that keeps per-run history.
+ * Absent on older backends: that absence is how the UI detects support.
+ */
+export type RunStatus = {
+  isRunning: boolean;
+  lastRun: RunSummary | null;
+  lastSuccess: RunSummary | null;
+  lastFailure: RunSummary | null;
+};
+
+export type TaskRun = RunSummary & { output: string | null };
+
 export type UpdateSchedulePayload = CreateSchedulePayload & {
   createdById: number;
   createdDate: string;
@@ -58,6 +78,8 @@ export interface SchedulerTaskData {
   verbMask: number;
   appId?: number | null;
   userId?: number | null;
+  runStatus?: RunStatus;
+  taskRunByTaskId?: TaskRun[];
   taskLogByTaskId: {
     taskId: number;
     statusCode: number;

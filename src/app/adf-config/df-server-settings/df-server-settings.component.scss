@@ -1,0 +1,85 @@
+.server-settings-container {
+  > p {
+    max-width: 720px;
+    margin: 0 0 12px;
+    color: var(--df-text-2);
+    font-size: 1.4rem;
+    line-height: 1.5;
+  }
+
+  .error {
+    color: var(--df-danger);
+  }
+
+  // Angular drops the whitespace between the note and the link after it.
+  .stale {
+    margin-right: 0.3em;
+  }
+
+  .unavailable {
+    max-width: 720px;
+    padding: 16px;
+    border: 1px solid var(--df-border);
+    border-radius: 8px;
+    color: var(--df-text-2);
+    font-size: 1.4rem;
+    line-height: 1.5;
+
+    strong {
+      color: var(--df-text);
+    }
+
+    p {
+      margin: 8px 0 12px;
+    }
+  }
+
+  .settings-list {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .setting-row {
+    max-width: 720px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--df-border);
+    border-radius: 8px;
+  }
+
+  .setting-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 1.2rem;
+    border: 1px solid var(--df-border);
+
+    &.override {
+      font-weight: 600;
+    }
+  }
+
+  .setting-body {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+
+    mat-select {
+      width: 200px;
+    }
+
+    // The global .save-btn colors are !important, so a disabled Save looked
+    // enabled. Nothing to save must look like nothing to save.
+    .save-btn[disabled] {
+      opacity: 0.5;
+    }
+  }
+}
