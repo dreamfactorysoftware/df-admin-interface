@@ -7,11 +7,12 @@ import {
   SectionLandingNote,
 } from '../shared/components/df-section-landing/df-section-landing.component';
 import { ROUTES } from '../shared/types/routes';
+import { DfAiAliasesComponent } from '../adf-ai-budgets/df-ai-aliases.component';
 
 @Component({
   selector: 'df-ai-setup',
   standalone: true,
-  imports: [CommonModule, DfSectionLandingComponent],
+  imports: [CommonModule, DfSectionLandingComponent, DfAiAliasesComponent],
   templateUrl: './df-ai-setup.component.html',
   styleUrls: ['./df-ai-setup.component.scss'],
 })

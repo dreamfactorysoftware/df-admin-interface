@@ -77,16 +77,16 @@ describe('DfPasswordResetComponent - Username Reset', () => {
 
   it('should populate passwordResetForm with URL params', () => {
     component.passwordResetForm.patchValue({
-      newPassword: 'password',
-      confirmPassword: 'password',
+      newPassword: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
 
     expect(component.passwordResetForm.value).toEqual({
       code: '123testcode',
       email: 'user@email.com',
       username: 'user@email.com',
-      newPassword: 'password',
-      confirmPassword: 'password',
+      newPassword: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
     expect(component.passwordResetForm.valid).toBeTruthy();
   });
@@ -100,8 +100,8 @@ describe('DfPasswordResetComponent - Username Reset', () => {
       code: '123testcode',
       email: 'user@email.com',
       username: 'user@email.com',
-      newPassword: 'password',
-      confirmPassword: 'password',
+      newPassword: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
 
     component.resetPassword();
@@ -133,8 +133,8 @@ describe('DfPasswordResetComponent - Username Reset', () => {
       code: '123testcode',
       email: 'user@email.com',
       username: 'user@email.com',
-      newPassword: 'password',
-      confirmPassword: 'password',
+      newPassword: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
 
     component.resetPassword();

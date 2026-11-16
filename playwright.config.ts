@@ -15,7 +15,11 @@ export default defineConfig({
   testDir: './e2e',
   // Files prefixed with `_` are exploratory / discovery runs — not gated
   // on CI. Run them explicitly with `npx playwright test e2e/_findings.spec.ts`.
-  testIgnore: ['**/_*.spec.ts'],
+  // e2e/flows writes to the backend and only runs against the seeded gate
+  // stack: opt in with E2E_FLOWS=1 (see e2e/flows/README.md).
+  testIgnore: process.env.E2E_FLOWS
+    ? ['**/_*.spec.ts']
+    : ['**/_*.spec.ts', '**/flows/**'],
   fullyParallel: false, // DF sessions are stateful; run serial to avoid flakes
   // One worker: suites create and delete services, and several assert against
   // the instance-wide service list, so files must not run concurrently.

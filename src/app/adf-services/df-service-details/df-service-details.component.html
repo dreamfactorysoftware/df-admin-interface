@@ -677,6 +677,51 @@
               "></df-dynamic-field>
           </ng-container>
 
+          <!-- Backend Authentication: outbound OAuth2 (client credentials).
+               Shown only when the service type's config schema carries the
+               fields (df-rws with outbound OAuth2). On any other schema they
+               are not split out and the form is unchanged. The fields are
+               built on open; their controls live in the config group either
+               way, so a closed panel still saves its values. -->
+          <df-disclosure
+            *ngIf="networkBackendAuthFields.length"
+            class="service-section"
+            data-testid="backend-auth-panel"
+            [eyebrow]="'services.backendAuth.eyebrow' | transloco"
+            [title]="'services.backendAuth.title' | transloco"
+            [description]="'services.backendAuth.description' | transloco"
+            [summary]="backendAuthSummaryKey | transloco"
+            [open]="backendAuthOpen"
+            (openChange)="backendAuthOpen = $event">
+            <ng-container *ngIf="backendAuthOpen">
+              <p class="service-section__hint">
+                {{ 'services.backendAuth.hint' | transloco }}
+              </p>
+              <div class="details-section">
+                <df-dynamic-field
+                  *ngFor="
+                    let item of networkBackendAuthFields;
+                    trackBy: trackByName
+                  "
+                  color="primary"
+                  [schema]="item"
+                  [formControl]="getConfigControl(item.name)"
+                  [attr.data-testid]="'backend-auth-' + item.name"
+                  class="dynamic-width"></df-dynamic-field>
+              </div>
+              <p
+                *ngIf="backendAuthMissingLabels as missing"
+                class="backend-auth-incomplete"
+                data-testid="backend-auth-incomplete"
+                role="alert">
+                {{
+                  'services.backendAuth.incomplete'
+                    | transloco: { fields: missing }
+                }}
+              </p>
+            </ng-container>
+          </df-disclosure>
+
           <!-- Advanced Options Section for Network Services -->
           <mat-accordion class="full-width">
             <mat-expansion-panel [expanded]="false">
@@ -777,12 +822,28 @@
         <ng-container *ngIf="this.isScriptService">
           <!-- Script Content - Always visible -->
           <ng-container *ngIf="getConfigControl('storageServiceId')">
+            <df-link-service
+              [cache]="
+                serviceForm.get('name')?.value ||
+                (serviceData ? serviceData.name : '')
+              "
+              [cacheScope]="'service'"
+              [storageServiceId]="serviceData ? serviceData.name : 'new'"
+              [storagePath]="getConfigControl('storagePath')"
+              [content]="getConfigControl('content')"
+              [storageServiceIdControl]="getConfigControl('storageServiceId')"
+              [scmRepositoryControl]="getConfigControl('scmRepository')"
+              [scmReferenceControl]="
+                getConfigControl('scmReference')
+              "></df-link-service>
             <df-script-editor
               [isScript]="this.isScriptService"
               [type]="getControl('type')"
               [storageServiceId]="getConfigControl('storageServiceId')"
               [storagePath]="getConfigControl('storagePath')"
               [content]="getConfigControl('content')"
+              [scmRepository]="getConfigControl('scmRepository')"
+              [scmReference]="getConfigControl('scmReference')"
               [cache]="serviceData ? serviceData.name : ''"
               [hideScmActions]="true"
               class="full-width"></df-script-editor>

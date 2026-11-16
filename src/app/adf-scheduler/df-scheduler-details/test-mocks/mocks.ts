@@ -17,6 +17,7 @@ export const mockServices: Service[] = [
     lastModifiedById: null,
     config: [],
     serviceDocByServiceId: null,
+    refresh: false,
   },
   {
     id: 5,
@@ -43,6 +44,7 @@ export const mockServices: Service[] = [
       cache_ttl: 0,
     },
     serviceDocByServiceId: null,
+    refresh: false,
   },
   {
     id: 6,
@@ -62,6 +64,7 @@ export const mockServices: Service[] = [
       parameters: [],
     },
     serviceDocByServiceId: null,
+    refresh: false,
   },
 ];
 

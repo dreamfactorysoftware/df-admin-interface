@@ -102,4 +102,27 @@ describe('String Conversion Utilities', () => {
     });
     expect(result.response_mapping).toEqual({ data: '{steps.s.resource}' });
   });
+
+  // Schema field validation rules are matched by name on the backend and edited
+  // as raw JSON in the field editor, so their inner keys must not be recased.
+  it('keeps schema field validation rules verbatim in both directions', () => {
+    const rules = {
+      api_read_only: true,
+      not_empty: { on_fail: 'Name is required' },
+    };
+
+    const fromApi = mapSnakeToCamel({
+      allow_null: false,
+      validation: rules,
+    }) as any;
+    expect(fromApi.allowNull).toBe(false); // adjacent key still transformed
+    expect(fromApi.validation).toEqual(rules);
+
+    const toApi = mapCamelToSnake({
+      allowNull: false,
+      validation: rules,
+    }) as any;
+    expect(toApi.allow_null).toBe(false);
+    expect(toApi.validation).toEqual(rules);
+  });
 });

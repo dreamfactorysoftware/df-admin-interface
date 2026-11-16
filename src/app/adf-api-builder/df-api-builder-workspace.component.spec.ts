@@ -4,6 +4,7 @@ import {
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { TranslocoTestingModule } from '@ngneat/transloco';
 import { BASE_URL } from '../shared/constants/urls';
 import { DfApiBuilderWorkspaceComponent } from './df-api-builder-workspace.component';
 
@@ -17,6 +18,13 @@ describe('DfApiBuilderWorkspaceComponent', () => {
         DfApiBuilderWorkspaceComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        // In-memory transloco, so no i18n request can reach the
+        // HttpTestingController that http.verify() checks below.
+        TranslocoTestingModule.forRoot({
+          langs: { en: {} },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
+        }),
       ],
     });
 
