@@ -32,5 +32,10 @@
   "showApiCall": "Show API Call",
   "quickSearch": "Search rows...",
   "searchDatabases": "Search databases",
-  "noMatches": "No databases match"
+  "noMatches": "No databases match",
+  "masked": "Masked",
+  "maskingFilter": "Conditions on masked columns match no rows: {{cols}}",
+  "maskingFilterAll": "A filter Data Masking could not check matched no rows",
+  "maskingSort": "Sort ignored on masked columns: {{cols}}",
+  "maskingMore": "+{{count}} more"
 }
