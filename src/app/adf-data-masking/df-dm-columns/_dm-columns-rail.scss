@@ -1,0 +1,217 @@
+// Columns tab rail: services, table rows, sensitivity strip slot and the
+// to-review badge.
+@mixin dm-columns-rail {
+  .rail {
+    border-right: 1px solid var(--df-border-2);
+    max-height: calc(100vh - 260px);
+    min-height: 240px;
+    overflow-y: auto;
+    padding-right: var(--df-space-3);
+    position: sticky;
+    scrollbar-width: thin;
+    top: 0;
+  }
+
+  .rail-group + .rail-group {
+    margin-top: var(--df-space-4);
+  }
+
+  .rail-service {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    margin: 0 0 var(--df-space-1);
+    padding: 0 var(--df-space-2);
+  }
+
+  .rail-row {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--df-radius-sm);
+    // Rows are buttons, but the coverage rows are a div / li: same box.
+    box-sizing: border-box;
+    color: var(--df-text-2);
+    cursor: pointer;
+    display: grid;
+    font: inherit;
+    font-size: var(--df-font-size-sm);
+    gap: var(--df-space-2);
+    // Fixed strip slot: names truncate evenly and strips line up.
+    grid-template-columns: minmax(0, 1fr) var(--dm-strip-slot, 72px) 22px;
+    height: 32px;
+    padding: 0 var(--df-space-2);
+    text-align: left;
+    width: 100%;
+
+    &:hover {
+      background: var(--df-hover);
+    }
+
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+
+    &.is-selected {
+      background: var(--df-accent-soft);
+      color: var(--df-text);
+      font-weight: var(--df-font-weight-medium);
+    }
+  }
+
+  .rail-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rail-badge {
+    display: inline-flex;
+    justify-content: flex-end;
+  }
+
+  .badge {
+    background: var(--df-accent-soft);
+    border-radius: 999px;
+    // Pulled toward the text colour: 4.5:1 on the soft wash in both themes.
+    color: color-mix(in srgb, var(--df-accent-strong) 65%, var(--df-text));
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    line-height: 18px;
+    min-width: 18px;
+    padding: 0 5px;
+    text-align: center;
+  }
+
+  .rail-check {
+    color: var(--df-success);
+    font-size: 16px;
+    height: 16px;
+    width: 16px;
+  }
+
+  // A covered service with no scan yet: its name and its own Scan.
+  .rail-row.is-pending {
+    color: var(--df-text-2);
+    cursor: default;
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+
+  .rail-scan {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--df-border);
+    border-radius: var(--df-radius-sm);
+    color: var(--df-accent-strong);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: var(--df-font-size-xs);
+    font-weight: var(--df-font-weight-medium);
+    gap: var(--df-space-1);
+    height: 24px;
+    padding: 0 var(--df-space-2);
+
+    mat-icon {
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+
+    &:hover:not(:disabled) {
+      background: var(--df-accent-soft);
+      border-color: transparent;
+    }
+
+    &:focus-visible {
+      box-shadow: var(--df-focus-ring);
+      outline: none;
+    }
+
+    &:disabled {
+      color: var(--df-text-faint);
+      cursor: default;
+    }
+  }
+
+  // The scan history could not be read: one muted line where the
+  // never-scanned group would be.
+  .rail-unknown {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    margin: 0;
+    padding: 0 var(--df-space-2);
+  }
+
+  // A database the last scan could not read: its name (reason on hover and
+  // for screen readers) and a Retry.
+  .rail-group.is-failed .rail-service {
+    color: var(--df-danger);
+  }
+
+  // Scanned, nothing under this filter: listed quietly so it never looks
+  // unscanned. A database with tables opens under All.
+  .rail-row.is-quiet {
+    color: var(--df-text-muted);
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    &:is(div) {
+      cursor: default;
+
+      &:hover {
+        background: transparent;
+      }
+    }
+  }
+
+  .rail-note {
+    color: var(--df-text-muted);
+    font-size: var(--df-font-size-xs);
+    white-space: nowrap;
+  }
+
+  // The rail foot alone, under an empty filter.
+  .rail.rail-solo {
+    border-right: 0;
+    margin: var(--df-space-4) auto 0;
+    max-height: none;
+    max-width: 360px;
+    min-height: 0;
+    padding-right: 0;
+    position: static;
+  }
+
+  // Databases Data Masking cannot mask: listed for the record, muted and
+  // not selectable. The tooltip (and its sr-only copy) says what that means.
+  .rail-group.is-uncovered {
+    border-top: 1px dashed var(--df-border-2);
+    padding-top: var(--df-space-3);
+  }
+
+  .rail-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .rail-row.is-uncovered {
+    color: var(--df-text-muted);
+    cursor: default;
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+
+  .rail-type {
+    color: var(--df-text-faint);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+  }
+}

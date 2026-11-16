@@ -1,0 +1,196 @@
+@use '../dm-controls' as *;
+@include dm-select;
+@include dm-segmented;
+@include dm-lock;
+
+:host {
+  display: block;
+}
+
+// Flat like the other tabs: a section title, then the principals.
+.card {
+  max-width: 860px;
+}
+
+.card-title {
+  border-bottom: 1px solid var(--df-border-2);
+  color: var(--df-text);
+  font-size: var(--df-font-size-lg);
+  font-weight: var(--df-font-weight-heading);
+  margin: 0;
+  padding: 0 0 var(--df-space-3);
+}
+
+// A table of principals: who on the left, how on the right.
+.principal {
+  display: grid;
+  gap: var(--df-space-4);
+  grid-template-columns: 200px minmax(0, 1fr);
+  padding: var(--df-space-4) 0;
+
+  & + & {
+    border-top: 1px solid var(--df-border-2);
+  }
+}
+
+.who {
+  align-items: center;
+  color: var(--df-text);
+  display: flex;
+  font-size: var(--df-font-size-sm);
+  font-weight: var(--df-font-weight-medium);
+  gap: var(--df-space-2);
+  height: 30px;
+
+  mat-icon {
+    color: var(--df-text-muted);
+    font-size: 18px;
+    height: 18px;
+    width: 18px;
+  }
+}
+
+.how {
+  max-width: 620px;
+  min-width: 0;
+}
+
+// Admin and role rows share one track (name | select | until), and both
+// lists carry the same 1px frame, so their selects line up.
+.admins,
+.roles {
+  border: 1px solid transparent;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admins {
+  border-color: var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  margin-top: var(--df-space-3);
+}
+
+.admin,
+.role {
+  align-items: center;
+  column-gap: var(--df-space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 176px 96px;
+  min-height: var(--df-row-height);
+  padding: 0 var(--df-space-3) 0 var(--df-space-1);
+}
+
+.admin {
+  & + & {
+    border-top: 1px solid var(--df-border-2);
+  }
+
+  mat-checkbox {
+    min-width: 0;
+  }
+}
+
+.admin-name {
+  color: var(--df-text);
+  font-size: var(--df-font-size-sm);
+}
+
+// Locked for this admin (only the super admin can grant): reads as such.
+.mat-mdc-checkbox-disabled .admin-name {
+  color: var(--df-text-muted);
+}
+
+.you {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-sm);
+  margin-left: var(--df-space-1);
+}
+
+.until {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+  grid-column: 3;
+}
+
+.dm-select {
+  grid-column: 2;
+}
+
+.role {
+  mat-slide-toggle {
+    font-size: var(--df-font-size-sm);
+    min-width: 0;
+
+    ::ng-deep .mdc-form-field > label {
+      padding-left: var(--df-space-3);
+    }
+  }
+}
+
+.none {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-sm);
+  line-height: 30px;
+}
+
+@media (max-width: 760px) {
+  .principal {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--df-space-2);
+    padding: var(--df-space-3) 0;
+  }
+
+  .admin,
+  .role {
+    grid-template-columns: minmax(0, 1fr) 150px;
+  }
+
+  .until {
+    grid-column: 1 / -1;
+    padding: 0 0 var(--df-space-2) var(--df-space-6);
+  }
+}
+
+// Duration options stay on one line ("Until turned off  Exceeds HIPAA");
+// the panel grows to fit them (durationPanelWidth).
+.duration-option ::ng-deep .mdc-list-item__primary-text {
+  white-space: nowrap;
+}
+
+// A duration longer than a tracked baseline allows: named, in the option.
+.exceeds {
+  color: var(--df-warning, var(--df-danger));
+  font-size: var(--df-font-size-xs);
+  margin-left: var(--df-space-2);
+}
+
+.exceeds-icon {
+  color: var(--df-warning, var(--df-danger));
+  font-size: 16px;
+  height: 16px;
+  margin-left: var(--df-space-1);
+  vertical-align: -3px;
+  width: 16px;
+}
+
+// Phones: the select drops under the name instead of spilling out.
+@media (max-width: 420px) {
+  .admin,
+  .role {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: var(--df-space-2);
+    row-gap: var(--df-space-1);
+  }
+
+  .dm-select {
+    grid-column: 1;
+    margin-left: var(--df-space-6);
+    max-width: calc(100% - var(--df-space-6));
+  }
+
+  .until {
+    grid-column: 1;
+    padding-bottom: 0;
+  }
+}

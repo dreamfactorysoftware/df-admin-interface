@@ -1,0 +1,189 @@
+<df-empty-state
+  *ngIf="store.failed.has('access') && !access; else loadingOrBody"
+  icon="cloud_off"
+  [title]="'dataMasking.empty.sliceFailed' | transloco"
+  [actionLabel]="'dataMasking.retry' | transloco"
+  (action)="store.loadAccess()"
+  data-testid="dm-access-failed"></df-empty-state>
+<ng-template #loadingOrBody>
+  <df-skeleton
+    *ngIf="!access; else body"
+    variant="table-row"
+    [count]="5"></df-skeleton>
+</ng-template>
+
+<ng-template #body>
+  <section class="card" *ngIf="access as a" data-testid="dm-access">
+    <h2 class="card-title">{{ 'dataMasking.access.title' | transloco }}</h2>
+
+    <p class="lock" *ngIf="!canGrant" data-testid="dm-access-lock">
+      <mat-icon aria-hidden="true">lock</mat-icon>
+      {{ 'dataMasking.access.locked' | transloco }}
+    </p>
+
+    <!-- Admins -->
+    <div class="principal">
+      <div class="who">
+        <mat-icon aria-hidden="true">admin_panel_settings</mat-icon>
+        <span id="dm-who-admins">{{
+          'dataMasking.access.admins' | transloco
+        }}</span>
+      </div>
+      <div class="how">
+        <mat-button-toggle-group
+          #adminGroup="matButtonToggleGroup"
+          class="dm-seg"
+          [value]="a.admins.mode"
+          (change)="setAdminMode($event.value)"
+          aria-labelledby="dm-who-admins"
+          data-testid="dm-admin-mode">
+          <mat-button-toggle value="none">{{
+            'dataMasking.access.none' | transloco
+          }}</mat-button-toggle>
+          <mat-button-toggle
+            value="selected"
+            [disabled]="modeLocked('selected')"
+            >{{ 'dataMasking.access.selected' | transloco }}</mat-button-toggle
+          >
+          <mat-button-toggle value="all" [disabled]="modeLocked('all')">{{
+            'dataMasking.access.allAdmins' | transloco
+          }}</mat-button-toggle>
+        </mat-button-toggle-group>
+
+        <ul class="admins" *ngIf="a.admins.mode === 'selected'">
+          <li
+            *ngFor="let ad of a.admins.available; trackBy: trackAdmin"
+            class="admin"
+            [class.is-granted]="isGranted(ad)">
+            <mat-checkbox
+              [checked]="isGranted(ad)"
+              [disabled]="checkboxDisabled(ad)"
+              (change)="toggleAdmin(ad, $event.checked)"
+              [attr.data-testid]="'dm-admin-' + ad.adminId">
+              <span class="admin-name">{{ ad.name }}</span>
+              <span class="you" *ngIf="ad.you">{{
+                'dataMasking.access.you' | transloco
+              }}</span>
+            </mat-checkbox>
+            <ng-container *ngIf="isGranted(ad)">
+              <mat-select
+                class="dm-select"
+                [value]="durationOf(ad)"
+                [panelWidth]="durationPanelWidth"
+                (valueChange)="setDuration(ad, $event)"
+                [aria-label]="
+                  'dataMasking.access.expiryFor' | transloco: { name: ad.name }
+                ">
+                <mat-select-trigger
+                  >{{
+                    'dataMasking.access.durations.' + durationOf(ad)
+                      | transloco
+                  }}<mat-icon
+                    *ngIf="exceeds(durationOf(ad)) as b"
+                    class="exceeds-icon"
+                    [attr.aria-label]="
+                      'dataMasking.access.exceeds' | transloco: { name: b }
+                    "
+                    >warning_amber</mat-icon
+                  ></mat-select-trigger
+                >
+                <mat-option
+                  *ngFor="let d of durations"
+                  class="duration-option"
+                  [value]="d"
+                  [disabled]="durationLocked(ad, d)"
+                  >{{ 'dataMasking.access.durations.' + d | transloco
+                  }}<span
+                    *ngIf="exceeds(d) as b"
+                    class="exceeds"
+                    data-testid="dm-duration-exceeds"
+                    >{{
+                      'dataMasking.access.exceeds' | transloco: { name: b }
+                    }}</span
+                  ></mat-option
+                >
+              </mat-select>
+              <span class="until df-numeric" *ngIf="untilOf(ad) as u">{{
+                'dataMasking.access.until' | transloco: { when: u }
+              }}</span>
+            </ng-container>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- AI and MCP sessions -->
+    <div class="principal">
+      <div class="who">
+        <mat-icon aria-hidden="true">smart_toy</mat-icon>
+        <span id="dm-who-ai">{{ 'dataMasking.access.ai' | transloco }}</span>
+      </div>
+      <div class="how">
+        <mat-button-toggle-group
+          #aiGroup="matButtonToggleGroup"
+          class="dm-seg"
+          [value]="a.ai"
+          (change)="setAi($event.value)"
+          aria-labelledby="dm-who-ai"
+          data-testid="dm-ai-mode">
+          <mat-button-toggle value="masked">{{
+            'dataMasking.access.aiMasked' | transloco
+          }}</mat-button-toggle>
+          <mat-button-toggle
+            value="same_as_admins"
+            [disabled]="aiLocked('same_as_admins')"
+            >{{ 'dataMasking.access.aiSame' | transloco }}</mat-button-toggle
+          >
+        </mat-button-toggle-group>
+      </div>
+    </div>
+
+    <!-- Roles -->
+    <div class="principal">
+      <div class="who">
+        <mat-icon aria-hidden="true">badge</mat-icon>
+        <span>{{ 'dataMasking.access.roles' | transloco }}</span>
+      </div>
+      <div class="how">
+        <ul class="roles" *ngIf="a.roles.length; else noRoles">
+          <li *ngFor="let r of a.roles; trackBy: trackRole" class="role">
+            <mat-slide-toggle
+              color="primary"
+              [checked]="r.enabled"
+              [disabled]="roleLocked(r)"
+              (change)="setRole(r, { enabled: $event.checked })"
+              [attr.data-testid]="'dm-role-' + r.roleId">
+              {{ r.name }}
+            </mat-slide-toggle>
+            <mat-select
+              *ngIf="r.enabled"
+              class="dm-select"
+              [value]="r.scope"
+              (valueChange)="setRole(r, { scope: $event })"
+              [aria-label]="
+                'dataMasking.access.scopeFor' | transloco: { name: r.name }
+              ">
+              <mat-select-trigger>{{
+                (r.scope === 'all'
+                  ? 'dataMasking.access.scopeAll'
+                  : 'dataMasking.access.scopeExceptRestricted'
+                ) | transloco
+              }}</mat-select-trigger>
+              <mat-option value="all" [disabled]="scopeLocked(r, 'all')">{{
+                'dataMasking.access.scopeAll' | transloco
+              }}</mat-option>
+              <mat-option value="except_restricted">{{
+                'dataMasking.access.scopeExceptRestricted' | transloco
+              }}</mat-option>
+            </mat-select>
+          </li>
+        </ul>
+        <ng-template #noRoles>
+          <span class="none">{{
+            'dataMasking.access.noRoles' | transloco
+          }}</span>
+        </ng-template>
+      </div>
+    </div>
+  </section>
+</ng-template>

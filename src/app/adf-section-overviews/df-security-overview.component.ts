@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { TranslocoService } from '@ngneat/transloco';
-import { catchError, map, of } from 'rxjs';
+import { catchError, map, of, switchMap, take } from 'rxjs';
 import {
   DfSectionLandingComponent,
   SectionLandingAction,
@@ -13,6 +13,10 @@ import { SERVICE_TYPE_SERVICE_TOKEN } from '../shared/constants/tokens';
 import { GenericListResponse } from '../shared/types/generic-http';
 import { ROUTES } from '../shared/types/routes';
 import { ServiceType } from '../shared/types/service';
+import { DfPaywallService } from '../shared/services/df-paywall.service';
+import { DfSystemConfigDataService } from '../shared/services/df-system-config-data.service';
+import { DfDataMaskingApiService } from '../adf-data-masking/data-masking-api.service';
+import { MaskingOverview } from '../adf-data-masking/data-masking.types';
 
 // Secure & Manage pillar home (/api-security). Tiles mirror the section's
 // nav children: Authentication + Rate Limiting live here, Role-Based Access
@@ -30,7 +34,8 @@ import { ServiceType } from '../shared/types/service';
       [description]="t('description')"
       [actions]="actions"
       [groups]="groups"
-      [notes]="notes">
+      [notes]="notes"
+      [cardColumns]="3">
     </df-section-landing>
   `,
 })
@@ -38,11 +43,16 @@ export class DfSecurityOverviewComponent implements OnInit {
   private serviceTypeService = inject(SERVICE_TYPE_SERVICE_TOKEN);
   private transloco = inject(TranslocoService);
   private serviceTypes: ServiceType[] | null = null;
+  private paywall = inject(DfPaywallService);
+  private systemConfig = inject(DfSystemConfigDataService);
+  private maskingApi = inject(DfDataMaskingApiService);
+  /** Data Masking status line on its card; unset = no line (as before). */
+  private maskingMeta?: string;
 
   groups: SectionLandingGroup[] = [];
 
-  t(key: string): string {
-    return this.transloco.translate(`sectionOverviews.security.${key}`);
+  t(key: string, params?: Record<string, unknown>): string {
+    return this.transloco.translate(`sectionOverviews.security.${key}`, params);
   }
 
   readonly actions: SectionLandingAction[] = [
@@ -90,6 +100,61 @@ export class DfSecurityOverviewComponent implements OnInit {
         this.serviceTypes = serviceTypes;
         this.buildGroups();
       });
+
+    this.loadMaskingStatus();
+  }
+
+  /**
+   * Data Masking's mode and queue on its card, where admins already look.
+   * Licenses without the feature make no request, and an instance without
+   * the package (paywalled, like Rate Limiting) shows no line either.
+   */
+  private loadMaskingStatus(): void {
+    const license =
+      this.systemConfig.environment?.platform?.license ?? 'OPEN SOURCE';
+    if (this.paywall.isFeatureLocked(ROUTES.DATA_MASKING, license)) return;
+    this.paywall
+      .activatePaywall('data_masking')
+      .pipe(
+        take(1),
+        switchMap(missing =>
+          missing
+            ? of(undefined)
+            : this.maskingApi.overview(true).pipe(
+                map(o => this.maskingStatus(o)),
+                catchError(() => of(undefined))
+              )
+        ),
+        catchError(() => of(undefined))
+      )
+      .subscribe(meta => {
+        this.maskingMeta = meta;
+        this.buildGroups();
+      });
+  }
+
+  private maskingStatus(o: MaskingOverview): string | undefined {
+    if (!o?.mode) return undefined;
+    if (o.scan?.status === 'running' && !o.scan.finishedAt) {
+      return this.t('maskingScanning');
+    }
+    if (!o.scan?.finishedAt && !o.scan?.columns) {
+      return this.t('maskingNotScanned');
+    }
+    const masked = o.counts?.masked ?? 0;
+    const review = o.counts?.review ?? 0;
+    switch (o.mode) {
+      case 'on':
+        return review
+          ? this.t('maskingOnReview', { masked, review })
+          : this.t('maskingOn', { masked });
+      case 'preview':
+        return review
+          ? this.t('maskingPreviewReview', { review })
+          : this.t('maskingPreview');
+      default:
+        return this.t('maskingOff');
+    }
   }
 
   private buildGroups(): void {
@@ -118,6 +183,23 @@ export class DfSecurityOverviewComponent implements OnInit {
             route: `/${ROUTES.API_SECURITY}/${ROUTES.RATE_LIMITING}`,
             action: this.t('rateAction'),
             tint: 'system',
+          },
+          {
+            icon: 'visibility_off',
+            title: this.t('maskingTitle'),
+            text: this.t('maskingText'),
+            route: `/${ROUTES.API_SECURITY}/${ROUTES.DATA_MASKING}`,
+            action: this.t('maskingAction'),
+            meta: this.maskingMeta,
+            tint: 'security',
+          },
+          {
+            icon: 'fact_check',
+            title: this.t('complianceTitle'),
+            text: this.t('complianceText'),
+            route: `/${ROUTES.API_SECURITY}/${ROUTES.COMPLIANCE}`,
+            action: this.t('complianceAction'),
+            tint: 'security',
           },
           {
             icon: 'admin_panel_settings',

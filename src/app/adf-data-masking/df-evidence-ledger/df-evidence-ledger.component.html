@@ -1,0 +1,66 @@
+<div
+  class="ledger"
+  [ngClass]="['is-' + detected, tierClass]"
+  [class.is-undecided]="column.verdict === 'review'">
+  <ol class="receipt">
+    <li
+      *ngFor="let l of lines"
+      class="line"
+      [class.is-zero]="l.points === 0"
+      [class.is-penalty]="l.points < 0">
+      <span class="pts df-numeric">{{ points(l.points) }}</span>
+      <span class="why">{{ l.text }}</span>
+    </li>
+    <li class="line total">
+      <span class="pts df-numeric">{{ total }}</span>
+      <span class="why verdict">{{
+        'dataMasking.verdict.' + detected | transloco
+      }}</span>
+      <span
+        class="meter"
+        role="meter"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        [attr.aria-valuenow]="total"
+        [attr.aria-label]="'dataMasking.ledger.score' | transloco">
+        <span class="meter-fill" [style.width.%]="total"></span>
+        <span class="notch" [style.left.%]="thresholds.review"
+          ><span class="notch-n df-numeric">{{ thresholds.review }}</span></span
+        >
+        <span class="notch" [style.left.%]="thresholds.mask"
+          ><span class="notch-n df-numeric">{{ thresholds.mask }}</span></span
+        >
+      </span>
+    </li>
+  </ol>
+
+  <dl class="facts">
+    <ng-container *ngIf="column.type">
+      <dt>{{ 'dataMasking.ledger.type' | transloco }}</dt>
+      <dd>
+        <code>{{ column.type }}</code>
+      </dd>
+    </ng-container>
+    <ng-container *ngIf="column.evidence.shapes?.length">
+      <dt>{{ 'dataMasking.ledger.shapes' | transloco }}</dt>
+      <dd class="shapes">
+        <span class="shape" *ngFor="let s of column.evidence.shapes"
+          ><code>{{ s[0] }}</code
+          ><span class="shape-pct df-numeric">{{ s[1] }}%</span></span
+        >
+      </dd>
+    </ng-container>
+    <ng-container *ngIf="column.source === 'admin'">
+      <dt>{{ 'dataMasking.ledger.decision' | transloco }}</dt>
+      <dd class="decided">
+        <mat-icon aria-hidden="true">person</mat-icon>
+        {{
+          (column.decidedBy
+            ? 'dataMasking.ledger.setBy'
+            : 'dataMasking.ledger.setByYou'
+          ) | transloco: { name: column.decidedBy, when: decidedAgo }
+        }}
+      </dd>
+    </ng-container>
+  </dl>
+</div>
