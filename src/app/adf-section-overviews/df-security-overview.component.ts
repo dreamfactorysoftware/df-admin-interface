@@ -19,10 +19,11 @@ import { DfDataMaskingApiService } from '../adf-data-masking/data-masking-api.se
 import { MaskingOverview } from '../adf-data-masking/data-masking.types';
 
 // Secure & Manage pillar home (/api-security). Tiles mirror the section's
-// nav children: Authentication + Rate Limiting live here, Role-Based Access
-// and API Keys are surfaced from api-connections via redirect. Tints keep
-// the page from reading monochrome (item 21): core access controls take the
-// security hue, rate limiting takes system (operational throttle).
+// nav children in nav order: Authentication, AAuth, Rate Limiting, Data
+// Masking and Compliance live here, Role-Based Access and API Keys are
+// surfaced from api-connections via redirect. Seven tiles sit 4 + 3. Tints
+// keep the page from reading monochrome (item 21): core access controls
+// take the security hue, rate limiting takes system (operational throttle).
 @Component({
   selector: 'df-security-overview',
   standalone: true,
@@ -35,7 +36,7 @@ import { MaskingOverview } from '../adf-data-masking/data-masking.types';
       [actions]="actions"
       [groups]="groups"
       [notes]="notes"
-      [cardColumns]="3">
+      [cardColumns]="4">
     </df-section-landing>
   `,
 })
@@ -174,6 +175,14 @@ export class DfSecurityOverviewComponent implements OnInit {
             action: this.t('authAction'),
             meta: this.providerMeta(authCount),
             disabled: authCount === 0,
+            tint: 'security',
+          },
+          {
+            icon: 'smart_toy',
+            title: this.t('aauthTitle'),
+            text: this.t('aauthText'),
+            route: `/${ROUTES.API_SECURITY}/${ROUTES.AAUTH}`,
+            action: this.t('aauthAction'),
             tint: 'security',
           },
           {

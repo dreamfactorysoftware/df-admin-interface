@@ -102,6 +102,7 @@ export function accessibleRoutes(
         allowed.push(ROUTES.USERS);
         break;
       case 'roles':
+        // Not ROUTES.AAUTH: every system/aauth call requires a sys admin.
         allowed.push(ROUTES.ROLE_BASED_ACCESS);
         break;
       case 'services':
