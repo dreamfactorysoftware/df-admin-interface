@@ -222,8 +222,9 @@ interface ServiceResponse {
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
-  /** Header line for the closed Access section: "12 of 313 roles ...". */
-  accessSummary: string | null = null;
+  /** Counts for the closed Access section's header line ("12 of 313
+   *  roles ..."). The template translates them, see loadAccessSummary(). */
+  accessCounts: { granted: number; total: number } | null = null;
   private readonly scope = inject(DfScopeService);
   private readonly transloco = inject(TranslocoService);
   /** DreamFactory Platform APIs route (data.system). Those services are not
@@ -2377,19 +2378,20 @@ export class DfServiceDetailsComponent implements OnInit {
   // scope in a dialog. df-scope-matrix only emits for non-'none' cells, so
   // there is always a real grant to inspect here.
   private loadAccessSummary(): void {
-    this.accessSummary = null;
+    this.accessCounts = null;
     const id = this.serviceData?.id;
     if (!this.edit || !this.isDatabase || !id) {
       return;
     }
+    // Keep the counts and let the transloco pipe in the template translate
+    // them. The roles can already be cached by an earlier page, so this can
+    // run before the lazily loaded "services" scope has arrived, and
+    // transloco.translate() would then return the raw key for good.
     this.scope.matrixForService(id).subscribe(matrix => {
       const granted = matrix.roles.filter(row =>
         Object.values(row.verbs).some(state => state !== 'none')
       ).length;
-      this.accessSummary = this.transloco.translate('services.access.summary', {
-        granted,
-        total: matrix.roles.length,
-      });
+      this.accessCounts = { granted, total: matrix.roles.length };
     });
   }
 

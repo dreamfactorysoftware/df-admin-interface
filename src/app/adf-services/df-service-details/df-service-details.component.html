@@ -1822,10 +1822,15 @@
 
       <df-disclosure
         class="service-section"
+        data-testid="access-panel"
         [eyebrow]="'services.access.eyebrow' | transloco"
         [title]="'services.access.title' | transloco"
         [description]="'services.access.description' | transloco"
-        [summary]="accessSummary">
+        [summary]="
+          accessCounts
+            ? ('services.access.summary' | transloco: accessCounts)
+            : null
+        ">
         <p class="service-section__hint">
           {{ 'services.access.hint' | transloco }}
         </p>
