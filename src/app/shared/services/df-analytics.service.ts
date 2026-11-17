@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of, forkJoin } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
 import { silent } from '../utilities/http-contexts';
-import { userServices } from '../utilities/user-services';
+import { filterUserServices } from '../utilities/user-services';
 
 export interface DashboardStats {
   services: {
@@ -36,6 +36,11 @@ export class DfAnalyticsService {
     // Fetch fresh rather than replaying an earlier count: that count predates
     // the user's first API and would keep them "first-time" after creating it.
     return this.fetchStats();
+  }
+
+  /** Drop the cached stats, e.g. after a service create changed the count. */
+  clearCache(): void {
+    localStorage.removeItem(this.CACHE_KEY);
   }
 
   private fetchStats(): Observable<DashboardStats> {
@@ -81,7 +86,7 @@ export class DfAnalyticsService {
 
     // Exclude the services DreamFactory and its packages provision at install
     // (system, api_docs, ..., plus api_builder / agents on commercial builds)
-    const userCreatedServices = userServices(services.resource);
+    const userServices = filterUserServices(services.resource);
 
     // Filter API Keys - exclude system apps by name
     const userApiKeys = (appKeys.resource || []).filter((a: any) => {
@@ -100,7 +105,7 @@ export class DfAnalyticsService {
 
     return {
       services: {
-        total: userCreatedServices.length,
+        total: userServices.length,
       },
       apiKeys: {
         total: userApiKeys.length,

@@ -325,6 +325,7 @@ async function setup(options: SetupOptions): Promise<Harness> {
         provide: DfAnalyticsService,
         useValue: {
           getDashboardStats: () => of({ services: { total: 3 } }),
+          clearCache: jest.fn(),
         },
       },
       {
@@ -622,6 +623,15 @@ describe('DfServiceDetailsComponent Backend Authentication panel', () => {
       expect(h.create).toHaveBeenCalledTimes(1);
       const sent = mapCamelToSnake(h.create.mock.calls[0][0]) as any;
       expect(sent.resource[0].config.oauth_token_url).toBeNull();
+    });
+
+    it('drops the cached first-API stats once the service is created', () => {
+      h.component.serviceForm.patchValue({ name: 'remote' });
+      h.component.save(false, false);
+      expect(h.create).toHaveBeenCalledTimes(1);
+      expect(
+        TestBed.inject(DfAnalyticsService).clearCache
+      ).toHaveBeenCalledTimes(1);
     });
 
     it('drops the panel when the type changes to one without the fields', () => {

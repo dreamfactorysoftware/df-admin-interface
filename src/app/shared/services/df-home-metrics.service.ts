@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
-import { userServices } from 'src/app/shared/utilities/user-services';
+import { filterUserServices } from 'src/app/shared/utilities/user-services';
 import type { TimeRange } from 'src/app/adf-ai-usage/services/usage.service';
 import {
   DfScopeService,
@@ -64,7 +64,7 @@ interface ServiceRow {
   id: number;
   name: string;
   type?: string;
-  created_by_id?: number | null;
+  createdById?: number | null; // created_by_id after caseInterceptor
   // Present only if the instance's service schema carries a lifecycle flag.
   // DF core does not; probed defensively so it lights up if one is added.
   deprecated?: boolean;
@@ -204,7 +204,7 @@ export class DfHomeMetricsService {
           }
         )
       );
-      return userServices(res?.resource);
+      return filterUserServices(res?.resource);
     } catch {
       return null;
     }

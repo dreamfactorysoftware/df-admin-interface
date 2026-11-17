@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import {
-  HttpClientTestingModule,
   HttpTestingController,
+  provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { caseInterceptor } from '../interceptors/case.interceptor';
 import { DashboardStats, DfAnalyticsService } from './df-analytics.service';
 
 // /system/service on a fresh 7.8 Gold install: the seeded services plus the
@@ -32,8 +34,13 @@ describe('DfAnalyticsService', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    // Wired as in main.ts: caseInterceptor camelCases every /api JSON
+    // response, so the service sees createdById, never created_by_id.
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
+      providers: [
+        provideHttpClient(withInterceptors([caseInterceptor])),
+        provideHttpClientTesting(),
+      ],
     });
     service = TestBed.inject(DfAnalyticsService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -44,16 +51,18 @@ describe('DfAnalyticsService', () => {
     localStorage.clear();
   });
 
+  const json = { headers: { 'Content-Type': 'application/json' } };
+
   function respond(services: unknown[]): void {
     httpMock
       .expectOne(r => r.url.startsWith('/api/v2/system/service?'))
-      .flush({ resource: services });
+      .flush({ resource: services }, json);
     httpMock
       .expectOne(r => r.url.startsWith('/api/v2/system/role?'))
-      .flush({ resource: [] });
+      .flush({ resource: [] }, json);
     httpMock
       .expectOne(r => r.url.startsWith('/api/v2/system/app?'))
-      .flush({ resource: [] });
+      .flush({ resource: [] }, json);
   }
 
   function load(services: unknown[]): DashboardStats | undefined {
@@ -69,8 +78,8 @@ describe('DfAnalyticsService', () => {
       r.url.startsWith('/api/v2/system/service?')
     );
     expect(req.request.url).toContain('fields=id,name,type,created_by_id');
-    req.flush({ resource: [] });
-    httpMock.match(() => true).forEach(r => r.flush({ resource: [] }));
+    req.flush({ resource: [] }, json);
+    httpMock.match(() => true).forEach(r => r.flush({ resource: [] }, json));
   });
 
   it('counts zero services on a fresh Gold install (first-time user)', () => {
@@ -83,10 +92,33 @@ describe('DfAnalyticsService', () => {
     ).toBe(1);
   });
 
+  it('counts a session-created service named after its type or a seeded name', () => {
+    // created_by_id reaches the service as createdById (caseInterceptor);
+    // a creator must still win over the name rules.
+    const mysql = { id: 11, name: 'mysql', type: 'mysql', created_by_id: 1 };
+    const cache = { id: 12, name: 'cache', type: 'redis', created_by_id: 1 };
+    expect(load([...GOLD_FRESH_SERVICES, mysql])?.services.total).toBe(1);
+
+    service.clearCache();
+    expect(load([...GOLD_FRESH_SERVICES, mysql, cache])?.services.total).toBe(
+      2
+    );
+  });
+
   it('fetches again once the cache expires instead of replaying the first count', () => {
     expect(load(GOLD_FRESH_SERVICES)?.services.total).toBe(0);
 
     localStorage.removeItem('df_dashboard_stats'); // 30s cache expired
+
+    expect(
+      load([...GOLD_FRESH_SERVICES, FIRST_USER_SERVICE])?.services.total
+    ).toBe(1);
+  });
+
+  it('refetches after clearCache() even within the 30s cache window', () => {
+    expect(load(GOLD_FRESH_SERVICES)?.services.total).toBe(0);
+
+    service.clearCache(); // the user just created a service
 
     expect(
       load([...GOLD_FRESH_SERVICES, FIRST_USER_SERVICE])?.services.total

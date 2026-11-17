@@ -2280,6 +2280,8 @@ export class DfServiceDetailsComponent implements OnInit {
         )
         .subscribe({
           next: (response: ServiceResponse) => {
+            // The cached first-API stats predate this service.
+            this.analyticsService.clearCache();
             if (data.type.toLowerCase().includes('saml')) {
               this.router.navigate(['../'], {
                 relativeTo: this.activatedRoute,
@@ -2544,6 +2546,8 @@ export class DfServiceDetailsComponent implements OnInit {
 
       // Store the newly created service ID for role creation
       this.currentServiceId = createdService.id;
+      // The cached first-API stats predate this service.
+      this.analyticsService.clearCache();
 
       // Show success message using DfSnackbarService
       this.snackbarService.openSnackBar('Service created', 'success');
