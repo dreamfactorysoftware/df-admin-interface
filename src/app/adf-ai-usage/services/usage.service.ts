@@ -284,6 +284,67 @@ export interface UsageBundle {
   apps: Map<number, string>;
 }
 
+/** Zeroed AI usage: what the dashboard shows when there is no data. */
+function emptyUsage(period: string): UsageResponse {
+  return {
+    period,
+    since: new Date(Date.now() - 7 * 86400000).toISOString(),
+    total_requests: 0,
+    total_input_tokens: 0,
+    total_output_tokens: 0,
+    total_cost_usd: 0,
+    errors: 0,
+    avg_latency_ms: 0,
+    latency_p50_ms: 0,
+    latency_p95_ms: 0,
+    latency_p99_ms: 0,
+    partials: 0,
+    by_service: [],
+    by_user: [],
+    by_role: [],
+    by_app: [],
+    by_provider: [],
+    by_model: [],
+    by_resource: [],
+    by_error_class: [],
+    series: [],
+    series_by_model: [],
+    series_by_user: [],
+    series_by_app: [],
+    series_by_provider: [],
+    most_expensive_calls: [],
+    filters: {},
+    budgets: [],
+    default_rates: {},
+  };
+}
+
+/** Zeroed MCP usage, the MCP counterpart of emptyUsage(). */
+function emptyMcpUsage(period: string): McpUsageResponse {
+  return {
+    period,
+    since: new Date(Date.now() - 7 * 86400000).toISOString(),
+    total_requests: 0,
+    total_bytes_in: 0,
+    total_bytes_out: 0,
+    errors: 0,
+    avg_duration_ms: 0,
+    by_service: [],
+    by_user: [],
+    by_role: [],
+    by_app: [],
+    by_client: [],
+    by_tool: [],
+    by_method: [],
+    series: [],
+  };
+}
+
+/** True for a JSON object body; false for null, arrays and primitives. */
+function isJsonObject(body: unknown): boolean {
+  return typeof body === 'object' && body !== null && !Array.isArray(body);
+}
+
 @Injectable({ providedIn: 'root' })
 export class UsageService {
   private http = inject(HttpClient);
@@ -309,6 +370,10 @@ export class UsageService {
     // Silent by design: every request in this bundle degrades to an empty
     // dataset (zero-state dashboard / "#N" name fallbacks); a toast per
     // failed analytics fetch would be noise. Intent is annotated per request.
+    // A 200 without a usage object (Angular parses '' and 'null' to null)
+    // gets the same zeroed shape, so consumers can read bundle.raw /
+    // bundle.mcp directly. Objects pass through as-is; consumers already
+    // default missing fields.
     return forkJoin({
       raw: this.http
         .get<UsageResponse>('/_internal/ai/usage', {
@@ -316,39 +381,8 @@ export class UsageService {
           context: silent(),
         })
         .pipe(
-          catchError(() =>
-            of({
-              period,
-              since: new Date(Date.now() - 7 * 86400000).toISOString(),
-              total_requests: 0,
-              total_input_tokens: 0,
-              total_output_tokens: 0,
-              total_cost_usd: 0,
-              errors: 0,
-              avg_latency_ms: 0,
-              latency_p50_ms: 0,
-              latency_p95_ms: 0,
-              latency_p99_ms: 0,
-              partials: 0,
-              by_service: [],
-              by_user: [],
-              by_role: [],
-              by_app: [],
-              by_provider: [],
-              by_model: [],
-              by_resource: [],
-              by_error_class: [],
-              series: [],
-              series_by_model: [],
-              series_by_user: [],
-              series_by_app: [],
-              series_by_provider: [],
-              most_expensive_calls: [],
-              filters: {},
-              budgets: [],
-              default_rates: {},
-            } as UsageResponse)
-          )
+          map(body => (isJsonObject(body) ? body : emptyUsage(period))),
+          catchError(() => of(emptyUsage(period)))
         ),
       mcp: this.http
         .get<McpUsageResponse>('/_internal/ai/mcp-usage', {
@@ -356,25 +390,8 @@ export class UsageService {
           context: silent(),
         })
         .pipe(
-          catchError(() =>
-            of({
-              period,
-              since: new Date(Date.now() - 7 * 86400000).toISOString(),
-              total_requests: 0,
-              total_bytes_in: 0,
-              total_bytes_out: 0,
-              errors: 0,
-              avg_duration_ms: 0,
-              by_service: [],
-              by_user: [],
-              by_role: [],
-              by_app: [],
-              by_client: [],
-              by_tool: [],
-              by_method: [],
-              series: [],
-            } as McpUsageResponse)
-          )
+          map(body => (isJsonObject(body) ? body : emptyMcpUsage(period))),
+          catchError(() => of(emptyMcpUsage(period)))
         ),
       services: this.getServicesLookup(),
       users: this.getUsersLookup(),

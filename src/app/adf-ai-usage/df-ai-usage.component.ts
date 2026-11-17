@@ -156,6 +156,8 @@ export class DfAiUsageComponent implements OnInit {
   // otherwise every CD pass hands child components new array/Map refs and
   // forces ngOnChanges → rebuild loops that pin a CPU core.
   summary: UsageSummary = this.emptySummary();
+  /** AI requests in the window; 0 (empty state) when the payload has none. */
+  totalRequests = 0;
   series: TimeBucket[] = [];
   byUser: GroupRow[] = [];
   byRole: GroupRow[] = [];
@@ -401,6 +403,7 @@ export class DfAiUsageComponent implements OnInit {
 
   private recomputeViews(): void {
     const r = this.bundle?.raw;
+    this.totalRequests = n(r?.total_requests);
     if (!r) {
       this.summary = this.emptySummary();
       this.series = [];

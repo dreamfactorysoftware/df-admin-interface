@@ -140,6 +140,37 @@ const POPULATED = {
   default_rates: {},
 };
 
+/** MCP traffic in the same window, as df-ai's /mcp-usage returns it. */
+const MCP_POPULATED = {
+  period: '7d',
+  since: '2026-11-02T00:00:00+00:00',
+  total_requests: 12,
+  total_bytes_in: 3400,
+  total_bytes_out: 9100,
+  errors: 0,
+  avg_duration_ms: 42,
+  by_service: [
+    { service_id: 7, requests: 12, bytes_in: 3400, bytes_out: 9100 },
+  ],
+  by_user: [{ user_id: 1, requests: 12, bytes_in: 3400, bytes_out: 9100 }],
+  by_role: [],
+  by_app: [],
+  by_client: [
+    {
+      client_id: 'claude-desktop',
+      client_name: 'Claude Desktop',
+      requests: 12,
+      bytes_in: 3400,
+      bytes_out: 9100,
+    },
+  ],
+  by_tool: [
+    { tool_name: 'get_tables', requests: 12, bytes_in: 3400, bytes_out: 9100 },
+  ],
+  by_method: [{ method: 'tools/call', requests: 12 }],
+  series: [],
+};
+
 describe('DfAiUsageComponent data states', () => {
   let fixture: ComponentFixture<DfAiUsageComponent>;
   let http: HttpTestingController;
@@ -216,6 +247,42 @@ describe('DfAiUsageComponent data states', () => {
   it('shows the empty state for a response with no fields at all', () => {
     expect(() => load({ body: {} })).not.toThrow();
     expectEmptyState();
+  });
+
+  // Regression: a 200 whose body is '' or 'null' reached the template as
+  // bundle.raw = null, and `bundle.raw.total_requests` threw on every change
+  // detection, so the page stayed blank below the filters. Angular's XHR
+  // backend parses both bodies to null; HttpTestingController hands the
+  // flushed value over untouched, so null stands in for both here, and ''
+  // and [] (a PHP empty array) cover the other non-object payloads.
+  it.each([
+    ["'' or 'null' (parsed to null)", null],
+    ['an unparsed empty string', ''],
+    ['an empty JSON array', []],
+  ])('shows the empty state for a 200 whose body is %s', (_label, body) => {
+    expect(() => load({ body })).not.toThrow();
+    expectEmptyState();
+  });
+
+  // Same regression: the null usage body also made recomputeViews bail out
+  // before building the MCP views, hiding real MCP traffic.
+  it('still shows MCP traffic when the AI usage body is null', () => {
+    expect(() => load({ body: null }, { body: MCP_POPULATED })).not.toThrow();
+    expectEmptyState();
+    expect(count('.usage__mcp-summary')).toBe(1);
+    expect(el().querySelector('.usage__mcp-summary')?.textContent).toContain(
+      '12'
+    );
+  });
+
+  // A body that is an object but misses fields is passed through as before,
+  // not swapped for the zeroed fallback.
+  it('renders the dashboard for a partial response', () => {
+    expect(() =>
+      load({ body: { total_requests: 3, by_model: [] } }, { body: {} })
+    ).not.toThrow();
+    expect(count('.usage__empty')).toBe(0);
+    expect(count('df-usage-summary')).toBe(1);
   });
 
   // Regression: the "Cost by user" chart threw "Cannot read properties of
