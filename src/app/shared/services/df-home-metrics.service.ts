@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
+import { filterUserServices } from 'src/app/shared/utilities/user-services';
 import type { TimeRange } from 'src/app/adf-ai-usage/services/usage.service';
 import {
   DfScopeService,
@@ -59,37 +60,11 @@ export interface HomeMetrics {
   openServices: ServiceScopePosture[];
 }
 
-// System service names excluded from the user-facing API count. Mirrors the
-// list in df-analytics.service (single security model); kept in sync by hand
-// because that list is a private const there.
-const SYSTEM_SERVICE_NAMES = new Set(
-  [
-    'system',
-    'api_docs',
-    'files',
-    'logs',
-    'db',
-    'email',
-    'user',
-    'script',
-    'ui',
-    'schema',
-    'api_doc',
-    'file',
-    'log',
-    'admin',
-    'df-admin',
-    'dreamfactory',
-    'cache',
-    'push',
-    'pub_sub',
-  ].map(s => s.toLowerCase())
-);
-
 interface ServiceRow {
   id: number;
   name: string;
   type?: string;
+  createdById?: number | null; // created_by_id after caseInterceptor
   // Present only if the instance's service schema carries a lifecycle flag.
   // DF core does not; probed defensively so it lights up if one is added.
   deprecated?: boolean;
@@ -229,9 +204,7 @@ export class DfHomeMetricsService {
           }
         )
       );
-      return (res?.resource ?? []).filter(
-        s => s?.name && !SYSTEM_SERVICE_NAMES.has(s.name.toLowerCase())
-      );
+      return filterUserServices(res?.resource);
     } catch {
       return null;
     }

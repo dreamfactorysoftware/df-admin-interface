@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, timer, forkJoin } from 'rxjs';
-import { catchError, map, shareReplay, switchMap, tap } from 'rxjs/operators';
+import { Observable, of, forkJoin } from 'rxjs';
+import { catchError, map, tap } from 'rxjs/operators';
 import { silent } from '../utilities/http-contexts';
+import { filterUserServices } from '../utilities/user-services';
 
 export interface DashboardStats {
   services: {
@@ -22,17 +23,8 @@ export interface DashboardStats {
 export class DfAnalyticsService {
   private readonly CACHE_KEY = 'df_dashboard_stats';
   private readonly CACHE_DURATION = 30 * 1000; // 30 seconds
-  private readonly REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
-  private stats$: Observable<DashboardStats>;
-
-  constructor(private http: HttpClient) {
-    // Initialize the stats observable with automatic refresh
-    this.stats$ = timer(0, this.REFRESH_INTERVAL).pipe(
-      switchMap(() => this.fetchStats()),
-      shareReplay(1)
-    );
-  }
+  constructor(private http: HttpClient) {}
 
   getDashboardStats(): Observable<DashboardStats> {
     // Check localStorage cache first
@@ -41,17 +33,25 @@ export class DfAnalyticsService {
       return of(cached);
     }
 
-    return this.stats$;
+    // Fetch fresh rather than replaying an earlier count: that count predates
+    // the user's first API and would keep them "first-time" after creating it.
+    return this.fetchStats();
+  }
+
+  /** Drop the cached stats, e.g. after a service create changed the count. */
+  clearCache(): void {
+    localStorage.removeItem(this.CACHE_KEY);
   }
 
   private fetchStats(): Observable<DashboardStats> {
-    // Fetch minimal data to filter out system services.
+    // Fetch minimal data to filter out auto-provisioned services
+    // (created_by_id is part of that rule, see isAutoProvisionedService).
     // Silent by design: roles without system permissions degrade gracefully
     // to the catchError fallback instead of triggering the error interceptor.
     const context = silent();
     const requests = {
       services: this.http.get<any>(
-        '/api/v2/system/service?fields=id,name,type&include_count=true',
+        '/api/v2/system/service?fields=id,name,type,created_by_id&include_count=true',
         { context }
       ),
       roles: this.http.get<any>(
@@ -76,29 +76,6 @@ export class DfAnalyticsService {
   private transformResponses(responses: any): DashboardStats {
     const { services, roles, appKeys } = responses;
 
-    // System service names to exclude (comprehensive list of DreamFactory system services)
-    // System service names to exclude (comprehensive list of DreamFactory system services)
-    const systemServiceNames = [
-      'system',
-      'api_docs',
-      'files',
-      'logs',
-      'db',
-      'email',
-      'user',
-      'script',
-      'ui',
-      'schema',
-      'api_doc',
-      'file',
-      'log',
-      'admin',
-      'df-admin',
-      'dreamfactory',
-      'cache',
-      'push',
-      'pub_sub',
-    ].map(s => s.toLowerCase());
     // Common system app names - being very specific to avoid filtering user apps
     const systemAppNames = ['admin', 'api_docs', 'file_manager'].map(s =>
       s.toLowerCase()
@@ -107,10 +84,9 @@ export class DfAnalyticsService {
       s => s.toLowerCase()
     );
 
-    // Filter services - exclude system services by name
-    const userServices = (services.resource || []).filter((s: any) => {
-      return !systemServiceNames.includes(s.name.toLowerCase());
-    });
+    // Exclude the services DreamFactory and its packages provision at install
+    // (system, api_docs, ..., plus api_builder / agents on commercial builds)
+    const userServices = filterUserServices(services.resource);
 
     // Filter API Keys - exclude system apps by name
     const userApiKeys = (appKeys.resource || []).filter((a: any) => {
