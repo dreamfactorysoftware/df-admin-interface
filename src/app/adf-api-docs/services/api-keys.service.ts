@@ -1,15 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import {
-  BehaviorSubject,
-  Observable,
-  map,
-  switchMap,
-  forkJoin,
-  of,
-} from 'rxjs';
+import { BehaviorSubject, Observable, map, switchMap, of } from 'rxjs';
 import { URLS } from 'src/app/shared/constants/urls';
 import { ApiKeyInfo, ServiceApiKeys } from 'src/app/shared/types/api-keys';
+import { getAllRecords } from 'src/app/shared/utilities/all-records';
 
 interface RoleServiceAccess {
   serviceId: number;
@@ -34,21 +28,10 @@ interface Role {
   lastModifiedById: number;
 }
 
-interface RolesResponse {
-  resource: Role[];
-}
-
 interface App {
   name: string;
   apiKey: string;
-  roleId: number;
-  id: number;
-  description?: string;
-  isActive?: boolean;
-}
-
-interface AppsResponse {
-  resource: App[];
+  roleId: number | null;
 }
 
 @Injectable({
@@ -73,52 +56,56 @@ export class ApiKeysService {
       }
     }
 
-    return this.http
-      .get<RolesResponse>(
-        `${URLS.ROLES}?related=role_service_access_by_role_id`
-      )
-      .pipe(
-        switchMap(roles => {
-          const relevantRoles = roles.resource.filter(role => {
-            if (!role.roleServiceAccessByRoleId) {
-              return false;
-            }
-
-            return role.roleServiceAccessByRoleId.some(
-              access => access.serviceId === serviceId
-            );
-          });
-
-          if (!relevantRoles.length) {
-            return of([]);
+    return getAllRecords<Role>(this.http, URLS.ROLES, {
+      related: 'role_service_access_by_role_id',
+    }).pipe(
+      switchMap(roles => {
+        const relevantRoles = roles.filter(role => {
+          if (!role.roleServiceAccessByRoleId) {
+            return false;
           }
 
-          const appRequests = relevantRoles.map(role =>
-            this.http.get<AppsResponse>(`${URLS.APP}`, {
-              params: {
-                filter: `role_id=${role.id}`,
-                fields: '*',
-              },
-            })
+          return role.roleServiceAccessByRoleId.some(
+            access => access.serviceId === serviceId
           );
+        });
 
-          return forkJoin(appRequests).pipe(
-            map(appsResponses => {
-              const keys: ApiKeyInfo[] = appsResponses
-                .flatMap(response => response.resource)
-                .filter((app): app is App => !!app && !!app.apiKey)
-                .map(app => ({
-                  name: app.name,
-                  apiKey: app.apiKey,
-                }));
+        if (!relevantRoles.length) {
+          return of([]);
+        }
 
-              this.serviceApiKeysCache.set(serviceId, { serviceId, keys });
-              this.currentServiceKeys.next(keys);
-              return keys;
-            })
-          );
-        })
-      );
+        // All apps in one paged GET, matched to the roles here. One request
+        // per role meant hundreds of parallel requests on instances with many
+        // roles, which ran MySQL out of connections.
+        return getAllRecords<App>(this.http, URLS.APP, {
+          fields: 'name,api_key,role_id',
+        }).pipe(
+          map(apps => {
+            const appsByRole = new Map<number, App[]>();
+            for (const app of apps) {
+              if (app?.roleId == null) {
+                continue;
+              }
+              const roleApps = appsByRole.get(app.roleId) ?? [];
+              roleApps.push(app);
+              appsByRole.set(app.roleId, roleApps);
+            }
+
+            const keys: ApiKeyInfo[] = relevantRoles
+              .flatMap(role => appsByRole.get(role.id) ?? [])
+              .filter(app => !!app.apiKey)
+              .map(app => ({
+                name: app.name,
+                apiKey: app.apiKey,
+              }));
+
+            this.serviceApiKeysCache.set(serviceId, { serviceId, keys });
+            this.currentServiceKeys.next(keys);
+            return keys;
+          })
+        );
+      })
+    );
   }
 
   clearCache() {
