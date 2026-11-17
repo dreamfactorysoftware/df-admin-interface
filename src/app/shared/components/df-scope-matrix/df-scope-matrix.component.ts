@@ -37,7 +37,9 @@ import {
  * that reach the service are listed by default ("all roles" shows the rest,
  * to prove absence of access), a search finds one role by name in either
  * view, rows scroll inside a fixed-height well, and only one page of rows is
- * in the DOM at a time. Short lists render as a plain grid with none of that.
+ * in the DOM at a time. Short lists (searchThreshold roles or fewer) render
+ * as a plain grid with none of that: every role is a row, so the grid itself
+ * proves absence of access.
  */
 @Component({
   selector: 'df-scope-matrix',
@@ -73,7 +75,7 @@ export class DfScopeMatrixComponent implements OnChanges, OnDestroy {
   showAll = false;
   /** Rows rendered per page; "Show N more" adds another page. */
   readonly pageSize = 60;
-  /** Lists at or under this size render as a plain grid without controls. */
+  /** Lists at or under this size render as a plain grid: every role, no controls. */
   readonly searchThreshold = 12;
 
   private shown = this.pageSize;
@@ -104,6 +106,9 @@ export class DfScopeMatrixComponent implements OnChanges, OnDestroy {
 
   /** Transloco key for the one-line status under the grid; '' when the grid shows everything. */
   get statusKey(): string {
+    if (!this.searchable) {
+      return '';
+    }
     if (this.query) {
       return this.matches.length === 0 ? 'noMatch' : '';
     }
@@ -177,9 +182,16 @@ export class DfScopeMatrixComponent implements OnChanges, OnDestroy {
       });
   }
 
-  /** A query searches every role, whichever view is on, so one role can
-   *  always be found by name; without a query the view decides the base. */
+  /** The plain grid has no search box or view switch, so it lists every role.
+   *  Otherwise a query searches every role, whichever view is on, so one role
+   *  can always be found by name; without a query the view decides the base. */
   private recompute(): void {
+    if (!this.searchable) {
+      this.matches = this.rows;
+      this.visibleRows = this.rows;
+      this.hiddenCount = 0;
+      return;
+    }
     const q = this.query.trim().toLowerCase();
     const base = q || this.showAll ? this.rows : this.reachingRows;
     this.matches = q

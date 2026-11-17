@@ -114,15 +114,21 @@ test('Database service Access matrix stays bounded', async ({ page }) => {
   const grid = page.getByTestId('scope-matrix-grid');
   await expect(grid).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(500);
-  const box = await grid.boundingBox();
-  expect(box!.height).toBeLessThanOrEqual(400);
-  expect(
-    await page.getByTestId('scope-matrix-row').count()
-  ).toBeLessThanOrEqual(60);
+  // Twelve roles or fewer render as the plain grid (every role a row, no
+  // controls); only the grid with controls sits in the fixed-height well.
+  const all = page.getByTestId('scope-matrix-view-all');
+  const bounded = (await all.count()) > 0;
+  const rows = await page.getByTestId('scope-matrix-row').count();
+  if (bounded) {
+    const box = await grid.boundingBox();
+    expect(box!.height).toBeLessThanOrEqual(400);
+    expect(rows).toBeLessThanOrEqual(60);
+  } else {
+    expect(rows).toBeLessThanOrEqual(12);
+  }
 
   // With controls present, "all roles" is still bounded and search narrows.
-  const all = page.getByTestId('scope-matrix-view-all');
-  if (await all.count()) {
+  if (bounded) {
     await all.click();
     await page.waitForTimeout(300);
     expect((await grid.boundingBox())!.height).toBeLessThanOrEqual(400);
@@ -144,4 +150,69 @@ test('Database service Access matrix stays bounded', async ({ page }) => {
       expect(n.toLowerCase()).toContain(sample.slice(0, 8).toLowerCase());
     }
   }
+});
+
+test('Access matrix with twelve roles or fewer lists every role', async ({
+  page,
+}) => {
+  // Cut the role graph down to twelve roles and keep only the first one's
+  // grants, so at most one role reaches the service: the plain grid must
+  // still list the other eleven (muted) to prove they have no access.
+  // Routed before login so no cached role list escapes the cut.
+  type RoleRow = { name: string; role_service_access_by_role_id?: unknown[] };
+  let listed: string[] = [];
+  await page.route(
+    url =>
+      url.pathname.endsWith('/api/v2/system/role') &&
+      (url.searchParams.get('related') ?? '').includes(
+        'role_service_access_by_role_id'
+      ),
+    async route => {
+      const res = await route.fetch();
+      const body = await res.json();
+      const cut: RoleRow[] = (body.resource ?? [])
+        .slice(0, 12)
+        .map((r: RoleRow, i: number) =>
+          i === 0 ? r : { ...r, role_service_access_by_role_id: [] }
+        );
+      body.resource = cut;
+      listed = cut.map(r => r.name);
+      await route.fulfill({ response: res, json: body });
+    }
+  );
+  await loginAsAdmin(page);
+  await waitForAppReady(page);
+  const api = await DfApi.login(page.request);
+  const groups = await api.listServiceTypeGroups();
+  const db = (await api.listServices()).find(
+    s => groups[s.type] === 'Database'
+  );
+  test.skip(!db, 'no database service on this instance');
+  await page.goto(
+    `/dreamfactory/dist/#/api-connections/api-types/database/${db.id}`,
+    { waitUntil: 'domcontentloaded' }
+  );
+
+  const header = page
+    .locator('mat-sidenav-content .disclosure__header', {
+      hasText: 'Who can reach this service',
+    })
+    .first();
+  await expect(header).toBeVisible({ timeout: 30_000 });
+  await header.click();
+  await expect(page.getByTestId('df-scope-matrix')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.locator('.scope-matrix__loading')).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  test.skip(listed.length === 0, 'no roles on this instance');
+
+  const rows = page.getByTestId('scope-matrix-row');
+  await expect(rows).toHaveCount(listed.length);
+  const names = await rows.locator('.scope-matrix__role').allTextContents();
+  expect(names.map(n => n.trim()).sort()).toEqual([...listed].sort());
+  await expect(page.getByTestId('scope-matrix-view-all')).toHaveCount(0);
+  await expect(page.getByTestId('scope-matrix-search')).toHaveCount(0);
+  await expect(page.getByTestId('scope-matrix-status')).toHaveCount(0);
 });
