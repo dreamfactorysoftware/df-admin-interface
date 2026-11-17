@@ -37,6 +37,7 @@ testem.log
 /typings
 /scripts/*
 !/scripts/publish.sh
+!/scripts/verify-dist.sh
 
 # System files
 .DS_Store

@@ -1,14 +1,23 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoTestingModule } from '@ngneat/transloco';
 import { DfFilterBuilderComponent } from './df-filter-builder.component';
 
-// Logic-only suite: exercises the pure compile/emit math without rendering, so
-// no transloco runtime provider is required.
+// Logic-only suite: exercises the pure compile/emit math without rendering.
+// The template still instantiates the transloco pipe when the component is
+// created, so an empty in-memory transloco is provided.
 describe('DfFilterBuilderComponent', () => {
   let component: DfFilterBuilderComponent;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DfFilterBuilderComponent],
+      imports: [
+        DfFilterBuilderComponent,
+        TranslocoTestingModule.forRoot({
+          langs: { en: {} },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
+        }),
+      ],
     }).compileComponents();
     component = TestBed.createComponent(
       DfFilterBuilderComponent

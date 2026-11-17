@@ -127,8 +127,8 @@ describe('DfProfileComponent', () => {
 
     component.updatePasswordForm.patchValue({
       oldPassword: 'password',
-      newPassword: 'password1',
-      confirmPassword: 'password1',
+      newPassword: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
 
     component.updatePasswordForm.markAsDirty();

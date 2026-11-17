@@ -10,7 +10,11 @@ export const ADMIN_PASSWORD =
  * and userData in-memory; a synthetic localStorage seed does not work
  * because no code path hydrates userData from storage at bootstrap.
  */
-export async function loginAsAdmin(page: Page) {
+export async function loginAsAdmin(
+  page: Page,
+  adminEmail = ADMIN_EMAIL,
+  adminPassword = ADMIN_PASSWORD
+) {
   await page.context().clearCookies();
   await page.goto('/dreamfactory/dist/#/auth/login');
   // Labels come from the userManagement i18n bundle — "Enter Email" /
@@ -18,8 +22,8 @@ export async function loginAsAdmin(page: Page) {
   // language-agnostic.
   const email = page.locator('input').first();
   await expect(email).toBeVisible({ timeout: 15_000 });
-  await email.fill(ADMIN_EMAIL);
-  await page.locator('input').nth(1).fill(ADMIN_PASSWORD);
+  await email.fill(adminEmail);
+  await page.locator('input').nth(1).fill(adminPassword);
 
   const loginReq = page.waitForResponse(
     r =>

@@ -1,7 +1,12 @@
-import { of, BehaviorSubject } from 'rxjs';
+import { of, BehaviorSubject, Observable } from 'rxjs';
 import { DfAuthService } from '../../adf-user-management/services/df-auth.service';
 import { DfUserDataService } from '../services/df-user-data.service';
-import { Router } from '@angular/router';
+import {
+  ActivatedRouteSnapshot,
+  Router,
+  RouterStateSnapshot,
+  UrlTree,
+} from '@angular/router';
 import { ROUTES } from '../types/routes';
 import { loggedInGuard } from './logged-in.guard';
 import { TestBed, waitForAsync } from '@angular/core/testing';
@@ -17,6 +22,14 @@ const MOCK_USER_DATA_SERVICE = {
 const MOCK_ROUTER = {
   createUrlTree: jest.fn(),
 };
+
+// The guard is a CanActivateFn: the router calls it with the route and the
+// target state, and the guard reads state.url to build the returnUrl.
+const runGuard = (url = '/') =>
+  loggedInGuard(
+    {} as ActivatedRouteSnapshot,
+    { url } as RouterStateSnapshot
+  ) as Observable<boolean | UrlTree>;
 
 describe('LoggedInGuard', () => {
   let router: Router;
@@ -43,7 +56,7 @@ describe('LoggedInGuard', () => {
 
   it('should return true if user is logged in', done => {
     TestBed.runInInjectionContext(() => {
-      loggedInGuard().subscribe(result => {
+      runGuard().subscribe(result => {
         expect(result).toBe(true);
         done();
       });
@@ -54,7 +67,7 @@ describe('LoggedInGuard', () => {
     TestBed.runInInjectionContext(() => {
       MOCK_USER_DATA_SERVICE.isLoggedIn$.next(false);
       MOCK_AUTH_SERVICE.checkSession.mockReturnValue(of(true));
-      loggedInGuard().subscribe(result => {
+      runGuard().subscribe(result => {
         expect(result).toBe(true);
         done();
       });
@@ -65,8 +78,23 @@ describe('LoggedInGuard', () => {
     TestBed.runInInjectionContext(() => {
       MOCK_USER_DATA_SERVICE.isLoggedIn$.next(false);
       MOCK_AUTH_SERVICE.checkSession.mockReturnValue(of(false));
-      loggedInGuard().subscribe(() => {
-        expect(router.createUrlTree).toHaveBeenCalledWith([ROUTES.AUTH]);
+      runGuard().subscribe(() => {
+        expect(router.createUrlTree).toHaveBeenCalledWith([ROUTES.AUTH], {
+          queryParams: undefined,
+        });
+        done();
+      });
+    });
+  });
+
+  it('should keep the requested URL as returnUrl when redirecting to the auth route', done => {
+    TestBed.runInInjectionContext(() => {
+      MOCK_USER_DATA_SERVICE.isLoggedIn$.next(false);
+      MOCK_AUTH_SERVICE.checkSession.mockReturnValue(of(false));
+      runGuard('/api-connections/api-types/database').subscribe(() => {
+        expect(router.createUrlTree).toHaveBeenLastCalledWith([ROUTES.AUTH], {
+          queryParams: { returnUrl: '/api-connections/api-types/database' },
+        });
         done();
       });
     });

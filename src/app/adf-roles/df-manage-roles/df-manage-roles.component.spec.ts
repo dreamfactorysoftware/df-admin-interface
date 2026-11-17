@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 describe('DfManageRolesComponent', () => {
   let component: DfManageRolesComponent;
@@ -18,6 +19,7 @@ describe('DfManageRolesComponent', () => {
         DfManageRolesComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       providers: [
         provideTransloco({

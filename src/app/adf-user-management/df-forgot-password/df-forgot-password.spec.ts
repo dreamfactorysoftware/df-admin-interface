@@ -174,8 +174,8 @@ describe('DfForgotPasswordComponent - Username Reset', () => {
 
     component.securityQuestionForm.patchValue({
       securityAnswer: 'test',
-      newPassword: 'test123456',
-      confirmPassword: 'test123456',
+      newPassword: 'sixteen-chars-pw',
+      confirmPassword: 'sixteen-chars-pw',
     });
 
     component.resetPassword();

@@ -10,6 +10,8 @@ import {
 } from '@ngneat/transloco';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import { DfLicenseCheckService } from 'src/app/shared/services/df-license-check.service';
+import { DfServerSettingsService } from 'src/app/shared/services/df-server-settings.service';
+import { RouterTestingModule } from '@angular/router/testing';
 import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 
@@ -112,10 +114,17 @@ describe('DfSystemInfoComponent license level label', () => {
     version: '0.1.2',
   };
 
-  function render(platform: Record<string, unknown>): HTMLElement {
+  // canOpenServerSettings stands in for DfServerSettingsService.canOpen$, the
+  // only thing the component reads from it. Stubbing it keeps this block free
+  // of HttpClient, like the two services stubbed below.
+  function render(
+    platform: Record<string, unknown>,
+    canOpenServerSettings = false
+  ): HTMLElement {
     TestBed.configureTestingModule({
       imports: [
         DfSystemInfoComponent,
+        RouterTestingModule,
         TranslocoTestingModule.forRoot({
           langs: {
             en: {
@@ -125,6 +134,8 @@ describe('DfSystemInfoComponent license level label', () => {
                   licenseLevelTrial: 'Trial — all features',
                   trialStatus: 'Trial Status',
                   trialStatusValue: { active: 'Active' },
+                  logLevel: 'Log Level',
+                  logLevelChange: 'Change',
                 },
               },
             },
@@ -148,6 +159,10 @@ describe('DfSystemInfoComponent license level label', () => {
         {
           provide: DfLicenseCheckService,
           useValue: { licenseCheck$: of(null) },
+        },
+        {
+          provide: DfServerSettingsService,
+          useValue: { canOpen$: of(canOpenServerSettings) },
         },
       ],
     });
@@ -175,5 +190,26 @@ describe('DfSystemInfoComponent license level label', () => {
   it('keeps the license value as-is outside a trial', () => {
     const el = render({ ...platformMock, license: 'SILVER' });
     expect(licenseText(el)).toBe('License Level: SILVER');
+  });
+
+  describe('log level Change link', () => {
+    const link = (el: HTMLElement) =>
+      el.querySelector<HTMLAnchorElement>(
+        '[data-testid="system-info-log-level-change"]'
+      );
+
+    it('is absent when Server Settings cannot be opened (old backend or no access)', () => {
+      const el = render({ ...platformMock, logLevel: 'debug' }, false);
+      expect(el.textContent).toContain('Log Level: debug');
+      expect(link(el)).toBeNull();
+    });
+
+    it('links to Server Settings when it can be opened', () => {
+      const el = render({ ...platformMock, logLevel: 'debug' }, true);
+      expect(link(el)?.textContent?.trim()).toBe('Change');
+      expect(link(el)?.getAttribute('href')).toBe(
+        '/system-settings/config/server-settings'
+      );
+    });
   });
 });

@@ -13,23 +13,35 @@ import {
   FormGroup,
   FormGroupDirective,
   ReactiveFormsModule,
+  Validators,
 } from '@angular/forms';
 import { EventEmitter } from '@angular/core';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 
-const rootForm = new FormGroup({
-  serviceAccess: new FormArray([
-    // Add FormControl or FormGroup instances to match your actual control structure
-    new FormGroup({
-      service: new FormControl(null),
-      component: new FormControl(null),
-      access: new FormControl([]),
-      requester: new FormControl([]),
-      advancedFilters: new FormControl([]),
-      id: new FormControl(null),
-    }),
-  ]),
-});
+// The role details page owns the role form. It passes the serviceAccess
+// FormArray, the row visibility flags and the form itself to this component
+// as inputs. The row below has the shape the role details page builds for a
+// saved access entry.
+const buildRootForm = () =>
+  new FormGroup({
+    serviceAccess: new FormArray([
+      new FormGroup({
+        service: new FormControl<number | null>(5, [Validators.required]),
+        component: new FormControl('_schema/'),
+        access: new FormControl([1], [Validators.required]),
+        requester: new FormControl([1]),
+        advancedFilters: new FormArray([]),
+        id: new FormControl(12),
+      }),
+    ]),
+  });
+let rootForm = buildRootForm();
+
+const setInputs = (component: DfRolesAccessComponent) => {
+  component.roleForm = rootForm;
+  component.formArray = rootForm.controls.serviceAccess;
+  component.visible = rootForm.controls.serviceAccess.controls.map(() => true);
+};
 
 const mockData = [
   {
@@ -55,7 +67,9 @@ const mockData = [
 ];
 
 class MockFormGroupDirective {
-  control = rootForm;
+  get control() {
+    return rootForm;
+  }
   ngSubmit = new EventEmitter();
 }
 
@@ -65,6 +79,7 @@ describe('DfRolesAccessComponent', () => {
   let activatedRouteMock: any;
 
   beforeEach(() => {
+    rootForm = buildRootForm();
     activatedRouteMock = [
       {
         id: 2,
@@ -146,7 +161,7 @@ describe('DfRolesAccessComponent', () => {
     });
     fixture = TestBed.createComponent(DfRolesAccessComponent);
     component = fixture.componentInstance;
-    component.rootForm = rootForm;
+    setInputs(component);
     fixture.detectChanges();
   });
 
@@ -155,16 +170,16 @@ describe('DfRolesAccessComponent', () => {
   });
 
   it('should add a new row', () => {
-    expect(component.serviceAccess.length).toBe(1);
+    expect(component.formArray.length).toBe(1);
     component.add();
-    expect(component.serviceAccess.length).toBe(2);
+    expect(component.formArray.length).toBe(2);
   });
 
   it('should call getComponents() but not baseCrudService()', () => {
     const getComponentsSpy = jest.spyOn(component, 'getComponents');
     const getCrudSpy = jest.spyOn(DfBaseCrudService.prototype, 'get');
 
-    component.serviceAccess.controls[0].get('service')?.setValue(6);
+    component.formArray.controls[0].get('service')?.setValue(6);
     component.getComponents(0);
 
     expect(getComponentsSpy).toHaveBeenCalled();
@@ -176,7 +191,7 @@ describe('DfRolesAccessComponent', () => {
     const getComponentsSpy = jest.spyOn(component, 'getComponents');
     const getCrudSpy = jest.spyOn(DfBaseCrudService.prototype, 'get');
 
-    component.serviceAccess.controls[0].get('service')?.setValue(2);
+    component.formArray.controls[0].get('service')?.setValue(2);
     component.getComponents(0);
 
     expect(getComponentsSpy).toHaveBeenCalled();
@@ -190,6 +205,7 @@ describe('DfRolesAccessComponent - Edit Data', () => {
   let activatedRouteMock: any;
 
   beforeEach(() => {
+    rootForm = buildRootForm();
     activatedRouteMock = [
       {
         id: 2,
@@ -258,7 +274,7 @@ describe('DfRolesAccessComponent - Edit Data', () => {
     });
     fixture = TestBed.createComponent(DfRolesAccessComponent);
     component = fixture.componentInstance;
-    component.rootForm = rootForm;
+    setInputs(component);
     fixture.detectChanges();
   });
 

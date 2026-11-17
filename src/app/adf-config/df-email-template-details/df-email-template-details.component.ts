@@ -91,8 +91,8 @@ export class DfEmailTemplateDetailsComponent implements OnInit {
     this.activatedRoute.data.subscribe(({ data }) => {
       this.editApp = data;
     });
-    this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
     if (this.editApp) {
+      this.snackbarService.setSnackbarLastEle(this.editApp.name, true);
       this.emailTemplateForm.patchValue({
         name: this.editApp.name,
         description: this.editApp.description,

@@ -2,9 +2,12 @@
 # publish.sh - build the admin UI and it's live. That's the whole pipeline.
 #
 # How publishing works here:
-#   - dist/ is COMMITTED to this repo. That's the repo convention (consumers
-#     install the built artifact via composer). Don't gitignore it, don't
-#     fight it - commit dist/ with your source changes.
+#   - dist/ is tracked (consumers install the built artifact via composer),
+#     but on develop CI is the only writer. This script is for local serving
+#     only. Do NOT commit dist/ with your changes: the Guard dist check fails
+#     a PR that touches it. To undo a local build:
+#       git restore --staged --worktree -- dist && git clean -fdq dist
+#     See README "dist is built by CI".
 #   - This package directory is bind-mounted into df-development-web-1 at
 #     /opt/dreamfactory/public/dreamfactory, so the moment `ng build` writes
 #     dist/, nginx at http://localhost:8081/dreamfactory/dist/ serves it.
