@@ -18,7 +18,7 @@ describe('DfAiUsageComponent service_id deep link', () => {
   let fixture: ComponentFixture<DfAiUsageComponent>;
   let http: HttpTestingController;
 
-  function open(query: Record<string, string>) {
+  function open(query: Record<string, string>, body: unknown = EMPTY_USAGE) {
     TestBed.configureTestingModule({
       imports: [
         DfAiUsageComponent,
@@ -55,8 +55,8 @@ describe('DfAiUsageComponent service_id deep link', () => {
       usage: usage.request.params.getAll('service_id'),
       mcp: mcp.request.params.getAll('service_id'),
     };
-    usage.flush(EMPTY_USAGE);
-    mcp.flush(EMPTY_USAGE);
+    usage.flush(body as object);
+    mcp.flush(body as object);
     fixture.detectChanges();
     return sent;
   }
@@ -74,6 +74,29 @@ describe('DfAiUsageComponent service_id deep link', () => {
     expect(
       fixture.nativeElement.querySelector('.usage__filter-chips').textContent
     ).toContain('connection: GPU demo');
+  });
+
+  // Regression: a 200 with an empty or 'null' body (both parse to null)
+  // threw in the template, and recomputeViews returned before rebuilding the
+  // chips, so the deep-linked filter vanished along with the page body.
+  it.each([
+    ["'' or 'null' (parsed to null)", null],
+    ['an unparsed empty string', ''],
+  ])('keeps the deep-linked filter when the body is %s', (_label, body) => {
+    let sent: ReturnType<typeof open> | undefined;
+    expect(() => (sent = open({ service_id: '268' }, body))).not.toThrow();
+
+    expect(sent).toEqual({ usage: ['268'], mcp: ['268'] });
+    expect(fixture.componentInstance.activeChips).toEqual([
+      { dimension: 'service_id', value: 268, label: 'connection: GPU demo' },
+    ]);
+    const page: HTMLElement = fixture.nativeElement;
+    expect(page.querySelector('.usage__filter-chips')?.textContent).toContain(
+      'connection: GPU demo'
+    );
+    expect(page.querySelector('.usage__empty')?.textContent).toContain(
+      'No AI requests in this period'
+    );
   });
 
   it.each([
