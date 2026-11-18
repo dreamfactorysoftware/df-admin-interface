@@ -1,0 +1,44 @@
+// Data Masking tier hooks. `.dm-tier-<tier>` sets --dm-tier / --dm-tier-soft
+// from the --df-mask-* tokens (styles.scss, all three themes) so chips,
+// bars, dots and strip ticks read one variable. --dm-tier-fill is what solid
+// marks (bars, ticks, meters) paint with: the tier colour, unless a theme
+// gives the tier a texture (phosphor hatches identity, since its tiers
+// cannot part by hue). --dm-tier-ink is the tier colour for small text on
+// its own wash: identity's amber is mixed toward the theme's text colour
+// (darker in light, lighter in dark) so 12px labels keep 4.5:1.
+@mixin dm-tiers {
+  .dm-tier-restricted {
+    --dm-tier: var(--df-mask-restricted);
+    --dm-tier-soft: var(--df-mask-restricted-soft);
+    --dm-tier-fill: var(--df-mask-restricted-fill, var(--df-mask-restricted));
+    --dm-tier-ink: var(--df-mask-restricted);
+  }
+  .dm-tier-identity {
+    --dm-tier: var(--df-mask-identity);
+    --dm-tier-soft: var(--df-mask-identity-soft);
+    --dm-tier-fill: var(--df-mask-identity-fill, var(--df-mask-identity));
+    --dm-tier-ink: color-mix(
+      in srgb,
+      var(--df-mask-identity) 76%,
+      var(--df-text)
+    );
+  }
+  .dm-tier-quasi {
+    --dm-tier: var(--df-mask-quasi);
+    --dm-tier-soft: var(--df-mask-quasi-soft);
+    --dm-tier-fill: var(--df-mask-quasi-fill, var(--df-mask-quasi));
+    --dm-tier-ink: var(--df-mask-quasi);
+  }
+  .dm-tier-free_text {
+    --dm-tier: var(--df-mask-free-text);
+    --dm-tier-soft: var(--df-mask-free-text-soft);
+    --dm-tier-fill: var(--df-mask-free-text-fill, var(--df-mask-free-text));
+    --dm-tier-ink: var(--df-mask-free-text);
+  }
+  .dm-tier-clear {
+    --dm-tier: var(--df-text-faint);
+    --dm-tier-soft: var(--df-surface-2);
+    --dm-tier-fill: var(--df-text-faint);
+    --dm-tier-ink: var(--df-text-muted);
+  }
+}

@@ -1,0 +1,66 @@
+# Flags pull requests that change dist/. CI builds dist/ after the merge (see
+# dist.yml), so a pull request has no reason to carry it, and a branch that
+# does carry it conflicts with every bot build.
+#
+# The repo has no branch protection, so this is advisory: a red check, not a
+# block.
+#
+# GitHub does not run pull_request workflows on a pull request that has merge
+# conflicts. A branch whose dist/ conflicts with the base gets no check from
+# here at all. The README section "dist is built by CI" covers that case.
+name: Guard dist
+
+on:
+  pull_request:
+    # Keep in step with the branch list in dist.yml.
+    branches:
+      - develop
+      - 'dist-proof/**'
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail if the pull request changes dist/
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          # HEAD is GitHub's test merge of the pull request into the base. The
+          # three-dot diff is what that merge would change on the base. Bot
+          # commits that reached the branch by merging the base in are not
+          # counted.
+          changed="$(git diff --name-only --no-renames "origin/${BASE}...HEAD" -- dist)"
+          if [ -z "$changed" ]; then
+            echo "No dist/ changes."
+            exit 0
+          fi
+
+          count="$(wc -l <<<"$changed" | tr -d ' ')"
+          echo "::error title=dist/ is built by CI::This pull request changes ${count} file(s) under dist/. Remove them from the branch. The commands are in the log of this job."
+          cat <<EOF
+
+          dist/ on ${BASE} is built by CI after every merge
+          (.github/workflows/dist.yml). A pull request must not change it.
+
+          To drop the dist changes from your branch:
+
+            git fetch origin
+            git restore --source="origin/${BASE}...HEAD" --staged --worktree -- dist
+            git commit -m "chore: drop dist changes"
+            git push
+
+          This puts dist/ back to what it was where your branch left ${BASE}.
+          It does not touch src/. For a branch that conflicts with ${BASE} in
+          dist/, see "dist is built by CI" in README.md.
+
+          Changed files (first 20 of ${count}):
+          EOF
+          head -n 20 <<<"$changed"
+          exit 1

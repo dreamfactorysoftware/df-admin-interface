@@ -21,7 +21,7 @@
       [type]="
         schema.type === 'integer'
           ? 'number'
-          : schema.type === 'password'
+          : schema.type === 'password' || isMaskedSecret
             ? 'password'
             : 'text'
       "
@@ -29,6 +29,18 @@
         schema.type === 'password' ? 'current-password' : 'off'
       "
       [attr.aria-label]="schema.label" />
+    <button
+      *ngIf="showSecretEye"
+      matSuffix
+      mat-icon-button
+      type="button"
+      data-testid="config-secret-eye"
+      [attr.aria-label]="secretRevealed ? 'Hide value' : 'Reveal value'"
+      [attr.aria-pressed]="secretRevealed"
+      [title]="secretRevealed ? 'Hide value' : 'Reveal value'"
+      (click)="toggleSecretReveal($event)">
+      <fa-icon [icon]="secretRevealed ? faEyeSlash : faEye"></fa-icon>
+    </button>
     <mat-select
       *ngIf="['picklist', 'multi_picklist'].includes(schema.type)"
       [multiple]="schema.type === 'multi_picklist'"

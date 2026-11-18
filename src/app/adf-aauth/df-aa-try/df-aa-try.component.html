@@ -1,0 +1,205 @@
+<form class="send" (ngSubmit)="send()" data-testid="aa-try-form">
+  <mat-select
+    class="method"
+    name="method"
+    [(ngModel)]="store.method"
+    [aria-label]="'aauth.try.method' | transloco"
+    data-testid="aa-try-method">
+    <mat-option *ngFor="let m of methods" [value]="m">{{ m }}</mat-option>
+  </mat-select>
+
+  <label class="url" data-testid="aa-try-url">
+    <span class="origin" *ngIf="origin">{{ origin }}</span>
+    <input
+      name="path"
+      [(ngModel)]="store.path"
+      autocomplete="off"
+      spellcheck="false"
+      [attr.aria-label]="'aauth.try.path' | transloco"
+      data-testid="aa-try-path" />
+  </label>
+
+  <button
+    mat-flat-button
+    color="primary"
+    type="submit"
+    class="send-btn"
+    [disabled]="!canSend"
+    data-testid="aa-try-send">
+    <mat-icon>send</mat-icon>
+    {{ 'aauth.try.send' | transloco }}
+  </button>
+  <button
+    mat-icon-button
+    type="button"
+    class="reset"
+    (click)="store.reset()"
+    [attr.aria-label]="'aauth.try.reset' | transloco"
+    [matTooltip]="'aauth.try.reset' | transloco"
+    data-testid="aa-try-reset">
+    <mat-icon>restart_alt</mat-icon>
+  </button>
+
+  <mat-form-field
+    *ngIf="store.bodyAllowed"
+    class="body"
+    appearance="outline"
+    subscriptSizing="dynamic">
+    <mat-label>{{ 'aauth.try.body' | transloco }}</mat-label>
+    <textarea
+      matInput
+      name="body"
+      rows="5"
+      spellcheck="false"
+      [(ngModel)]="store.body"
+      data-testid="aa-try-body"></textarea>
+  </mat-form-field>
+</form>
+
+<!-- The three participants, named once; every step draws between them. -->
+<div class="lanes" aria-hidden="true" data-testid="aa-lanes">
+  <span class="lane-name" data-lane="agent">{{
+    'aauth.try.lane.agent' | transloco
+  }}</span>
+  <span class="lane-name" data-lane="api">{{
+    'aauth.try.lane.api' | transloco
+  }}</span>
+  <span class="lane-name" data-lane="ps">{{
+    'aauth.try.lane.ps' | transloco
+  }}</span>
+</div>
+<div
+  class="idle"
+  *ngIf="!store.run?.steps?.length"
+  aria-hidden="true"
+  data-testid="aa-lanes-idle"></div>
+
+<ol class="timeline" *ngIf="store.run as run" data-testid="aa-timeline">
+  <li
+    *ngFor="let s of run.steps; let i = index; trackBy: trackStep"
+    class="row">
+    <!-- Agent -> the lane it called; the response status colours the head. -->
+    <span
+      class="strip"
+      [attr.data-lane]="lane(s)"
+      [attr.data-tone]="tone(s)"
+      [class.enter]="i === entrance.index"
+      data-testid="aa-lane">
+      <span class="cdk-visually-hidden">{{
+        'aauth.try.lane.' + lane(s) | transloco
+      }}</span>
+      <span class="from"></span>
+      <span class="shaft"></span>
+      <span class="head"></span>
+      <span class="to"></span>
+      <span class="dots">
+        <span data-dot="agent"></span>
+        <span data-dot="api"></span>
+        <span data-dot="ps"></span>
+      </span>
+    </span>
+    <df-aa-step
+      [step]="s"
+      [index]="i"
+      [expanded]="isOpen(i)"
+      [bodyBelow]="bodyBelow(run, i)"
+      (toggled)="toggle(i)"></df-aa-step>
+  </li>
+
+  <!-- A person must approve: the card hangs off the Person Server lane. -->
+  <li class="row wait" *ngIf="run.status === 'waiting' && run.pending as p">
+    <span class="strip" data-lane="ps" data-tone="accent" aria-hidden="true">
+      <span class="hook"></span>
+      <span class="hook-line"></span>
+      <span class="dots">
+        <span data-dot="agent"></span>
+        <span data-dot="api"></span>
+        <span data-dot="ps"></span>
+      </span>
+    </span>
+    <section
+      class="approve"
+      role="status"
+      aria-live="polite"
+      data-testid="aa-approve-card">
+      <div class="approve-state">
+        <span class="ring" aria-hidden="true"></span>
+        {{ 'aauth.try.waiting' | transloco }}
+      </div>
+      <div class="approve-main">
+        <span class="cdk-visually-hidden">{{
+          'aauth.try.code' | transloco
+        }}</span>
+        <span class="code" data-testid="aa-approve-code">{{ p.code }}</span>
+        <df-aa-copy
+          class="code-copy"
+          [text]="p.code"
+          [label]="'aauth.try.copyCode' | transloco"
+          testId="aa-approve-copy"></df-aa-copy>
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="approve-btn"
+          (click)="approve()"
+          data-testid="aa-approve">
+          <mat-icon>open_in_new</mat-icon>
+          {{ 'aauth.try.approve' | transloco }}
+        </button>
+      </div>
+    </section>
+  </li>
+
+  <li class="row end" *ngIf="run.status === 'running'">
+    <span class="strip" data-lane="agent" aria-hidden="true">
+      <span class="node busy">
+        <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+      </span>
+    </span>
+    <div class="tl-note" data-testid="aa-run-running">
+      {{ 'aauth.try.running' | transloco }}
+    </div>
+  </li>
+
+  <li class="row end" *ngIf="run.status === 'failed'">
+    <span class="strip" data-lane="agent" data-tone="danger" aria-hidden="true">
+      <span class="node"><mat-icon>close</mat-icon></span>
+    </span>
+    <div class="tl-error" role="alert" data-testid="aa-run-error">
+      <strong>{{ 'aauth.try.failed' | transloco }}</strong>
+      <span *ngIf="run.error">{{ run.error }}</span>
+    </div>
+  </li>
+
+  <!-- What the agent got back: the end of every lifeline. -->
+  <li class="row end result" *ngIf="run.result as r">
+    <span
+      class="strip"
+      data-lane="agent"
+      [attr.data-tone]="statusVariant(r.status)"
+      aria-hidden="true">
+      <span class="node"
+        ><mat-icon>{{
+          statusVariant(r.status) === 'success' ? 'check' : 'flag'
+        }}</mat-icon></span
+      >
+    </span>
+    <section class="result-card" data-testid="aa-run-result">
+      <header>
+        <span class="result-label">{{ 'aauth.try.result' | transloco }}</span>
+        <df-badge
+          [variant]="statusVariant(r.status)"
+          [label]="'' + r.status"
+          data-testid="aa-run-result-status"></df-badge>
+      </header>
+      <df-aa-json
+        *ngIf="r.body; else empty"
+        [value]="r.body"
+        [label]="'aauth.try.result' | transloco"
+        testId="aa-result-copy"></df-aa-json>
+      <ng-template #empty>
+        <p class="nobody">{{ 'aauth.try.noBody' | transloco }}</p>
+      </ng-template>
+    </section>
+  </li>
+</ol>

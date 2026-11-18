@@ -20,26 +20,106 @@ export const DEFAULT_RATES: Record<string, ProviderRates> = {
   },
 };
 
+/** One rate entry as served by df-ai (USD per 1k tokens). */
+export interface RateEntryRaw {
+  input_per_1k: number | string;
+  output_per_1k: number | string;
+}
+
 /**
- * Convert the snake_case shape served by /_internal/ai/usage's
+ * `default_rates` as served by /_internal/ai/usage. Two shapes are in the
+ * field and both must keep working:
+ *   - df-ai 0.1.0 and later (DreamFactory 7.7): provider rates and per-model
+ *     rates, `{ providers: {...}, models: {...} }`.
+ *   - df-ai 0.0.x: a flat provider map, `{ anthropic: {...}, ... }`.
+ */
+export type DefaultRatesRaw =
+  | Record<string, RateEntryRaw>
+  | {
+      providers?: Record<string, RateEntryRaw>;
+      models?: Record<string, RateEntryRaw>;
+    };
+
+export interface RatePair {
+  inputPer1k: number;
+  outputPer1k: number;
+}
+
+/** `default_rates` in one shape, whichever one the backend sent. */
+export interface LiveRates {
+  providers: Record<string, RatePair>;
+  models: Record<string, RatePair>;
+}
+
+function rateNumber(v: unknown): number {
+  if (typeof v === 'number') {
+    return v;
+  }
+  return typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+}
+
+function ratePair(v: unknown): RatePair | null {
+  if (!v || typeof v !== 'object') {
+    return null;
+  }
+  const inputPer1k = rateNumber((v as Partial<RateEntryRaw>).input_per_1k);
+  const outputPer1k = rateNumber((v as Partial<RateEntryRaw>).output_per_1k);
+  return Number.isFinite(inputPer1k) && Number.isFinite(outputPer1k)
+    ? { inputPer1k, outputPer1k }
+    : null;
+}
+
+function collectRates(map: unknown): Record<string, RatePair> {
+  // No prototype, so a model named "constructor" never resolves to an
+  // inherited member.
+  const out: Record<string, RatePair> = Object.create(null);
+  if (!map || typeof map !== 'object') {
+    return out;
+  }
+  for (const [name, entry] of Object.entries(map)) {
+    const pair = ratePair(entry);
+    if (pair) {
+      out[name] = pair;
+    }
+  }
+  return out;
+}
+
+/**
+ * Read `default_rates` in either served shape. The payload is nested when
+ * `providers` or `models` holds a map rather than a rate entry, so a flat
+ * map that prices a provider literally named "providers" still reads as
+ * flat. Entries without two numeric rates are dropped.
+ */
+export function liveRates(raw: DefaultRatesRaw | null | undefined): LiveRates {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const nested = [r['providers'], r['models']].some(
+    v => !!v && typeof v === 'object' && !ratePair(v)
+  );
+  return nested
+    ? {
+        providers: collectRates(r['providers']),
+        models: collectRates(r['models']),
+      }
+    : { providers: collectRates(r), models: {} };
+}
+
+/**
+ * Convert the provider rates served by /_internal/ai/usage's
  * `default_rates` field into the camelCase ProviderRates shape used by the
  * cost-estimator's table. Caller passes the value out of `bundle.raw`.
  */
 export function ratesFromBundle(
-  defaultRates:
-    | Record<string, { input_per_1k: number; output_per_1k: number }>
-    | undefined
+  defaultRates: DefaultRatesRaw | null | undefined
 ): Record<string, ProviderRates> {
   if (!defaultRates) {
     return DEFAULT_RATES;
   }
   const out: Record<string, ProviderRates> = {};
-  for (const [provider, r] of Object.entries(defaultRates)) {
-    out[provider] = {
-      provider,
-      inputPer1k: r.input_per_1k,
-      outputPer1k: r.output_per_1k,
-    };
+  for (const [provider, r] of Object.entries(
+    liveRates(defaultRates).providers
+  )) {
+    out[provider] = { provider, ...r };
   }
   // Merge in fallback for any provider the backend didn't list — keeps the
   // estimator from breaking if a new provider gets added before the

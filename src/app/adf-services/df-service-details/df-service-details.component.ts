@@ -7,6 +7,7 @@ import {
   OnInit,
   TemplateRef,
   ViewChild,
+  inject,
 } from '@angular/core';
 import {
   FormArray,
@@ -25,7 +26,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslocoPipe } from '@ngneat/transloco';
+import { TranslocoPipe, TranslocoService } from '@ngneat/transloco';
 import { DfArrayFieldComponent } from 'src/app/shared/components/df-field-array/df-array-field.component';
 import { DfDynamicFieldComponent } from 'src/app/shared/components/df-dynamic-field/df-dynamic-field.component';
 import { DfRoleScopeComponent } from 'src/app/shared/components/df-role-scope/df-role-scope.component';
@@ -67,6 +68,7 @@ import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service'
 import { Service } from 'src/app/shared/types/files';
 import { AceEditorMode } from 'src/app/shared/types/scripts';
 import { DfScriptEditorComponent } from 'src/app/shared/components/df-script-editor/df-script-editor.component';
+import { DfLinkServiceComponent } from 'src/app/shared/components/df-link-service/df-link-service.component';
 import { DfFileGithubComponent } from 'src/app/shared/components/df-file-github/df-file-github.component';
 import { DfSystemConfigDataService } from 'src/app/shared/services/df-system-config-data.service';
 import {
@@ -114,18 +116,25 @@ import { DfSystemService } from 'src/app/shared/services/df-system.service';
 import { DfPaywallModal } from 'src/app/shared/components/df-paywall-modal/df-paywall-modal.component';
 import { DfAnalyticsService } from 'src/app/shared/services/df-analytics.service';
 import { DfArtifactResolverService } from 'src/app/shared/services/df-artifact-resolver.service';
-import { DfPageHeaderComponent } from 'src/app/shared/components/df-page-header/df-page-header.component';
+import { DfDisclosureComponent } from 'src/app/shared/components/df-disclosure/df-disclosure.component';
 import {
   DfArtifactCardComponent,
   ArtifactKeyOption,
 } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 import { DfScopeMatrixComponent } from 'src/app/shared/components/df-scope-matrix/df-scope-matrix.component';
+import { DfScopeService } from 'src/app/shared/services/df-scope.service';
 import { DfServiceHealthPanelComponent } from '../df-service-health-panel/df-service-health-panel.component';
 import { DfPipelineStripComponent } from 'src/app/shared/components/df-pipeline-strip/df-pipeline-strip.component';
 import { ScopeVerb } from 'src/app/shared/services/df-scope.service';
 import { DfServiceRoleScopeDialogComponent } from './df-service-role-scope-dialog.component';
 import { DfCurlImportDialogComponent } from 'src/app/shared/components/df-curl-import-dialog/df-curl-import-dialog.component';
 import { ParsedCurl } from 'src/app/shared/utilities/curl-parser';
+import {
+  backendAuthDefaultsToApply,
+  backendAuthState,
+  missingBackendAuthFields,
+  pickBackendAuthFields,
+} from './backend-auth-fields';
 
 type UnsavedToolChoice = 'save' | 'discard' | 'cancel';
 
@@ -189,6 +198,7 @@ interface ServiceResponse {
     MatTooltipModule,
     MatButtonModule,
     DfScriptEditorComponent,
+    DfLinkServiceComponent,
     DfFileGithubComponent,
     DfPaywallComponent,
     MatStepperModule,
@@ -202,7 +212,7 @@ interface ServiceResponse {
     DfSecurityConfigComponent,
     MatMenuModule,
     MatDialogModule,
-    DfPageHeaderComponent,
+    DfDisclosureComponent,
     DfArtifactCardComponent,
     DfScopeMatrixComponent,
     DfPipelineStripComponent,
@@ -212,6 +222,11 @@ interface ServiceResponse {
 export class DfServiceDetailsComponent implements OnInit {
   edit = false;
   isDatabase = false;
+  /** Counts for the closed Access section's header line ("12 of 313
+   *  roles ..."). The template translates them, see loadAccessSummary(). */
+  accessCounts: { granted: number; total: number } | null = null;
+  private readonly scope = inject(DfScopeService);
+  private readonly transloco = inject(TranslocoService);
   /** DreamFactory Platform APIs route (data.system). Those services are not
    * role-governed the way a user service is, so they are not health-scored. */
   isPlatformService = false;
@@ -591,6 +606,7 @@ export class DfServiceDetailsComponent implements OnInit {
           }
         }
         this.serviceData = data;
+        this.loadAccessSummary();
         if (data) {
           // For script services, use script content, not service definition
           if (this.isScriptService) {
@@ -1547,6 +1563,7 @@ export class DfServiceDetailsComponent implements OnInit {
         config.addControl('content', new FormControl(''));
         // Initialize serviceDefinitionType for JSON/YAML toggle
         this.serviceDefinitionType = '0'; // Default to JSON
+        this.wireBackendAuthDefaults(config);
       }
       if (this.isScriptService) {
         // Ensure script services have content field for script content
@@ -1558,7 +1575,27 @@ export class DfServiceDetailsComponent implements OnInit {
       }
     }
 
+    this.backendAuthOpen = false;
     this.serviceForm.setControl('config', config);
+  }
+
+  // Entering a token URL turns outbound OAuth2 on. A service saved before the
+  // OAuth2 columns existed loads its grant type and auth method as null, so
+  // fill the empty picklists from the schema defaults at that point. Nothing
+  // is touched while the token URL is blank, so a service that does not use
+  // the feature saves the same config as before.
+  private wireBackendAuthDefaults(config: FormGroup): void {
+    const fields = this.networkBackendAuthFields;
+    const tokenUrl = config.get('oauthTokenUrl');
+    if (!fields.length || !tokenUrl) {
+      return;
+    }
+    tokenUrl.valueChanges.subscribe(() => {
+      backendAuthDefaultsToApply(
+        fields,
+        name => config.get(name)?.value
+      ).forEach(([name, value]) => config.get(name)?.setValue(value));
+    });
   }
 
   get subscriptionRequired() {
@@ -1665,6 +1702,7 @@ export class DfServiceDetailsComponent implements OnInit {
   private memoAdvancedFields: Array<ConfigSchema> = [];
   private memoNetworkRequiredFields: Array<ConfigSchema> = [];
   private memoNetworkAdvancedFields: Array<ConfigSchema> = [];
+  private memoNetworkBackendAuthFields: Array<ConfigSchema> = [];
 
   private syncSchemaViews(): void {
     if (
@@ -1719,13 +1757,21 @@ export class DfServiceDetailsComponent implements OnInit {
     if (!this.isNetworkService) {
       this.memoNetworkRequiredFields = [];
       this.memoNetworkAdvancedFields = [];
+      this.memoNetworkBackendAuthFields = [];
     } else {
+      // Outbound OAuth2 fields get their own panel. The list is empty unless
+      // the schema carries them. When it is empty, Advanced Options keeps
+      // every field, as before.
+      const backendAuthFields = pickBackendAuthFields(viewSchema);
+      this.memoNetworkBackendAuthFields = backendAuthFields;
       this.memoNetworkRequiredFields = viewSchema.filter(field =>
         requiredFieldNames.includes(field.name)
       );
       this.memoNetworkAdvancedFields = viewSchema.filter(
         field =>
-          !requiredFieldNames.includes(field.name) && field.name !== 'content'
+          !requiredFieldNames.includes(field.name) &&
+          field.name !== 'content' &&
+          !backendAuthFields.includes(field)
       );
     }
   }
@@ -1767,6 +1813,38 @@ export class DfServiceDetailsComponent implements OnInit {
   get networkAdvancedFields() {
     this.syncSchemaViews();
     return this.memoNetworkAdvancedFields;
+  }
+
+  // Backend Authentication panel: the outbound OAuth2 fields of an HTTP
+  // service. Empty for every schema that does not carry them.
+  get networkBackendAuthFields() {
+    this.syncSchemaViews();
+    return this.memoNetworkBackendAuthFields;
+  }
+
+  /** Open state of the Backend Authentication disclosure. */
+  backendAuthOpen = false;
+
+  private readonly backendAuthValue = (name: string): unknown =>
+    this.serviceForm.get(`config.${name}`)?.value;
+
+  /** Transloco key for the one-line state in the panel header. */
+  get backendAuthSummaryKey(): string {
+    return `services.backendAuth.summary.${backendAuthState(
+      this.networkBackendAuthFields,
+      this.backendAuthValue
+    )}`;
+  }
+
+  /** Labels of the fields still empty although a token URL is set. Empty
+   *  string when the panel is complete, turned off, or not shown. */
+  get backendAuthMissingLabels(): string {
+    return missingBackendAuthFields(
+      this.networkBackendAuthFields,
+      this.backendAuthValue
+    )
+      .map(field => field.label)
+      .join(', ');
   }
 
   trackByName = (_: number, item: { name: string }): string => item.name;
@@ -1935,6 +2013,19 @@ export class DfServiceDetailsComponent implements OnInit {
     if (data.type === '' || data.name === '') {
       // Show validation errors instead of silently doing nothing.
       this.serviceForm.markAllAsTouched();
+      return;
+    }
+    // A token URL without the rest leaves outbound OAuth2 silently off in the
+    // backend. Only reachable when the Backend Authentication panel is shown.
+    const backendAuthMissing = this.backendAuthMissingLabels;
+    if (backendAuthMissing) {
+      this.backendAuthOpen = true;
+      this.snackbarService.openSnackBar(
+        this.transloco.translate('services.backendAuth.saveBlocked', {
+          fields: backendAuthMissing,
+        }),
+        'error'
+      );
       return;
     }
     if (!this.validateServiceName(data.name)) {
@@ -2190,24 +2281,20 @@ export class DfServiceDetailsComponent implements OnInit {
         )
         .subscribe({
           next: (response: ServiceResponse) => {
+            // The cached first-API stats predate this service.
+            this.analyticsService.clearCache();
             if (data.type.toLowerCase().includes('saml')) {
               this.router.navigate(['../'], {
                 relativeTo: this.activatedRoute,
               });
             } else if (this.isDatabase) {
-              // Meridian Phase 1 proof-of-life: a new database API lands on its
-              // Overview (the Live API Card with a runnable curl), not the
-              // api-docs scavenger hunt. `../{id}` is the sibling :id route.
-              const newId = response?.resource?.[0]?.id;
-              if (newId != null) {
-                this.router.navigate(['../', newId], {
-                  relativeTo: this.activatedRoute,
-                });
-              } else {
-                this.router.navigate([
-                  `/api-connections/api-docs/${formattedName}`,
-                ]);
-              }
+              // A new database API lands on Data Explorer with that API
+              // selected: live rows from the connection just entered, not
+              // the config form it was created from (2026-07 landed on the
+              // service Overview; before that, API Docs).
+              this.router.navigate(['/api-connections/data-explorer'], {
+                queryParams: { service: data.name },
+              });
             } else if (this.isMcp) {
               // A new MCP server lands on its own editor's Connect tab with
               // the endpoint URL and first-run checklist — never API Docs,
@@ -2292,6 +2379,24 @@ export class DfServiceDetailsComponent implements OnInit {
   // Meridian Phase 3: a granted scope-matrix cell opens the role's resolved
   // scope in a dialog. df-scope-matrix only emits for non-'none' cells, so
   // there is always a real grant to inspect here.
+  private loadAccessSummary(): void {
+    this.accessCounts = null;
+    const id = this.serviceData?.id;
+    if (!this.edit || !this.isDatabase || !id) {
+      return;
+    }
+    // Keep the counts and let the transloco pipe in the template translate
+    // them. The roles can already be cached by an earlier page, so this can
+    // run before the lazily loaded "services" scope has arrived, and
+    // transloco.translate() would then return the raw key for good.
+    this.scope.matrixForService(id).subscribe(matrix => {
+      const granted = matrix.roles.filter(row =>
+        Object.values(row.verbs).some(state => state !== 'none')
+      ).length;
+      this.accessCounts = { granted, total: matrix.roles.length };
+    });
+  }
+
   onScopeCellClick(event: { roleId: number; verb: ScopeVerb }): void {
     this.dialog.open(DfServiceRoleScopeDialogComponent, {
       width: '640px',
@@ -2443,6 +2548,8 @@ export class DfServiceDetailsComponent implements OnInit {
 
       // Store the newly created service ID for role creation
       this.currentServiceId = createdService.id;
+      // The cached first-API stats predate this service.
+      this.analyticsService.clearCache();
 
       // Show success message using DfSnackbarService
       this.snackbarService.openSnackBar('Service created', 'success');

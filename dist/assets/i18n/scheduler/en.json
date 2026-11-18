@@ -21,8 +21,31 @@
       "component": "Component",
       "method": "Method",
       "frequency": "Frequency",
+      "lastRun": "Last run",
       "log": "Log"
     }
+  },
+  "run": {
+    "running": "Running",
+    "never": "Never",
+    "ok": "OK, {{ago}}",
+    "failedCode": "Failed {{code}}, {{ago}}",
+    "unfinished": "Did not finish, started {{ago}}",
+    "unfinishedNoTime": "Did not finish",
+    "historyTab": "Run history",
+    "lastSuccess": "Last success",
+    "lastFailure": "Last failure",
+    "none": "None",
+    "started": "Started",
+    "duration": "Duration",
+    "status": "Status",
+    "inProgress": "In progress",
+    "seconds": "{{seconds}}s",
+    "showOutput": "Show output",
+    "hideOutput": "Hide output",
+    "loadError": "Run history could not be loaded.",
+    "emptyTitle": "This task has not run yet",
+    "emptyHint": "It runs every {{frequency}} minute(s) while it is active. Runs appear here after the first one."
   },
   "logs": {
     "title": "Scheduler Task Log",

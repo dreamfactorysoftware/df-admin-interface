@@ -96,6 +96,16 @@
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+// Opt-in fixed column count ([cardColumns]); auto-fit again when narrow.
+@media (min-width: 900px) {
+  .section-landing__cards--fixed {
+    grid-template-columns: repeat(
+      var(--section-landing-card-cols),
+      minmax(0, 1fr)
+    );
+  }
+}
+
 // Categorical tint (punch 21). A card/stat maps its data-category to the
 // shared --df-tint-<cat>-* token pair via two local vars; the chip, action
 // link, and hover border below read those vars. No category = accent

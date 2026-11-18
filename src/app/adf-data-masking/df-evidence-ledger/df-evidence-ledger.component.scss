@@ -1,0 +1,190 @@
+@use '../dm-tier' as *;
+@include dm-tiers;
+
+:host {
+  display: block;
+}
+
+.ledger {
+  display: grid;
+  gap: var(--df-space-5);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  padding: var(--df-space-3) var(--df-space-4) var(--df-space-4);
+
+  @media (max-width: 720px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--df-space-3);
+  }
+}
+
+.receipt {
+  list-style: none;
+  margin: 0;
+  max-width: 520px;
+  padding: 0;
+}
+
+.line {
+  align-items: baseline;
+  color: var(--df-text-2);
+  display: grid;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-3);
+  grid-template-columns: 40px minmax(0, 1fr);
+  line-height: var(--df-lh-base);
+  padding: 2px 0;
+
+  &.is-zero {
+    color: var(--df-text-muted);
+  }
+
+  &.is-penalty .pts {
+    color: var(--df-danger);
+  }
+}
+
+.pts {
+  color: var(--df-text);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  text-align: right;
+
+  .is-zero & {
+    color: var(--df-text-faint);
+  }
+}
+
+// The total: a ruled-off receipt line with the score on a thresholded bar.
+.total {
+  align-items: center;
+  border-top: 1px dashed var(--df-border);
+  grid-template-columns: 40px auto minmax(120px, 200px);
+  margin-top: var(--df-space-2);
+  padding-top: var(--df-space-2);
+
+  .pts {
+    font-size: var(--df-font-size-md);
+    font-weight: var(--df-font-weight-heading);
+  }
+}
+
+.verdict {
+  color: var(--df-text);
+  font-weight: var(--df-font-weight-medium);
+}
+
+.meter {
+  background: var(--df-surface-2);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--df-border-2);
+  height: 6px;
+  margin-bottom: 12px;
+  position: relative;
+  top: 6px;
+}
+
+.meter-fill {
+  background: var(--df-text-faint);
+  border-radius: 999px;
+  inset: 0 auto 0 0;
+  position: absolute;
+  transition: width var(--df-duration-standard) var(--df-ease-standard);
+
+  // Same language as the chip and strip: solid tier for masked, a hollow
+  // tier outline while the column still needs review.
+  .is-masked &,
+  .is-review & {
+    background: var(--dm-tier-fill);
+  }
+
+  .is-undecided & {
+    background: var(--dm-tier-soft);
+    box-shadow: inset 0 0 0 1px var(--dm-tier);
+  }
+}
+
+.notch {
+  background: var(--df-text-muted);
+  height: 10px;
+  position: absolute;
+  top: -2px;
+  width: 1px;
+}
+
+.notch-n {
+  color: var(--df-text-faint);
+  font-size: 10px;
+  left: 50%;
+  line-height: 1;
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+}
+
+.facts {
+  align-content: start;
+  display: grid;
+  font-size: var(--df-font-size-sm);
+  gap: var(--df-space-2) var(--df-space-3);
+  grid-template-columns: max-content minmax(0, 1fr);
+  margin: 0;
+
+  dt {
+    color: var(--df-text-muted);
+    padding-top: 2px;
+  }
+
+  dd {
+    color: var(--df-text-2);
+    margin: 0;
+    min-width: 0;
+  }
+
+  code {
+    color: var(--df-text-2);
+    font-family: var(--df-font-mono);
+    font-size: var(--df-font-size-xs);
+  }
+}
+
+.shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--df-space-1);
+}
+
+.shape {
+  align-items: center;
+  background: var(--df-surface-2);
+  border: 1px solid var(--df-border-2);
+  border-radius: var(--df-radius-sm);
+  display: inline-flex;
+  gap: 6px;
+  max-width: 100%;
+  padding: 1px 6px;
+
+  code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.shape-pct {
+  color: var(--df-text-muted);
+  font-size: var(--df-font-size-xs);
+}
+
+.decided {
+  align-items: center;
+  display: flex;
+  gap: var(--df-space-1);
+
+  mat-icon {
+    color: var(--df-text-muted);
+    font-size: 16px;
+    height: 16px;
+    width: 16px;
+  }
+}

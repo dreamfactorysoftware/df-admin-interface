@@ -13,6 +13,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoModule } from '@ngneat/transloco';
+import { ActivatedRoute } from '@angular/router';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -72,7 +73,8 @@ export class DfDataExplorerComponent
     private dataExplorerService: DataExplorerService,
     private themeService: DfThemeService,
     private elementRef: ElementRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
@@ -120,6 +122,15 @@ export class DfDataExplorerComponent
         next: dbs => {
           this.databases = dbs;
           this.loadingDbs = false;
+          // ?service=<name> opens straight on that database: the post-create
+          // handoff from the API wizard lands here with the new API selected.
+          const requested = this.route.snapshot.queryParamMap.get('service');
+          const match = requested
+            ? dbs.find(db => db.name === requested)
+            : undefined;
+          if (match) {
+            this.onDatabaseSelected(match);
+          }
         },
         error: err => {
           this.errorDbs = normalizeError(err).message;

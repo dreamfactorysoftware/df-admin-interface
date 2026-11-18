@@ -46,10 +46,16 @@ import {
   DataExplorerService,
   TableSchemaResponse,
   FieldInfo,
+  TableKey,
 } from './services/data-explorer.service';
 import { DfSchemaInfoComponent } from './df-schema-info.component';
 import { DfRowDetailComponent } from './df-row-detail.component';
 import { normalizeError } from 'src/app/shared/utilities/app-error';
+import { RouterLink } from '@angular/router';
+import { MaskingNote, MaskingNotice, maskingNoteFor } from './masking-notice';
+import { DfPresentationService } from 'src/app/shared/services/df-presentation.service';
+import { maskSecret } from 'src/app/shared/utilities/mask';
+import { snakeToCamelString } from 'src/app/shared/utilities/case';
 
 interface FilterOp {
   value: string;
@@ -89,6 +95,7 @@ interface ColumnFilter {
     FontAwesomeModule,
     DfSchemaInfoComponent,
     DfRowDetailComponent,
+    RouterLink,
   ],
   template: `
     <div class="data-grid-container" *transloco="let t; scope: 'dataExplorer'">
@@ -106,6 +113,16 @@ interface ColumnFilter {
                 {{ t('dataExplorer.readOnly') }}
               </mat-chip>
             </mat-chip-set>
+            <!-- Data Masking (df-masking): only when the response says so. -->
+            <a
+              *ngIf="maskingNotice?.masked"
+              class="masked-chip"
+              routerLink="/api-security/data-masking"
+              [queryParams]="{ tab: 'access' }"
+              data-testid="de-masked">
+              <mat-icon aria-hidden="true">visibility_off</mat-icon>
+              {{ t('dataExplorer.masked') }}
+            </a>
           </div>
           <div class="toolbar-right">
             <!-- Quick search -->
@@ -195,6 +212,21 @@ interface ColumnFilter {
             matTooltip="Remove navigation filter and show all records">
             <mat-icon>close</mat-icon>
           </button>
+        </div>
+
+        <!-- Data Masking: filters on masked columns match no rows; sorts on
+             them are ignored. One line, only when the response says so. -->
+        <div
+          class="masking-note"
+          *ngIf="maskingNote && !error"
+          role="status"
+          data-testid="de-masking-dropped">
+          <mat-icon class="masking-note-icon" aria-hidden="true"
+            >filter_alt_off</mat-icon
+          >
+          <span class="masking-note-text" [attr.title]="maskingNoteText(t)">{{
+            maskingNoteText(t)
+          }}</span>
         </div>
 
         <!-- Top pagination bar -->
@@ -294,6 +326,88 @@ interface ColumnFilter {
               <mat-icon>{{ apiCopied ? 'check' : 'content_copy' }}</mat-icon>
             </button>
           </div>
+          <div class="api-key-prompt">
+            <ng-container *ngIf="!readKey; else keyReady">
+              <mat-icon>vpn_key</mat-icon>
+              <span class="api-key-text"
+                >No role can read this table yet. Your app calls this URL with
+                an API key, and the key's role decides which tables and verbs it
+                can reach.</span
+              >
+              <button
+                mat-stroked-button
+                class="api-key-btn"
+                [disabled]="keyBusy || keysLoading"
+                (click)="createReadKey()"
+                matTooltip="Creates a role that can only GET this table, plus an API key bound to it. Edit either one later.">
+                Create read-only key for {{ tableName }}
+              </button>
+              <a
+                class="api-key-link"
+                routerLink="/api-connections/role-based-access"
+                >Roles</a
+              >
+              <a class="api-key-link" routerLink="/api-connections/api-keys"
+                >API keys</a
+              >
+            </ng-container>
+            <ng-template #keyReady>
+              <mat-icon [class.ok]="readKey!.apiKey">{{
+                readKey!.apiKey ? 'check_circle' : 'vpn_key'
+              }}</mat-icon>
+              <span class="api-key-text">Roles with read access:</span>
+              <select
+                *ngIf="tableKeys.length > 1; else oneKey"
+                class="api-key-select"
+                [value]="keyOptionId(readKey!)"
+                (change)="selectKey($event)">
+                <option *ngFor="let k of tableKeys" [value]="keyOptionId(k)">
+                  {{ k.roleName
+                  }}{{ k.apiKey ? ' / ' + k.appName : ' (no key)' }}
+                </option>
+              </select>
+              <ng-template #oneKey
+                ><strong>{{ readKey!.roleName }}</strong></ng-template
+              >
+              <ng-container *ngIf="readKey!.apiKey; else noKey">
+                <code class="api-key-value">{{
+                  presentation.on
+                    ? maskSecret(readKey!.apiKey)
+                    : readKey!.apiKey
+                }}</code>
+                <button
+                  mat-stroked-button
+                  class="api-key-btn"
+                  (click)="copyCurl()"
+                  matTooltip="Copy a curl command with this key in the X-DreamFactory-API-Key header">
+                  <mat-icon>{{
+                    curlCopied ? 'check' : 'content_copy'
+                  }}</mat-icon>
+                  Copy curl
+                </button>
+              </ng-container>
+              <ng-template #noKey>
+                <span class="api-key-text">has no API key.</span>
+                <button
+                  mat-stroked-button
+                  class="api-key-btn"
+                  [disabled]="keyBusy"
+                  (click)="createKeyForRole()"
+                  matTooltip="Creates an API key bound to this role">
+                  Create key
+                </button>
+              </ng-template>
+              <a
+                class="api-key-link"
+                [routerLink]="[
+                  '/api-connections/role-based-access',
+                  readKey!.roleId,
+                ]"
+                >Edit role</a
+              >
+            </ng-template>
+            <span class="api-key-error" *ngIf="keyError">{{ keyError }}</span>
+          </div>
           <div class="api-call-options">
             <span class="options-label">Include:</span>
             <label
@@ -364,6 +478,13 @@ interface ColumnFilter {
           <button mat-stroked-button color="primary" (click)="loadData()">
             {{ t('dataExplorer.retry') }}
           </button>
+          <!-- The error hides the filter row, so a bad filter needs a way out here. -->
+          <button
+            mat-stroked-button
+            *ngIf="activeFilterCount > 0"
+            (click)="clearAllFilters()">
+            Clear filters
+          </button>
         </div>
 
         <!-- Empty -->
@@ -406,6 +527,13 @@ interface ColumnFilter {
                     class="pk-icon"
                     matTooltip="Primary Key"
                     >vpn_key</mat-icon
+                  >
+                  <mat-icon
+                    *ngIf="isMaskedColumn(col)"
+                    class="masked-col-icon"
+                    [matTooltip]="t('dataExplorer.masked')"
+                    data-testid="de-masked-col"
+                    >visibility_off</mat-icon
                   >
                   {{ col }}
                   <span
@@ -621,6 +749,30 @@ interface ColumnFilter {
             .lock-icon {
               font-size: 11px;
               margin-right: 4px;
+            }
+          }
+
+          .masked-chip {
+            align-items: center;
+            background: var(--df-accent-soft);
+            border-radius: 999px;
+            color: var(--df-accent-strong, var(--df-accent));
+            display: inline-flex;
+            font-size: 12px;
+            font-weight: 500;
+            gap: 4px;
+            padding: 2px 10px 2px 8px;
+            text-decoration: none;
+
+            mat-icon {
+              font-size: 14px;
+              height: 14px;
+              width: 14px;
+            }
+
+            &:focus-visible {
+              box-shadow: var(--df-focus-ring);
+              outline: none;
             }
           }
         }
@@ -1099,6 +1251,59 @@ interface ColumnFilter {
           }
         }
 
+        .api-key-prompt {
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 0;
+          font-size: 11px;
+          color: var(--df-text-muted);
+
+          mat-icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+            color: var(--df-accent);
+            &.ok {
+              color: var(--df-success);
+            }
+          }
+
+          .api-key-btn {
+            height: 26px;
+            line-height: 26px;
+            font-size: 12px;
+            padding: 0 10px;
+            mat-icon {
+              color: inherit;
+            }
+          }
+
+          .api-key-select {
+            font-size: 12px;
+            max-width: 220px;
+          }
+
+          .api-key-value {
+            font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+            color: var(--df-text-2);
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .api-key-link {
+            color: var(--df-accent-strong);
+          }
+
+          .api-key-error {
+            flex-basis: 100%;
+            color: var(--df-danger);
+          }
+        }
+
         .api-call-options,
         .api-call-related {
           display: flex;
@@ -1143,6 +1348,16 @@ interface ColumnFilter {
         vertical-align: middle;
       }
 
+      /* Data Masking: masked column in header */
+      .masked-col-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+        color: var(--df-text-muted);
+        margin-right: 2px;
+        vertical-align: middle;
+      }
+
       /* FK link cells */
       .fk-cell {
         cursor: pointer !important;
@@ -1172,6 +1387,36 @@ interface ColumnFilter {
 
         &:hover .fk-nav-icon {
           opacity: 0.7;
+        }
+      }
+
+      /* Data Masking: request parts it ignored */
+      .masking-note {
+        align-items: center;
+        background: var(--df-surface-2);
+        border-bottom: 1px solid var(--df-border);
+        color: var(--df-text-2);
+        display: flex;
+        flex-shrink: 0;
+        font-size: 12px;
+        gap: 8px;
+        padding: 4px 12px;
+
+        .masking-note-icon {
+          color: var(--df-text-muted);
+          flex: none;
+          font-size: 16px;
+          height: 16px;
+          width: 16px;
+        }
+
+        // One line: a long column list ends in an ellipsis (full text in
+        // the title) instead of growing the note.
+        .masking-note-text {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
       }
 
@@ -1263,6 +1508,17 @@ export class DfDataGridComponent
   // Filter state
   columnFilters: Record<string, ColumnFilter> = {};
   activeFilterCount = 0;
+
+  /**
+   * Data Masking's headers on the last response (masked values, ignored
+   * filters/sorts); null when there were none, which is always the case
+   * without the commercial df-masking package.
+   */
+  maskingNotice: MaskingNotice | null = null;
+  /** The one-line note those headers call for, or null. */
+  maskingNote: MaskingNote | null = null;
+  /** Masked top-level columns the header named, lower-cased (both cases). */
+  private maskedColumns = new Set<string>();
   private filterSubject$ = new Subject<void>();
 
   // Column resize state
@@ -1271,7 +1527,9 @@ export class DfDataGridComponent
 
   // Panel state
   showSchemaPanel = false;
-  showApiCall = false;
+  // On by default: Data Explorer is the landing page, and the matching API
+  // call is the point of it.
+  showApiCall = true;
   apiCopied = false;
   apiIncludeLimit = true;
   apiIncludeOffset = true;
@@ -1335,7 +1593,8 @@ export class DfDataGridComponent
   constructor(
     private dataExplorerService: DataExplorerService,
     private cdr: ChangeDetectorRef,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    public presentation: DfPresentationService
   ) {
     this.filterSubject$
       .pipe(debounceTime(500), takeUntil(this.destroy$))
@@ -1367,6 +1626,10 @@ export class DfDataGridComponent
   }
 
   resetAndLoad(): void {
+    this.readKey = null;
+    this.tableKeys = [];
+    this.keyError = '';
+    this.loadKeys();
     this.allColumns = [];
     this.columns = [];
     this.filterColumns = [];
@@ -1383,6 +1646,9 @@ export class DfDataGridComponent
     this.cachedSchema = null;
     this.columnWidths = {};
     this.navigationFilter = this.initialFilter || null;
+    this.maskingNotice = null;
+    this.maskingNote = null;
+    this.maskedColumns.clear();
     this.initialLoading = true;
     this.loadData();
     this.loadSchemaForTable();
@@ -1441,10 +1707,22 @@ export class DfDataGridComponent
           }
           this.dataSource.data = records;
           this.totalRecords = res.meta?.count ?? records.length;
+          this.maskingNotice = res.masking ?? null;
+          this.maskingNote = maskingNoteFor(this.maskingNotice);
+          // Response keys arrive camelCased (first_name -> firstName).
+          this.maskedColumns = new Set(
+            (this.maskingNotice?.fields ?? []).flatMap(f => [
+              f.toLowerCase(),
+              snakeToCamelString(f).toLowerCase(),
+            ])
+          );
           this.loading = false;
           this.initialLoading = false;
         },
         error: err => {
+          this.maskingNotice = null;
+          this.maskingNote = null;
+          this.maskedColumns.clear();
           this.error = normalizeError(err).message;
           this.loading = false;
           this.initialLoading = false;
@@ -1614,10 +1892,14 @@ export class DfDataGridComponent
   getOperatorsForColumn(col: string): FilterOp[] {
     const fieldInfo = this.getFieldInfo(col);
     if (!fieldInfo) return this.textOperators;
-    const type = (fieldInfo.type || fieldInfo.dbType).toLowerCase();
-    if (this.isNumericType(type)) return this.numericOperators;
-    if (this.isDateType(type)) return this.dateOperators;
-    if (this.isBooleanType(type)) return this.booleanOperators;
+    // DF types foreign keys as `reference` (and PKs as `id`), so check the
+    // real column type too: a reference to an int column is numeric.
+    const types = [fieldInfo.type, fieldInfo.dbType]
+      .filter(Boolean)
+      .map(t => t.toLowerCase());
+    if (types.some(t => this.isNumericType(t))) return this.numericOperators;
+    if (types.some(t => this.isDateType(t))) return this.dateOperators;
+    if (types.some(t => this.isBooleanType(t))) return this.booleanOperators;
     return this.textOperators;
   }
 
@@ -1678,6 +1960,32 @@ export class DfDataGridComponent
     this.pageIndex = 0;
     this.currentOffset = 0;
     this.loadData();
+  }
+
+  /**
+   * "Conditions on masked columns match no rows: email · Sort ignored on
+   * masked columns: ssn", from the note (`t` is the template's translate).
+   */
+  maskingNoteText(
+    t: (key: string, params?: Record<string, unknown>) => string
+  ): string {
+    const note = this.maskingNote;
+    if (!note) return '';
+    const parts: string[] = [];
+    if (note.filter) {
+      parts.push(
+        note.filter.length
+          ? t('dataExplorer.maskingFilter', { cols: note.filter.join(', ') })
+          : t('dataExplorer.maskingFilterAll')
+      );
+    }
+    if (note.sort) {
+      parts.push(t('dataExplorer.maskingSort', { cols: note.sort.join(', ') }));
+    }
+    const line = parts.join(' · ');
+    return note.more
+      ? `${line} ${t('dataExplorer.maskingMore', { count: note.more })}`
+      : line;
   }
 
   private updateActiveFilterCount(): void {
@@ -1796,6 +2104,14 @@ export class DfDataGridComponent
 
   // --- Primary key detection ---
 
+  /** The column is named in X-DreamFactory-Masked-Fields (case-insensitive). */
+  isMaskedColumn(col: string): boolean {
+    return (
+      this.maskedColumns.has(col.toLowerCase()) ||
+      this.maskedColumns.has(this.getDbColumnName(col).toLowerCase())
+    );
+  }
+
   isPrimaryKey(col: string): boolean {
     const fi = this.getFieldInfo(col);
     return fi?.isPrimaryKey ?? false;
@@ -1895,6 +2211,98 @@ export class DfDataGridComponent
     navigator.clipboard.writeText(url).then(() => {
       this.apiCopied = true;
       setTimeout(() => (this.apiCopied = false), 2000);
+    });
+  }
+
+  // --- Starter API key ---
+
+  tableKeys: TableKey[] = [];
+  readKey: TableKey | null = null;
+  keysLoading = false;
+  keyBusy = false;
+  keyError = '';
+  curlCopied = false;
+  maskSecret = maskSecret;
+
+  /** Show a key that can already read this table, so a reload keeps it. */
+  loadKeys(): void {
+    if (!this.serviceName || !this.tableName) return;
+    this.keysLoading = true;
+    this.dataExplorerService
+      .findReadKeys(this.serviceName, this.tableName)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: keys => {
+          this.tableKeys = keys;
+          this.readKey = keys[0] ?? null;
+          this.keysLoading = false;
+          this.cdr.markForCheck();
+        },
+        // Listing roles is a convenience; on failure, fall back to Create.
+        error: () => {
+          this.keysLoading = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  keyOptionId(k: TableKey): string {
+    return `${k.roleId}:${k.appName}`;
+  }
+
+  selectKey(event: Event): void {
+    const id = (event.target as HTMLSelectElement).value;
+    this.readKey = this.tableKeys.find(k => this.keyOptionId(k) === id) ?? null;
+  }
+
+  createKeyForRole(): void {
+    const role = this.readKey;
+    if (!role) return;
+    this.keyBusy = true;
+    this.keyError = '';
+    this.dataExplorerService
+      .createKeyForRole(role.roleId, role.roleName)
+      .subscribe({
+        next: key => {
+          this.tableKeys = this.tableKeys.map(k => (k === role ? key : k));
+          this.readKey = key;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.keyError = normalizeError(err).message;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  createReadKey(): void {
+    this.keyBusy = true;
+    this.keyError = '';
+    this.dataExplorerService
+      .createReadOnlyKey(this.serviceName, this.tableName)
+      .subscribe({
+        next: key => {
+          this.tableKeys = [key];
+          this.readKey = key;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.keyError = normalizeError(err).message;
+          this.keyBusy = false;
+          this.cdr.markForCheck();
+        },
+      });
+  }
+
+  copyCurl(): void {
+    if (!this.readKey) return;
+    const cmd = `curl -H "X-DreamFactory-API-Key: ${this.readKey.apiKey}" "${this.buildApiUrl()}"`;
+    navigator.clipboard.writeText(cmd).then(() => {
+      this.curlCopied = true;
+      setTimeout(() => (this.curlCopied = false), 2000);
     });
   }
 

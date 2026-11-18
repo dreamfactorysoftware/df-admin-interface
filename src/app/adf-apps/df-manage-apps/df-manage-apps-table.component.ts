@@ -27,6 +27,7 @@ import { faCopy } from '@fortawesome/free-solid-svg-icons';
 import { catchError, forkJoin, of, throwError } from 'rxjs';
 import { UsageService, n } from 'src/app/adf-ai-usage/services/usage.service';
 import { LimitType } from 'src/app/shared/types/limit';
+import { DfSecretComponent } from 'src/app/shared/components/df-secret/df-secret.component';
 
 /** Threshold state for a key's rate-limit meter. */
 type MeterVariant = 'ok' | 'warning' | 'danger';
@@ -73,6 +74,7 @@ interface VirtualKeyRow {
   imports: [
     ...DfManageTableModules,
     DfEmptyStateComponent,
+    DfSecretComponent,
     DecimalPipe,
     CurrencyPipe,
   ],

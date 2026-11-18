@@ -21,6 +21,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
+import { filterUserServices } from 'src/app/shared/utilities/user-services';
 import { SERVICES_SERVICE_TOKEN } from 'src/app/shared/constants/tokens';
 import { DfBaseCrudService } from 'src/app/shared/services/df-base-crud.service';
 import { ROUTES } from 'src/app/shared/types/routes';
@@ -38,38 +39,12 @@ import { DfBadgeComponent } from 'src/app/shared/components/df-badge/df-badge.co
 import { DfEmptyStateComponent } from 'src/app/shared/components/df-empty-state/df-empty-state.component';
 import { DfSkeletonComponent } from 'src/app/shared/components/df-skeleton/df-skeleton.component';
 
-// System service names excluded from the user-facing API count / State
-// detection. Mirrors DfHomeMetricsService + DfAnalyticsService (one security
-// model kept in sync by hand because each holds a private copy).
-const SYSTEM_SERVICE_NAMES = new Set(
-  [
-    'system',
-    'api_docs',
-    'files',
-    'logs',
-    'db',
-    'email',
-    'user',
-    'script',
-    'ui',
-    'schema',
-    'api_doc',
-    'file',
-    'log',
-    'admin',
-    'df-admin',
-    'dreamfactory',
-    'cache',
-    'push',
-    'pub_sub',
-  ].map(s => s.toLowerCase())
-);
-
 interface ServiceRow {
   id: number;
   name: string;
   label?: string;
   type?: string;
+  createdById?: number | null; // created_by_id after caseInterceptor
 }
 
 /** One quick-action CTA: a single verb that routes straight into a create (or
@@ -390,17 +365,16 @@ export class DfDashboardComponent implements OnInit {
 
   // --- data fetch ----------------------------------------------------------
 
-  // Throws on real failure so load() can render the error state. Filters system
-  // services so State detection matches the user-facing API count.
+  // Throws on real failure so load() can render the error state. Filters
+  // auto-provisioned services (filterUserServices) so State detection matches
+  // the user-facing API count.
   private async fetchUserServices(): Promise<ServiceRow[]> {
     const res = await firstValueFrom(
       this.http.get<{ resource: ServiceRow[] }>(`${BASE_URL}/system/service`, {
         context: silent(),
       })
     );
-    return (res?.resource ?? []).filter(
-      s => s?.name && !SYSTEM_SERVICE_NAMES.has(s.name.toLowerCase())
-    );
+    return filterUserServices(res?.resource);
   }
 
   // include_count total for a system collection. Silent; 0 on failure (a

@@ -14,9 +14,19 @@ export class DfPaywallService {
     'rate-limiting',
     'scheduler',
     'reporting',
+    'data-masking',
+    'compliance',
+    'aauth',
   ];
 
-  private silverLockedFeatures = ['rate-limiting', 'scheduler', 'reporting'];
+  private silverLockedFeatures = [
+    'rate-limiting',
+    'scheduler',
+    'reporting',
+    'data-masking',
+    'compliance',
+    'aauth',
+  ];
 
   isFeatureLocked(route: string, licenseType: string): boolean {
     if (licenseType == 'GOLD') return false;

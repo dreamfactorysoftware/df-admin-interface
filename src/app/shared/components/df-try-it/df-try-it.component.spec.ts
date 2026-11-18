@@ -1,16 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { TranslocoTestingModule } from '@ngneat/transloco';
 import { DfTryItComponent } from './df-try-it.component';
 
 // Logic-only suite: exercises the pure request/snippet/scope math without
-// rendering (ngOnInit HTTP fires on detectChanges, which we deliberately skip),
-// so no transloco runtime provider is required.
+// rendering (ngOnInit HTTP fires on detectChanges, which we deliberately skip).
+// The template still instantiates the transloco pipe when the component is
+// created, so an empty in-memory transloco is provided.
 describe('DfTryItComponent', () => {
   let component: DfTryItComponent;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DfTryItComponent, HttpClientTestingModule],
+      imports: [
+        DfTryItComponent,
+        HttpClientTestingModule,
+        TranslocoTestingModule.forRoot({
+          langs: { en: {} },
+          translocoConfig: { availableLangs: ['en'], defaultLang: 'en' },
+          preloadLangs: true,
+        }),
+      ],
     }).compileComponents();
     component = TestBed.createComponent(DfTryItComponent).componentInstance;
     component.baseUrl = 'http://localhost/api/v2/mysql';

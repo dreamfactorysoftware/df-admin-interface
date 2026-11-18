@@ -9,6 +9,7 @@ import { DfSystemConfigDataService } from '../../shared/services/df-system-confi
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
 import { of } from 'rxjs';
 
@@ -46,6 +47,7 @@ describe('DfRoleDetailsComponent - create', () => {
         DfRoleDetailsComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       declarations: [],
       providers: [
@@ -125,6 +127,7 @@ describe('DfRoleDetailsComponent - edit', () => {
         DfRoleDetailsComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       declarations: [],
       providers: [

@@ -1,0 +1,83 @@
+@use '../dm-tier' as *;
+@include dm-tiers;
+
+:host {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mv {
+  align-items: center;
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mv-text {
+  align-items: center;
+  color: var(--df-text-2);
+  display: inline-flex;
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  line-height: var(--df-lh-base);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+// Kept text gives way before a bar does: in a narrow cell each plain run
+// shrinks (with an ellipsis) so the bars, the proof of masking, stay in view.
+.mv-seg {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+// A redaction bar: one solid, rounded slab per masked run.
+.mv-bar {
+  background: var(--dm-tier-fill);
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+  height: 0.8em;
+  margin: 0 0.06em;
+  opacity: 0.88;
+
+  // Kept characters sit a clear gap from the bar, so "••••5911" reads as
+  // redacted-then-kept, not clipped.
+  &.before-text {
+    margin-inline-end: 0.15em;
+  }
+
+  &.after-text {
+    margin-inline-start: 0.15em;
+  }
+}
+
+.mv-token {
+  background: var(--dm-tier-soft);
+  border-radius: var(--df-radius-sm);
+  color: var(--dm-tier-ink);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  font-weight: var(--df-font-weight-medium);
+  line-height: 1;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+
+// What the API returns for this column is null: a tinted chip like a
+// token, so it reads as masked, not as missing data.
+.mv-null {
+  background: var(--dm-tier-soft);
+  border-radius: var(--df-radius-sm);
+  color: var(--dm-tier-ink);
+  font-family: var(--df-font-mono);
+  font-size: var(--df-font-size-xs);
+  line-height: 1;
+  padding: 3px 6px;
+}

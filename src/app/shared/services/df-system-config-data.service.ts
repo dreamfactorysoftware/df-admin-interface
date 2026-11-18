@@ -10,7 +10,10 @@ import {
   throwError,
 } from 'rxjs';
 import { URLS } from '../constants/urls';
-import { SHOW_LOADING_HEADER } from '../constants/http-headers';
+import {
+  SESSION_TOKEN_HEADER,
+  SHOW_LOADING_HEADER,
+} from '../constants/http-headers';
 import { normalizeError } from '../utilities/app-error';
 import { silent } from '../utilities/http-contexts';
 import { trialLockFromError } from '../utilities/trial';
@@ -80,10 +83,17 @@ export class DfSystemConfigDataService {
       );
   }
 
-  fetchSystemData() {
+  // showLoading false: a background lookup that must not flash the spinner.
+  // sessionToken: for a caller that runs while a session is being set, before
+  // its token is in the cookie the interceptor reads (the role lookup in
+  // DfUserDataService passes it for the same reason).
+  fetchSystemData(showLoading = true, sessionToken?: string) {
     return this.http
       .get<System>(URLS.SYSTEM, {
-        headers: SHOW_LOADING_HEADER,
+        headers: {
+          ...(showLoading ? SHOW_LOADING_HEADER : {}),
+          ...(sessionToken ? { [SESSION_TOKEN_HEADER]: sessionToken } : {}),
+        },
         // Deliberate graceful degradation: consumers handle missing system
         // data; same silence semantics the legacy header used to carry.
         context: silent(),

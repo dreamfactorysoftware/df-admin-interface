@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
@@ -43,6 +43,7 @@ import { DfUsageBarsComponent } from './components/df-usage-bars/df-usage-bars.c
 import { DfUsageSummaryComponent } from './components/df-usage-summary/df-usage-summary.component';
 import { DfCostEstimatorComponent } from './components/df-cost-estimator/df-cost-estimator.component';
 import { DfTaskEstimatorComponent } from './components/df-task-estimator/df-task-estimator.component';
+import { DfAiBudgetsLinkComponent } from '../adf-ai-budgets/df-ai-budgets-link.component';
 import {
   DfCostByDimensionComponent,
   DimensionSeriesPoint,
@@ -113,6 +114,7 @@ export interface BudgetRow {
     DfCostByDimensionComponent,
     DfExpensiveCallsComponent,
     DfSpendBreakdownComponent,
+    DfAiBudgetsLinkComponent,
   ],
   templateUrl: './df-ai-usage.component.html',
   styleUrls: ['./df-ai-usage.component.scss'],
@@ -120,6 +122,7 @@ export interface BudgetRow {
 export class DfAiUsageComponent implements OnInit {
   private api = inject(UsageService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   loading = true;
   errorMessage: string | null = null;
@@ -153,6 +156,8 @@ export class DfAiUsageComponent implements OnInit {
   // otherwise every CD pass hands child components new array/Map refs and
   // forces ngOnChanges → rebuild loops that pin a CPU core.
   summary: UsageSummary = this.emptySummary();
+  /** AI requests in the window; 0 (empty state) when the payload has none. */
+  totalRequests = 0;
   series: TimeBucket[] = [];
   byUser: GroupRow[] = [];
   byRole: GroupRow[] = [];
@@ -224,6 +229,12 @@ export class DfAiUsageComponent implements OnInit {
   faXmark = faXmark;
 
   ngOnInit(): void {
+    // Deep link: /ai/usage?service_id=<id> opens with that service selected
+    // in the Connection filter.
+    const id = Number(this.route.snapshot.queryParamMap.get('service_id'));
+    if (Number.isInteger(id) && id > 0) {
+      this.filters = { ...this.filters, service_id: [id] };
+    }
     this.refresh();
   }
 
@@ -392,6 +403,7 @@ export class DfAiUsageComponent implements OnInit {
 
   private recomputeViews(): void {
     const r = this.bundle?.raw;
+    this.totalRequests = n(r?.total_requests);
     if (!r) {
       this.summary = this.emptySummary();
       this.series = [];
@@ -577,7 +589,7 @@ export class DfAiUsageComponent implements OnInit {
         : this.budgets;
 
     const services = this.bundle?.services;
-    const providerFallback = r.by_provider[0]?.provider ?? 'unknown';
+    const providerFallback = r.by_provider?.[0]?.provider ?? 'unknown';
     const cp = new Map<number, string>();
     if (services) {
       for (const row of r.by_service ?? []) {

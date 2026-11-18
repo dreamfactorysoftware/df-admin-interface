@@ -1,0 +1,98 @@
+@use '../aa-grid' as *;
+@include aa-grid;
+@include aa-who;
+
+:host {
+  display: block;
+}
+
+.row {
+  grid-template-columns:
+    minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(0, 1.1fr)
+    110px 80px 64px;
+}
+
+.who-name {
+  font-weight: var(--df-font-weight-medium);
+}
+
+.agent-id {
+  white-space: nowrap;
+}
+
+// A blocked agent reads as stopped: name in danger red, its Allowed switch off.
+.row.blocked .who-name {
+  color: var(--df-danger);
+}
+
+// The column header names the count on wide screens; phones say it inline.
+.unit {
+  display: none;
+}
+
+// Phones: one card per agent. Name and its switch lead; id and provider
+// sit under the name; last seen and the request count share the last line.
+@media (max-width: 600px) {
+  .row:not(.head) {
+    grid-template-areas:
+      'who allow'
+      'id id'
+      'provider provider'
+      'seen requests';
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    row-gap: 2px;
+
+    > .cell {
+      grid-column: auto;
+    }
+
+    > .who {
+      align-items: flex-start;
+      grid-area: who;
+    }
+
+    // The name gets two lines before it gives way to an ellipsis.
+    .who-name {
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      display: -webkit-box;
+      line-height: 20px;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    > .allow {
+      grid-area: allow;
+    }
+
+    > .agent-id,
+    > .provider,
+    > .seen {
+      // Under the name, past the tile (24px) and its gap.
+      padding-left: calc(24px + var(--df-space-2));
+    }
+
+    > .agent-id {
+      grid-area: id;
+    }
+
+    > .provider {
+      grid-area: provider;
+    }
+
+    > .seen {
+      grid-area: seen;
+    }
+
+    > .requests {
+      color: var(--df-text-muted);
+      grid-area: requests;
+      justify-self: end;
+    }
+  }
+
+  .unit {
+    display: inline;
+  }
+}

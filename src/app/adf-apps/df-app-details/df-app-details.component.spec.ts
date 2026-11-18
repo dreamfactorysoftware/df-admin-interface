@@ -4,6 +4,7 @@ import { TranslocoService, provideTransloco } from '@ngneat/transloco';
 import { TranslocoHttpLoader } from '../../../transloco-loader';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Validators } from '@angular/forms';
 import { DfBaseCrudService } from '../../shared/services/df-base-crud.service';
@@ -20,6 +21,7 @@ describe('DfAppDetailsComponent - Create', () => {
       imports: [
         DfAppDetailsComponent,
         HttpClientTestingModule,
+        MatSnackBarModule,
         NoopAnimationsModule,
       ],
       providers: [
@@ -106,6 +108,7 @@ describe('DfAppDetailsComponent - Edit', () => {
       imports: [
         DfAppDetailsComponent,
         HttpClientTestingModule,
+        MatSnackBarModule,
         NoopAnimationsModule,
       ],
       providers: [
@@ -160,5 +163,21 @@ describe('DfAppDetailsComponent - Edit', () => {
 
     expect(component.appForm.value).toEqual(appFormPopulated);
     expect(component.appForm.valid).toBeTruthy();
+  });
+  it('keeps "what this key can reach" collapsed until opened', () => {
+    const el: HTMLElement = fixture.nativeElement;
+    const reach = el.querySelector('#metering-reach') as HTMLElement;
+    expect(component.reachOpen).toBe(false);
+    expect(reach.hidden).toBe(true);
+    expect(el.querySelector('.metering-count')).toBeNull();
+
+    component.reachSummary = { services: 152, entries: 152 };
+    fixture.detectChanges();
+    expect(el.querySelector('.metering-count')).not.toBeNull();
+
+    (el.querySelector('.metering-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(component.reachOpen).toBe(true);
+    expect(reach.hidden).toBe(false);
   });
 });

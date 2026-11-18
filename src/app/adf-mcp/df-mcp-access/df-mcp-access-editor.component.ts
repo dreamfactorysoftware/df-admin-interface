@@ -42,6 +42,7 @@ import { DfMcpAccessApiService, McpRole } from '../mcp-access-api.service';
 import { McpServiceKind } from '../mcp-catalog';
 import { McpBackendService } from '../mcp-effective';
 import { McpEditorStore } from '../mcp-store';
+import { DfSecretComponent } from 'src/app/shared/components/df-secret/df-secret.component';
 
 export interface McpAccessEditorData {
   store: McpEditorStore;
@@ -68,6 +69,7 @@ export const ROLE_ROUTE = '/api-connections/role-based-access';
   selector: 'df-mcp-access-editor',
   standalone: true,
   imports: [
+    DfSecretComponent,
     CommonModule,
     FormsModule,
     MatButtonModule,

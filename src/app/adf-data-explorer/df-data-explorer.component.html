@@ -21,7 +21,7 @@
         <ng-container *ngIf="selectedDb">
           <df-schema-tree
             [serviceName]="selectedDb.name"
-            [serviceLabel]="selectedDb.label || selectedDb.name"
+            [serviceLabel]="selectedDb.name"
             [tables]="tables"
             [loading]="loadingSchema"
             [error]="errorSchema"

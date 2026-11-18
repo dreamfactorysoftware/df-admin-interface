@@ -20,13 +20,11 @@
   margin-bottom: 2.4rem;
 }
 
-// ---- Meridian Phase 5: Pipeline section (request chain under the overview) ---
-// ---- Meridian Phase 3: Access section (scope matrix under the overview) ----
-.service-pipeline,
-.service-access {
-  margin-top: 3.2rem;
-  padding-top: 3.2rem;
-  border-top: 1px solid var(--df-border-2);
+// ---- Live API / Pipeline / Access as closed sections ----
+// Each df-disclosure owns its top hairline; this only spaces them in the
+// form's flex flow and styles the one-line hint inside an open section.
+.service-section {
+  margin-top: var(--df-space-5);
 
   &__hint {
     margin: 0 0 1.6rem;
@@ -35,6 +33,20 @@
     font-size: 1.3rem;
     line-height: 1.5;
   }
+}
+
+// Backend Authentication panel (HTTP service): the line that names what is
+// still missing once a token URL is set.
+.backend-auth-incomplete {
+  margin: var(--df-space-4) 0 0;
+  max-width: 68ch;
+  padding: var(--df-space-2) var(--df-space-3);
+  border: 1px solid var(--df-danger-border);
+  border-radius: var(--df-radius-sm);
+  background: var(--df-danger-soft);
+  color: var(--df-text);
+  font-size: var(--df-font-size-sm);
+  line-height: var(--df-lh-base);
 }
 
 // ---- Departure type scale for in-form section headers ----
@@ -225,10 +237,10 @@ mat-icon {
   }
 }
 
-::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
+:host ::ng-deep .mat-expansion-panel-header > .mat-expansion-indicator::after {
   color: unset !important;
 }
-::ng-deep .mat-mdc-select-arrow {
+:host ::ng-deep .mat-mdc-select-arrow {
   color: unset !important;
 }
 

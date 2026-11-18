@@ -14,6 +14,9 @@ import {
   rolesResolver,
 } from './adf-roles/resolvers/role.resolver';
 import { limitsResolver } from './adf-limits/resolvers/limits.resolver';
+import { dataMaskingResolver } from './adf-data-masking/data-masking.resolver';
+import { complianceResolver } from './adf-compliance/compliance.resolver';
+import { aauthResolver } from './adf-aauth/aauth.resolver';
 import { serviceReportsResolver } from './adf-reports/resolvers/service-report.resolver';
 import { DfProfileService } from './adf-profile/services/df-profile.service';
 import { DfPasswordService } from './adf-user-management/services/df-password.service';
@@ -57,7 +60,10 @@ import { globalLicenseGuard } from './shared/guards/global-license.guard';
 import { trialGuard } from './shared/guards/trial.guard';
 import { errorGuard } from './shared/guards/error.guard';
 import { paywallGuard } from './shared/guards/paywall.guard';
-import { rootAdminGuard } from './shared/guards/admin.guard';
+import {
+  rootAdminGuard,
+  serverSettingsGuard,
+} from './shared/guards/admin.guard';
 import { SERVICE_GROUPS } from './shared/constants/serviceGroups';
 
 export const routes: Routes = [
@@ -325,7 +331,7 @@ export const routes: Routes = [
                 m => m.DfApiDocsTableComponent
               ),
             resolve: {
-              data: servicesResolver(100, '(type not like "%swagger%")'),
+              data: servicesResolver(0, '(type not like "%swagger%")'),
               serviceTypes: serviceTypesResolver,
             },
           },
@@ -377,6 +383,17 @@ export const routes: Routes = [
         providers: [provideTranslocoScope('services')],
       },
       {
+        // Agent authorization (AAuth, df-aauth, GOLD). The standard
+        // paywall whenever the aauth system resource is missing.
+        path: ROUTES.AAUTH,
+        loadComponent: () =>
+          import('./adf-aauth/df-aauth/df-aauth.component').then(
+            m => m.DfAauthComponent
+          ),
+        resolve: { data: aauthResolver },
+        providers: [provideTranslocoScope('aauth')],
+      },
+      {
         path: ROUTES.RATE_LIMITING,
         children: [
           {
@@ -419,6 +436,24 @@ export const routes: Routes = [
           },
         ],
         providers: [provideTranslocoScope('limits')],
+      },
+      {
+        path: ROUTES.DATA_MASKING,
+        loadComponent: () =>
+          import('./adf-data-masking/df-data-masking/df-data-masking.component').then(
+            m => m.DfDataMaskingComponent
+          ),
+        resolve: { data: dataMaskingResolver },
+        providers: [provideTranslocoScope('dataMasking')],
+      },
+      {
+        path: ROUTES.COMPLIANCE,
+        loadComponent: () =>
+          import('./adf-compliance/df-compliance/df-compliance.component').then(
+            m => m.DfComplianceComponent
+          ),
+        resolve: { data: complianceResolver },
+        providers: [provideTranslocoScope('compliance')],
       },
       {
         path: ROUTES.ROLE_BASED_ACCESS,
@@ -464,6 +499,15 @@ export const routes: Routes = [
             resolve: {
               data: checkStatusResolver,
             },
+          },
+          {
+            path: ROUTES.SERVER_SETTINGS,
+            loadComponent: () =>
+              import('./adf-config/df-server-settings/df-server-settings.component').then(
+                m => m.DfServerSettingsComponent
+              ),
+            providers: [provideTranslocoScope('serverSettings')],
+            canActivate: [serverSettingsGuard],
           },
           {
             path: ROUTES.CORS,
@@ -970,6 +1014,13 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./adf-ai-usage/df-ai-usage.component').then(
             m => m.DfAiUsageComponent
+          ),
+      },
+      {
+        path: ROUTES.AI_BUDGETS,
+        loadComponent: () =>
+          import('./adf-ai-budgets/df-ai-budgets.component').then(
+            m => m.DfAiBudgetsComponent
           ),
       },
       {

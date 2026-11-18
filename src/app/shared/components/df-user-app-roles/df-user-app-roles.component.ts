@@ -1,3 +1,4 @@
+import { DfSearchPipe } from 'src/app/shared/components/df-select-search/df-select-search.component';
 import { Component, Input, OnInit } from '@angular/core';
 import {
   FormArray,
@@ -29,6 +30,7 @@ import { UntilDestroy } from '@ngneat/until-destroy';
   styleUrls: ['./df-user-app-roles.component.scss'],
   standalone: true,
   imports: [
+    DfSearchPipe,
     FormsModule,
     ReactiveFormsModule,
     MatAutocompleteModule,

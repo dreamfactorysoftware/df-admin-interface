@@ -13,11 +13,14 @@ export class DfBaseCrudService {
     private http: HttpClient
   ) {}
 
+  // limit 0 = every row (server caps at max_records_returned). Manage tables
+  // page client-side over what this returns, so a smaller default silently
+  // truncates them while meta.count still reports the full total.
   getAll<T>(options?: Partial<RequestOptions>) {
     return this.http.get<T>(
       this.url,
       this.getOptions({
-        limit: 50,
+        limit: 0,
         offset: 0,
         includeCount: true,
         ...options,
@@ -47,7 +50,7 @@ export class DfBaseCrudService {
     return this.http.get<T>(
       '/api/v2/system/event_script',
       this.getOptions({
-        limit: 50,
+        limit: 0,
         offset: 0,
         includeCount: true,
       })

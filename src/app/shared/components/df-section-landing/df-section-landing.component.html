@@ -34,7 +34,10 @@
       *ngFor="let group of groups; trackBy: trackByGroupTitle"
       [attr.aria-label]="group.title">
       <h3>{{ group.title }}</h3>
-      <div class="section-landing__cards">
+      <div
+        class="section-landing__cards"
+        [class.section-landing__cards--fixed]="!!cardColumns"
+        [style.--section-landing-card-cols]="cardColumns || null">
         <ng-container
           *ngFor="let card of group.cards; trackBy: trackByCardRoute">
           <a

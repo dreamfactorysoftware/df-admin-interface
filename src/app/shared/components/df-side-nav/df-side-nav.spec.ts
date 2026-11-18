@@ -6,6 +6,7 @@ import { TranslocoHttpLoader } from 'src/transloco-loader';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { ROUTES } from '../../types/routes';
 
 describe('DfSideNavComponent', () => {
@@ -18,6 +19,7 @@ describe('DfSideNavComponent', () => {
         DfSideNavComponent,
         HttpClientTestingModule,
         NoopAnimationsModule,
+        MatSnackBarModule,
       ],
       providers: [
         provideTransloco({

@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
+import { getAllRecords } from 'src/app/shared/utilities/all-records';
 import { ArtifactKeyOption } from 'src/app/shared/components/df-artifact-card/df-artifact-card.component';
 
 /** Resolved Live API Card inputs. `apiKey` is the first working key (the one
@@ -143,17 +144,19 @@ export class DfArtifactResolverService {
   private async resolveCandidates(
     serviceId: number
   ): Promise<ArtifactCandidate[]> {
-    const rolesRes = await firstValueFrom(
-      this.http.get<any>(
-        `${BASE_URL}/system/role?related=role_service_access_by_role_id&limit=200`,
-        { context: silent() }
+    const roles = await firstValueFrom(
+      getAllRecords<any>(
+        this.http,
+        `${BASE_URL}/system/role`,
+        { related: 'role_service_access_by_role_id' },
+        silent()
       )
     );
     const perRole = new Map<
       number,
       { tables: string[]; grantsAll: boolean; writeCapable: boolean }
     >();
-    for (const role of rolesRes?.resource ?? []) {
+    for (const role of roles) {
       if (role?.isActive === false) {
         continue;
       }
@@ -201,24 +204,29 @@ export class DfArtifactResolverService {
     if (!perRole.size) {
       return [];
     }
-    const roleIds = [...perRole.keys()];
-    const appResps = await Promise.all(
-      roleIds.map(roleId =>
-        firstValueFrom(
-          this.http.get<any>(
-            `${BASE_URL}/system/app?filter=role_id=${roleId}&fields=*`,
-            { context: silent() }
-          )
-        ).catch(() => ({ resource: [] }))
+    // All apps in one paged GET, matched to the roles above. One request per
+    // role meant hundreds of parallel requests on instances with many roles,
+    // which ran MySQL out of connections.
+    const apps = await firstValueFrom(
+      getAllRecords<any>(
+        this.http,
+        `${BASE_URL}/system/app`,
+        { fields: 'name,api_key,role_id,is_active' },
+        silent()
       )
-    );
-    const out: ArtifactCandidate[] = [];
-    roleIds.forEach((roleId, i) => {
-      const grant = perRole.get(roleId);
-      if (!grant) {
-        return;
+    ).catch(() => []);
+    const appsByRole = new Map<number, typeof apps>();
+    for (const app of apps) {
+      if (app?.roleId == null) {
+        continue;
       }
-      for (const app of appResps[i]?.resource ?? []) {
+      const roleApps = appsByRole.get(app.roleId) ?? [];
+      roleApps.push(app);
+      appsByRole.set(app.roleId, roleApps);
+    }
+    const out: ArtifactCandidate[] = [];
+    perRole.forEach((grant, roleId) => {
+      for (const app of appsByRole.get(roleId) ?? []) {
         if (app?.isActive === false || !app?.apiKey) {
           continue;
         }

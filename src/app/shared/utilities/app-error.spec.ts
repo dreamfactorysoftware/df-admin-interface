@@ -141,6 +141,21 @@ describe('normalizeError', () => {
     expect(normalizeError(httpError(403, null)).kind).toBe('forbidden');
   });
 
+  it('treats a blacklisted-session 403 as auth, other 403s as forbidden', () => {
+    const dead = httpError(403, {
+      error: {
+        code: 403,
+        message:
+          'The token has been blacklisted: Session terminated. Please re-login',
+      },
+    });
+    expect(normalizeError(dead).kind).toBe('auth');
+    const denied = httpError(403, {
+      error: { code: 403, message: 'GET access to system/role denied.' },
+    });
+    expect(normalizeError(denied).kind).toBe('forbidden');
+  });
+
   it('reads the flat body variant', () => {
     const e = normalizeError(httpError(402, { message: 'Payment required' }));
     expect(e.message).toBe('Payment required');

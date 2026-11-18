@@ -25,13 +25,19 @@ import { MatButtonModule } from '@angular/material/button';
 import { TranslocoPipe } from '@ngneat/transloco';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCircleInfo,
+  faEye,
+  faEyeSlash,
+} from '@fortawesome/free-solid-svg-icons';
 import { UntilDestroy } from '@ngneat/until-destroy';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { Observable, map, startWith } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { addGroupEntries } from '../../utilities/eventScripts';
 import { DfThemeService } from '../../services/df-theme.service';
+import { DfPresentationService } from '../../services/df-presentation.service';
+import { isSecretFieldName } from '../../utilities/mask';
 import {
   DfFileSelectorComponent,
   SelectedFile,
@@ -65,7 +71,11 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck, AfterViewInit {
   @Input() showLabel = true;
   @ViewChild('fileSelector') fileSelector: DfFileSelectorComponent;
   faCircleInfo = faCircleInfo;
+  faEye = faEye;
+  faEyeSlash = faEyeSlash;
   control = new FormControl();
+  /** Per-field override of the presentation-mode mask. */
+  secretRevealed = false;
   private pendingFilePath: string | null = null;
 
   onChange: (value: any) => void;
@@ -74,9 +84,39 @@ export class DfDynamicFieldComponent implements OnInit, DoCheck, AfterViewInit {
   constructor(
     @Optional() @Self() public controlDir: NgControl,
     private activedRoute: ActivatedRoute,
-    private themeService: DfThemeService
+    private themeService: DfThemeService,
+    public presentation: DfPresentationService
   ) {
     controlDir.valueAccessor = this;
+  }
+
+  /** True when this config field holds a credential that presentation mode
+   *  should cover. Service config schemas are inconsistent about marking
+   *  secrets as `password` — oidc.client_secret ships as `text` and
+   *  mcp.oauth_client_secret as `string` — so the field name decides. */
+  get isMaskedSecret(): boolean {
+    if (this.secretRevealed || !this.presentation.on) {
+      return false;
+    }
+    return (
+      ['string', 'text', 'password'].includes(this.schema?.type) &&
+      isSecretFieldName(this.schema?.name)
+    );
+  }
+
+  /** The eye only appears on a field that is actually covered right now, or on
+   *  one this component is covering and the user has since revealed. */
+  get showSecretEye(): boolean {
+    return (
+      this.presentation.on &&
+      ['string', 'text', 'password'].includes(this.schema?.type) &&
+      isSecretFieldName(this.schema?.name)
+    );
+  }
+
+  toggleSecretReveal(event?: Event): void {
+    event?.stopPropagation();
+    this.secretRevealed = !this.secretRevealed;
   }
 
   eventList: string[] = [];

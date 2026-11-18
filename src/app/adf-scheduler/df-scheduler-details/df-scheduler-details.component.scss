@@ -7,3 +7,23 @@ h4 {
   letter-spacing: -0.01em;
   color: var(--df-text);
 }
+
+.run-table {
+  border-collapse: collapse;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--df-border);
+  }
+}
+
+.run-output {
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  // Long unbroken output (base64, minified JSON) must wrap, not widen the page.
+  overflow-wrap: anywhere;
+  margin: 0;
+}

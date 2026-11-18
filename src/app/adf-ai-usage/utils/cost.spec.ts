@@ -1,4 +1,22 @@
-import { DEFAULT_RATES, estimateCost, formatUSD } from './cost';
+import {
+  DEFAULT_RATES,
+  estimateCost,
+  formatUSD,
+  ratesFromBundle,
+} from './cost';
+
+/** `default_rates` as df-ai 0.1.0 and later serve it (DreamFactory 7.7). */
+const NESTED = {
+  providers: {
+    anthropic: { input_per_1k: 0.004, output_per_1k: 0.02 },
+    gemini: { input_per_1k: 0.0001, output_per_1k: 0.0004 },
+    ollama: { input_per_1k: 0, output_per_1k: 0 },
+  },
+  models: {
+    'claude-opus-4-8': { input_per_1k: 0.015, output_per_1k: 0.075 },
+    'gpt-4.1-nano': { input_per_1k: 0.0001, output_per_1k: 0.0004 },
+  },
+};
 
 describe('cost', () => {
   describe('estimateCost', () => {
@@ -47,6 +65,34 @@ describe('cost', () => {
     it('handles non-finite gracefully', () => {
       expect(formatUSD(NaN)).toBe('$0.00');
       expect(formatUSD(Infinity)).toBe('$0.00');
+    });
+  });
+
+  describe('ratesFromBundle', () => {
+    // Regression: the nested shape was read as a flat provider map, which
+    // produced two bogus "providers" and "models" entries with undefined
+    // rates and left every real rate to the hardcoded fallback table.
+    it('reads provider rates from the nested shape', () => {
+      const rates = ratesFromBundle(NESTED);
+
+      expect(rates['providers']).toBeUndefined();
+      expect(rates['models']).toBeUndefined();
+      // Served values, not the hardcoded fallback (0.003 / 0.015).
+      expect(rates['anthropic']).toEqual({
+        provider: 'anthropic',
+        inputPer1k: 0.004,
+        outputPer1k: 0.02,
+      });
+      // A provider the hardcoded table does not know.
+      expect(rates['gemini']).toEqual({
+        provider: 'gemini',
+        inputPer1k: 0.0001,
+        outputPer1k: 0.0004,
+      });
+      for (const r of Object.values(rates)) {
+        expect(Number.isFinite(r.inputPer1k)).toBe(true);
+        expect(Number.isFinite(r.outputPer1k)).toBe(true);
+      }
     });
   });
 

@@ -75,6 +75,23 @@ mat-card {
     flex-direction: column;
     gap: var(--df-space-2);
 
+    .metering-block-head {
+      display: flex;
+      align-items: center;
+      gap: var(--df-space-3);
+
+      .metering-count {
+        font-size: 1.3rem;
+        color: var(--df-text-muted);
+      }
+
+      .metering-toggle {
+        margin-left: auto;
+        min-width: 0;
+        font-size: 1.3rem;
+      }
+    }
+
     h3 {
       margin: 0;
       font-size: 1.1rem;
@@ -188,4 +205,9 @@ mat-card {
     letter-spacing: 0.06em;
     color: var(--df-text-muted);
   }
+}
+
+.role-search-icon {
+  margin: 0 8px 0 12px;
+  color: var(--df-text-muted);
 }

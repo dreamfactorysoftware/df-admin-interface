@@ -35,7 +35,15 @@
               [variant]="g.allow ? 'success' : 'danger'"
               [label]="g.allow ? t('allow') : t('deny')">
             </df-badge>
-            <span class="scope-map__service">{{ g.serviceLabel }}</span>
+            <span
+              class="scope-map__service"
+              [title]="
+                g.serviceLabel && g.serviceLabel !== g.serviceName
+                  ? g.serviceLabel
+                  : ''
+              "
+              >{{ g.serviceName }}</span
+            >
           </mat-panel-title>
           <mat-panel-description class="scope-map__desc">
             <df-badge

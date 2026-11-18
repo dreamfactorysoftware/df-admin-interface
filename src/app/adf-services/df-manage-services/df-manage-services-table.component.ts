@@ -307,7 +307,7 @@ export class DfManageServicesTableComponent
 
   override deleteRow(row: ServiceRow): void {
     this.serviceService
-      .delete(row.id, { snackbarSuccess: 'admins.alerts.deleteSuccess' })
+      .delete(row.id, { snackbarSuccess: 'services.deleteSuccessMsg' })
       .subscribe(() => {
         this.refreshTable();
       });

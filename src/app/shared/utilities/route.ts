@@ -90,6 +90,7 @@ export function accessibleRoutes(
     ROUTES.AI_CHAT_SERVICES,
     ROUTES.AI_CHAT_UI,
     ROUTES.AI_USAGE,
+    ROUTES.AI_BUDGETS,
     ROUTES.AI_MCP,
   ];
   allowedTabs?.forEach(tab => {
@@ -101,6 +102,7 @@ export function accessibleRoutes(
         allowed.push(ROUTES.USERS);
         break;
       case 'roles':
+        // Not ROUTES.AAUTH: every system/aauth call requires a sys admin.
         allowed.push(ROUTES.ROLE_BASED_ACCESS);
         break;
       case 'services':
@@ -133,7 +135,8 @@ export function accessibleRoutes(
           ROUTES.CONFIG_PACKAGE,
           ROUTES.EMAIL_TEMPLATES,
           ROUTES.GLOBAL_LOOKUP_KEYS,
-          ROUTES.INTERCOM
+          ROUTES.INTERCOM,
+          ROUTES.SERVER_SETTINGS
         );
         break;
       case 'limits':
@@ -151,6 +154,17 @@ export function accessibleRoutes(
     }
     return allowed.includes(nav.route);
   });
+}
+
+/** Drops every nav entry for `route`, at any depth. Parents are kept. */
+export function withoutRoute(navs: Array<Nav>, route: ROUTES): Array<Nav> {
+  return navs
+    .filter(nav => nav.route !== route)
+    .map(nav =>
+      nav.subRoutes
+        ? { ...nav, subRoutes: withoutRoute(nav.subRoutes, route) }
+        : nav
+    );
 }
 
 export type Breadcrumb = {

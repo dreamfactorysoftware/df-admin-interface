@@ -11,6 +11,8 @@
     </div>
 
     <div class="usage__controls">
+      <df-ai-budgets-link></df-ai-budgets-link>
+
       <mat-button-toggle-group
         [value]="range"
         (change)="setRange($event.value)"
@@ -280,7 +282,7 @@
   <div *ngIf="errorMessage" class="usage__error">{{ errorMessage }}</div>
 
   <ng-container *ngIf="!loading && bundle">
-    <mat-card *ngIf="bundle.raw.total_requests === 0" class="usage__empty">
+    <mat-card *ngIf="!totalRequests" class="usage__empty">
       <mat-card-content>
         <h3>No AI requests in this period</h3>
         <p>
@@ -295,7 +297,7 @@
       </mat-card-content>
     </mat-card>
 
-    <ng-container *ngIf="bundle.raw.total_requests > 0">
+    <ng-container *ngIf="totalRequests > 0">
       <header class="usage__section-header">
         <h3 class="usage__section-title">
           DreamFactory AI usage

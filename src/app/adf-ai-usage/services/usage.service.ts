@@ -4,6 +4,7 @@ import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, map, shareReplay } from 'rxjs/operators';
 import { BASE_URL } from 'src/app/shared/constants/urls';
 import { silent } from 'src/app/shared/utilities/http-contexts';
+import { DefaultRatesRaw } from '../utils/cost';
 
 export type TimeRange = '24h' | '7d' | '30d' | 'all';
 
@@ -78,13 +79,10 @@ export interface UsageResponse {
   /** Per-service month-to-date spend vs configured budget. Calendar-month
    *  bound, NOT bound to the dashboard's period filter. */
   budgets: BudgetRowRaw[];
-  /** Per-provider fallback rates from the backend's UsageRates::DEFAULT_RATES.
-   *  Frontend reads from here so we don't have to maintain a duplicate
-   *  hardcoded pricing table. */
-  default_rates: Record<
-    string,
-    { input_per_1k: number; output_per_1k: number }
-  >;
+  /** Fallback rates from the backend's UsageRates tables. Frontend reads
+   *  from here so we don't have to maintain a duplicate hardcoded pricing
+   *  table. Nested or flat, depending on the df-ai version. */
+  default_rates: DefaultRatesRaw;
   /** Top-line totals for the immediately-preceding window of equal length.
    *  Only present when the request was made with compare=1. */
   previous?: PreviousSummaryRaw;
@@ -286,6 +284,67 @@ export interface UsageBundle {
   apps: Map<number, string>;
 }
 
+/** Zeroed AI usage: what the dashboard shows when there is no data. */
+function emptyUsage(period: string): UsageResponse {
+  return {
+    period,
+    since: new Date(Date.now() - 7 * 86400000).toISOString(),
+    total_requests: 0,
+    total_input_tokens: 0,
+    total_output_tokens: 0,
+    total_cost_usd: 0,
+    errors: 0,
+    avg_latency_ms: 0,
+    latency_p50_ms: 0,
+    latency_p95_ms: 0,
+    latency_p99_ms: 0,
+    partials: 0,
+    by_service: [],
+    by_user: [],
+    by_role: [],
+    by_app: [],
+    by_provider: [],
+    by_model: [],
+    by_resource: [],
+    by_error_class: [],
+    series: [],
+    series_by_model: [],
+    series_by_user: [],
+    series_by_app: [],
+    series_by_provider: [],
+    most_expensive_calls: [],
+    filters: {},
+    budgets: [],
+    default_rates: {},
+  };
+}
+
+/** Zeroed MCP usage, the MCP counterpart of emptyUsage(). */
+function emptyMcpUsage(period: string): McpUsageResponse {
+  return {
+    period,
+    since: new Date(Date.now() - 7 * 86400000).toISOString(),
+    total_requests: 0,
+    total_bytes_in: 0,
+    total_bytes_out: 0,
+    errors: 0,
+    avg_duration_ms: 0,
+    by_service: [],
+    by_user: [],
+    by_role: [],
+    by_app: [],
+    by_client: [],
+    by_tool: [],
+    by_method: [],
+    series: [],
+  };
+}
+
+/** True for a JSON object body; false for null, arrays and primitives. */
+function isJsonObject(body: unknown): boolean {
+  return typeof body === 'object' && body !== null && !Array.isArray(body);
+}
+
 @Injectable({ providedIn: 'root' })
 export class UsageService {
   private http = inject(HttpClient);
@@ -311,6 +370,10 @@ export class UsageService {
     // Silent by design: every request in this bundle degrades to an empty
     // dataset (zero-state dashboard / "#N" name fallbacks); a toast per
     // failed analytics fetch would be noise. Intent is annotated per request.
+    // A 200 without a usage object (Angular parses '' and 'null' to null)
+    // gets the same zeroed shape, so consumers can read bundle.raw /
+    // bundle.mcp directly. Objects pass through as-is; consumers already
+    // default missing fields.
     return forkJoin({
       raw: this.http
         .get<UsageResponse>('/_internal/ai/usage', {
@@ -318,39 +381,8 @@ export class UsageService {
           context: silent(),
         })
         .pipe(
-          catchError(() =>
-            of({
-              period,
-              since: new Date(Date.now() - 7 * 86400000).toISOString(),
-              total_requests: 0,
-              total_input_tokens: 0,
-              total_output_tokens: 0,
-              total_cost_usd: 0,
-              errors: 0,
-              avg_latency_ms: 0,
-              latency_p50_ms: 0,
-              latency_p95_ms: 0,
-              latency_p99_ms: 0,
-              partials: 0,
-              by_service: [],
-              by_user: [],
-              by_role: [],
-              by_app: [],
-              by_provider: [],
-              by_model: [],
-              by_resource: [],
-              by_error_class: [],
-              series: [],
-              series_by_model: [],
-              series_by_user: [],
-              series_by_app: [],
-              series_by_provider: [],
-              most_expensive_calls: [],
-              filters: {},
-              budgets: [],
-              default_rates: {},
-            } as UsageResponse)
-          )
+          map(body => (isJsonObject(body) ? body : emptyUsage(period))),
+          catchError(() => of(emptyUsage(period)))
         ),
       mcp: this.http
         .get<McpUsageResponse>('/_internal/ai/mcp-usage', {
@@ -358,25 +390,8 @@ export class UsageService {
           context: silent(),
         })
         .pipe(
-          catchError(() =>
-            of({
-              period,
-              since: new Date(Date.now() - 7 * 86400000).toISOString(),
-              total_requests: 0,
-              total_bytes_in: 0,
-              total_bytes_out: 0,
-              errors: 0,
-              avg_duration_ms: 0,
-              by_service: [],
-              by_user: [],
-              by_role: [],
-              by_app: [],
-              by_client: [],
-              by_tool: [],
-              by_method: [],
-              series: [],
-            } as McpUsageResponse)
-          )
+          map(body => (isJsonObject(body) ? body : emptyMcpUsage(period))),
+          catchError(() => of(emptyMcpUsage(period)))
         ),
       services: this.getServicesLookup(),
       users: this.getUsersLookup(),
@@ -433,7 +448,7 @@ export class UsageService {
         params: {
           fields: 'id,name,label,type',
           filter:
-            '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp")',
+            '(type = "ai_connection") or (type = "ai_chat") or (type = "mcp") or (type = "system_mcp")',
         },
         context: silent(),
       })
@@ -448,25 +463,30 @@ export class UsageService {
   }
 
   private listUsers(): Observable<Map<number, string>> {
-    // /api/v2/system/admin requires root-admin and is gated by df-compliance
-    // (returns 500/403 for restricted admins). We only fetch /system/user
-    // here — admin names not appearing in the dashboard is acceptable; the
-    // by_user breakdown falls back to "user #N".
-    return this.http
-      .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/user`, {
-        params: { fields: 'id,name,username,email' },
-        context: silent(),
-      })
-      .pipe(
-        map(res => {
-          const m = new Map<number, string>();
-          (res.resource ?? []).forEach(u =>
-            m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
-          );
-          return m;
-        }),
-        catchError(() => of(new Map<number, string>()))
+    // MCP traffic is mostly admins (OAuth sign-in from Claude Desktop etc.),
+    // and admins are not in /system/user. /system/admin needs root-admin and
+    // is gated by df-compliance (500/403 for restricted admins), so fetch both
+    // and treat a failed admin lookup as "no names" rather than an error.
+    const toMap = (rows: UserLookupRow[] | undefined) => {
+      const m = new Map<number, string>();
+      (rows ?? []).forEach(u =>
+        m.set(u.id, u.name || u.username || u.email || `user #${u.id}`)
       );
+      return m;
+    };
+    const fetch = (path: 'user' | 'admin') =>
+      this.http
+        .get<{ resource: UserLookupRow[] }>(`${BASE_URL}/system/${path}`, {
+          params: { fields: 'id,name,username,email' },
+          context: silent(),
+        })
+        .pipe(
+          map(res => toMap(res.resource)),
+          catchError(() => of(new Map<number, string>()))
+        );
+    return forkJoin([fetch('user'), fetch('admin')]).pipe(
+      map(([users, admins]) => new Map([...users, ...admins]))
+    );
   }
 
   private listRoles(): Observable<Map<number, string>> {

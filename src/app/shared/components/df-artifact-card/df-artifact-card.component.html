@@ -64,9 +64,8 @@
     <div class="artifact-card__meta-row">
       <dt class="df-eyebrow">{{ t('authHeaderLabel') }}</dt>
       <dd class="artifact-card__meta-val" *ngIf="hasKey; else noKey">
-        <code class="artifact-card__inline"
-          >{{ headerName }}: {{ activeKey }}</code
-        >
+        <code class="artifact-card__inline">{{ headerName }}:</code>
+        <df-secret [value]="activeKey"></df-secret>
         <button
           type="button"
           mat-icon-button

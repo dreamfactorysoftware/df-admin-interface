@@ -1,3 +1,7 @@
+import {
+  DfSearchPipe,
+  DfSelectSearchComponent,
+} from 'src/app/shared/components/df-select-search/df-select-search.component';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -56,6 +60,8 @@ const BOOLEAN = /^(true|false)$/i;
   templateUrl: './df-filter-builder.component.html',
   styleUrls: ['./df-filter-builder.component.scss'],
   imports: [
+    DfSelectSearchComponent,
+    DfSearchPipe,
     CommonModule,
     FormsModule,
     MatFormFieldModule,
