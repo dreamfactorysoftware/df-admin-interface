@@ -79,6 +79,26 @@ describe('caseInterceptor', () => {
     req.flush({});
   });
 
+  it('leaves semantic catalog requests and responses in snake_case', done => {
+    const entry = {
+      stale_reason: null,
+      definition: { maps_to: { table: 'orders' }, group_by: ['status'] },
+    };
+    http
+      .post('/api/v2/system/semantic/db', {
+        definition: { group_by: ['status'], keptAsIs: 1 },
+      })
+      .subscribe((body: any) => {
+        expect(body).toEqual(entry);
+        done();
+      });
+    const req = httpMock.expectOne('/api/v2/system/semantic/db');
+    expect(req.request.body).toEqual({
+      definition: { group_by: ['status'], keptAsIs: 1 },
+    });
+    req.flush(entry, { headers: { 'Content-Type': 'application/json' } });
+  });
+
   it('does not transform requests that fall outside /api', () => {
     http.get('/dreamfactory/dist/assets/i18n/en.json').subscribe();
     const req = httpMock.expectOne('/dreamfactory/dist/assets/i18n/en.json');

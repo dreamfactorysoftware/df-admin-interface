@@ -231,6 +231,21 @@ export class DfMcpSettingsComponent implements OnInit, OnChanges {
     this.store.touch();
   }
 
+  setSemanticTools(event: MatSlideToggleChange): void {
+    this.store.cfg.semanticTools = event.checked;
+    this.store.touch();
+  }
+
+  setSemanticCatalog(event: MatSlideToggleChange): void {
+    this.store.cfg.semanticCatalog = event.checked;
+    this.store.touch();
+  }
+
+  setCompactResults(event: MatSlideToggleChange): void {
+    this.store.cfg.compactResults = event.checked;
+    this.store.touch();
+  }
+
   regenerateSecret(): void {
     const ok = window.confirm(
       'Clients using the old secret will stop connecting. Regenerate?'

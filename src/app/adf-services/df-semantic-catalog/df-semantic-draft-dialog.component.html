@@ -1,0 +1,271 @@
+<header mat-dialog-title class="sem-draft__head">
+  <div class="sem-draft__heading">
+    <p class="sem-draft__eyebrow">
+      {{ 'services.semantic.eyebrow' | transloco }} · {{ data.service }}
+    </p>
+    <h2 class="sem-draft__title" data-testid="semantic-draft-title">
+      {{ 'services.semantic.draft.title' | transloco }}
+    </h2>
+  </div>
+  <button
+    mat-icon-button
+    type="button"
+    class="sem-draft__close"
+    [attr.aria-label]="'services.semantic.actions.close' | transloco"
+    (click)="close()">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<mat-dialog-content class="sem-draft__content" data-testid="semantic-draft">
+  <p class="sem-draft__hint">
+    {{ 'services.semantic.draft.hint' | transloco }}
+  </p>
+
+  <!-- no connection yet -->
+  <div
+    class="sem-draft__empty"
+    data-testid="semantic-draft-no-ai"
+    *ngIf="connections && !connections.length && !connectionsError">
+    <mat-icon>smart_toy</mat-icon>
+    <p>{{ 'services.semantic.draft.noAi' | transloco }}</p>
+  </div>
+  <div
+    class="sem-draft__empty"
+    data-testid="semantic-draft-ai-error"
+    *ngIf="connectionsError">
+    <mat-icon>{{
+      connectionsError === 'forbidden' ? 'lock' : 'error_outline'
+    }}</mat-icon>
+    <p>
+      {{
+        (connectionsError === 'forbidden'
+          ? 'services.semantic.draft.aiForbidden'
+          : 'services.semantic.draft.aiFailed'
+        ) | transloco
+      }}
+    </p>
+  </div>
+
+  <ng-container *ngIf="!report && connections?.length">
+    <mat-form-field appearance="outline" class="sem-draft__full">
+      <mat-label>{{
+        'services.semantic.draft.aiService' | transloco
+      }}</mat-label>
+      <mat-select
+        required
+        name="aiService"
+        data-testid="semantic-draft-ai-service"
+        [disabled]="running"
+        [(ngModel)]="aiService">
+        <mat-option *ngFor="let c of connections" [value]="c.name">
+          {{ c.label || c.name }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="sem-draft__full">
+      <mat-label>{{ 'services.semantic.draft.model' | transloco }}</mat-label>
+      <input
+        matInput
+        name="model"
+        data-testid="semantic-draft-model"
+        [disabled]="running"
+        [(ngModel)]="model" />
+      <mat-hint>{{ 'services.semantic.draft.modelHint' | transloco }}</mat-hint>
+    </mat-form-field>
+
+    <section
+      class="sem-draft__tables"
+      data-testid="semantic-draft-tables-section">
+      <div class="sem-draft__tables-head">
+        <span class="sem-draft__label">{{
+          (needsTables
+            ? 'services.semantic.draft.tablesRequired'
+            : 'services.semantic.draft.tables'
+          ) | transloco
+        }}</span>
+        <span
+          class="sem-draft__picked"
+          data-testid="semantic-draft-tables-picked"
+          [class.sem-draft__picked--full]="picked.length >= maxTables">
+          {{
+            'services.semantic.draft.picked'
+              | transloco: { count: picked.length, max: maxTables }
+          }}
+        </span>
+      </div>
+      <df-picker-list
+        *ngIf="tablesKnown"
+        testId="semantic-draft-tables"
+        [items]="tableItems"
+        [selected]="tables"
+        [noun]="'services.semantic.draft.tablesNoun' | transloco"
+        (toggle)="toggleTable($event)">
+      </df-picker-list>
+      <mat-form-field
+        *ngIf="!tablesKnown"
+        appearance="outline"
+        class="sem-draft__full">
+        <mat-label>{{
+          'services.semantic.draft.tablesText' | transloco
+        }}</mat-label>
+        <input
+          matInput
+          required
+          name="tablesText"
+          data-testid="semantic-draft-tables-text"
+          [disabled]="running"
+          [(ngModel)]="tablesText" />
+      </mat-form-field>
+      <p
+        class="sem-draft__tables-hint"
+        [class.sem-draft__tables-hint--error]="tooManyTables || capHit"
+        [attr.role]="tooManyTables || capHit ? 'alert' : null"
+        data-testid="semantic-draft-tables-hint">
+        {{
+          tooManyTables || capHit
+            ? ('services.semantic.draft.tooManyTables'
+              | transloco: { max: maxTables })
+            : !tablesKnown
+              ? ('services.semantic.draft.tablesUnknownHint'
+                | transloco: { max: maxTables })
+              : ((needsTables
+                  ? 'services.semantic.draft.tablesRequiredHint'
+                  : 'services.semantic.draft.tablesHint'
+                ) | transloco: { count: data.tables!.length, max: maxTables })
+        }}
+      </p>
+    </section>
+
+    <div class="sem-draft__row">
+      <mat-form-field appearance="outline" class="sem-draft__num">
+        <mat-label>{{
+          'services.semantic.draft.maxEntries' | transloco
+        }}</mat-label>
+        <input
+          matInput
+          type="number"
+          min="1"
+          max="200"
+          name="maxEntries"
+          data-testid="semantic-draft-max"
+          [disabled]="running"
+          [(ngModel)]="maxEntries" />
+      </mat-form-field>
+      <div class="sem-draft__samples">
+        <mat-checkbox
+          name="includeSamples"
+          data-testid="semantic-draft-include-samples"
+          [disabled]="running"
+          [(ngModel)]="includeSamples">
+          {{ 'services.semantic.draft.includeSamples' | transloco }}
+        </mat-checkbox>
+        <p class="sem-draft__samples-hint">
+          {{ 'services.semantic.draft.includeSamplesHint' | transloco }}
+        </p>
+      </div>
+    </div>
+
+    <div class="sem-draft__running" role="status" *ngIf="running">
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <p>{{ 'services.semantic.draft.running' | transloco }}</p>
+    </div>
+  </ng-container>
+
+  <div
+    class="sem-draft__error"
+    role="alert"
+    data-testid="semantic-draft-error"
+    *ngIf="error">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ error }}</span>
+  </div>
+
+  <!-- result -->
+  <ng-container *ngIf="report">
+    <div
+      class="sem-draft__result"
+      role="status"
+      data-testid="semantic-draft-result">
+      <mat-icon>{{ report.created ? 'check_circle' : 'info' }}</mat-icon>
+      <div>
+        <div>
+          {{
+            'services.semantic.draft.result'
+              | transloco
+                : {
+                    proposed: report.proposed,
+                    created: report.created,
+                    rejected: report.rejected.length,
+                  }
+          }}
+        </div>
+        <div class="sem-draft__meta" *ngIf="report.model">
+          {{
+            'services.semantic.draft.tokens'
+              | transloco
+                : {
+                    model: report.model,
+                    input: report.input_tokens ?? '?',
+                    output: report.output_tokens ?? '?',
+                  }
+          }}
+        </div>
+      </div>
+    </div>
+
+    <section class="sem-draft__section" *ngIf="report.entries.length">
+      <h3>{{ 'services.semantic.draft.saved' | transloco }}</h3>
+      <ul class="sem-draft__list">
+        <li *ngFor="let e of report.entries">
+          <span class="sem-draft__kind">{{
+            'services.semantic.kinds.' + e.kind + '.one' | transloco
+          }}</span>
+          <strong>{{ e.name }}</strong>
+          <span class="sem-draft__meta" *ngIf="e.description">
+            — {{ e.description }}</span
+          >
+        </li>
+      </ul>
+    </section>
+
+    <section
+      class="sem-draft__section"
+      data-testid="semantic-draft-rejected"
+      *ngIf="report.rejected.length">
+      <h3>{{ 'services.semantic.draft.rejected' | transloco }}</h3>
+      <ul class="sem-draft__list sem-draft__list--warn">
+        <li *ngFor="let r of report.rejected">
+          <mat-icon inline>warning_amber</mat-icon>
+          <strong>{{
+            r.name || ('services.semantic.unnamed' | transloco)
+          }}</strong>
+          <span class="sem-draft__meta"> — {{ r.reason }}</span>
+        </li>
+      </ul>
+    </section>
+  </ng-container>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button type="button" (click)="close()">
+    {{
+      (report
+        ? 'services.semantic.actions.close'
+        : 'services.semantic.actions.cancel'
+      ) | transloco
+    }}
+  </button>
+  <button
+    *ngIf="!report && connections?.length"
+    mat-flat-button
+    color="primary"
+    type="button"
+    data-testid="semantic-draft-run"
+    [disabled]="!canRun"
+    (click)="run()">
+    <mat-icon>auto_awesome</mat-icon>
+    {{ 'services.semantic.draft.run' | transloco }}
+  </button>
+</mat-dialog-actions>

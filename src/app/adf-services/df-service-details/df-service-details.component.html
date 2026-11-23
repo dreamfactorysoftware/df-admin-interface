@@ -613,6 +613,15 @@
             (click)="gotoSchema()">
             {{ 'schema' | transloco }}
           </button>
+          <button
+            *ngIf="semanticAvailable"
+            type="button"
+            mat-stroked-button
+            class="semantic-jump-btn"
+            data-testid="semantic-jump"
+            (click)="gotoSemanticCatalog()">
+            {{ 'services.semantic.jump' | transloco }}
+          </button>
         </ng-container>
         <ng-template #notDatabase>
           <button
@@ -1839,6 +1848,24 @@
           (cellClick)="onScopeCellClick($event)">
         </df-scope-matrix>
       </df-disclosure>
+
+      <!-- Semantic catalog (df-semantic): business terms, metrics and
+           verified queries that agents receive in the MCP data model. After
+           Access, because it curates meaning on top of this service's schema.
+           Open (not a df-disclosure): the "Semantic catalog" button beside
+           Schema scrolls here, and the catalog carries its own header.
+      -->
+      <section
+        class="service-section service-semantic"
+        id="semantic-catalog"
+        data-testid="service-semantic-section"
+        [hidden]="!semanticAvailable">
+        <df-semantic-catalog
+          [serviceName]="serviceData.name"
+          [serviceLabel]="serviceData.label || serviceData.name"
+          (availability)="semanticAvailable = $event !== 'missing'">
+        </df-semantic-catalog>
+      </section>
     </ng-container>
 
     <div class="full-width action-bar" *ngIf="!subscriptionRequired">

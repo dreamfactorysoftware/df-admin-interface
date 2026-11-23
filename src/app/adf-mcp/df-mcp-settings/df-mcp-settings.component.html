@@ -232,6 +232,73 @@
       </p>
     </ng-container>
 
+    <!-- system_mcp serves no databases: no semantic catalog, no data results.
+         All three are opt-in; off, the tools are exactly the stock ones. -->
+    <ng-container *ngIf="!store.isSystemMcp">
+      <h3 class="mcp-sub-title">Semantic catalog</h3>
+      <mat-slide-toggle
+        color="primary"
+        [checked]="store.cfg.semanticCatalog"
+        (change)="setSemanticCatalog($event)"
+        data-testid="mcp-semantic-catalog-toggle">
+        Give agents the semantic catalog
+      </mat-slide-toggle>
+      <p class="mcp-hint">
+        <ng-container *ngIf="store.cfg.semanticCatalog; else catalogOff">
+          Agents get a get_semantics tool (the business terms, metrics, verified
+          queries and warnings approved in each exposed database's catalog), are
+          told to call it first, and get_data_model returns the catalog-aware
+          model. Clients must reconnect to pick up a change.
+        </ng-container>
+        <ng-template #catalogOff>
+          Off: no get_semantics tool, and get_data_model returns the plain
+          schema model. Approved entries are kept, just not served.
+        </ng-template>
+      </p>
+
+      <h3 class="mcp-sub-title">Semantic tools</h3>
+      <mat-slide-toggle
+        color="primary"
+        [checked]="store.cfg.semanticTools"
+        (change)="setSemanticTools($event)"
+        data-testid="mcp-semantic-tools-toggle">
+        Offer approved metrics and queries as tools
+      </mat-slide-toggle>
+      <p class="mcp-hint">
+        <ng-container *ngIf="store.cfg.semanticTools; else semanticOff">
+          Every approved metric and verified query in an exposed database's
+          semantic catalog is also offered as its own tool (metric_…, query_…),
+          run under the caller's role. They stay listed when on-demand delivery
+          is active and follow approvals within about 30 seconds; the preview
+          does not list them yet.
+        </ng-container>
+        <ng-template #semanticOff>
+          Off: approved metrics and queries are not offered as tools of their
+          own.
+        </ng-template>
+      </p>
+
+      <h3 class="mcp-sub-title">Compact results</h3>
+      <mat-slide-toggle
+        color="primary"
+        [checked]="store.cfg.compactResults"
+        (change)="setCompactResults($event)"
+        data-testid="mcp-compact-results-toggle">
+        Return smaller tool results
+      </mat-slide-toggle>
+      <p class="mcp-hint">
+        <ng-container *ngIf="store.cfg.compactResults; else compactOff">
+          Table reads default to 50 rows with a total count, aggregates to 100
+          groups, results are compact JSON, and get_data_model returns an index
+          for databases with more than 12 tables. The tools also take optional
+          arguments to ask for more. Clients must reconnect to pick up a change.
+        </ng-container>
+        <ng-template #compactOff>
+          Off: tool results and arguments are as in earlier releases.
+        </ng-template>
+      </p>
+    </ng-container>
+
     <h3 class="mcp-sub-title">Catalog delivery</h3>
     <mat-form-field appearance="outline" class="mcp-field">
       <mat-label>Catalog delivery</mat-label>

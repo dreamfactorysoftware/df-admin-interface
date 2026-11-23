@@ -140,5 +140,296 @@
     },
     "incomplete": "A token URL is set. Also fill in: {{fields}}.",
     "saveBlocked": "Backend Authentication is incomplete. A token URL is set. Also fill in: {{fields}}."
+  },
+  "semantic": {
+    "eyebrow": "Semantic catalog",
+    "title": "What agents should know about this data",
+    "description": "Business terms, metrics, verified questions and notes for this service. Approved entries reach AI agents inside the MCP data model; drafts and stale entries never do.",
+    "jump": "Semantic catalog",
+    "loading": "Loading…",
+    "kinds": {
+      "term": {
+        "one": "Term",
+        "many": "Glossary"
+      },
+      "metric": {
+        "one": "Metric",
+        "many": "Metrics"
+      },
+      "query": {
+        "one": "Verified query",
+        "many": "Verified queries"
+      },
+      "note": {
+        "one": "Note",
+        "many": "Notes"
+      }
+    },
+    "status": {
+      "draft": "Draft",
+      "approved": "Approved",
+      "stale": "Stale"
+    },
+    "filters": {
+      "kind": "Filter by kind",
+      "status": "Filter by status",
+      "all": "All",
+      "anyStatus": "Any status",
+      "search": "Filter entries",
+      "noMatch": "No entries match “{{query}}”.",
+      "pages": "Catalog entries pages"
+    },
+    "groupEmpty": {
+      "term": "No glossary terms match.",
+      "metric": "No metrics match.",
+      "query": "No verified queries match.",
+      "note": "No notes match."
+    },
+    "empty": {
+      "title": "Teach agents what this data means",
+      "description": "Add glossary terms, metrics, verified questions and notes so AI agents read your business language instead of guessing from column names. Start by seeding drafts from the descriptions your database already has, or let an AI Connection draft them. Only entries you approve are sent to agents."
+    },
+    "actions": {
+      "new": {
+        "term": "New term",
+        "metric": "New metric",
+        "query": "New query",
+        "note": "New note"
+      },
+      "validate": "Check against schema",
+      "preview": "Preview what agents see",
+      "approve": "Approve",
+      "reapprove": "Re-approve",
+      "unapprove": "Back to draft",
+      "edit": "Edit",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create",
+      "close": "Close",
+      "retry": "Retry",
+      "fill": "Fill the catalog",
+      "seed": "Seed from schema descriptions",
+      "draft": "Draft with AI",
+      "import": "Import JSON",
+      "export": "Export JSON",
+      "review": "Review",
+      "showAll": "Show everything",
+      "approveAll": "Approve all {{count}} waiting drafts"
+    },
+    "delete": {
+      "title": "Delete entry",
+      "message": "Delete \"{{name}}\"? Agents stop receiving it immediately if it was approved."
+    },
+    "validate": {
+      "ok": "Checked {{checked}} approved entries against the live schema. All still match.",
+      "stale": "Checked {{checked}} approved entries. {{count}} no longer match the schema and are now stale:"
+    },
+    "editor": {
+      "newTitle": {
+        "term": "New term",
+        "metric": "New metric",
+        "query": "New verified query",
+        "note": "New note"
+      },
+      "editTitle": {
+        "term": "Edit term",
+        "metric": "Edit metric",
+        "query": "Edit verified query",
+        "note": "Edit note"
+      },
+      "hint": {
+        "term": "A glossary entry: what a business word means here, and optionally which table, column or value it refers to.",
+        "metric": "A named aggregate. Agents run it with the aggregate_data tool using exactly these arguments.",
+        "query": "A question you have checked, with the request that answers it. Agents run it with the get_table_data tool.",
+        "note": "A caveat agents must know before querying: test rows to exclude, a view whose name misleads, a sentinel date. Example: \"Rows 122, 123 and 125 in departments are test data; real departments are d001 to d009.\""
+      },
+      "backToDraftNote": "Changing the definition sends this entry back to draft; a name or description change keeps its status.",
+      "name": "Name",
+      "description": "Description",
+      "descriptionHint": "Optional note for admins and agents.",
+      "meaning": "Meaning",
+      "synonyms": "Synonyms",
+      "synonymsHint": "Press Enter or comma after each synonym.",
+      "mapsTo": "Maps to a table or column",
+      "table": "Table",
+      "field": "Field",
+      "fieldOptional": "Field (optional)",
+      "mapNone": "Whole column",
+      "mapValue": "A value",
+      "mapFilter": "A filter",
+      "valueNeedsField": "Pick a field first",
+      "value": "Value",
+      "valueHint": "The stored value this term stands for, e.g. shipped.",
+      "termFilterHint": "DreamFactory filter, e.g. status in ('pending','processing').",
+      "question": "Question",
+      "questionHint": "Phrase it the way a user would ask it.",
+      "aggregates": "Aggregates",
+      "addAggregate": "Add aggregate",
+      "function": "Function",
+      "alias": "Alias (optional)",
+      "fields": "Fields",
+      "fieldsHint": "Leave empty to return every field.",
+      "filter": "Filter",
+      "filterHint": "DreamFactory filter syntax. Use {name} for a value the agent supplies, and declare it below.",
+      "groupBy": "Group by",
+      "unit": "Unit",
+      "order": "Order",
+      "orderHint": "e.g. order_date DESC",
+      "limit": "Limit",
+      "related": "Related",
+      "relatedHint": "Relationships to include with each row.",
+      "params": "Parameters",
+      "addParam": "Add parameter",
+      "paramsHint": "None. Add one for each {placeholder} in the filter.",
+      "paramName": "Name",
+      "paramType": "Type",
+      "paramRequired": "Required",
+      "remove": "Remove",
+      "undeclared": "The filter uses {{names}} but no parameter declares it.",
+      "unused": "Declared but not used in the filter: {{names}}.",
+      "declare": "Declare",
+      "text": "Text",
+      "textHint": "One or two plain sentences an agent can act on.",
+      "severity": "Severity",
+      "severityHint": "Warnings go ahead of the metrics; info notes trail the block.",
+      "severities": {
+        "warning": "Warning",
+        "info": "Info"
+      },
+      "appliesTo": "Applies to",
+      "addTarget": "Add table",
+      "appliesToHint": "Optional. Naming tables (and columns) scopes the note: agents whose role cannot see a table never receive it.",
+      "examples": "Example questions",
+      "examplesHint": "Ways a user might ask for this, one per Enter. Helps agents match a question to this entry.",
+      "serviceWide": "Visible to every role",
+      "serviceWideHint": "Otherwise an entry with no table is shown only to roles that can read every table in this service."
+    },
+    "preview": {
+      "eyebrow": "Preview",
+      "title": "What agents see for {{service}}",
+      "hint": "This is the semantics block MCP get_semantics (and the head of get_data_model) returns for this service. Only approved entries are included.",
+      "empty": "Nothing yet. Approve an entry and it appears here.",
+      "guidance": "Guidance",
+      "synonyms": "Synonyms",
+      "mapsTo": "Maps to",
+      "params": "Parameters",
+      "runWith": "Run with",
+      "omitted": "Omitted",
+      "raw": "Raw JSON",
+      "warnings": "Warnings",
+      "notes": "Notes",
+      "examples": "Example questions",
+      "optional": " (optional)"
+    },
+    "sources": {
+      "manual": "Manual",
+      "seeded": "Seeded",
+      "drafted": "AI draft",
+      "imported": "Imported",
+      "harvested": "Harvested"
+    },
+    "banner": {
+      "seedOk": "Seeded {{created}} draft terms from table and column descriptions, labels and database comments ({{skipped}} already existed). Review and approve the ones that are right.",
+      "seedAllExist": "Nothing new to seed: all {{skipped}} candidates already exist in the catalog.",
+      "seedNone": "Nothing to seed: this service has no table or column descriptions, labels or database comments recorded. Draft with AI, or add entries by hand.",
+      "draftOk": "The model proposed {{proposed}} entries: {{created}} saved as drafts, {{rejected}} rejected by the schema check. Review and approve the ones that are right.",
+      "importOk": "Import finished: {{created}} created, {{updated}} updated, {{unchanged}} unchanged, {{approved}} approved, {{failed}} failed.",
+      "approveAll": "Approved {{ok}} of {{total}} drafts. {{failed}} could not be approved; the reason is shown on each row.",
+      "approveAllStopped": "Stopped after {{done}} of {{total}} drafts: {{ok}} approved, {{failed}} could not be approved. The rest are still drafts."
+    },
+    "review": {
+      "waiting": "{{count}} drafts are waiting for review ({{detail}}). Agents receive nothing until they are approved.",
+      "reviewing": "Reviewing {{count}} drafts from seeding, AI and imports. Approve the ones that are right, edit or delete the rest.",
+      "detail": {
+        "seeded": "{{count}} seeded",
+        "drafted": "{{count}} AI drafts",
+        "imported": "{{count}} imported",
+        "harvested": "{{count}} harvested"
+      }
+    },
+    "draft": {
+      "title": "Draft with AI",
+      "hint": "The model reads this service’s condensed data model (tables, columns and counts, plus sample values if you allow them) and proposes terms, warnings, metrics and queries. Everything it proposes is checked against the schema and saved as a draft for you to review.",
+      "noAi": "No AI Connection service exists yet. Create one under API Generation & Connections › AI (type AI Connection), then come back here.",
+      "aiService": "AI Connection",
+      "tables": "Tables (optional)",
+      "tablesHint": "Leave empty to send the whole model ({{count}} tables).",
+      "maxEntries": "Max entries",
+      "run": "Draft",
+      "running": "Asking the model… reading the schema can take a minute on a large database.",
+      "result": "The model proposed {{proposed}} entries: {{created}} saved as drafts, {{rejected}} rejected.",
+      "tokens": "{{model}}: {{input}} tokens in, {{output}} out.",
+      "saved": "Saved as drafts",
+      "rejected": "Rejected by the schema check",
+      "model": "Model (optional)",
+      "modelHint": "Overrides the connection’s default model for this draft. Required if the connection has no default model.",
+      "tablesRequired": "Tables",
+      "tablesRequiredHint": "This service exposes {{count}} tables. Pick the ones worth describing, at most {{max}} per draft; the rest are not scanned.",
+      "tooManyTables": "Pick at most {{max}} tables per draft.",
+      "picked": "{{count}} / {{max}} picked",
+      "tablesNoun": "tables",
+      "tablesText": "Tables (comma separated)",
+      "tablesUnknownHint": "The table list could not be loaded. Type the tables to describe, at most {{max}}.",
+      "includeSamples": "Send sample rows to the model",
+      "includeSamplesHint": "Sample rows and value lists are data from your database. Off: the model sees no row values, only names, types and counts.",
+      "aiForbidden": "You don’t have access to the list of AI Connection services, so there is nothing to draft with. Ask an administrator.",
+      "aiFailed": "The AI Connection services could not be loaded. Close this and try again."
+    },
+    "import": {
+      "title": "Import catalog JSON",
+      "hint": "Paste an export document or choose a file. Entries are matched by kind and name: new ones are created as drafts, existing ones are updated.",
+      "file": "Choose file",
+      "json": "JSON",
+      "count": "{{count}} entries in the document.",
+      "approve": "Approve entries the document marks approved (each is checked against the schema first)",
+      "run": "Import",
+      "invalid": "That is not an export document. Expected {\"entries\": [...]} as produced by Export JSON.",
+      "result": "Import finished: {{created}} created, {{updated}} updated, {{unchanged}} unchanged, {{approved}} approved, {{failed}} failed.",
+      "tooLarge": "That file is larger than {{max}} MB. Split the catalog or paste the part you need.",
+      "readFailed": "Could not read {{name}}."
+    },
+    "validation": {
+      "name": "Name is required.",
+      "meaning": "Meaning is required.",
+      "mapValueField": "A mapped value needs a field.",
+      "mapTable": "Pick the table this term maps to.",
+      "mapValue": "Enter the value this term maps to.",
+      "text": "Text is required.",
+      "targetTable": "Applies-to {{n}} needs a table (or remove it).",
+      "table": "Pick a table.",
+      "aggregates": "Add at least one aggregate.",
+      "aggFunction": "Aggregate {{n}} needs a function.",
+      "aggField": "Aggregate {{n}} needs a field.",
+      "aggStar": "Aggregate {{n}}: * only works with COUNT.",
+      "question": "Question is required.",
+      "limit": "Limit must be a whole number from 1 to 1000.",
+      "paramName": "Param \"{{name}}\" must start with a letter or _ and use only letters, digits and _.",
+      "paramTwice": "Param \"{{name}}\" is declared twice.",
+      "paramType": "Param \"{{name}}\" needs a type."
+    },
+    "summary": {
+      "on": "{{aggregates}} on {{table}}",
+      "by": " by {{fields}}",
+      "where": " where {{filter}}"
+    },
+    "errors": {
+      "requestFailed": "Request failed."
+    },
+    "unnamed": "(unnamed)",
+    "noAccess": {
+      "title": "You don’t have access to the semantic catalog",
+      "description": "Your role cannot read the catalog for this service. Ask an administrator for access to system/semantic."
+    },
+    "picker": {
+      "more": "{{count}} more match. Keep typing to narrow the list.",
+      "none": "No table matches “{{query}}”.",
+      "freeText": "The table list could not be loaded; type the table name."
+    },
+    "approveAll": {
+      "title": "Approve {{count}} drafts?",
+      "message": "Each of the {{count}} drafts waiting for review is checked against the schema and approved, one at a time. Approved entries reach agents right away. Drafts that fail the check stay drafts and show why.",
+      "progress": "Approving {{done}} / {{total}}…"
+    }
   }
 }

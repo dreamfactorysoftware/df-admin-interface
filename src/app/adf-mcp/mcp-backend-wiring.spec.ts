@@ -96,6 +96,95 @@ describe('allow_writes / require_role_access config', () => {
   });
 });
 
+describe('semantic_tools config (opt-in)', () => {
+  it('defaults off and only an explicit true turns it on', () => {
+    expect(parseMcpConfig({}).semanticTools).toBe(false);
+    expect(parseMcpConfig({ semantic_tools: 1 }).semanticTools).toBe(false);
+    expect(parseMcpConfig({ semantic_tools: true }).semanticTools).toBe(true);
+    expect(parseMcpConfig({ semanticTools: true }).semanticTools).toBe(true);
+  });
+
+  it('round-trips on save and is not duplicated through rest', () => {
+    const c = parseMcpConfig({ semantic_tools: true });
+    expect(c.rest['semantic_tools']).toBeUndefined();
+    expect(serializeMcpConfig(c)['semanticTools']).toBe(true);
+    expect(serializeMcpConfig(parseMcpConfig({}))['semanticTools']).toBe(false);
+  });
+
+  it('store: the switch marks dirty and is connection-affecting', () => {
+    const s = new McpEditorStore();
+    s.init(
+      {
+        id: 1,
+        name: 'm',
+        label: 'm',
+        description: '',
+        isActive: true,
+        type: 'mcp',
+        raw: {},
+      },
+      {}
+    );
+    expect(s.dirty()).toBe(false);
+    s.cfg.semanticTools = true;
+    expect(s.dirty()).toBe(true);
+    expect(s.connectionAffecting()).toBe(true);
+  });
+});
+
+describe.each([
+  ['semantic_catalog', 'semanticCatalog', 'sc'],
+  ['compact_results', 'compactResults', 'cr'],
+] as const)('%s config (opt-in)', (snake, camel) => {
+  it('defaults off and only an explicit true turns it on', () => {
+    expect(parseMcpConfig({})[camel]).toBe(false);
+    expect(parseMcpConfig({ [snake]: 1 })[camel]).toBe(false);
+    expect(parseMcpConfig({ [snake]: 'true' })[camel]).toBe(false);
+    expect(parseMcpConfig({ [snake]: true })[camel]).toBe(true);
+    expect(parseMcpConfig({ [camel]: true })[camel]).toBe(true);
+  });
+
+  it('round-trips on save and is not duplicated through rest', () => {
+    const c = parseMcpConfig({ [snake]: true });
+    expect(c.rest[snake]).toBeUndefined();
+    expect(c.rest[camel]).toBeUndefined();
+    expect(serializeMcpConfig(c)[camel]).toBe(true);
+    // Stored off: saved as false. Never stored and off: left out, so a server
+    // without the column gets the payload it always got.
+    expect(serializeMcpConfig(parseMcpConfig({ [snake]: false }))[camel]).toBe(
+      false
+    );
+    expect(camel in serializeMcpConfig(parseMcpConfig({}))).toBe(false);
+    const fresh = parseMcpConfig({});
+    fresh[camel] = true;
+    expect(serializeMcpConfig(fresh)[camel]).toBe(true);
+  });
+
+  it('store: the switch marks dirty and is connection-affecting', () => {
+    const s = new McpEditorStore();
+    s.init(
+      {
+        id: 1,
+        name: 'm',
+        label: 'm',
+        description: '',
+        isActive: true,
+        type: 'mcp',
+        raw: {},
+      },
+      {}
+    );
+    expect(s.dirty()).toBe(false);
+    s.cfg[camel] = true;
+    expect(s.dirty()).toBe(true);
+    expect(s.connectionAffecting()).toBe(true);
+    // On, saved, then off again in the same session: the off is sent.
+    s.markSaved();
+    s.cfg[camel] = false;
+    expect(serializeMcpConfig(s.cfg)[camel]).toBe(false);
+  });
+});
+
 describe('catalog size + lazy model', () => {
   it('flips to the facade above 32 KiB on auto', () => {
     // 60 × 540 = 32400 B ≤ 32768; 61 × 540 = 32940 B > 32768.

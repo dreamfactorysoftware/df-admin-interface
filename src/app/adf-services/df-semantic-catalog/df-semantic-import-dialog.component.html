@@ -1,0 +1,138 @@
+<header mat-dialog-title class="sem-import__head">
+  <div class="sem-import__heading">
+    <p class="sem-import__eyebrow">
+      {{ 'services.semantic.eyebrow' | transloco }} · {{ data.service }}
+    </p>
+    <h2 class="sem-import__title" data-testid="semantic-import-title">
+      {{ 'services.semantic.import.title' | transloco }}
+    </h2>
+  </div>
+  <button
+    mat-icon-button
+    type="button"
+    class="sem-import__close"
+    [attr.aria-label]="'services.semantic.actions.close' | transloco"
+    (click)="close()">
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<mat-dialog-content class="sem-import__content" data-testid="semantic-import">
+  <p class="sem-import__hint">
+    {{ 'services.semantic.import.hint' | transloco }}
+  </p>
+
+  <ng-container *ngIf="!report">
+    <div class="sem-import__row">
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="running"
+        (click)="fileInput.click()">
+        <mat-icon>upload_file</mat-icon>
+        {{ 'services.semantic.import.file' | transloco }}
+      </button>
+      <span class="sem-import__meta" *ngIf="fileName">{{ fileName }}</span>
+      <input
+        #fileInput
+        type="file"
+        accept="application/json,.json"
+        hidden
+        data-testid="semantic-import-file"
+        (change)="onFile($event)" />
+    </div>
+
+    <mat-form-field appearance="outline" class="sem-import__full">
+      <mat-label>{{ 'services.semantic.import.json' | transloco }}</mat-label>
+      <textarea
+        matInput
+        rows="10"
+        class="sem-import__mono"
+        name="json"
+        data-testid="semantic-import-json"
+        [disabled]="running"
+        [ngModel]="json"
+        (ngModelChange)="onJson($event)"></textarea>
+      <mat-hint *ngIf="entryCount">
+        {{
+          'services.semantic.import.count' | transloco: { count: entryCount }
+        }}
+      </mat-hint>
+    </mat-form-field>
+
+    <mat-checkbox
+      name="approve"
+      data-testid="semantic-import-approve"
+      [disabled]="running"
+      [(ngModel)]="approve">
+      {{ 'services.semantic.import.approve' | transloco }}
+    </mat-checkbox>
+  </ng-container>
+
+  <div
+    class="sem-import__error"
+    role="alert"
+    data-testid="semantic-import-error"
+    *ngIf="invalid || error">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{
+      invalid ? ('services.semantic.import.invalid' | transloco) : error
+    }}</span>
+  </div>
+
+  <ng-container *ngIf="report">
+    <div
+      class="sem-import__result"
+      role="status"
+      data-testid="semantic-import-result">
+      <mat-icon>{{
+        report.failed.length ? 'warning_amber' : 'check_circle'
+      }}</mat-icon>
+      <div>
+        {{
+          'services.semantic.import.result'
+            | transloco
+              : {
+                  created: report.created,
+                  updated: report.updated,
+                  unchanged: report.unchanged,
+                  approved: report.approved,
+                  failed: report.failed.length,
+                }
+        }}
+      </div>
+    </div>
+    <ul
+      class="sem-import__list"
+      data-testid="semantic-import-failed"
+      *ngIf="report.failed.length">
+      <li *ngFor="let f of report.failed">
+        <strong>{{
+          f.name || ('services.semantic.unnamed' | transloco)
+        }}</strong>
+        <span class="sem-import__meta"> — {{ f.reason }}</span>
+      </li>
+    </ul>
+  </ng-container>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button type="button" (click)="close()">
+    {{
+      (report
+        ? 'services.semantic.actions.close'
+        : 'services.semantic.actions.cancel'
+      ) | transloco
+    }}
+  </button>
+  <button
+    *ngIf="!report"
+    mat-flat-button
+    color="primary"
+    type="button"
+    data-testid="semantic-import-run"
+    [disabled]="running || !json.trim()"
+    (click)="run()">
+    {{ 'services.semantic.import.run' | transloco }}
+  </button>
+</mat-dialog-actions>

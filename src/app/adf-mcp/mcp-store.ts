@@ -27,6 +27,7 @@ import {
   serviceFraction,
   ServiceFraction,
   toolKey,
+  withSavedFlags,
 } from './mcp-effective';
 
 export type McpServiceType = 'mcp' | 'system_mcp';
@@ -62,6 +63,9 @@ function cfgFingerprint(c: McpConfig): string {
     k: c.allowApiKeyAuth,
     w: c.allowWrites,
     rr: c.requireRoleAccess,
+    st: c.semanticTools,
+    sc: c.semanticCatalog,
+    cr: c.compactResults,
     ci: c.oauthClientId,
     cs: c.oauthClientSecret,
     lu: c.customLoginUrl,
@@ -218,6 +222,9 @@ export class McpEditorStore {
       this.cfg.allowApiKeyAuth !== this.savedCfg.allowApiKeyAuth ||
       // The daemon registers tools at connect: clients must reconnect.
       this.cfg.allowWrites !== this.savedCfg.allowWrites ||
+      this.cfg.semanticTools !== this.savedCfg.semanticTools ||
+      this.cfg.semanticCatalog !== this.savedCfg.semanticCatalog ||
+      this.cfg.compactResults !== this.savedCfg.compactResults ||
       this.cfg.toolStyle !== this.savedCfg.toolStyle ||
       this.cfg.oauthClientSecret !== this.savedCfg.oauthClientSecret ||
       JSON.stringify(this.cfg.redirectUris) !==
@@ -226,6 +233,7 @@ export class McpEditorStore {
   }
 
   markSaved(): void {
+    this.cfg = withSavedFlags(this.cfg);
     this.savedCfg = cloneCfg(this.cfg);
     this.service.name = this.draftName;
     this.service.label = this.draftLabel;

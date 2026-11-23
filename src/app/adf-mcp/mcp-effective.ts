@@ -55,6 +55,19 @@ export interface McpConfig {
   allowWrites: boolean;
   /** true = only roles granted access to this MCP service may connect (admins always pass). */
   requireRoleAccess: boolean;
+  /** Opt-in: each approved semantic metric / verified query becomes a named tool. */
+  semanticTools: boolean;
+  /** Opt-in: get_semantics and the catalog-aware data model. */
+  semanticCatalog: boolean;
+  /** Opt-in: smaller tool results (row/group limits, compact JSON, model index). */
+  compactResults: boolean;
+  /**
+   * Which of semanticCatalog / compactResults the loaded record carried. A
+   * flag that is off and was never stored is left out of the save, so a
+   * server whose column does not exist yet (or never will) gets the payload
+   * it always got.
+   */
+  storedFlags?: ReadonlySet<'semanticCatalog' | 'compactResults'>;
   oauthClientId: string;
   oauthClientSecret: string;
   customLoginUrl: string;
@@ -86,6 +99,12 @@ const KNOWN_KEYS = [
   'allowWrites',
   'require_role_access',
   'requireRoleAccess',
+  'semantic_tools',
+  'semanticTools',
+  'semantic_catalog',
+  'semanticCatalog',
+  'compact_results',
+  'compactResults',
   'oauth_client_id',
   'oauthClientId',
   'oauth_client_secret',
@@ -105,6 +124,18 @@ const KNOWN_KEYS = [
 function pick(raw: Record<string, any>, snake: string, camel: string): any {
   if (raw[snake] !== undefined) return raw[snake];
   return raw[camel];
+}
+
+const OPT_IN_FLAGS = ['semanticCatalog', 'compactResults'] as const;
+
+/**
+ * After a save: a flag that went out on it is stored from now on, so turning
+ * it off again in the same session is sent too.
+ */
+export function withSavedFlags(c: McpConfig): McpConfig {
+  const stored = new Set(c.storedFlags ?? []);
+  for (const flag of OPT_IN_FLAGS) if (c[flag]) stored.add(flag);
+  return { ...c, storedFlags: stored };
 }
 
 /** Accepts either snake_case (API) or camelCase (legacy resolver) blobs. */
@@ -138,6 +169,20 @@ export function parseMcpConfig(
     // rows that predate it (new services are created with it on).
     allowWrites: pick(r, 'allow_writes', 'allowWrites') !== false,
     requireRoleAccess: !!pick(r, 'require_role_access', 'requireRoleAccess'),
+    // Opt-in, column default false.
+    semanticTools: pick(r, 'semantic_tools', 'semanticTools') === true,
+    semanticCatalog: pick(r, 'semantic_catalog', 'semanticCatalog') === true,
+    compactResults: pick(r, 'compact_results', 'compactResults') === true,
+    storedFlags: new Set(
+      (
+        [
+          ['semantic_catalog', 'semanticCatalog'],
+          ['compact_results', 'compactResults'],
+        ] as const
+      )
+        .filter(([snake, camel]) => pick(r, snake, camel) !== undefined)
+        .map(([, camel]) => camel)
+    ),
     oauthClientId: pick(r, 'oauth_client_id', 'oauthClientId') ?? '',
     oauthClientSecret:
       pick(r, 'oauth_client_secret', 'oauthClientSecret') ?? '',
@@ -170,6 +215,7 @@ export function serializeMcpConfig(
     allowApiKeyAuth: c.allowApiKeyAuth,
     allowWrites: c.allowWrites !== false,
     requireRoleAccess: !!c.requireRoleAccess,
+    semanticTools: !!c.semanticTools,
     oauthClientId: c.oauthClientId,
     oauthClientSecret: c.oauthClientSecret,
     customLoginUrl: c.customLoginUrl || null,
@@ -178,6 +224,9 @@ export function serializeMcpConfig(
     // Read-only field, re-emitted verbatim so saves never drop the column.
     registeredRedirectUris: [...(c.registeredRedirectUris ?? [])],
   };
+  for (const flag of OPT_IN_FLAGS) {
+    if (c[flag] || c.storedFlags?.has(flag)) out[flag] = !!c[flag];
+  }
   if (serviceType === 'mcp') {
     out['customTools'] = (c.customTools ?? []).map((tool: any) => ({
       id: tool.id,

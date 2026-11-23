@@ -35,6 +35,20 @@
   }
 }
 
+// Semantic catalog: open section after Access, with a hairline like the
+// df-disclosure sections above it.
+.service-semantic {
+  display: block;
+  padding-top: var(--df-space-5);
+  border-top: 1px solid var(--df-border-2);
+}
+
+// Hidden when df-semantic is not installed; [hidden] alone loses to the
+// display rule above.
+.service-semantic[hidden] {
+  display: none;
+}
+
 // Backend Authentication panel (HTTP service): the line that names what is
 // still missing once a token URL is set.
 .backend-auth-incomplete {
@@ -1033,4 +1047,8 @@ mat-icon {
     font-size: 0.85rem;
     opacity: 0.7;
   }
+}
+
+.semantic-jump-btn {
+  margin-left: var(--df-space-2);
 }
